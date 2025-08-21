@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Prevent text selection on mobile devices */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 6%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 200 90% 50%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 180 100% 50%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 180 100% 50%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 222.2 84% 6%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 200 90% 50%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 180 100% 50%;
+
+    /* Neon Vector Aesthetic */
+    --neon: 180 100% 50%; /* Cyan */
+    --neon-2: 165 92% 60%; /* Green-cyan */
+    --neon-bg: 222 84% 3%;
+    --gradient-primary: linear-gradient(135deg, hsl(var(--neon)), hsl(var(--neon-2)));
+    --shadow-neon: 0 0 40px hsl(var(--neon) / 0.45);
+    --shadow-neon-strong: 0 0 64px hsl(var(--neon) / 0.6);
+  }
+
+  .dark {
+    --background: 222.2 84% 3%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 200 90% 50%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 180 100% 50%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 180 100% 50%;
+    --sidebar-background: 222.2 84% 3.5%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 200 90% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 180 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Utilities and animations */
+@layer utilities {
+  /* Neon palette for cycling */
+  :root {
+    --neon-p1: 330 100% 60%;
+    --neon-p2: 50 100% 60%;
+    --neon-p3: 140 100% 55%;
+    --neon-p4: 270 100% 70%;
+    --neon-p5: 25 100% 60%;
+    --neon-p6: 0 100% 60%;
+  }
+
+  @keyframes neonCycle {
+    0% { color: hsl(var(--neon-p1)); text-shadow: 0 0 10px hsl(var(--neon-p1) / 0.6), 0 0 24px hsl(var(--neon-p1) / 0.4); }
+    16% { color: hsl(var(--neon-p2)); text-shadow: 0 0 10px hsl(var(--neon-p2) / 0.6), 0 0 24px hsl(var(--neon-p2) / 0.4); }
+    33% { color: hsl(var(--neon-p3)); text-shadow: 0 0 10px hsl(var(--neon-p3) / 0.6), 0 0 24px hsl(var(--neon-p3) / 0.4); }
+    50% { color: hsl(var(--neon-p4)); text-shadow: 0 0 10px hsl(var(--neon-p4) / 0.6), 0 0 24px hsl(var(--neon-p4) / 0.4); }
+    66% { color: hsl(var(--neon-p5)); text-shadow: 0 0 10px hsl(var(--neon-p5) / 0.6), 0 0 24px hsl(var(--neon-p5) / 0.4); }
+    83% { color: hsl(var(--neon-p6)); text-shadow: 0 0 10px hsl(var(--neon-p6) / 0.6), 0 0 24px hsl(var(--neon-p6) / 0.4); }
+    100% { color: hsl(var(--neon-p1)); text-shadow: 0 0 10px hsl(var(--neon-p1) / 0.6), 0 0 24px hsl(var(--neon-p1) / 0.4); }
+  }
+  @keyframes neonPulseSoft {
+    0%, 100% { filter: drop-shadow(0 0 12px hsl(var(--neon) / 0.5)); }
+    50% { filter: drop-shadow(0 0 20px hsl(var(--neon) / 0.8)); }
+  }
+  .neon-title {
+    animation: neonCycle 18s linear infinite, neonPulseSoft 2.6s ease-in-out infinite;
+  }
+
+  /* Alternate neon palette for Fixed mode sections */
+  .neon-fixed-theme {
+    --neon: 320 100% 62%; /* Magenta */
+    --neon-2: 280 100% 66%; /* Purple */
+    --accent: 320 100% 62%;
+  }
+
+  /* Neon theme for Online (Global) leaderboards */
+  .neon-online-theme {
+    --neon: 48 100% 60%; /* Neon gold */
+    --neon-2: 28 100% 60%; /* Warm amber */
+    --accent: 48 100% 60%;
+  }
+}

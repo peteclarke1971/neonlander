@@ -1,0 +1,588 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { GameEngine } from "@/components/game/GameEngine";
+import { HomeScreen } from "@/components/game/HomeScreen";
+import { Difficulty, GameOverData, HighScore, Mode } from "@/components/game/types";
+import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { submitScore, fetchTop } from "@/lib/leaderboard";
+import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
+import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
+import { HomeStarfield } from "@/components/game/HomeStarfield";
+import type { HyperspaceStarfieldHandle } from "@/components/game/HyperspaceStarfield";
+import { AsteroidField } from "@/components/game/AsteroidField";
+import type { AsteroidFieldHandle } from "@/components/game/AsteroidField";
+import { VectorWormhole } from "@/components/game/VectorWormhole";
+import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
+import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
+import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave";
+import { AudioManager } from "@/components/game/AudioManager";
+const HS_CLASSIC_KEY = "ll-highscores-classic";
+const HS_FIXED_KEY = "ll-highscores-fixed";
+
+const Index = () => {
+  const [view, setView] = useState<"home" | "game" | "gameover">("home");
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [mode, setMode] = useState<Mode>("classic");
+  const [lastResult, setLastResult] = useState<GameOverData | null>(null);
+  const audioRef = useRef(new AudioManager());
+  const [classicScores, setClassicScores] = useState<HighScore[]>(() => {
+    const now = Date.now();
+    const seed: HighScore[] = [
+      { initials: "IH", score: 100000, difficulty: "easy", date: now },
+      { initials: "LEM", score: 50000, difficulty: "easy", date: now - 86400000 * 2 },
+      { initials: "NGN", score: 25000, difficulty: "hard", date: now - 86400000 * 5 },
+      { initials: "ROK", score: 10000, difficulty: "easy", date: now - 86400000 * 8 },
+      { initials: "LND", score: 5000, difficulty: "hard", date: now - 86400000 * 10 },
+    ];
+    try {
+      const raw = localStorage.getItem(HS_CLASSIC_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed) && parsed.length >= 5) return parsed.slice(0, 5);
+    } catch {}
+    localStorage.setItem(HS_CLASSIC_KEY, JSON.stringify(seed));
+    return seed;
+  });
+  const [fixedScores, setFixedScores] = useState<HighScore[]>(() => {
+    const now = Date.now();
+    const seed: HighScore[] = [
+      { initials: "IH", score: 100000, difficulty: "easy", date: now },
+      { initials: "FIX", score: 50000, difficulty: "easy", date: now - 86400000 * 3 },
+      { initials: "RIG", score: 25000, difficulty: "hard", date: now - 86400000 * 6 },
+      { initials: "SYN", score: 10000, difficulty: "easy", date: now - 86400000 * 9 },
+      { initials: "GLB", score: 5000, difficulty: "hard", date: now - 86400000 * 11 },
+    ];
+    try {
+      const raw = localStorage.getItem(HS_FIXED_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed) && parsed.length >= 5) return parsed.slice(0, 5);
+    } catch {}
+    localStorage.setItem(HS_FIXED_KEY, JSON.stringify(seed));
+    return seed;
+  });
+  const [carry, setCarry] = useState<{ score: number; landings: number; level: number } | null>(null);
+  const [successCount, setSuccessCount] = useState(0);
+  const [needsInitials, setNeedsInitials] = useState(false);
+  const [lowGraphics, setLowGraphics] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-graphics-settings');
+      return saved ? JSON.parse(saved).lowGraphics : true;
+    } catch {
+      return true; // Default to low-gfx
+    }
+  });
+
+  const [goIndex, setGoIndex] = useState(0);
+
+  // Refs for gameover navigation
+  const contRef = useRef<HTMLButtonElement>(null);
+  const homeRef = useRef<HTMLButtonElement>(null);
+  const retryCurrRef = useRef<HTMLButtonElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+
+  // Hyperspace starfield control and randomized config per gameover screen
+  const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
+  const asteroidsRef = useRef<AsteroidFieldHandle>(null);
+   const wormholeRef = useRef<VectorWormholeHandle>(null);
+   const gwRef = useRef<GravityWaveHandle>(null);
+   const successTitleRef = useRef<HTMLHeadingElement>(null);
+   const [wormholeVP, setWormholeVP] = useState<{ cx: number; cy: number } | null>(null);
+   const [currentSuccessBg, setCurrentSuccessBg] = useState<number>(0);
+   const successBgCursorRef = useRef<number>(0);
+   type SFStyle = "vector" | "glow" | "crt";
+  const [sfConfig, setSfConfig] = useState<{
+    seed: number;
+    speed: number;
+    density: number;
+    focalLength: number;
+    trail: number;
+    style: SFStyle;
+    cx: number;
+    cy: number;
+  } | null>(null);
+  const genSfConfig = () => {
+    const seed = (Math.random() * 0xffffffff) >>> 0;
+    const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+    // Heavily bias toward glow for stronger bloom-like visuals
+    const styles: SFStyle[] = ["glow", "glow", "crt", "vector"];
+    const style = pick(styles);
+    // Speed: up to 20% of original (<= 0.07), often much slower
+    const max = 0.07; // 20% of default 0.35
+    const speed = Math.max(0.006, (Math.random() ** 2) * max); // bias lower, clamp tiny floor
+    // Intensity knobs
+    const density = Math.floor(600 + Math.random() * 2600); // 600 - 3200
+    const focalLength = 420 + Math.random() * 480; // 420 - 900
+    const trail = 0.15 + Math.random() * 0.75; // 0.15 - 0.9
+    const cx = 0.4 + Math.random() * 0.2; // 0.4 - 0.6
+    const cy = 0.4 + Math.random() * 0.2;
+    return { seed, speed, density, focalLength, trail, style, cx, cy };
+  };
+  useEffect(() => {
+    document.title = "Neon Lunar Lander — Vector Arcade";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", "Pilot a neon-glow lunar lander. Master thrust and rotation to score precision landings on procedural terrain.");
+  }, []);
+
+  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean) => {
+    setDifficulty(d);
+    setMode(mode);
+    const finalLowGfx = lowGfx ?? lowGraphics; // Use current setting if not explicitly provided
+    setLowGraphics(finalLowGfx);
+    // Save graphics preference
+    try {
+      localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
+    } catch {}
+    if (startLevel && startLevel > 1) {
+      const lvlIndex = Math.max(0, Math.floor(startLevel - 1));
+      setSuccessCount(lvlIndex);
+      setCarry({ score: 0, landings: 0, level: lvlIndex });
+      const colors = [
+        "330 100% 60%", // pink
+        "50 100% 60%",  // yellow
+        "140 100% 55%", // green
+        "270 100% 70%", // purple
+        "25 100% 60%",  // orange
+        "0 100% 60%",   // red
+      ];
+      const idx = Math.floor(lvlIndex / 2) % colors.length;
+      const root = document.documentElement;
+      root.style.setProperty("--neon", colors[idx]);
+      root.style.setProperty("--neon-2", colors[idx]);
+    } else {
+      // reset to base
+      setCarry(null);
+      setSuccessCount(0);
+      const root = document.documentElement;
+      root.style.removeProperty("--neon");
+      root.style.removeProperty("--neon-2");
+    }
+    setView("game");
+  };
+
+  const handleGameOver = (data: GameOverData) => {
+    setLastResult(data);
+    // Generate a fresh starfield/effect config for this screen
+    setSfConfig(genSfConfig());
+    if (data.cause === "success") {
+      // Choose background for this success and advance cursor for next time
+      const total = 2; // Wormhole (0), Gravity Wave (1)
+      const current = successBgCursorRef.current % total;
+      setCurrentSuccessBg(current);
+      successBgCursorRef.current = (current + 1) % total;
+
+      setCarry({ score: data.score, landings: data.landings, level: successCount + 1 });
+      setSuccessCount((c) => c + 1);
+      setNeedsInitials(false);
+      setView("gameover");
+      return;
+    }
+    // On failure, reset rotation order
+    successBgCursorRef.current = 0;
+    // Failure path: check highscore eligibility first; allow initials entry
+    const currentList = mode === "fixed" ? fixedScores : classicScores;
+    const qualifies = currentList.length < 5 || data.score > Math.min(...currentList.slice(0, 5).map((s) => s.score));
+    if (qualifies && data.score > 0) {
+      setNeedsInitials(true);
+    } else {
+      setNeedsInitials(false);
+    }
+    setView("gameover");
+  };
+
+  const continueGame = () => {
+    // Stop mission success music
+    try { audioRef.current.stopMissionSuccess(); } catch {}
+    
+    const colors = [
+      "330 100% 60%",
+      "50 100% 60%",
+      "140 100% 55%",
+      "270 100% 70%",
+      "25 100% 60%",
+      "0 100% 60%",
+    ];
+    const lvl = (carry?.level ?? successCount);
+    const idx = Math.floor(lvl / 2) % colors.length;
+    const root = document.documentElement;
+    root.style.setProperty("--neon", colors[idx]);
+    root.style.setProperty("--neon-2", colors[idx]);
+    setView("game");
+  };
+const retryGame = () => {
+  const root = document.documentElement;
+  root.style.removeProperty("--neon");
+  root.style.removeProperty("--neon-2");
+  setCarry({ score: 0, landings: 0, level: 0 });
+  setSuccessCount(0);
+  setView("game");
+};
+  const retryCurrentLevel = () => {
+    // Keep current level but reset score and landings
+    setCarry((prev) => ({ score: 0, landings: 0, level: prev?.level ?? successCount }));
+    setView("game");
+  };
+
+  // Focus initial gameover button on entering the view
+  useEffect(() => {
+    if (view !== "gameover") return;
+    const t = setTimeout(() => {
+      if (lastResult?.cause === "success") {
+        contRef.current?.focus();
+      } else {
+        if (!needsInitials) {
+          setGoIndex(0);
+          homeRef.current?.focus();
+        } else {
+          setGoIndex(1);
+          retryCurrRef.current?.focus();
+        }
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [view, lastResult, needsInitials]);
+
+  // Apply randomized starfield config and sync asteroids on gameover
+  useEffect(() => {
+    if (view !== "gameover" || !sfConfig) return;
+    try {
+      starfieldRef.current?.SetSeed(sfConfig.seed);
+      starfieldRef.current?.SetSpeed(sfConfig.speed);
+      starfieldRef.current?.SetDensity(sfConfig.density);
+      starfieldRef.current?.SetVanishingPoint(sfConfig.cx, sfConfig.cy);
+      const aseed = (sfConfig.seed ^ 0xA57E01D) >>> 0; // mix for asteroids
+      asteroidsRef.current?.SetSeed(aseed);
+      asteroidsRef.current?.AlignToStarfield(true);
+    } catch {}
+  }, [view, sfConfig]);
+
+  // Map gamepad D-pad/LS to Arrow keys and activate selected index on press
+  useEffect(() => {
+    if (view !== "gameover") return;
+    let raf = 0;
+    let lastId: string | null = getLastDeviceId();
+    let gpProfile = loadProfile(lastId || undefined);
+    let prev = { up: false, down: false, left: false, right: false, select: false, back: false };
+    let lastFire = { up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 };
+    const canFire = (k: keyof typeof lastFire) => (performance.now() - lastFire[k]) > 150;
+    const mark = (k: keyof typeof lastFire) => { lastFire[k] = performance.now(); };
+    const fire = (key: string) => {
+      const target = (document.activeElement as HTMLElement) || document.body;
+      target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    };
+    const focusOrder = () => [homeRef.current, retryCurrRef.current, retryRef.current] as const;
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const gp = anyGamepad?.();
+      if (!gp || !gp.connected) return;
+      if (lastId !== gp.id) {
+        lastId = gp.id;
+        gpProfile = loadProfile(gp.id);
+      }
+      const input = readGamepad(gp, gpProfile);
+      if (input.ui.up && !prev.up && canFire("up")) { fire("ArrowUp"); mark("up"); }
+      if (input.ui.down && !prev.down && canFire("down")) { fire("ArrowDown"); mark("down"); }
+      if (input.ui.left && !prev.left && canFire("left")) {
+        const order = focusOrder();
+        const active = document.activeElement as HTMLElement | null;
+        const idx = order.findIndex((el) => el === active);
+        const ni = Math.max(0, (idx >= 0 ? idx - 1 : goIndex - 1));
+        setGoIndex(ni);
+        (order[ni] ?? order[0])?.focus();
+        mark("left");
+      }
+      if (input.ui.right && !prev.right && canFire("right")) {
+        const order = focusOrder();
+        const active = document.activeElement as HTMLElement | null;
+        const idx = order.findIndex((el) => el === active);
+        const ni = Math.min(order.length - 1, (idx >= 0 ? idx + 1 : goIndex + 1));
+        setGoIndex(ni);
+        (order[ni] ?? order[order.length - 1])?.focus();
+        mark("right");
+      }
+      if (input.ui.select && !prev.select && canFire("select")) {
+        gateThrustUntilRelease();
+        if (lastResult?.cause === "success") {
+          contRef.current?.click();
+        } else {
+          const active = document.activeElement as HTMLElement | null;
+          const order = focusOrder();
+          // If nothing focused, activate current index
+          if (!active) {
+            (order[goIndex] ?? order[0])?.click();
+          } else if (active === retryCurrRef.current) {
+            retryCurrRef.current?.click();
+          } else if (active === retryRef.current) {
+            retryRef.current?.click();
+          } else {
+            homeRef.current?.click();
+          }
+        }
+        mark("select");
+      }
+      if (input.ui.back && !prev.back && canFire("back")) { fire("Escape"); mark("back"); }
+      prev = input.ui;
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [view, lastResult, needsInitials, goIndex]);
+
+  // Arrow-key navigation on gameover screen (matches HomeScreen pattern)
+  const handleGameOverKeys: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (view !== "gameover") return;
+    const key = e.key;
+    const focus = (el?: HTMLElement | null) => el && el.focus();
+    if (lastResult?.cause === "success") {
+      if (key === "Enter") { e.preventDefault(); contRef.current?.click(); }
+      return;
+    }
+    const order = [homeRef.current, retryCurrRef.current, retryRef.current];
+    const active = document.activeElement as HTMLElement | null;
+    const idx = order.findIndex((el) => el === active);
+    if (idx >= 0) {
+      if (key === "ArrowRight") { e.preventDefault(); const ni = Math.min(order.length - 1, idx + 1); setGoIndex(ni); focus(order[ni]); }
+      if (key === "ArrowLeft") { e.preventDefault(); const ni = Math.max(0, idx - 1); setGoIndex(ni); focus(order[ni]); }
+      if (key === "Enter") { e.preventDefault(); active?.click(); }
+    } else {
+      // No button focused, ensure our index is focused (defaults to Home)
+      focus(order[goIndex] ?? order[0]);
+    }
+  };
+
+  // Enter key: activate default action when not entering initials (only when no button is focused)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || view !== "gameover" || needsInitials) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === "BUTTON" || active.closest("button,[role='button']"))) {
+        return;
+      }
+      e.preventDefault();
+      if (lastResult?.cause === "success") {
+        continueGame();
+      } else {
+        const order = [homeRef.current, retryCurrRef.current, retryRef.current];
+        const target = order[goIndex] ?? order.find(b => b && !b.disabled) ?? retryCurrRef.current;
+        target?.click();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, needsInitials, lastResult, goIndex]);
+
+  // Toggle UI mode for gamepad based on view
+  useEffect(() => {
+    try { setUiMode(view !== "game"); } catch {}
+  }, [view]);
+
+  // Apply effect on gameover mount
+  useEffect(() => {
+    if (view !== "gameover" || !sfConfig || lastResult?.cause !== "success") return;
+    try {
+      if (currentSuccessBg === 0) {
+        wormholeRef.current?.SetSeed(((sfConfig.seed ?? 0) ^ 0x57f00f) >>> 0);
+        wormholeRef.current?.SetStyle(((sfConfig.style || "glow").charAt(0).toUpperCase() + (sfConfig.style || "glow").slice(1)) as any);
+        wormholeRef.current?.Play("Wormhole");
+      } else {
+        // Start Gravity Wave with deterministic seed
+        const baseSeed = ((sfConfig.seed ?? 0) ^ 0xA11CE) >>> 0;
+        gwRef.current?.Play({ baseSeed, modeName: mode, levelIndex: carry?.level ?? 0, instanceId: successCount });
+      }
+    } catch {}
+    // Play mission success music after landing sound finishes (triggered after 1 second)
+    const musicTimer = setTimeout(() => {
+      try { audioRef.current.playMissionSuccess(); } catch {}
+    }, 1000);
+    return () => clearTimeout(musicTimer);
+   }, [view, sfConfig, lastResult, currentSuccessBg]);
+ 
+   // Compute vanishing point under the success title
+   useEffect(() => {
+     if (view !== "gameover" || lastResult?.cause !== "success") return;
+     const update = () => {
+       const r = successTitleRef.current?.getBoundingClientRect();
+       if (!r) return;
+       const cx = (r.left + r.width / 2) / window.innerWidth;
+       const cy = Math.min(0.95, Math.max(0.05, (r.bottom + 16) / window.innerHeight));
+       setWormholeVP({ cx, cy });
+     };
+     update();
+     const onRes = () => update();
+     window.addEventListener("resize", onRes);
+     const t = setTimeout(update, 0);
+     return () => { window.removeEventListener("resize", onRes); clearTimeout(t); };
+   }, [view, lastResult]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {view === "home" && (
+        <HomeScreen onStart={startGame} highScoresClassic={classicScores} highScoresFixed={fixedScores} />
+      )}
+      {view === "game" && (
+        <GameEngine
+          difficulty={difficulty}
+          onExit={() => setView("home")}
+          onGameOver={handleGameOver}
+          initialScore={carry?.score}
+          initialLandings={carry?.landings}
+          level={carry?.level ?? successCount}
+          mode={mode}
+          lowGraphics={lowGraphics}
+        />
+      )}
+      {view === "gameover" && lastResult && (
+        <main className="min-h-screen relative flex items-center justify-center">
+          {lastResult.cause === "success" ? (
+            <>
+              {lowGraphics ? (
+                <div className="absolute inset-0 z-0">
+                  <HomeStarfield />
+                </div>
+              ) : (
+                <>
+                  {currentSuccessBg === 0 ? (
+                    <VectorWormhole
+                      ref={wormholeRef}
+                      active
+                      loop
+                      preset="Wormhole"
+                      style={(sfConfig?.style || "glow") as any}
+                      focalLength={sfConfig?.focalLength}
+                      cx={wormholeVP?.cx ?? 0.5}
+                      cy={wormholeVP?.cy ?? 0.5}
+                      seed={(sfConfig?.seed ?? 0) ^ 0x57F00F}
+                    />
+                  ) : (
+                    <>
+                      <GravityDistortionWave
+                        ref={gwRef}
+                        active
+                        preset="Normal"
+                        focalLength={sfConfig?.focalLength}
+                        cx={wormholeVP?.cx ?? 0.5}
+                        cy={wormholeVP?.cy ?? 0.5}
+                        baseSeed={(sfConfig?.seed ?? 0) ^ 0xA11CE}
+                        modeName={mode}
+                        levelIndex={carry?.level ?? 0}
+                        instanceId={successCount}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {lowGraphics ? (
+                <div className="absolute inset-0 z-0">
+                  <HomeStarfield />
+                </div>
+              ) : (
+                <>
+                  <HyperspaceStarfield
+                    ref={starfieldRef}
+                    speed={sfConfig?.speed}
+                    density={sfConfig?.density}
+                    focalLength={sfConfig?.focalLength}
+                    trail={sfConfig?.trail}
+                    style={sfConfig?.style}
+                    cx={sfConfig?.cx}
+                    cy={sfConfig?.cy}
+                    allowBoost={false}
+                  />
+                  <AsteroidField
+                    ref={asteroidsRef}
+                    active
+                    activity={0.5}
+                    maxCount={80}
+                    sizeMin={2.0}
+                    sizeMax={8.0}
+                    spinMinDeg={5}
+                    spinMaxDeg={60}
+                    allowNoSpin
+                    clusterFrequency={0.85}
+                    occludeStars
+                    alignToStarfield
+                    focalLength={sfConfig?.focalLength}
+                    cx={sfConfig?.cx}
+                    cy={sfConfig?.cy}
+                    style={sfConfig?.style === 'vector' ? 'vector' : 'glow'}
+                  />
+                </>
+              )}
+            </>
+          )}
+          <section className="relative text-center animate-enter" onKeyDown={handleGameOverKeys} tabIndex={0}>
+            <h1 ref={successTitleRef} className="text-4xl font-display font-bold mb-3">{lastResult.cause === "success" ? "Mission Successful" : lastResult.cause === "crash" ? "Mission Failed" : "Mission Ended"}</h1>
+            <p className="text-muted-foreground">Score: <span className="text-accent font-semibold">{lastResult.score}</span> · Landings: {lastResult.landings} · Time: {lastResult.elapsed.toFixed(1)}s</p>
+            {lastResult.cause === "success" && (lastResult.padBonus2x || lastResult.bullseye || lastResult.speedBonus) && (
+              <div className="mt-3 flex items-center justify-center gap-3 animate-enter">
+                {lastResult.padBonus2x && (
+                  <span className="px-3 py-1 rounded-md border border-accent/50 shadow-neon font-display text-accent">2x PAD BONUS</span>
+                )}
+                {lastResult.bullseye && (
+                  <span className="px-3 py-1 rounded-md border border-accent/50 shadow-neon font-display text-accent">+500 BULLSEYE</span>
+                )}
+                {lastResult.speedBonus && (
+                  <span className="px-3 py-1 rounded-md border border-accent/50 shadow-neon font-display text-accent">+500 SPEED BONUS</span>
+                )}
+              </div>
+            )}
+
+            {/* Highscore initials entry after failure if eligible */}
+            {lastResult.cause !== "success" && needsInitials && (
+              <InitialsEntry
+                score={lastResult.score}
+                onSubmit={(initials) => {
+                  const hs: HighScore = { initials, score: lastResult.score, difficulty: lastResult.difficulty, date: Date.now() };
+                  if (mode === "fixed") {
+                    const list = [...fixedScores, hs].sort((a, b) => b.score - a.score).slice(0, 5);
+                    setFixedScores(list);
+                    localStorage.setItem(HS_FIXED_KEY, JSON.stringify(list));
+                  } else {
+                    const list = [...classicScores, hs].sort((a, b) => b.score - a.score).slice(0, 5);
+                    setClassicScores(list);
+                    localStorage.setItem(HS_CLASSIC_KEY, JSON.stringify(list));
+                  }
+                  // Online submission rule: until 5 exist, accept any; then only submit new highs
+                  void (async () => {
+                    try {
+                      const top = await fetchTop(mode, 5);
+                      const rows = Array.isArray(top.rows) ? top.rows : [];
+                      const qualifies = rows.length < 5 || hs.score > Math.min(...rows.map(r => r.score));
+                      if (qualifies) {
+                        await submitScore({ initials, score: hs.score, difficulty: hs.difficulty, mode });
+                      }
+                    } catch {}
+                  })();
+                  setNeedsInitials(false);
+                  setTimeout(() => { setGoIndex(0); homeRef.current?.focus(); }, 0);
+                }}
+              />
+            )}
+
+            <div className="mt-6 flex gap-3 justify-center">
+              {lastResult.cause === "success" ? (
+                <Button
+                  ref={contRef}
+                  variant="neon"
+                  onClick={continueGame}
+                >
+                  Continue
+                </Button>
+              ) : (
+                <>
+                  <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setView("home")} disabled={needsInitials}>Home</Button>
+                  <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials}>Retry Current Level</Button>
+                  <Button ref={retryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryGame} disabled={needsInitials}>Retry From Start</Button>
+                </>
+              )}
+            </div>
+          </section>
+        </main>
+      )}
+
+    </div>
+  );
+};
+
+export default Index;
+
