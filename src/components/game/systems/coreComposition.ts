@@ -237,47 +237,33 @@ export class CoreComposition {
 
   private selectThemeForLevel(level: number, rand: () => number): MineralType[] {
     const allTypes = Object.values(MINERAL_TYPES);
-    const theme: MineralType[] = [];
     
-    // Number of types based on level
-    let numTypes = 1;
-    if (level >= 3) numTypes = 2;
-    if (level >= 6) numTypes = Math.random() < 0.7 ? 3 : 2;
+    // Only one element type per level to prevent performance issues
+    // Use level as seed to make it deterministic but different per level
+    const typeIndex = level % allTypes.length;
+    const selectedType = allTypes[typeIndex];
     
-    // Select types with some level-based weighting
-    const weights = allTypes.map(type => {
-      switch (type) {
-        case MINERAL_TYPES.DIAMOND_FACETS:
-        case MINERAL_TYPES.CRYSTAL_SPIKES:
-          return level >= 2 ? 1.0 : 0.5;
-        case MINERAL_TYPES.GOLD_VEINS:
-          return 1.0; // Always available
-        case MINERAL_TYPES.MAGMA_POCKETS:
-          return level >= 4 ? 1.0 : 0.2;
-        case MINERAL_TYPES.ALIEN_LATTICE:
-          return level >= 7 ? 0.3 : 0.05; // Rare
-        case MINERAL_TYPES.GLOW_DUST:
-          return level >= 3 ? 0.8 : 0.3;
-        default:
-          return 0.8;
-      }
-    });
-
-    for (let i = 0; i < numTypes; i++) {
-      const totalWeight = weights.reduce((sum, w, idx) => theme.includes(allTypes[idx]) ? sum : sum + w, 0);
-      let target = rand() * totalWeight;
-      
-      for (let j = 0; j < allTypes.length; j++) {
-        if (theme.includes(allTypes[j])) continue;
-        target -= weights[j];
-        if (target <= 0) {
-          theme.push(allTypes[j]);
-          break;
-        }
-      }
+    // Level-based filtering - some types only appear at higher levels
+    switch (selectedType) {
+      case MINERAL_TYPES.DIAMOND_FACETS:
+      case MINERAL_TYPES.CRYSTAL_SPIKES:
+        if (level < 2) return [MINERAL_TYPES.GOLD_VEINS]; // Fallback for early levels
+        break;
+      case MINERAL_TYPES.MAGMA_POCKETS:
+        if (level < 4) return [MINERAL_TYPES.IRON_NODULES]; // Fallback for early levels
+        break;
+      case MINERAL_TYPES.ALIEN_LATTICE:
+        if (level < 7) return [MINERAL_TYPES.CRYSTAL_SPIKES]; // Fallback for early levels
+        break;
+      case MINERAL_TYPES.GLOW_DUST:
+        if (level < 3) return [MINERAL_TYPES.GOLD_VEINS]; // Fallback for early levels
+        break;
+      default:
+        // Most types are available from level 1
+        break;
     }
 
-    return theme.length > 0 ? theme : [MINERAL_TYPES.GOLD_VEINS];
+    return [selectedType];
   }
 
   private hashMineralType(type: MineralType): number {
