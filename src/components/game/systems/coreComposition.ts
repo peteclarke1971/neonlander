@@ -355,7 +355,7 @@ export class CoreComposition {
                 type,
                 x: elementX,
                 y: elementY,
-                scale: 0.08 + rand() * 0.17, // Much smaller: 0.08-0.25
+                scale: (0.08 + rand() * 0.17) * (3 + rand() * 4), // 3-7x bigger: 0.24-1.75
                 rotation: rand() * Math.PI * 2,
                 data: { seed: rand() }
               });
@@ -484,7 +484,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.25 + rand() * 0.3, // Much smaller: 0.25-0.55
+            scale: (0.25 + rand() * 0.3) * (3 + rand() * 4), // 3-7x bigger: 0.75-3.85
             rotation: rand() * Math.PI * 2,
             data: { cols: 2 + Math.floor(rand() * 4), rows: 1 + Math.floor(rand() * 3) }
           });
@@ -509,7 +509,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.15 + rand() * 0.2, // Much smaller: 0.15-0.35
+            scale: (0.15 + rand() * 0.2) * (3 + rand() * 4), // 3-7x bigger: 0.45-2.45
             rotation: 0,
             data: { seed: rand() }
           });
@@ -534,7 +534,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.2 + rand() * 0.3, // Much smaller: 0.2-0.5
+            scale: (0.2 + rand() * 0.3) * (3 + rand() * 4), // 3-7x bigger: 0.6-3.5
             rotation: rand() * Math.PI * 2,
             data: { seed: rand() }
           });
@@ -563,7 +563,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.2 + rand() * 0.3, // Much smaller: 0.2-0.5
+            scale: (0.2 + rand() * 0.3) * (3 + rand() * 4), // 3-7x bigger: 0.6-3.5
             rotation: 0,
             data: { seed: rand() }
           });
@@ -588,7 +588,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.2 + rand() * 0.3, // Much smaller: 0.2-0.5
+            scale: (0.2 + rand() * 0.3) * (3 + rand() * 4), // 3-7x bigger: 0.6-3.5
             rotation: rand() * Math.PI * 2,
             data: { seed: rand() }
           });
@@ -613,7 +613,7 @@ export class CoreComposition {
             type,
             x,
             y,
-            scale: 0.1 + rand() * 0.2, // Much smaller: 0.1-0.3
+            scale: (0.1 + rand() * 0.2) * (3 + rand() * 4), // 3-7x bigger: 0.3-2.1
             rotation: 0,
             data: { seed: rand() }
           });

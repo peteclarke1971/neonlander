@@ -284,7 +284,8 @@ export function updateVolcanoes(
 export function drawVolcanoes(
   ctx: CanvasRenderingContext2D,
   volcanoes: Volcano[],
-  particles: VolcanoParticle[]
+  particles: VolcanoParticle[],
+  levelColor?: string
 ) {
   // Draw volcano craters
   ctx.save();
@@ -318,16 +319,45 @@ export function drawVolcanoes(
     const alpha = particle.life;
     if (alpha <= 0) continue;
     
-    // Color based on temperature
+    // Color based on temperature - use level color shades if provided
     let color: string;
-    if (particle.temperature > 0.7) {
-      color = `rgba(255, 69, 0, ${alpha})`; // hot orange-red
-    } else if (particle.temperature > 0.4) {
-      color = `rgba(255, 140, 0, ${alpha})`; // warm orange
-    } else if (particle.temperature > 0.1) {
-      color = `rgba(255, 215, 0, ${alpha})`; // cooling yellow
+    if (levelColor) {
+      // Parse the level color (expected to be HSL format like "hsl(180, 100%, 50%)")
+      const hslMatch = levelColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+      if (hslMatch) {
+        const [, h, s, l] = hslMatch.map(Number);
+        if (particle.temperature > 0.7) {
+          color = `hsla(${h}, ${s}%, ${Math.min(90, l + 20)}%, ${alpha})`; // bright shade
+        } else if (particle.temperature > 0.4) {
+          color = `hsla(${h}, ${s}%, ${l}%, ${alpha})`; // base shade  
+        } else if (particle.temperature > 0.1) {
+          color = `hsla(${h}, ${Math.max(30, s - 20)}%, ${Math.max(30, l - 10)}%, ${alpha})`; // darker shade
+        } else {
+          color = `hsla(${h}, ${Math.max(20, s - 40)}%, ${Math.max(20, l - 30)}%, ${alpha})`; // darkest shade
+        }
+      } else {
+        // Fallback to default colors if level color can't be parsed
+        if (particle.temperature > 0.7) {
+          color = `rgba(255, 69, 0, ${alpha})`;
+        } else if (particle.temperature > 0.4) {
+          color = `rgba(255, 140, 0, ${alpha})`;
+        } else if (particle.temperature > 0.1) {
+          color = `rgba(255, 215, 0, ${alpha})`;
+        } else {
+          color = `rgba(139, 69, 19, ${alpha})`;
+        }
+      }
     } else {
-      color = `rgba(139, 69, 19, ${alpha})`; // cool brown
+      // Default color scheme when no level color provided
+      if (particle.temperature > 0.7) {
+        color = `rgba(255, 69, 0, ${alpha})`; // hot orange-red
+      } else if (particle.temperature > 0.4) {
+        color = `rgba(255, 140, 0, ${alpha})`; // warm orange
+      } else if (particle.temperature > 0.1) {
+        color = `rgba(255, 215, 0, ${alpha})`; // cooling yellow
+      } else {
+        color = `rgba(139, 69, 19, ${alpha})`; // cool brown
+      }
     }
     
     ctx.fillStyle = color;

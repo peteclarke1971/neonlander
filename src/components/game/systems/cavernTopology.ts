@@ -221,24 +221,35 @@ function createTunnel(
 ): TunnelEdge {
   const path: Vec2[] = [fromNode.center, toNode.center];
   
-  // Add elbows with vertical bias starting from level 5
+  // Add elbows with strong vertical bias starting from level 5
   if (level >= 5) {
-    const elbowChance = level >= 6 ? 0.7 : 0.5; // Higher chance for levels 6+
+    const elbowChance = level >= 6 ? 0.85 : 0.75; // Much higher chance for levels 5+
     if (rand() < elbowChance) {
-      // Bias towards vertical tunnels from level 5+
+      // Strong bias towards vertical tunnels from level 5+
       const dx = toNode.center.x - fromNode.center.x;
       const dy = toNode.center.y - fromNode.center.y;
       
-      // Create vertical emphasis by making midpoint favor Y movement
-      const verticalBias = level >= 5 ? 0.7 : 0.3; // Strong vertical bias from level 5
-      const horizontalVariation = (rand() - 0.5) * 100; // Reduced horizontal variation
-      const verticalVariation = (rand() - 0.5) * 300 * (rand() < verticalBias ? 2 : 0.5); // Favor vertical
+      // Create strong vertical emphasis with multiple midpoints for more vertical tunnels
+      const verticalBias = level >= 5 ? 0.9 : 0.3; // Very strong vertical bias from level 5
+      const horizontalVariation = (rand() - 0.5) * 60; // Much reduced horizontal variation
+      const verticalVariation = (rand() - 0.5) * 400 * (rand() < verticalBias ? 3 : 0.3); // Heavily favor vertical
       
+      // Add primary vertical midpoint
       const midPoint = vec2(
         (fromNode.center.x + toNode.center.x) / 2 + horizontalVariation,
         (fromNode.center.y + toNode.center.y) / 2 + verticalVariation
       );
       path.splice(1, 0, midPoint);
+      
+      // For levels 6+, occasionally add a second midpoint for more complex vertical paths
+      if (level >= 6 && rand() < 0.4) {
+        const secondVerticalVariation = (rand() - 0.5) * 350 * (rand() < 0.8 ? 2.5 : 0.2);
+        const secondMidPoint = vec2(
+          (fromNode.center.x + midPoint.x) / 2 + (rand() - 0.5) * 40,
+          (fromNode.center.y + midPoint.y) / 2 + secondVerticalVariation
+        );
+        path.splice(1, 0, secondMidPoint);
+      }
     }
   }
   

@@ -636,6 +636,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         // Apply gravity only when not resting on start pad
         vy += gravity * 60 * dt;
         
+        // Apply anomaly acceleration (gravity wells) if not disabled
+        if (!anomaliesDisabled && anomalies.length > 0) {
+          const { ax, ay } = anomalyAccelAt(anomalies, x, y, elapsed);
+          vx += ax * dt;
+          vy += ay * dt;
+        }
+        
         // Air resistance
         const drag = 0.998;
         vx *= Math.pow(drag, dt * 60);
@@ -1150,7 +1157,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (!isCavernLevel) {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
-          drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles);
+          drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles, neonColor);
         }
       }
 
