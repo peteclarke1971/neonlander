@@ -62,6 +62,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   // Mobile detection and low-gfx mode for performance optimizations
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const shouldOptimizePerformance = isMobile || lowGraphics;
+  
+  // Volcano particles state
+  const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
 
   // Controls state
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean }>({ left: false, right: false, thrust: false, abort: false });
@@ -127,6 +130,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     const styles = getComputedStyle(document.documentElement);
     const neonColor = `hsl(${styles.getPropertyValue('--neon')})`;
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
+    // Clear volcano particles at start of each level
+    setVolcanoParticles([]);
+    
     // Physics state
     const baseSeed = 873421;
     const fixedSeed = baseSeed + (difficulty === "hard" ? 100000 : 0) + (level | 0) * 9973;
@@ -292,8 +298,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
     
-    // Volcano particles
-    const volcanoParticles: VolcanoParticle[] = [];
 
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
@@ -657,6 +661,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (volcanoUpdate.shouldPlayEruptionSound) {
             try { audio.current.explosion(); } catch {} // Use explosion sound for eruptions
           }
+          // Update volcano particles state with new particles
+          setVolcanoParticles([...volcanoParticles]);
         }
       }
       // Hazard collisions (airborne)
