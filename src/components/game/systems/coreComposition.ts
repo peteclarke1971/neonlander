@@ -341,7 +341,7 @@ export class CoreComposition {
                 type,
                 x: elementX,
                 y: elementY,
-                scale: (0.08 + rand() * 0.17) * (3 + rand() * 4), // 3-7x bigger: 0.24-1.75
+                scale: (0.08 + rand() * 0.17) * (3 + rand() * 4) * 0.5, // 3-7x bigger, 50% brightness: 0.12-0.875
                 rotation: rand() * Math.PI * 2,
                 data: { seed: rand() }
               });

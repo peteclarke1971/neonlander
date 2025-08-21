@@ -141,18 +141,27 @@ function interpolateEdge(corners: Vec2[], values: number[], edgeIndex: number): 
       throw new Error(`Invalid edge index: ${edgeIndex}`);
   }
   
-  // Linear interpolation to find zero crossing
-  const t = Math.abs(v1) < 1e-6 ? 0 : Math.abs(v2) < 1e-6 ? 1 : Math.abs(v1) / (Math.abs(v1) + Math.abs(v2));
+  // Improved interpolation for better continuity at elbow joints
+  const tolerance = 1e-8;
+  const t = Math.abs(v1) < tolerance ? 0 : 
+            Math.abs(v2) < tolerance ? 1 : 
+            Math.abs(v1) / (Math.abs(v1) + Math.abs(v2));
+  
+  // Apply small smoothing to reduce gaps at sharp corners
+  const smoothT = t * 0.98 + 0.01; // Slight bias toward more complete edges
   
   return {
-    x: p1.x + t * (p2.x - p1.x),
-    y: p1.y + t * (p2.y - p1.y)
+    x: p1.x + smoothT * (p2.x - p1.x),
+    y: p1.y + smoothT * (p2.y - p1.y)
   };
 }
 
 function connectSegments(segments: { start: Vec2; end: Vec2 }[], tolerance: number): Vec2[][] {
   const polylines: Vec2[][] = [];
   const used = new Set<number>();
+  
+  // Use tighter tolerance for better gap closure, especially for vertical tunnels
+  const connectionTolerance = tolerance * 1.5;
   
   for (let i = 0; i < segments.length; i++) {
     if (used.has(i)) continue;
@@ -173,24 +182,24 @@ function connectSegments(segments: { start: Vec2; end: Vec2 }[], tolerance: numb
         const firstPoint = polyline[0];
         
         // Check if segment connects to end of polyline
-        if (distance(lastPoint, seg.start) < tolerance) {
+        if (distance(lastPoint, seg.start) < connectionTolerance) {
           polyline.push(seg.end);
           used.add(j);
           extended = true;
           break;
-        } else if (distance(lastPoint, seg.end) < tolerance) {
+        } else if (distance(lastPoint, seg.end) < connectionTolerance) {
           polyline.push(seg.start);
           used.add(j);
           extended = true;
           break;
         }
         // Check if segment connects to start of polyline
-        else if (distance(firstPoint, seg.start) < tolerance) {
+        else if (distance(firstPoint, seg.start) < connectionTolerance) {
           polyline.unshift(seg.end);
           used.add(j);
           extended = true;
           break;
-        } else if (distance(firstPoint, seg.end) < tolerance) {
+        } else if (distance(firstPoint, seg.end) < connectionTolerance) {
           polyline.unshift(seg.start);
           used.add(j);
           extended = true;
@@ -199,8 +208,8 @@ function connectSegments(segments: { start: Vec2; end: Vec2 }[], tolerance: numb
       }
     }
     
-    // Check if polyline forms a loop
-    if (polyline.length > 2 && distance(polyline[0], polyline[polyline.length - 1]) < tolerance) {
+    // Check if polyline forms a loop with looser tolerance for better closure
+    if (polyline.length > 2 && distance(polyline[0], polyline[polyline.length - 1]) < connectionTolerance) {
       polyline.pop(); // Remove duplicate endpoint
     }
     

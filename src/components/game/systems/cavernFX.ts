@@ -263,9 +263,9 @@ export class CavernFX {
         
         // Output with alpha based on proximity to walls
         float alpha = totalIntensity * wallProximity;
-        alpha = clamp(alpha, 0.0, 1.2); // 50% brighter cap maximum opacity
+        alpha = clamp(alpha, 0.0, 0.84); // 30% brighter reduced maximum opacity
         
-        gl_FragColor = vec4(color * totalIntensity * 1.5, alpha); // 50% brighter
+        gl_FragColor = vec4(color * totalIntensity * 1.05, alpha); // 30% brighter reduced
       }
     `;
     

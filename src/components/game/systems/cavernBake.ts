@@ -159,8 +159,8 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
     maxY: worldBounds.height + margin
   };
   
-  // Calculate cell size
-  const cellSize = Math.max(6, Math.min(14, Math.floor(hShip / 3)));
+  // Calculate cell size - use smaller cells for better continuity at joints
+  const cellSize = Math.max(4, Math.min(12, Math.floor(hShip / 4)));
   
   // Create SDF function with start and end caverns clipped to flat floors
   const startDisc: Disc = { center: startNode.center, radius: startNode.radius };
