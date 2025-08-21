@@ -338,8 +338,9 @@ export class CavernFX {
     
     const { worldBounds, collisionGrid, collisionCellSize } = this.cavernData;
     
-    // Create lower resolution distance field (512x384 for 4:3 aspect)
-    const fieldWidth = 512;
+    // Performance optimization: Use even lower resolution for low-gfx mode
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const fieldWidth = isMobile ? 256 : 512; // Half resolution on mobile
     const fieldHeight = Math.floor(fieldWidth * worldBounds.height / worldBounds.width);
     
     const distanceData = new Float32Array(fieldWidth * fieldHeight * 4); // RGBA
@@ -550,16 +551,18 @@ export class CavernFX {
   }
   
   private applyPerformanceGovernor(): void {
-    if (this.currentFPS < 55 && !this.performanceGoverned) {
-      console.warn('CavernFX: Performance governor activated');
+    // More aggressive performance targeting for 60fps minimum
+    if (this.currentFPS < 60 && !this.performanceGoverned) {
+      console.warn('CavernFX: Performance governor activated for 60fps target');
       this.performanceGoverned = true;
       
-      // Reduce expensive effects
-      this.params.dustDensity *= 0.5;
-      this.params.rippleStrength *= 0.75;
-      this.params.lensWarp = Math.min(this.params.lensWarp, 0.2);
-    } else if (this.currentFPS > 58 && this.performanceGoverned) {
-      // Gradually restore when performance improves
+      // Aggressively reduce expensive effects for stable 60fps
+      this.params.dustDensity *= 0.3; // Reduce dust more aggressively
+      this.params.rippleStrength *= 0.6;
+      this.params.lensWarp = Math.min(this.params.lensWarp, 0.15);
+      this.params.breathDepth *= 0.7; // Reduce breathing effect
+    } else if (this.currentFPS > 62 && this.performanceGoverned) {
+      // Only restore when consistently above 62fps
       this.performanceGoverned = false;
     }
   }

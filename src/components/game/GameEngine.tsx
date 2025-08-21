@@ -1363,7 +1363,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       <HUD {...hud} />
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
-        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[10px] font-mono text-muted-foreground">
+        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
           FPS: {Math.round(fps)}
         </div>
       </div>

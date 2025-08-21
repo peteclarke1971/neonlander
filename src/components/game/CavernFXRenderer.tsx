@@ -83,7 +83,10 @@ export const CavernFXRenderer: React.FC<CavernFXRendererProps> = ({
     if (!canvas) return;
 
     const updateCanvasSize = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Performance optimization: Limit DPR and resolution for better performance
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const maxDpr = isMobile ? 1.5 : 2; // Lower DPR on mobile
+      const dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
       const parent = canvas.parentElement as HTMLElement | null;
       const width = parent?.clientWidth || canvas.clientWidth || window.innerWidth;
       const height = parent?.clientHeight || canvas.clientHeight || window.innerHeight;
