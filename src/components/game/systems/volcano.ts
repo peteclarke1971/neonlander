@@ -147,7 +147,8 @@ export function generateVolcanoes(
         isErupting: false,
         eruptionTimer: 0,
         eruptionDuration: config.eruptionDuration,
-        power: config.power
+        power: config.power,
+        emissionCarry: 0
       });
     }
   }
@@ -171,7 +172,11 @@ export function updateVolcanoes(
       
       // Generate particles during eruption
       if (volcano.eruptionTimer > 0) {
-        const particlesThisFrame = Math.floor(config.particleCount * dt / volcano.eruptionDuration);
+        // Emit particles at a steady rate across frames using an accumulator
+        const rate = config.particleCount / volcano.eruptionDuration; // particles per second
+        volcano.emissionCarry = (volcano.emissionCarry ?? 0) + rate * dt;
+        const particlesThisFrame = Math.floor(volcano.emissionCarry);
+        volcano.emissionCarry -= particlesThisFrame;
         
         for (let i = 0; i < particlesThisFrame; i++) {
           // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
@@ -202,6 +207,7 @@ export function updateVolcanoes(
       if (volcano.nextEruption <= 0) {
         volcano.isErupting = true;
         volcano.eruptionTimer = volcano.eruptionDuration;
+        volcano.emissionCarry = 0;
         shouldPlayEruptionSound = true;
       }
     }

@@ -11,6 +11,7 @@ export interface Volcano {
   eruptionTimer: number;
   eruptionDuration: number;
   power: number;
+  emissionCarry?: number;
 }
 
 export interface Pad {
