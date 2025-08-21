@@ -174,7 +174,8 @@ export function updateVolcanoes(
         const particlesThisFrame = Math.floor(config.particleCount * dt / volcano.eruptionDuration);
         
         for (let i = 0; i < particlesThisFrame; i++) {
-          const angle = (Math.random() - 0.5) * Math.PI * 0.6 + Math.PI / 2; // mostly upward
+          // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
+          const angle = (Math.random() - 0.5) * Math.PI * 0.6 - Math.PI / 2; // mostly upward
           const speed = volcano.power * (80 + Math.random() * 120); // base velocity
           const size = 2 + Math.random() * 4;
           const life = 2 + Math.random() * 2; // particle lifetime
@@ -183,7 +184,7 @@ export function updateVolcanoes(
             x: volcano.x + (Math.random() - 0.5) * volcano.size,
             y: volcano.y,
             vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
+            vy: Math.sin(angle) * speed, // negative initially (upward), then gravity pulls down
             life: 1,
             maxLife: life,
             size,
