@@ -19,6 +19,7 @@ function mulberry32(seed: number) {
   };
 }
 import { generateCavern, CavernData } from "./cavern";
+import { getCavernSeed } from "./systems/fixedCavernMode";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision } from "./systems/hazards";
@@ -136,11 +137,18 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Physics state
     const baseSeed = 873421;
     const fixedSeed = baseSeed + (difficulty === "hard" ? 100000 : 0) + (level | 0) * 9973;
-    const seed = mode === "fixed" ? fixedSeed : Math.floor(Math.random() * 1e9);
     const levelVar = Math.min(Math.max(0, level), 20);
     
     // Check if this is a cavern level - only in caverns mode
     const isCavernLevel = mode === "caverns";
+    
+    // Determine seed based on mode and level type
+    let seed: number;
+    if (isCavernLevel) {
+      seed = getCavernSeed(mode, level, difficulty, baseSeed);
+    } else {
+      seed = mode === "fixed" ? fixedSeed : Math.floor(Math.random() * 1e9);
+    }
     
     const terrain: TerrainData | CavernData = isCavernLevel 
       ? generateCavern(seed, level, difficulty)
@@ -165,13 +173,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       setCavernBakeResult(null);
     }
     
-    // Generate random effects for cavern levels 0-49 (match landscape color)
-    const effectsEnabled = isCavernLevel && (level ?? 0) < 50;
+    // Generate random effects for cavern levels (match landscape color)
+    // In fixed mode, effects use deterministic seed; in classic mode, they're random per session
+    const effectsEnabled = isCavernLevel;
     setHasRandomEffects(effectsEnabled);
     
     if (effectsEnabled) {
-      // Use level-based seed for consistent effects per level
-      const effectSeed = fixedSeed + 12345;
+      // Use deterministic effects for fixed and caverns modes, random for classic
+      const effectSeed = seed + 12345;
       const randFx = mulberry32(effectSeed);
       
       const effectParams: CavernFXParams = {
