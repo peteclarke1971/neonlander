@@ -215,7 +215,16 @@ export function updateVolcanoes(
         for (let i = 0; i < particlesThisFrame; i++) {
           // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
           const angle = (Math.random() - 0.5) * Math.PI * 0.6 - Math.PI / 2; // mostly upward
-          const speed = volcano.power * (320 + Math.random() * 480); // 4x higher velocity for 4x height
+          
+          // Height scaling by level: 1-10 (2x), 10-30 (3x), 30+ (4x)
+          let heightMultiplier = 2; // default 2x for levels 1-10
+          if (level >= 30) {
+            heightMultiplier = 4;
+          } else if (level >= 10) {
+            heightMultiplier = 3;
+          }
+          
+          const speed = volcano.power * (80 + Math.random() * 120) * heightMultiplier;
           const size = 2 + Math.random() * 4;
           const life = 2 + Math.random() * 2; // particle lifetime
           
