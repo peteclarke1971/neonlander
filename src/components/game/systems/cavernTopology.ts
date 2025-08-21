@@ -1,10 +1,15 @@
-import { Vec2, vec2, vec2Distance } from './sdf';
+import { Vec2, vec2, vec2Distance, CavernShape } from './sdf';
+import { selectShapeType, generateShapeParams, getInscribedRadius, validateShapeParams, degradeShape } from './cavernShapes';
 
 export interface CavernNode {
   id: number;
   center: Vec2;
-  radius: number;
+  radius: number; // bounding radius for legacy compatibility
   connections: number[];
+  // Enhanced shape data
+  shapeType: import('./sdf').CavernShape;
+  shapeParams: import('./sdf').ShapeParams;
+  inscribedRadius: number; // for tunnel attachment validation
 }
 
 export interface TunnelEdge {
@@ -114,11 +119,31 @@ export function generateCavernTopology(
     }
     
     if (!overlaps) {
+      // Generate shape for this cavern
+      const shapeSeed = levelSeed ^ (nodes.length * 0x87654321);
+      const shapeType = selectShapeType(level, shapeSeed);
+      let shapeParams = generateShapeParams(shapeType, center, radius, level, shapeSeed, hShip);
+      let currentShapeType = shapeType;
+      
+      // Validate and potentially degrade shape
+      let attempts = 0;
+      while (!validateShapeParams(currentShapeType, shapeParams, hShip) && attempts < 3) {
+        const degraded = degradeShape(currentShapeType, shapeParams);
+        currentShapeType = degraded.shapeType;
+        shapeParams = degraded.params;
+        attempts++;
+      }
+      
+      const inscribedRadius = getInscribedRadius(currentShapeType, shapeParams);
+      
       nodes.push({
         id: nodes.length,
         center,
         radius,
-        connections: []
+        connections: [],
+        shapeType: currentShapeType,
+        shapeParams,
+        inscribedRadius
       });
     }
     
@@ -131,19 +156,29 @@ export function generateCavernTopology(
     const fallbackRadius = 150;
     
     // Start node
+    const startCenter = vec2(fallbackRadius + 100, worldBounds.height / 2);
+    const startShapeParams = generateShapeParams(CavernShape.Ellipse, startCenter, fallbackRadius, level, levelSeed, hShip);
     nodes.push({
       id: 0,
-      center: vec2(fallbackRadius + 100, worldBounds.height / 2),
+      center: startCenter,
       radius: fallbackRadius,
-      connections: []
+      connections: [],
+      shapeType: CavernShape.Ellipse,
+      shapeParams: startShapeParams,
+      inscribedRadius: getInscribedRadius(CavernShape.Ellipse, startShapeParams)
     });
     
     // End node
+    const endCenter = vec2(worldBounds.width - fallbackRadius - 100, worldBounds.height / 2);
+    const endShapeParams = generateShapeParams(CavernShape.Ellipse, endCenter, fallbackRadius, level, levelSeed ^ 0x12345678, hShip);
     nodes.push({
       id: 1,
-      center: vec2(worldBounds.width - fallbackRadius - 100, worldBounds.height / 2),
+      center: endCenter,
       radius: fallbackRadius,
-      connections: []
+      connections: [],
+      shapeType: CavernShape.Ellipse,
+      shapeParams: endShapeParams,
+      inscribedRadius: getInscribedRadius(CavernShape.Ellipse, endShapeParams)
     });
   }
   

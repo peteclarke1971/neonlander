@@ -1,4 +1,4 @@
-import { Vec2, vec2, sdfDisc, sdfCapsule, sdfUnion, vec2Distance, vec2Lerp, Disc, Capsule } from './sdf';
+import { Vec2, vec2, sdfDisc, sdfCapsule, sdfUnion, vec2Distance, vec2Lerp, Disc, Capsule, sdfShape, sdfHalfPlaneClip, CavernShape } from './sdf';
 import { generateCavernTopology, CavernGraph, CavernNode, TunnelEdge } from './cavernTopology';
 import { marchingSquares, simplifyPolyline, MarchingSquaresResult } from './marchingSquares';
 import { Pad } from '../types';
@@ -29,6 +29,8 @@ export interface AcceptanceReport {
   clearance: boolean;
   bounds: boolean;
   destination: boolean;
+  curvature: boolean;
+  tunnelJoints: boolean;
   minWidth: number;
   issues: string[];
 }
@@ -85,6 +87,8 @@ let lastAcceptanceReport: AcceptanceReport = {
   clearance: false,
   bounds: false,
   destination: false,
+  curvature: false,
+  tunnelJoints: false,
   minWidth: 0,
   issues: []
 };
@@ -117,11 +121,10 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
   const endFloorY = endNode.center.y + endR - endHFlat;
   const endFlatHalfWidth = Math.sqrt(Math.max(0, endR * endR - (endR - endHFlat) * (endR - endHFlat)));
   
-  // Discs for all non-start/end caverns (start/end caverns handled as composites in sdfFunction)
-  const discs: Disc[] = graph.nodes
+  // Regular caverns (non-start/end) using their specific shapes
+  const regularCaverns = graph.nodes
     .map((node, index) => ({ node, index }))
-    .filter(({ index }) => index !== graph.startId && index !== graph.destId)
-    .map(({ node }) => ({ center: node.center, radius: node.radius }));
+    .filter(({ index }) => index !== graph.startId && index !== graph.destId);
   
   
   const capsules: Capsule[] = [];
@@ -162,14 +165,18 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
   // Calculate cell size - use smaller cells for better continuity at joints
   const cellSize = Math.max(4, Math.min(12, Math.floor(hShip / 4)));
   
-  // Create SDF function with start and end caverns clipped to flat floors
-  const startDisc: Disc = { center: startNode.center, radius: startNode.radius };
-  const endDisc: Disc = { center: endNode.center, radius: endNode.radius };
-  
+  // Create SDF function with enhanced shapes and flat floor clipping
   const sdfFunction = (p: Vec2): number => {
-    const startComposite = Math.max(sdfDisc(p, startDisc), p.y - startFloorY);
-    const endComposite = Math.max(sdfDisc(p, endDisc), p.y - endFloorY);
-    const discSDFs = discs.map(disc => sdfDisc(p, disc));
+    // Start cavern with flat floor
+    const startSDF = sdfShape(p, startNode.shapeType, startNode.shapeParams);
+    const startComposite = Math.max(startSDF, p.y - startFloorY);
+    
+    // End cavern with flat floor
+    const endSDF = sdfShape(p, endNode.shapeType, endNode.shapeParams);
+    const endComposite = Math.max(endSDF, p.y - endFloorY);
+    
+    // Regular caverns with their specific shapes
+    const regularSDFs = regularCaverns.map(({ node }) => sdfShape(p, node.shapeType, node.shapeParams));
 
     // Union of all capsules
     let capsuleUnion = Infinity;
@@ -193,7 +200,7 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
     if (nearStart) capsuleClipped = Math.max(capsuleClipped, p.y - startFloorY);
     if (nearEnd) capsuleClipped = Math.max(capsuleClipped, p.y - endFloorY);
 
-    return Math.min(startComposite, endComposite, ...discSDFs, capsuleClipped);
+    return Math.min(startComposite, endComposite, ...regularSDFs, capsuleClipped);
   };
   
   // Bake mesh using marching squares
@@ -266,6 +273,8 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
       clearance: false,
       bounds: false,
       destination: false,
+      curvature: false,
+      tunnelJoints: false,
       minWidth: 0,
       issues: []
     }
@@ -280,6 +289,8 @@ function runAcceptanceChecks(result: CavernBakeResult, hShip: number): Acceptanc
     clearance: false,
     bounds: false,
     destination: false,
+    curvature: false,
+    tunnelJoints: false,
     minWidth: Infinity,
     issues: []
   };
@@ -320,8 +331,22 @@ function runAcceptanceChecks(result: CavernBakeResult, hShip: number): Acceptanc
     report.issues.push('Destination is not the farthest node');
   }
   
+  // Check 6: Curvature validation
+  const validCurvature = checkCurvature(result, hShip);
+  report.curvature = validCurvature;
+  if (!validCurvature) {
+    report.issues.push('Shape curvature too sharp for ship');
+  }
+  
+  // Check 7: Tunnel joint validation
+  const validJoints = checkTunnelJoints(result, hShip);
+  report.tunnelJoints = validJoints;
+  if (!validJoints) {
+    report.issues.push('Tunnel-cavern joints have insufficient clearance');
+  }
+  
   report.passed = report.connectivity && report.continuity && report.clearance && 
-                   report.bounds && report.destination;
+                   report.bounds && report.destination && report.curvature && report.tunnelJoints;
   
   lastAcceptanceReport = report;
   return report;
@@ -429,6 +454,49 @@ function checkDestination(result: CavernBakeResult): boolean {
   return result.destId !== result.startId;
 }
 
+function checkCurvature(result: CavernBakeResult, hShip: number): boolean {
+  const minCurvatureRadius = 1.2 * hShip;
+  
+  // For now, assume all our generated shapes have acceptable curvature
+  // This could be enhanced to do actual curvature analysis
+  for (const cavern of result.caverns) {
+    if (cavern.inscribedRadius < minCurvatureRadius) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+function checkTunnelJoints(result: CavernBakeResult, hShip: number): boolean {
+  const margin = 4; // pixels
+  
+  for (const tunnel of result.tunnels) {
+    const fromCavern = result.caverns[tunnel.from];
+    const toCavern = result.caverns[tunnel.to];
+    
+    // Check start joint
+    const startPoint = tunnel.path[0];
+    const startRadius = tunnel.radiusProfile[0];
+    const startCavernSDF = sdfShape(startPoint, fromCavern.shapeType, fromCavern.shapeParams);
+    
+    if (startCavernSDF > -startRadius - margin) {
+      return false;
+    }
+    
+    // Check end joint
+    const endPoint = tunnel.path[tunnel.path.length - 1];
+    const endRadius = tunnel.radiusProfile[tunnel.radiusProfile.length - 1];
+    const endCavernSDF = sdfShape(endPoint, toCavern.shapeType, toCavern.shapeParams);
+    
+    if (endCavernSDF > -endRadius - margin) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 function generateFallbackCavern(params: CavernBakeParams): CavernBakeResult {
   const { level, hShip, worldBounds, baseSeed } = params;
   
@@ -445,13 +513,27 @@ function generateFallbackCavern(params: CavernBakeParams): CavernBakeResult {
       id: 0,
       center: startCenter,
       radius: startRadius,
-      connections: [1]
+      connections: [1],
+      shapeType: CavernShape.Ellipse,
+      shapeParams: {
+        center: startCenter,
+        orientation: 0,
+        axes: { a: startRadius, b: startRadius }
+      },
+      inscribedRadius: startRadius * 0.8
     },
     {
       id: 1,
       center: endCenter,
       radius: endRadius,
-      connections: [0]
+      connections: [0],
+      shapeType: CavernShape.Ellipse,
+      shapeParams: {
+        center: endCenter,
+        orientation: 0,
+        axes: { a: endRadius, b: endRadius }
+      },
+      inscribedRadius: endRadius * 0.8
     }
   ];
   
@@ -566,6 +648,8 @@ function generateFallbackCavern(params: CavernBakeParams): CavernBakeResult {
       clearance: true,
       bounds: true,
       destination: true,
+      curvature: true,
+      tunnelJoints: true,
       minWidth: tunnelRadius * 2,
       issues: []
     }
