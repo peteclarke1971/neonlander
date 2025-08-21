@@ -381,6 +381,9 @@ export function checkVolcanoParticleCollision(
     // Skip the two smallest particle sizes (< 4) as they're too small to cause damage
     if (particle.size < 4) continue;
     
+    // Skip particles that are over 70% faded (too faint to cause damage)
+    if (particle.life < 0.3) continue;
+    
     const dx = landerX - particle.x;
     const dy = landerY - particle.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
