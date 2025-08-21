@@ -378,6 +378,9 @@ export function checkVolcanoParticleCollision(
   for (const particle of particles) {
     if (particle.life <= 0) continue;
     
+    // Skip the two smallest particle sizes (< 4) as they're too small to cause damage
+    if (particle.size < 4) continue;
+    
     const dx = landerX - particle.x;
     const dy = landerY - particle.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
