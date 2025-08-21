@@ -1,6 +1,18 @@
 export type Difficulty = "easy" | "hard";
 export type Mode = "classic" | "fixed" | "caverns";
 
+export interface Volcano {
+  x: number;
+  y: number;
+  size: number;
+  nextEruption: number;
+  eruptionInterval: number;
+  isErupting: boolean;
+  eruptionTimer: number;
+  eruptionDuration: number;
+  power: number;
+}
+
 export interface Pad {
   xStart: number;
   xEnd: number;
@@ -14,6 +26,7 @@ export interface TerrainData {
   worldWidth: number;
   points: { x: number; y: number }[];
   pads: Pad[];
+  volcanoes?: Volcano[];
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
   isCavern?: false;

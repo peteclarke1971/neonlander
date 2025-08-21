@@ -1,4 +1,5 @@
 import { Pad, TerrainData } from "./types";
+import { generateVolcanoes } from "./systems/volcano";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -10,7 +11,7 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0): TerrainData {
+export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1): TerrainData {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
 
@@ -108,6 +109,17 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   // Re-sync seam after all modifications
   points[segments].y = points[0].y;
 
+  // Generate volcanoes for this level
+  const volcanoes = generateVolcanoes(seed ^ 0xCAFE, worldWidth, level, (x) => {
+    const xx = ((x % worldWidth) + worldWidth) % worldWidth;
+    let i = Math.floor((xx / worldWidth) * segments);
+    i = Math.max(0, Math.min(segments - 1, i));
+    const x0 = i * step;
+    const x1 = (i + 1) * step;
+    const t = (xx - x0) / (x1 - x0);
+    return points[i].y * (1 - t) + points[i + 1].y * t;
+  }, points);
+
   const worldWidthLocal = worldWidth;
   const wrapX = (x: number) => {
     let xx = x % worldWidthLocal;
@@ -140,5 +152,5 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return null;
   };
 
-  return { worldWidth: worldWidthLocal, points, pads, getHeightAt, getPadAt };
+  return { worldWidth: worldWidthLocal, points, pads, volcanoes, getHeightAt, getPadAt };
 }

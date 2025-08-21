@@ -22,6 +22,7 @@ import { generateCavern, CavernData } from "./cavern";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision } from "./systems/hazards";
+import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
 
 interface Props {
@@ -139,7 +140,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       ? generateCavern(seed, level, difficulty)
       : (() => {
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
-          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar);
+          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level);
         })();
     
     // Set cavern data for FX renderer and core composition
@@ -290,6 +291,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Particles
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
+    
+    // Volcano particles
+    const volcanoParticles: VolcanoParticle[] = [];
 
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
@@ -644,8 +648,35 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       // Update moving hazards in non-cavern levels
       if (!isCavernLevel) { updateHazards(hazards, dt, terrain.worldWidth, BASE_HEIGHT); }
+      
+      // Update volcanoes (only in terrain mode for now)
+      if (!isCavernLevel) {
+        const terrainData = terrain as TerrainData;
+        if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
+          const volcanoUpdate = updateVolcanoes(terrainData.volcanoes, volcanoParticles, dt, level);
+          if (volcanoUpdate.shouldPlayEruptionSound) {
+            try { audio.current.explosion(); } catch {} // Use explosion sound for eruptions
+          }
+        }
+      }
       // Hazard collisions (airborne)
       if (!crashed && checkHazardCollision(hazards, x, y, 10)) {
+        running = false;
+        crashed = true;
+        spawnExplosion();
+        spawnDebris();
+        audio.current.explosion();
+        audio.current.stopThruster();
+        try { audio.current.stopFuelAlarm(); } catch {}
+        cameraShake = 24;
+        if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+        setTimeout(() => {
+          onGameOver({ score, landings, cause: "crash", difficulty, elapsed });
+        }, 700);
+      }
+      
+      // Volcano particle collisions (airborne)
+      if (!crashed && !isCavernLevel && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1108,6 +1139,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       drawAnomaliesField(ctx, anomalies, elapsed, neonColor);
       // Moving hazards
       drawHazards(ctx, hazards, neonColor);
+      
+      // Volcanoes and their particles (terrain mode only)
+      if (!isCavernLevel) {
+        const terrainData = terrain as TerrainData;
+        if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
+          drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles);
+        }
+      }
 
       // Lander
       if (!crashed) {
