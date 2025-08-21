@@ -326,7 +326,7 @@ export class CoreComposition {
   }
 
   private generateClusters(data: CoreCompositionData, rand: () => number, type: MineralType, density: number): void {
-    const numClusters = Math.floor(density * 35 * (data.worldBounds.width * data.worldBounds.height) / (1600 * 1200)); // Much more prevalent
+    const numClusters = Math.floor(density * 105 * (data.worldBounds.width * data.worldBounds.height) / (1600 * 1200)); // 3x more prevalent
     
     // Poisson-disk sampling for cluster centers
     for (let i = 0; i < numClusters; i++) {
@@ -335,7 +335,7 @@ export class CoreComposition {
         const x = rand() * data.worldBounds.width;
         const y = rand() * data.worldBounds.height;
         
-        if (this.isInRock(x, y, data) && this.getDistanceToAir(x, y, data) >= data.marginSize) {
+        if (this.isInRock(x, y, data) && this.getDistanceToAir(x, y, data) >= data.marginSize * 0.5) { // 3x farther drawing range
           const cluster: MineralCluster = {
             center: vec2(x, y),
             radius: 8 + rand() * 16, // Much smaller clusters
@@ -343,14 +343,14 @@ export class CoreComposition {
           };
           
           // Generate elements around cluster center
-          const numElements = 6 + Math.floor(rand() * 24); // 6-30 elements
+          const numElements = 18 + Math.floor(rand() * 72); // 3x volume: 18-90 elements
           for (let j = 0; j < numElements; j++) {
             const angle = rand() * Math.PI * 2;
             const distance = rand() * cluster.radius;
             const elementX = cluster.center.x + Math.cos(angle) * distance;
             const elementY = cluster.center.y + Math.sin(angle) * distance;
             
-            if (this.isInRock(elementX, elementY, data) && this.getDistanceToAir(elementX, elementY, data) >= data.marginSize) {
+            if (this.isInRock(elementX, elementY, data) && this.getDistanceToAir(elementX, elementY, data) >= data.marginSize * 0.5) {
               cluster.elements.push({
                 type,
                 x: elementX,

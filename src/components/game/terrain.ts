@@ -118,7 +118,7 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     const x1 = (i + 1) * step;
     const t = (xx - x0) / (x1 - x0);
     return points[i].y * (1 - t) + points[i + 1].y * t;
-  }, points);
+  }, points, pads);
 
   const worldWidthLocal = worldWidth;
   const wrapX = (x: number) => {

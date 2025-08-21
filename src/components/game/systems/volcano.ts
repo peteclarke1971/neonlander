@@ -52,11 +52,22 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       particleCount: 25,
       power: 0.8
     };
-  } else {
+  } else if (level <= 40) {
     return {
       count: Math.min(4, 2 + Math.floor((level - 8) / 3)),
       minSize: 16,
       maxSize: 32, // max size of smallest pad
+      baseInterval: 4,
+      eruptionDuration: 3,
+      particleCount: 35,
+      power: 1.0
+    };
+  } else {
+    // Level 40+ with mega volcanoes
+    return {
+      count: Math.min(4, 2 + Math.floor((level - 8) / 3)),
+      minSize: 16,
+      maxSize: 32,
       baseInterval: 4,
       eruptionDuration: 3,
       particleCount: 35,
@@ -70,7 +81,8 @@ export function generateVolcanoes(
   worldWidth: number, 
   level: number,
   getHeightAt: (x: number) => number,
-  terrainPoints: { x: number; y: number }[]
+  terrainPoints: { x: number; y: number }[],
+  pads: { xStart: number; xEnd: number; y: number }[]
 ): Volcano[] {
   const config = getVolcanoConfigForLevel(level);
   const rng = mulberry32(seed ^ 0xC0DE);
@@ -135,21 +147,43 @@ export function generateVolcanoes(
     }
     
     if (validPlacement) {
-      const size = config.minSize + rng() * (config.maxSize - config.minSize);
-      const baseInterval = config.baseInterval * (0.8 + rng() * 0.4); // slight randomization
+      // Check if location overlaps with any landing pad
+      let overlapsWithPad = false;
+      for (const pad of pads) {
+        const padCenterX = (pad.xStart + pad.xEnd) / 2;
+        const padWidth = pad.xEnd - pad.xStart;
+        const distance = Math.abs(candidate.x - padCenterX);
+        const wrappedDistance = Math.min(distance, worldWidth - distance);
+        
+        // Ensure volcano doesn't spawn within pad area + safety margin
+        if (wrappedDistance < (padWidth / 2) + 50) {
+          overlapsWithPad = true;
+          break;
+        }
+      }
       
-      volcanoes.push({
-        x: candidate.x,
-        y: candidate.y,
-        size,
-        nextEruption: baseInterval * (0.5 + rng() * 0.5), // stagger initial eruptions
-        eruptionInterval: baseInterval,
-        isErupting: false,
-        eruptionTimer: 0,
-        eruptionDuration: config.eruptionDuration,
-        power: config.power,
-        emissionCarry: 0
-      });
+      if (!overlapsWithPad) {
+        const size = config.minSize + rng() * (config.maxSize - config.minSize);
+        const baseInterval = config.baseInterval * (0.8 + rng() * 0.4); // slight randomization
+        
+        // Mega volcano chance for level 40+
+        const isMegaVolcano = level > 40 && rng() < 0.3;
+        const finalSize = isMegaVolcano ? size * 1.5 : size;
+        const finalPower = isMegaVolcano ? config.power * 2 : config.power;
+        
+        volcanoes.push({
+          x: candidate.x,
+          y: candidate.y,
+          size: finalSize,
+          nextEruption: baseInterval * (0.5 + rng() * 0.5), // stagger initial eruptions
+          eruptionInterval: baseInterval,
+          isErupting: false,
+          eruptionTimer: 0,
+          eruptionDuration: config.eruptionDuration,
+          power: finalPower,
+          emissionCarry: 0
+        });
+      }
     }
   }
 
@@ -181,7 +215,7 @@ export function updateVolcanoes(
         for (let i = 0; i < particlesThisFrame; i++) {
           // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
           const angle = (Math.random() - 0.5) * Math.PI * 0.6 - Math.PI / 2; // mostly upward
-          const speed = volcano.power * (80 + Math.random() * 120); // base velocity
+          const speed = volcano.power * (320 + Math.random() * 480); // 4x higher velocity for 4x height
           const size = 2 + Math.random() * 4;
           const life = 2 + Math.random() * 2; // particle lifetime
           
