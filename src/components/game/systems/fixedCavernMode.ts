@@ -25,8 +25,8 @@ export function getCavernSeed(mode: Mode, level: number, difficulty: Difficulty,
     return fixedSeed;
   }
   
-  // For classic mode, use truly random seeds
-  return Math.floor(Math.random() * 1e9);
+  // For classic mode, generate truly random seeds that change each time
+  return Math.floor(Math.random() * 1e9) ^ Date.now();
 }
 
 /**

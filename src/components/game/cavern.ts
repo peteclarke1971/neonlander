@@ -38,12 +38,12 @@ export interface CavernData {
 export function generateCavern(seed: number, level: number, difficulty: "easy" | "hard"): CavernData {
   // Use new mesh-baked cavern system
   const hShip = 16; // Approximate lander height
-  // Progressive world scaling - 8x larger at max levels
+  // Progressive world scaling - reduced to 4x larger at max levels (was 8x)
   const baseWidth = 2000;
   const baseHeight = 800;
-  const scaleMultiplier = 1 + (level / 49) * 7; // 1x to 8x scaling
+  const scaleMultiplier = 0.5 + (level / 49) * 3.5; // 0.5x to 4x scaling (halved from original)
   const worldWidth = Math.floor(baseWidth * scaleMultiplier);
-  const worldHeight = Math.floor(baseHeight * Math.min(scaleMultiplier, 3)); // Height caps at 3x
+  const worldHeight = Math.floor(baseHeight * Math.min(scaleMultiplier, 2)); // Height caps at 2x (was 3x)
   
   const bakeResult = CavernBake.generate({
     level,

@@ -57,8 +57,8 @@ export function generateCavernTopology(
     cavernCount = 5 + Math.floor(rand() * 5); // 5-9 caverns
   }
   
-  // Progressive scaling - 8x growth from level 0 to 49
-  const scaleMultiplier = 1 + (level / 49) * 7; // 1x to 8x scaling
+  // Progressive scaling - 4x growth from level 0 to 49 (was 8x)
+  const scaleMultiplier = 0.5 + (level / 49) * 3.5; // 0.5x to 4x scaling (halved from original)
   
   // Calculate cavern radii with progressive scaling and shape-aware sizing
   const getRadius = () => {

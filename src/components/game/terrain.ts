@@ -84,16 +84,32 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     const xCenter = centerIdx * step;
     const xStart = (xCenter - width / 2 + worldWidth) % worldWidth;
     const xEnd = (xCenter + width / 2 + worldWidth) % worldWidth;
-    const y = points[centerIdx].y - 8; // slightly flattened lower than surrounding
-
-    // Flatten nearby points to create a pad region (broader than visual width for playability)
+    // Flatten nearby points first to create a pad region (broader than visual width for playability)
     const halfCount = Math.max(1, Math.round((width / step) * 1.2));
+    const targetY = points[centerIdx].y - 8; // slightly flattened lower than surrounding
+    
+    // Ensure perfect flattening for pads
     for (let j = -halfCount; j <= halfCount; j++) {
       const idx = ((centerIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
-      points[idx].y = y;
+      points[idx].y = targetY;
     }
+    
+    const y = targetY; // use the exact flattened height
 
-    pads.push({ xStart, xEnd, y, multiplier, width, bonus2x: false });
+    // Check for overlap with existing pads before adding
+    let overlaps = false;
+    for (const existingPad of pads) {
+      const existingWidth = existingPad.xEnd - existingPad.xStart;
+      const overlap = !(xEnd < existingPad.xStart || xStart > existingPad.xEnd);
+      if (overlap) {
+        overlaps = true;
+        break;
+      }
+    }
+    
+    if (!overlaps) {
+      pads.push({ xStart, xEnd, y, multiplier, width, bonus2x: false });
+    }
   }
 
   // Mark smallest pad as 2x bonus pad (most difficult)

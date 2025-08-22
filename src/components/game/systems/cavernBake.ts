@@ -232,10 +232,11 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
   const startEffectivePadHalf = Math.max(20, Math.min(padWidth / 2, startFlatHalfWidth - padMargin));
   const endEffectivePadHalf = Math.max(20, Math.min(padWidth / 2, endFlatHalfWidth - padMargin));
   
+  // Ensure pads have proper clearance and are perfectly flush with flat floors
   const startPad: Pad = {
     xStart: startNode.center.x - startEffectivePadHalf,
     xEnd: startNode.center.x + startEffectivePadHalf,
-    y: startFloorY, // exactly on the flat floor
+    y: startFloorY - 1, // slightly below floor to ensure flush contact
     multiplier: 1,
     width: startEffectivePadHalf * 2,
     bonus2x: false
@@ -244,7 +245,7 @@ function generateCavernAttempt(params: CavernBakeParams, attempt: number): Caver
   const endPad: Pad = {
     xStart: endNode.center.x - endEffectivePadHalf,
     xEnd: endNode.center.x + endEffectivePadHalf,
-    y: endFloorY, // exactly on the flat floor
+    y: endFloorY - 1, // slightly below floor to ensure flush contact
     multiplier: 5,
     width: endEffectivePadHalf * 2,
     bonus2x: true

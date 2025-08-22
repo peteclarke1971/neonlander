@@ -147,7 +147,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
     } else {
-      seed = mode === "fixed" ? fixedSeed : Math.floor(Math.random() * 1e9);
+      // For classic mode (non-caverns), always use random generation
+      seed = mode === "fixed" ? fixedSeed : (Math.floor(Math.random() * 1e9) ^ Date.now());
     }
     
     const terrain: TerrainData | CavernData = isCavernLevel 
@@ -243,7 +244,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         // For cavern levels, spawn exactly flush on the start pad
         const cavernData = terrain as CavernData;
         const padCenterX = (cavernData.startPad.xStart + cavernData.startPad.xEnd) / 2;
-        const spawnY = cavernData.startPad.y - 14; // Lander sits slightly higher on pad for easy lift-off
+        const spawnY = cavernData.startPad.y - 18; // Ensure clear of any terrain collision
         return { x: padCenterX, y: spawnY };
       }
       

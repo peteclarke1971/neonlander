@@ -13,47 +13,47 @@ export interface ShapeWeights {
 
 // Default shape weights by difficulty level
 const LEVEL_WEIGHTS: { [key: string]: ShapeWeights } = {
-  // L1-3: Simple shapes, wide passages
+  // L0-4: Simple shapes, wide passages
   beginner: {
-    ellipse: 0.6,
+    ellipse: 0.7,
     superellipse: 0.0,
-    roundedBox: 0.4,
+    roundedBox: 0.3,
     roundedPolygon: 0.0,
     metaball: 0.0,
     radialNoise: 0.0,
     orthLRoom: 0.0
   },
   
-  // L4-7: Add variety, mild complexity
+  // L5-9: Add variety, mild complexity  
   intermediate: {
-    ellipse: 0.4,
-    superellipse: 0.2,
-    roundedBox: 0.3,
-    roundedPolygon: 0.0,
+    ellipse: 0.3,
+    superellipse: 0.25,
+    roundedBox: 0.25,
+    roundedPolygon: 0.15,
     metaball: 0.0,
     radialNoise: 0.05,
-    orthLRoom: 0.05
+    orthLRoom: 0.0
   },
   
-  // L8-12: Full variety, higher complexity
+  // L10-19: More variety, higher complexity
   advanced: {
-    ellipse: 0.25,
-    superellipse: 0.2,
-    roundedBox: 0.2,
-    roundedPolygon: 0.15,
-    metaball: 0.1,
-    radialNoise: 0.05,
-    orthLRoom: 0.05
-  },
-  
-  // L13+: All shapes, maximum complexity
-  expert: {
-    ellipse: 0.2,
+    ellipse: 0.15,
     superellipse: 0.2,
     roundedBox: 0.15,
-    roundedPolygon: 0.2,
+    roundedPolygon: 0.25,
     metaball: 0.15,
     radialNoise: 0.05,
+    orthLRoom: 0.05
+  },
+  
+  // L20+: All shapes, maximum complexity and exotic shapes
+  expert: {
+    ellipse: 0.1,
+    superellipse: 0.15,
+    roundedBox: 0.1,
+    roundedPolygon: 0.25,
+    metaball: 0.25,
+    radialNoise: 0.1,
     orthLRoom: 0.05
   }
 };
@@ -69,9 +69,9 @@ function mulberry32(seed: number) {
 }
 
 export function getShapeWeightsForLevel(level: number): ShapeWeights {
-  if (level <= 3) return LEVEL_WEIGHTS.beginner;
-  if (level <= 7) return LEVEL_WEIGHTS.intermediate;
-  if (level <= 12) return LEVEL_WEIGHTS.advanced;
+  if (level <= 4) return LEVEL_WEIGHTS.beginner;
+  if (level <= 9) return LEVEL_WEIGHTS.intermediate;
+  if (level <= 19) return LEVEL_WEIGHTS.advanced;
   return LEVEL_WEIGHTS.expert;
 }
 
@@ -123,7 +123,8 @@ export function generateShapeParams(
   
   switch (shapeType) {
     case CavernShape.Ellipse: {
-      const aspectRatio = 0.7 + rand() * 0.6; // 0.7 to 1.3
+      // Much more variety in aspect ratios
+      const aspectRatio = level <= 4 ? (0.8 + rand() * 0.4) : (0.5 + rand() * 1.0); // 0.5 to 1.5 for higher levels
       const majorAxis = safeRadius;
       const minorAxis = majorAxis * aspectRatio;
       params.axes = { a: majorAxis, b: minorAxis };
@@ -131,8 +132,9 @@ export function generateShapeParams(
     }
     
     case CavernShape.Superellipse: {
-      const aspectRatio = 0.8 + rand() * 0.4; // 0.8 to 1.2
-      const pow = 2 + rand() * 4; // 2 to 6
+      // More extreme aspect ratios and power values
+      const aspectRatio = level <= 9 ? (0.7 + rand() * 0.6) : (0.4 + rand() * 1.2); // 0.4 to 1.6 for higher levels
+      const pow = level <= 9 ? (2 + rand() * 3) : (1.5 + rand() * 6); // 1.5 to 7.5 for higher levels
       const majorAxis = safeRadius;
       const minorAxis = majorAxis * aspectRatio;
       params.axes = { a: majorAxis, b: minorAxis };
@@ -141,21 +143,24 @@ export function generateShapeParams(
     }
     
     case CavernShape.RoundedBox: {
-      const aspectRatio = 0.7 + rand() * 0.6;
-      const cornerRadius = Math.max(10, safeRadius * (0.1 + rand() * 0.2));
+      // More extreme aspect ratios and corner variations
+      const aspectRatio = level <= 9 ? (0.6 + rand() * 0.8) : (0.3 + rand() * 1.4); // 0.3 to 1.7 for higher levels
+      const cornerRadius = Math.max(8, safeRadius * (0.05 + rand() * 0.3)); // More variation in corners
       params.halfSize = vec2(safeRadius, safeRadius * aspectRatio);
       params.cornerRadius = cornerRadius;
       break;
     }
     
     case CavernShape.RoundedPolygon: {
-      const sides = 3 + Math.floor(rand() * 4); // 3-6 sides
+      // More variety in sides and much more irregular shapes
+      const sides = level <= 9 ? (3 + Math.floor(rand() * 4)) : (3 + Math.floor(rand() * 6)); // 3-8 sides for higher levels
       const vertices: Vec2[] = [];
-      const cornerRadius = Math.max(8, safeRadius * (0.05 + rand() * 0.15));
+      const cornerRadius = Math.max(6, safeRadius * (0.03 + rand() * 0.2)); // More corner variation
       
       for (let i = 0; i < sides; i++) {
         const angle = (i / sides) * Math.PI * 2;
-        const radiusJitter = 1 + (rand() - 0.5) * 0.18; // ±9% variation
+        // Much more irregular shapes for higher levels
+        const radiusJitter = level <= 9 ? (1 + (rand() - 0.5) * 0.3) : (1 + (rand() - 0.5) * 0.6); // ±30% variation for higher levels
         const radius = safeRadius * radiusJitter;
         vertices.push(vec2(
           center.x + Math.cos(angle) * radius,
@@ -169,16 +174,22 @@ export function generateShapeParams(
     }
     
     case CavernShape.Metaball: {
-      const numDiscs = 2 + Math.floor(rand() * 3); // 2-4 discs
+      // More metaballs and variety for higher levels
+      const numDiscs = level <= 9 ? (2 + Math.floor(rand() * 3)) : (2 + Math.floor(rand() * 5)); // 2-6 discs for higher levels
       const discs = [];
-      const smoothK = 0.15 + rand() * 0.1; // 0.15-0.25
+      const smoothK = level <= 9 ? (0.15 + rand() * 0.1) : (0.1 + rand() * 0.2); // More variation in smoothness
       
       for (let i = 0; i < numDiscs; i++) {
+        // More spread for higher levels
+        const maxOffset = level <= 9 ? 0.6 : 0.8;
         const offset = vec2(
-          (rand() - 0.5) * safeRadius * 0.6,
-          (rand() - 0.5) * safeRadius * 0.6
+          (rand() - 0.5) * safeRadius * maxOffset,
+          (rand() - 0.5) * safeRadius * maxOffset
         );
-        const discRadius = safeRadius * (0.4 + rand() * 0.3); // 0.4-0.7 of base
+        // More size variation for higher levels
+        const minSize = level <= 9 ? 0.4 : 0.3;
+        const maxSize = level <= 9 ? 0.7 : 0.8;
+        const discRadius = safeRadius * (minSize + rand() * (maxSize - minSize));
         discs.push({
           center: vec2(center.x + offset.x, center.y + offset.y),
           radius: discRadius
@@ -191,9 +202,10 @@ export function generateShapeParams(
     }
     
     case CavernShape.RadialNoise: {
-      const maxAmplitude = level <= 3 ? 0 : level <= 7 ? 0.12 : level <= 12 ? 0.16 : 0.18;
+      // Much more aggressive noise for higher levels
+      const maxAmplitude = level <= 4 ? 0.05 : level <= 9 ? 0.15 : level <= 19 ? 0.25 : 0.35;
       const amplitude = rand() * maxAmplitude;
-      const bands = 2 + Math.floor(rand() * 4); // 2-5 bands
+      const bands = level <= 9 ? (2 + Math.floor(rand() * 3)) : (3 + Math.floor(rand() * 5)); // 3-7 bands for higher levels
       
       params.baseRadius = safeRadius;
       params.noiseAmplitude = amplitude;
@@ -202,8 +214,9 @@ export function generateShapeParams(
     }
     
     case CavernShape.OrthLRoom: {
-      const aspectRatio = 0.6 + rand() * 0.8; // 0.6-1.4
-      const cornerRadius = Math.max(12, safeRadius * (0.08 + rand() * 0.12));
+      // More extreme L-room variations
+      const aspectRatio = level <= 9 ? (0.5 + rand() * 1.0) : (0.3 + rand() * 1.4); // 0.3 to 1.7 for higher levels
+      const cornerRadius = Math.max(10, safeRadius * (0.05 + rand() * 0.15));
       params.halfSize = vec2(safeRadius, safeRadius * aspectRatio);
       params.cornerRadius = cornerRadius;
       break;
