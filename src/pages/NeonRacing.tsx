@@ -1,0 +1,404 @@
+import React, { useState, useRef, useEffect } from "react";
+import { SpaceRaceEngine } from "@/components/game/SpaceRaceEngine";
+import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { SpaceRaceDifficulty, SpaceRaceGameOverData } from "@/components/game/types/spaceracing";
+import { Button } from "@/components/ui/button";
+import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
+import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, setUiMode } from "@/hooks/use-gamepad";
+
+type View = "home" | "game" | "gameover";
+type Difficulty = "easy" | "hard";
+
+interface HighScore {
+  initials: string;
+  score: number;
+  difficulty: Difficulty;
+  level: number;
+  date: number;
+}
+
+const NeonRacing: React.FC = () => {
+  const [view, setView] = useState<View>("home");
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [mode, setMode] = useState<"time-trial" | "grand-prix" | "endless">("time-trial");
+  const [startTrack, setStartTrack] = useState<number>(1);
+  const [lastResult, setLastResult] = useState<SpaceRaceGameOverData | null>(null);
+  const [highScores, setHighScores] = useState<HighScore[]>(() => {
+    const now = Date.now();
+    const seed: HighScore[] = [
+      { initials: "NEO", score: 80000, difficulty: "easy", level: 15, date: now },
+      { initials: "ACE", score: 65000, difficulty: "hard", level: 12, date: now - 86400000 },
+      { initials: "JET", score: 50000, difficulty: "easy", level: 10, date: now - 86400000 * 2 },
+      { initials: "MAX", score: 35000, difficulty: "hard", level: 8, date: now - 86400000 * 3 },
+      { initials: "ZEN", score: 25000, difficulty: "easy", level: 6, date: now - 86400000 * 4 },
+    ];
+    try {
+      const saved = localStorage.getItem("neon-racing-high-scores");
+      const parsed = saved ? JSON.parse(saved) : [];
+      if (Array.isArray(parsed) && parsed.length >= 5) return parsed.slice(0, 5);
+    } catch {}
+    localStorage.setItem("neon-racing-high-scores", JSON.stringify(seed));
+    return seed;
+  });
+
+  // Navigation refs
+  const diffButtonRefs = useRef<{ [key in Difficulty]: HTMLButtonElement | null }>({
+    easy: null,
+    hard: null
+  });
+  const trackButtonRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({});
+  const [navIndex, setNavIndex] = useState({ section: 0, item: 0 });
+
+  // Game Over refs
+  const tryAgainRef = useRef<HTMLButtonElement>(null);
+  const mainMenuRef = useRef<HTMLButtonElement>(null);
+  const [goFocusIndex, setGoFocusIndex] = useState<0 | 1>(0);
+
+  const startGame = (selectedDifficulty: Difficulty, selectedMode: typeof mode, track: number = 1) => {
+    setDifficulty(selectedDifficulty);
+    setMode(selectedMode);
+    setStartTrack(track);
+    setView("game");
+  };
+
+  const handleGameOver = (data: SpaceRaceGameOverData) => {
+    setLastResult(data);
+    setView("gameover");
+    setTimeout(() => {
+      tryAgainRef.current?.focus();
+      setGoFocusIndex(0);
+    }, 10);
+  };
+
+  const handleInitialsSubmit = (initials: string) => {
+    if (lastResult) {
+      const newScore: HighScore = {
+        initials,
+        score: lastResult.score,
+        difficulty: difficulty,
+        level: lastResult.tracksCompleted,
+        date: Date.now()
+      };
+      
+      const updatedScores = [...highScores, newScore]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+      
+      setHighScores(updatedScores);
+      
+      try {
+        localStorage.setItem("neon-racing-high-scores", JSON.stringify(updatedScores));
+      } catch {}
+    }
+    
+    setView("home");
+  };
+
+  const backToHome = () => {
+    setView("home");
+  };
+
+  const retryGame = () => {
+    setView("game");
+  };
+
+  // Navigation logic similar to lunar lander
+  const difficulties: Difficulty[] = ["easy", "hard"];
+  const tracks = [1, 3, 5, 8, 10, 15];
+  const modes = [
+    { key: "time-trial" as const, label: "Time Trial", desc: "Single track racing with ghost" },
+    { key: "grand-prix" as const, label: "Grand Prix", desc: "Multi-track championship" },
+    { key: "endless" as const, label: "Endless", desc: "Infinite procedural racing" }
+  ];
+
+  // Gamepad navigation
+  useEffect(() => {
+    if (view !== "home") return;
+    
+    let raf = 0;
+    let lastId: string | null = getLastDeviceId();
+    let gpProfile = loadProfile(lastId || undefined);
+    let prev = { up: false, down: false, left: false, right: false, select: false, back: false };
+    let lastFire = { up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 };
+    
+    const canFire = (k: keyof typeof lastFire) => (performance.now() - lastFire[k]) > 150;
+    const mark = (k: keyof typeof lastFire) => { lastFire[k] = performance.now(); };
+    
+    const fire = (key: string) => {
+      const target = (document.activeElement as HTMLElement) || document.body;
+      target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    };
+    
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const gp = anyGamepad?.();
+      if (!gp || !gp.connected) return;
+      
+      if (lastId !== gp.id) {
+        lastId = gp.id;
+        gpProfile = loadProfile(gp.id);
+      }
+      
+      const input = readGamepad(gp, gpProfile);
+      
+      if (input.ui.up && !prev.up && canFire("up")) { fire("ArrowUp"); mark("up"); }
+      if (input.ui.down && !prev.down && canFire("down")) { fire("ArrowDown"); mark("down"); }
+      if (input.ui.left && !prev.left && canFire("left")) { fire("ArrowLeft"); mark("left"); }
+      if (input.ui.right && !prev.right && canFire("right")) { fire("ArrowRight"); mark("right"); }
+      if (input.ui.select && !prev.select && canFire("select")) { fire("Enter"); mark("select"); }
+      if (input.ui.back && !prev.back && canFire("back")) { fire("Escape"); mark("back"); }
+      
+      prev = input.ui;
+    };
+    
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [view, navIndex]);
+
+  // Keyboard navigation matching Lunar Lander HomeScreen pattern
+  useEffect(() => {
+    if (view !== "home") return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", " ", "Tab"].includes(e.key)) return;
+      
+      const focus = (el?: HTMLElement | null) => el && el.focus();
+      const key = e.key;
+      
+      // Allow natural tab navigation without interference
+      if (key === "Tab") return;
+      
+      // Prevent default for arrow keys and Enter/Space
+      e.preventDefault();
+      
+      const active = document.activeElement as HTMLElement | null;
+      
+      // Get all focusable elements in order
+      const getAllFocusableElements = () => {
+        const elements: HTMLElement[] = [];
+        
+        // Add difficulty buttons
+        difficulties.forEach(d => {
+          const btn = diffButtonRefs.current[d];
+          if (btn) elements.push(btn);
+        });
+        
+        // Add track buttons
+        difficulties.forEach(d => {
+          tracks.forEach(t => {
+            const btn = trackButtonRefs.current[t];
+            if (btn) elements.push(btn);
+          });
+        });
+        
+        return elements;
+      };
+      
+      const focusables = getAllFocusableElements();
+      const currentIndex = focusables.findIndex(el => el === active);
+      
+      if (key === "ArrowRight" || key === "ArrowDown") {
+        const nextIndex = (currentIndex + 1) % focusables.length;
+        focus(focusables[nextIndex]);
+      } else if (key === "ArrowLeft" || key === "ArrowUp") {
+        const prevIndex = currentIndex <= 0 ? focusables.length - 1 : currentIndex - 1;
+        focus(focusables[prevIndex]);
+      } else if (key === "Enter" || key === " ") {
+        active?.click();
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [view]);
+
+  // Set UI mode for gamepad
+  useEffect(() => {
+    try { setUiMode(view !== "game"); } catch {}
+  }, [view]);
+
+  if (view === "home") {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        <div className="absolute inset-0 z-0" aria-hidden>
+          <HyperspaceStarfield />
+        </div>
+        <div className="absolute inset-0 z-10 opacity-50 pointer-events-none" aria-hidden>
+          <div className="pointer-events-none w-full h-full" style={{
+            background: "radial-gradient(800px 400px at 50% 0%, hsla(var(--neon),0.15), transparent 60%)"
+          }} />
+        </div>
+
+        <section className="relative z-20 text-center animate-enter">
+          <h1 className="neon-title text-5xl md:text-6xl font-extrabold font-display tracking-widest mb-3 text-foreground drop-shadow-[0_0_18px_hsla(var(--neon),_0.5)]">
+            NEON RACING
+          </h1>
+          <p className="text-muted-foreground max-w-xl mx-auto mb-2">
+            Navigate 3D wireframe tracks at breakneck speed. Thread gates, avoid obstacles, and outrun AI rivals in this vector space racing experience.
+          </p>
+          <p className="text-xs text-muted-foreground/80 max-w-lg mx-auto">
+            Use WASD to strafe, arrow keys to steer, SPACE for airbrake, SHIFT for boost
+          </p>
+
+          {/* Navigation buttons */}
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <a href="/" className="inline-block">
+              <Button variant="outline">
+                ← Back to Main Menu
+              </Button>
+            </a>
+          </div>
+
+          {/* Mode Selection */}
+          <div className="mt-8 mb-6">
+            <h3 className="text-lg font-semibold mb-4 text-accent">Race Mode</h3>
+            <div className="flex flex-wrap justify-center gap-3">
+              {modes.map((m) => (
+                <Button
+                  key={m.key}
+                  variant={mode === m.key ? "neon" : "outline"}
+                  onClick={() => setMode(m.key)}
+                  className="flex flex-col items-center p-4 h-auto min-w-[120px]"
+                >
+                  <span className="font-semibold">{m.label}</span>
+                  <span className="text-xs opacity-80">{m.desc}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex gap-3">
+              {difficulties.map((d, dIndex) => (
+                <div key={d} className="border border-border/60 rounded-lg p-4 w-44 bg-card/50">
+                  <div className="text-lg font-semibold">{d.toUpperCase()}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {d === "easy" ? "Forgiving handling, slower AI" : "Precise controls, aggressive AI"}
+                  </div>
+                  <Button
+                    ref={(el) => { diffButtonRefs.current[d] = el; }}
+                    variant="hero" 
+                    size="lg" 
+                    className="w-full mt-3 font-mono tracking-wider text-accent border-accent shadow-[0_0_20px_hsl(var(--accent)/0.3)] hover:shadow-[0_0_30px_hsl(var(--accent)/0.5)] transition-all duration-300" 
+                    onClick={() => startGame(d, mode, 1)}
+                  >
+                    &gt; ENTER THE GRID &lt;
+                  </Button>
+                  {mode !== "endless" && (
+                    <>
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground mt-3">Start at track</div>
+                      <div className="mt-2 grid grid-cols-6 gap-2">
+                        {tracks.map((t, idx) => (
+                          <Button
+                            key={t}
+                            ref={(el) => { trackButtonRefs.current[t] = el; }}
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => startGame(d, mode, t)}
+                          >
+                            {t}
+                          </Button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {highScores.length > 0 && (
+              <div className="mt-6 text-left bg-card/60 border border-border/60 rounded-lg p-4 w-[min(90vw,720px)]">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm uppercase tracking-wider text-muted-foreground">High Scores</div>
+                </div>
+                <div className="mt-2 space-y-2 animate-enter-slow">
+                  <ol>
+                    {highScores.slice(0, 5).map((score, i) => (
+                      <li key={`${score.initials}-${i}`} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
+                          <span className="font-mono text-accent">{score.initials}</span>
+                        </div>
+                        <span className="text-accent font-semibold">{score.score.toLocaleString()}</span>
+                        <span className="text-muted-foreground hidden sm:block">
+                          Track {score.level}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (view === "game") {
+    return (
+      <SpaceRaceEngine
+        difficulty={difficulty === "easy" ? "Easy" : "Hard"}
+        mode={mode}
+        startTrack={startTrack}
+        onExit={backToHome}
+        onGameOver={handleGameOver}
+      />
+    );
+  }
+
+  // Game over view
+  const isHighScore = lastResult && highScores.some(score => lastResult.score > score.score);
+  
+  return (
+    <div className="relative w-full h-screen bg-background overflow-hidden">
+      <div className="absolute inset-0 z-0" aria-hidden>
+        <HyperspaceStarfield />
+      </div>
+      
+      <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8">
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold text-destructive">
+            {lastResult?.cause === "crash" ? "SHIP DESTROYED" : 
+             lastResult?.cause === "timeout" ? "TIME EXPIRED" : "RACE ENDED"}
+          </h1>
+          
+          {lastResult && (
+            <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6 space-y-2">
+              <div className="text-2xl font-bold text-accent">
+                Score: {lastResult.score.toLocaleString()}
+              </div>
+              <div className="text-lg">Tracks Completed: {lastResult.tracksCompleted}</div>
+              <div className="text-lg">Best Lap: {lastResult.bestLapTime?.toFixed(2)}s</div>
+              <div className="text-sm text-muted-foreground">
+                Total Time: {lastResult.elapsed.toFixed(1)}s
+              </div>
+            </div>
+          )}
+        </div>
+
+        {isHighScore && lastResult ? (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-accent">NEW HIGH SCORE!</h2>
+            <InitialsEntry
+              onSubmit={handleInitialsSubmit}
+              score={lastResult.score}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Button onClick={retryGame} variant="outline" size="lg">
+              Try Again
+            </Button>
+            <Button onClick={backToHome} variant="ghost">
+              Main Menu
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default NeonRacing;
