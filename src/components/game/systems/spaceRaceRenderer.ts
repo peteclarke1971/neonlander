@@ -35,6 +35,8 @@ export class WireframeRenderer {
   setViewport(width: number, height: number): void {
     this.width = width;
     this.height = height;
+    this.canvas.width = width;
+    this.canvas.height = height;
   }
   
   setCamera(camera: RaceCamera): void {
@@ -46,11 +48,11 @@ export class WireframeRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
     // Draw starfield background
-    this.ctx.fillStyle = 'hsl(var(--background))';
+    this.ctx.fillStyle = '#000011';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
     // Add some stars for space ambiance
-    this.ctx.fillStyle = 'hsla(var(--muted-foreground), 0.3)';
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     for (let i = 0; i < 100; i++) {
       const x = Math.random() * this.canvas.width;
       const y = Math.random() * this.canvas.height;
@@ -96,7 +98,7 @@ export class WireframeRenderer {
     if (!projected.visible) return;
     
     const size = isPlayer ? 8 : 6;
-    const color = isPlayer ? 'hsl(var(--accent))' : 'hsl(var(--primary))';
+    const color = isPlayer ? '#00ffff' : '#ff00ff';
     
     this.ctx.fillStyle = color;
     if (isPlayer) {
@@ -136,7 +138,7 @@ export class WireframeRenderer {
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     
-    this.ctx.fillStyle = 'hsl(var(--accent))';
+    this.ctx.fillStyle = '#00ffff';
     this.ctx.font = '48px monospace';
     this.ctx.textAlign = 'center';
     this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2);
