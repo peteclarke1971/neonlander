@@ -244,7 +244,7 @@ function generateGateWireframe(position: Vec3, width: number, height: number): W
     lines.push({
       start: points[i],
       end: points[next],
-      color: "hsl(var(--accent))",
+      color: "#00ffff",
       glow: true
     });
   }
@@ -256,7 +256,7 @@ function generateWallWireframe(position: Vec3): WireframeLine[] {
   return [{
     start: { x: position.x, y: position.y - 20, z: position.z },
     end: { x: position.x, y: position.y + 20, z: position.z },
-    color: "hsl(var(--muted-foreground))",
+    color: "#666666",
     glow: false
   }];
 }
@@ -289,7 +289,7 @@ function generateAsteroidWireframe(center: Vec3, size: number): WireframeLine[] 
     lines.push({
       start: p1,
       end: p2,
-      color: "hsl(var(--muted-foreground))",
+      color: "#888888",
       glow: false
     });
   }

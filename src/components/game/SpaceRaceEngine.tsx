@@ -28,9 +28,9 @@ interface Props {
 }
 
 const DIFFICULTY_SETTINGS = {
-  "Easy": { playerSpeed: 800, aiSpeed: 600, aiCount: 2, assistsEnabled: true },
-  "Normal": { playerSpeed: 1000, aiSpeed: 800, aiCount: 3, assistsEnabled: false },
-  "Hard": { playerSpeed: 1200, aiSpeed: 1000, aiCount: 4, assistsEnabled: false }
+  "Easy": { playerSpeed: 60, aiSpeed: 45, aiCount: 2, assistsEnabled: true },
+  "Normal": { playerSpeed: 80, aiSpeed: 65, aiCount: 3, assistsEnabled: false },
+  "Hard": { playerSpeed: 100, aiSpeed: 80, aiCount: 4, assistsEnabled: false }
 };
 
 const BASE_SCORE_PER_GATE = 100;
@@ -389,8 +389,8 @@ export const SpaceRaceEngine: React.FC<Props> = ({
 
   const handlePlayerInput = (ship: SpaceShip, dt: number) => {
     const keys = keysRef.current;
-    const strafeForce = 1200 * dt; // lateral movement force
-    const rotationForce = 3.0 * dt; // rotation speed
+    const strafeForce = 100 * dt; // lateral movement force
+    const rotationForce = 2.0 * dt; // rotation speed
     
     // Strafe movement
     if (keys.strafeLeft) ship.velocity.x -= strafeForce;
@@ -408,17 +408,17 @@ export const SpaceRaceEngine: React.FC<Props> = ({
 
     // Speed control
     if (keys.boost && ship.boostMeter > 0) {
-      ship.speed = Math.min(ship.maxSpeed, ship.speed + 800 * dt);
+      ship.speed = Math.min(ship.maxSpeed, ship.speed + 60 * dt);
       ship.boostMeter = Math.max(0, ship.boostMeter - dt * 0.6); // drain boost
     } else if (keys.airbrake) {
-      ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 1200 * dt);
+      ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 90 * dt);
     } else {
       // Return to base speed gradually
       const targetSpeed = ship.baseSpeed;
       if (ship.speed > targetSpeed) {
-        ship.speed = Math.max(targetSpeed, ship.speed - 600 * dt);
+        ship.speed = Math.max(targetSpeed, ship.speed - 40 * dt);
       } else if (ship.speed < targetSpeed) {
-        ship.speed = Math.min(targetSpeed, ship.speed + 400 * dt);
+        ship.speed = Math.min(targetSpeed, ship.speed + 30 * dt);
       }
     }
 
@@ -432,8 +432,8 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     const profile = loadProfile(gamepad.id);
     const input = readGamepad(gamepad, profile);
     
-    const strafeForce = 1200 * dt;
-    const rotationForce = 3.0 * dt;
+    const strafeForce = 100 * dt;
+    const rotationForce = 2.0 * dt;
 
     // Analog strafe with left stick
     ship.velocity.x += (gamepad.axes[0] || 0) * strafeForce * 2; // X-axis
@@ -448,16 +448,16 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     const brake = Math.max(0, (gamepad.axes[6] || 0) + 1) / 2; // LT
 
     if (input.buttons.rotateLeft && ship.boostMeter > 0) { // Boost with LB
-      ship.speed = Math.min(ship.maxSpeed, ship.speed + 800 * dt);
+      ship.speed = Math.min(ship.maxSpeed, ship.speed + 60 * dt);
       ship.boostMeter = Math.max(0, ship.boostMeter - dt * 0.6);
     } else if (brake > 0.1) {
-      ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 1200 * brake * dt);
+      ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 90 * brake * dt);
     } else {
       const targetSpeed = ship.baseSpeed * (0.8 + throttle * 0.4); // 80%-120% speed range
       if (ship.speed > targetSpeed) {
-        ship.speed = Math.max(targetSpeed, ship.speed - 600 * dt);
+        ship.speed = Math.max(targetSpeed, ship.speed - 40 * dt);
       } else if (ship.speed < targetSpeed) {
-        ship.speed = Math.min(targetSpeed, ship.speed + 400 * dt);
+        ship.speed = Math.min(targetSpeed, ship.speed + 30 * dt);
       }
     }
   };
