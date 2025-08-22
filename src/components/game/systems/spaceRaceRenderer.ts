@@ -7,6 +7,7 @@ import {
   ProjectionResult 
 } from "../types/spaceracing";
 
+// 3D Wireframe renderer for Neon Racing 
 export class WireframeRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
