@@ -53,6 +53,9 @@ export const CavernEngine: React.FC<Props> = ({
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
   
+  // FPS monitoring for core elements removal
+  const [lowFpsStartTime, setLowFpsStartTime] = useState<number | null>(null);
+  
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
@@ -283,6 +286,7 @@ export const CavernEngine: React.FC<Props> = ({
     let last = performance.now();
     let frameCount = 0;
     let lastFpsUpdate = last;
+    let lowFpsStartTime: number | null = null;
 
     const updateHud = () => {
       const floorHeight = cavern.getHeightAt(x);
@@ -300,6 +304,30 @@ export const CavernEngine: React.FC<Props> = ({
       const dt = Math.min((now - last) / 1000, 1/30); // cap to 30fps minimum
       last = now;
       elapsed += dt;
+      
+      // FPS monitoring and performance protection
+      frameCount++;
+      if (now - lastFpsUpdate >= 1000) { // Check every second
+        const currentFps = frameCount / ((now - lastFpsUpdate) / 1000);
+        setFps(Math.round(currentFps));
+        frameCount = 0;
+        lastFpsUpdate = now;
+        
+        // Performance protection: remove core elements if FPS drops below 50 for more than 1 second
+        if (currentFps < 50) {
+          if (lowFpsStartTime === null) {
+            lowFpsStartTime = now;
+          } else if (now - lowFpsStartTime > 1000) {
+            // FPS has been below 50 for more than 1 second - remove core elements
+            coreComposition.stop();
+            lowFpsStartTime = null;
+            console.warn("Performance protection: Core elements removed due to low FPS");
+          }
+        } else {
+          // Reset the low FPS timer if performance recovers
+          lowFpsStartTime = null;
+        }
+      }
       
       // Update camera state for FX renderer
       setCameraState({
