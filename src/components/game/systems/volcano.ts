@@ -195,10 +195,11 @@ export function updateVolcanoes(
   particles: VolcanoParticle[],
   dt: number,
   level: number
-): { newParticles: VolcanoParticle[]; shouldPlayEruptionSound: boolean } {
+): { newParticles: VolcanoParticle[]; shouldPlayEruptionSound: boolean; eruptingVolcanoes: { x: number }[] } {
   const config = getVolcanoConfigForLevel(level);
   const newParticles: VolcanoParticle[] = [];
   let shouldPlayEruptionSound = false;
+  const eruptingVolcanoes: { x: number }[] = [];
 
   for (const volcano of volcanoes) {
     if (volcano.isErupting) {
@@ -252,6 +253,7 @@ export function updateVolcanoes(
         volcano.eruptionTimer = volcano.eruptionDuration;
         volcano.emissionCarry = 0;
         shouldPlayEruptionSound = true;
+        eruptingVolcanoes.push({ x: volcano.x });
       }
     }
   }
@@ -278,7 +280,7 @@ export function updateVolcanoes(
   // Add new particles
   particles.push(...newParticles);
 
-  return { newParticles, shouldPlayEruptionSound };
+  return { newParticles, shouldPlayEruptionSound, eruptingVolcanoes };
 }
 
 export function drawVolcanoes(

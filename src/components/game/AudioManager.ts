@@ -254,6 +254,83 @@ export class AudioManager {
     src.start(0);
   }
 
+  private playSpatialOneShot(buffer: AudioBuffer, volume = 0.9, pan = 0) {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    if (!this.sfxGain) {
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 1;
+      this.sfxGain.connect(this.master);
+    }
+    
+    // Create spatial audio chain: source -> gain -> panner -> sfxGain -> master
+    const gain = this.ctx.createGain();
+    gain.gain.value = volume;
+    
+    const panner = this.ctx.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan)); // Clamp between -1 and 1
+    
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(gain);
+    gain.connect(panner);
+    panner.connect(this.sfxGain);
+    src.start(0);
+  }
+
+  private playSpatialNoise(duration = 0.25, volume = 0.5, pan = 0) {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    
+    const gain = this.ctx.createGain();
+    gain.gain.value = volume;
+    
+    const panner = this.ctx.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+    
+    src.connect(gain);
+    gain.connect(panner);
+    panner.connect(this.master);
+    src.start();
+  }
+
+  // Spatial audio for volcano eruptions
+  spatialExplosion(sourceX: number, listenerX: number, worldWidth: number) {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Calculate distance and panning
+    const dx = sourceX - listenerX;
+    const distance = Math.abs(dx);
+    const wrappedDistance = Math.min(distance, worldWidth - distance);
+    
+    // Determine which direction is shorter (for wrapping)
+    const useWrappedDirection = (worldWidth - distance) < distance;
+    const finalDx = useWrappedDirection ? (dx > 0 ? -(worldWidth - distance) : (worldWidth - distance)) : dx;
+    
+    // Pan based on direction (-1 = left, 1 = right)
+    const maxPanDistance = worldWidth * 0.3; // 30% of world width for full pan
+    const panValue = Math.max(-1, Math.min(1, finalDx / maxPanDistance));
+    
+    // Volume based on distance (closer = louder)
+    const maxHearingDistance = worldWidth * 0.8; // Can hear across 80% of world width
+    const distanceRatio = Math.min(1, wrappedDistance / maxHearingDistance);
+    const volume = Math.max(0.1, 1 - distanceRatio * 0.8); // Keep minimum 10% volume
+    
+    if (this.landingBuffer) {
+      this.playSpatialOneShot(this.landingBuffer, volume, panValue);
+    } else {
+      this.playSpatialNoise(0.35, volume * 0.8, panValue);
+    }
+  }
+
   explosion() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;

@@ -674,8 +674,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
           const volcanoUpdate = updateVolcanoes(terrainData.volcanoes, volcanoParticles, dt, level);
-          if (volcanoUpdate.shouldPlayEruptionSound) {
-            try { audio.current.explosion(); } catch {} // Use explosion sound for eruptions
+          if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0) {
+            // Play spatial audio for each erupting volcano
+            for (const volcano of volcanoUpdate.eruptingVolcanoes) {
+              try { 
+                audio.current.spatialExplosion(volcano.x, x, terrainData.worldWidth); 
+              } catch {} 
+            }
           }
           // Update volcano particles state with new particles
           setVolcanoParticles([...volcanoParticles]);
