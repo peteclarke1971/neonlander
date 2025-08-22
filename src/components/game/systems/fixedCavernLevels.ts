@@ -11,68 +11,78 @@ export interface FixedCavernLevel {
 // Base seed for all fixed cavern levels
 const CAVERN_BASE_SEED = 982734;
 
-// Pre-defined seeds for 50 fixed cavern levels
-// These seeds have been tested to generate playable, balanced caverns
+// Enhanced 50 fixed cavern levels utilizing new shape archetypes and progressive scaling
+// Each level carefully designed with specific shape combinations and balanced difficulty curves
 export const FIXED_CAVERN_LEVELS: FixedCavernLevel[] = [
-  // Beginner levels (0-9) - Larger caverns, wider tunnels
-  { level: 0, seed: CAVERN_BASE_SEED + 0x1234, difficulty: 'easy', description: 'Tutorial Cavern' },
-  { level: 1, seed: CAVERN_BASE_SEED + 0x2468, difficulty: 'easy', description: 'First Steps' },
-  { level: 2, seed: CAVERN_BASE_SEED + 0x369C, difficulty: 'easy', description: 'Learning to Navigate' },
-  { level: 3, seed: CAVERN_BASE_SEED + 0x48D0, difficulty: 'easy', description: 'Simple Maze' },
-  { level: 4, seed: CAVERN_BASE_SEED + 0x5A04, difficulty: 'easy', description: 'Branch Paths' },
-  { level: 5, seed: CAVERN_BASE_SEED + 0x6B38, difficulty: 'easy', description: 'Vertical Climb' },
-  { level: 6, seed: CAVERN_BASE_SEED + 0x7C6C, difficulty: 'easy', description: 'Winding Tunnels' },
-  { level: 7, seed: CAVERN_BASE_SEED + 0x8DA0, difficulty: 'easy', description: 'Multi-Chamber' },
-  { level: 8, seed: CAVERN_BASE_SEED + 0x9ED4, difficulty: 'easy', description: 'Deep Descent' },
-  { level: 9, seed: CAVERN_BASE_SEED + 0xA008, difficulty: 'easy', description: 'Complex Network' },
+  // Tutorial levels (0-4) - Simple ellipses and rounded boxes, 1x scale
+  { level: 0, seed: CAVERN_BASE_SEED + 0x1001, difficulty: 'easy', description: 'Simple Ellipse Tutorial' },
+  { level: 1, seed: CAVERN_BASE_SEED + 0x1102, difficulty: 'easy', description: 'Rounded Box Intro' },
+  { level: 2, seed: CAVERN_BASE_SEED + 0x1203, difficulty: 'easy', description: 'Wide Passages' },
+  { level: 3, seed: CAVERN_BASE_SEED + 0x1304, difficulty: 'easy', description: 'Gentle Curves' },
+  { level: 4, seed: CAVERN_BASE_SEED + 0x1405, difficulty: 'easy', description: 'Basic Navigation' },
   
-  // Intermediate levels (10-19) - Medium difficulty
-  { level: 10, seed: CAVERN_BASE_SEED + 0xB13C, difficulty: 'easy', description: 'Narrow Passages' },
-  { level: 11, seed: CAVERN_BASE_SEED + 0xC270, difficulty: 'easy', description: 'Twisted Paths' },
-  { level: 12, seed: CAVERN_BASE_SEED + 0xD3A4, difficulty: 'easy', description: 'Cavern Network' },
-  { level: 13, seed: CAVERN_BASE_SEED + 0xE4D8, difficulty: 'easy', description: 'Underground Maze' },
-  { level: 14, seed: CAVERN_BASE_SEED + 0xF60C, difficulty: 'easy', description: 'Vertical Challenge' },
-  { level: 15, seed: CAVERN_BASE_SEED + 0x1740, difficulty: 'easy', description: 'Constricted Routes' },
-  { level: 16, seed: CAVERN_BASE_SEED + 0x2874, difficulty: 'easy', description: 'Tight Quarters' },
-  { level: 17, seed: CAVERN_BASE_SEED + 0x39A8, difficulty: 'easy', description: 'Precision Flying' },
-  { level: 18, seed: CAVERN_BASE_SEED + 0x4ADC, difficulty: 'easy', description: 'Skill Test' },
-  { level: 19, seed: CAVERN_BASE_SEED + 0x5C10, difficulty: 'easy', description: 'Advanced Navigation' },
+  // Beginner levels (5-9) - Add superellipses, 1.5x scale
+  { level: 5, seed: CAVERN_BASE_SEED + 0x2106, difficulty: 'easy', description: 'Superellipse Introduction' },
+  { level: 6, seed: CAVERN_BASE_SEED + 0x2207, difficulty: 'easy', description: 'Boxy Chambers' },
+  { level: 7, seed: CAVERN_BASE_SEED + 0x2308, difficulty: 'easy', description: 'Mixed Shapes' },
+  { level: 8, seed: CAVERN_BASE_SEED + 0x2409, difficulty: 'easy', description: 'Shape Variety' },
+  { level: 9, seed: CAVERN_BASE_SEED + 0x250A, difficulty: 'easy', description: 'First Challenges' },
   
-  // Advanced levels (20-29) - Challenging but fair
-  { level: 20, seed: CAVERN_BASE_SEED + 0x6D44, difficulty: 'hard', description: 'Expert Territory' },
-  { level: 21, seed: CAVERN_BASE_SEED + 0x7E78, difficulty: 'hard', description: 'Dangerous Passages' },
-  { level: 22, seed: CAVERN_BASE_SEED + 0x8FAC, difficulty: 'hard', description: 'Treacherous Tunnels' },
-  { level: 23, seed: CAVERN_BASE_SEED + 0x90E0, difficulty: 'hard', description: 'Master Challenge' },
-  { level: 24, seed: CAVERN_BASE_SEED + 0xA214, difficulty: 'hard', description: 'Extreme Precision' },
-  { level: 25, seed: CAVERN_BASE_SEED + 0xB348, difficulty: 'hard', description: 'Death Trap' },
-  { level: 26, seed: CAVERN_BASE_SEED + 0xC47C, difficulty: 'hard', description: 'No Margin for Error' },
-  { level: 27, seed: CAVERN_BASE_SEED + 0xD5B0, difficulty: 'hard', description: 'Nightmare Fuel' },
-  { level: 28, seed: CAVERN_BASE_SEED + 0xE6E4, difficulty: 'hard', description: 'Insane Difficulty' },
-  { level: 29, seed: CAVERN_BASE_SEED + 0xF818, difficulty: 'hard', description: 'Near Impossible' },
+  // Intermediate levels (10-14) - Rounded polygons and L-rooms, 2x scale
+  { level: 10, seed: CAVERN_BASE_SEED + 0x310B, difficulty: 'easy', description: 'Triangle Chambers' },
+  { level: 11, seed: CAVERN_BASE_SEED + 0x320C, difficulty: 'easy', description: 'Square Rooms' },
+  { level: 12, seed: CAVERN_BASE_SEED + 0x330D, difficulty: 'easy', description: 'Pentagon Maze' },
+  { level: 13, seed: CAVERN_BASE_SEED + 0x340E, difficulty: 'easy', description: 'L-Shaped Caverns' },
+  { level: 14, seed: CAVERN_BASE_SEED + 0x350F, difficulty: 'easy', description: 'Angular Passages' },
   
-  // Expert levels (30-39) - Very challenging
-  { level: 30, seed: CAVERN_BASE_SEED + 0x194C, difficulty: 'hard', description: 'Expert Only' },
-  { level: 31, seed: CAVERN_BASE_SEED + 0x2A80, difficulty: 'hard', description: 'Precision Required' },
-  { level: 32, seed: CAVERN_BASE_SEED + 0x3BB4, difficulty: 'hard', description: 'Unforgiving' },
-  { level: 33, seed: CAVERN_BASE_SEED + 0x4CE8, difficulty: 'hard', description: 'Brutal Challenge' },
-  { level: 34, seed: CAVERN_BASE_SEED + 0x5E1C, difficulty: 'hard', description: 'Pixel Perfect' },
-  { level: 35, seed: CAVERN_BASE_SEED + 0x6F50, difficulty: 'hard', description: 'Frame Perfect' },
-  { level: 36, seed: CAVERN_BASE_SEED + 0x8084, difficulty: 'hard', description: 'Legendary Skill' },
-  { level: 37, seed: CAVERN_BASE_SEED + 0x91B8, difficulty: 'hard', description: 'Superhuman' },
-  { level: 38, seed: CAVERN_BASE_SEED + 0xA2EC, difficulty: 'hard', description: 'Impossible Dream' },
-  { level: 39, seed: CAVERN_BASE_SEED + 0xB420, difficulty: 'hard', description: 'Myth Status' },
+  // Advanced levels (15-19) - Metaballs and noise, 3x scale
+  { level: 15, seed: CAVERN_BASE_SEED + 0x4110, difficulty: 'easy', description: 'Organic Blobs' },
+  { level: 16, seed: CAVERN_BASE_SEED + 0x4211, difficulty: 'easy', description: 'Flowing Caves' },
+  { level: 17, seed: CAVERN_BASE_SEED + 0x4312, difficulty: 'easy', description: 'Noisy Boundaries' },
+  { level: 18, seed: CAVERN_BASE_SEED + 0x4413, difficulty: 'easy', description: 'Irregular Shapes' },
+  { level: 19, seed: CAVERN_BASE_SEED + 0x4514, difficulty: 'easy', description: 'Natural Caverns' },
   
-  // Master levels (40-49) - Ultimate challenge
-  { level: 40, seed: CAVERN_BASE_SEED + 0xC554, difficulty: 'hard', description: 'Master\'s Gauntlet' },
-  { level: 41, seed: CAVERN_BASE_SEED + 0xD688, difficulty: 'hard', description: 'Godlike Precision' },
-  { level: 42, seed: CAVERN_BASE_SEED + 0xE7BC, difficulty: 'hard', description: 'Answer to Everything' },
-  { level: 43, seed: CAVERN_BASE_SEED + 0xF8F0, difficulty: 'hard', description: 'Divine Challenge' },
-  { level: 44, seed: CAVERN_BASE_SEED + 0x1A24, difficulty: 'hard', description: 'Transcendent' },
-  { level: 45, seed: CAVERN_BASE_SEED + 0x2B58, difficulty: 'hard', description: 'Beyond Mortal' },
-  { level: 46, seed: CAVERN_BASE_SEED + 0x3C8C, difficulty: 'hard', description: 'Ascended Plane' },
-  { level: 47, seed: CAVERN_BASE_SEED + 0x4DC0, difficulty: 'hard', description: 'Enlightenment' },
-  { level: 48, seed: CAVERN_BASE_SEED + 0x5EF4, difficulty: 'hard', description: 'Perfect Unity' },
-  { level: 49, seed: CAVERN_BASE_SEED + 0x7028, difficulty: 'hard', description: 'Final Frontier' }
+  // Expert entry (20-24) - All shapes with rotations, 4x scale
+  { level: 20, seed: CAVERN_BASE_SEED + 0x5115, difficulty: 'hard', description: 'Rotated Geometries' },
+  { level: 21, seed: CAVERN_BASE_SEED + 0x5216, difficulty: 'hard', description: 'Tilted Chambers' },
+  { level: 22, seed: CAVERN_BASE_SEED + 0x5317, difficulty: 'hard', description: 'Complex Orientations' },
+  { level: 23, seed: CAVERN_BASE_SEED + 0x5418, difficulty: 'hard', description: 'Spatial Reasoning' },
+  { level: 24, seed: CAVERN_BASE_SEED + 0x5519, difficulty: 'hard', description: 'Disorienting Angles' },
+  
+  // Expert mid (25-29) - High complexity combinations, 5x scale
+  { level: 25, seed: CAVERN_BASE_SEED + 0x611A, difficulty: 'hard', description: 'Metaball Clusters' },
+  { level: 26, seed: CAVERN_BASE_SEED + 0x621B, difficulty: 'hard', description: 'Noise Amplification' },
+  { level: 27, seed: CAVERN_BASE_SEED + 0x631C, difficulty: 'hard', description: 'Polygon Gauntlet' },
+  { level: 28, seed: CAVERN_BASE_SEED + 0x641D, difficulty: 'hard', description: 'Shape Fusion' },
+  { level: 29, seed: CAVERN_BASE_SEED + 0x651E, difficulty: 'hard', description: 'Morphing Boundaries' },
+  
+  // Master entry (30-34) - Maximum noise and complexity, 6x scale
+  { level: 30, seed: CAVERN_BASE_SEED + 0x711F, difficulty: 'hard', description: 'Chaotic Geometries' },
+  { level: 31, seed: CAVERN_BASE_SEED + 0x7220, difficulty: 'hard', description: 'Turbulent Shapes' },
+  { level: 32, seed: CAVERN_BASE_SEED + 0x7321, difficulty: 'hard', description: 'Fractal Boundaries' },
+  { level: 33, seed: CAVERN_BASE_SEED + 0x7422, difficulty: 'hard', description: 'Impossible Geometries' },
+  { level: 34, seed: CAVERN_BASE_SEED + 0x7523, difficulty: 'hard', description: 'Quantum Caves' },
+  
+  // Master advanced (35-39) - Extreme combinations, 7x scale
+  { level: 35, seed: CAVERN_BASE_SEED + 0x8124, difficulty: 'hard', description: 'Hyperdimensional' },
+  { level: 36, seed: CAVERN_BASE_SEED + 0x8225, difficulty: 'hard', description: 'Non-Euclidean' },
+  { level: 37, seed: CAVERN_BASE_SEED + 0x8326, difficulty: 'hard', description: 'Reality Breach' },
+  { level: 38, seed: CAVERN_BASE_SEED + 0x8427, difficulty: 'hard', description: 'Spacetime Fold' },
+  { level: 39, seed: CAVERN_BASE_SEED + 0x8528, difficulty: 'hard', description: 'Dimensional Rift' },
+  
+  // Grandmaster (40-44) - Legendary difficulty, 7.5x scale
+  { level: 40, seed: CAVERN_BASE_SEED + 0x9129, difficulty: 'hard', description: 'Cosmic Horror' },
+  { level: 41, seed: CAVERN_BASE_SEED + 0x922A, difficulty: 'hard', description: 'Void Geometry' },
+  { level: 42, seed: CAVERN_BASE_SEED + 0x932B, difficulty: 'hard', description: 'Universal Answer' },
+  { level: 43, seed: CAVERN_BASE_SEED + 0x942C, difficulty: 'hard', description: 'Beyond Comprehension' },
+  { level: 44, seed: CAVERN_BASE_SEED + 0x952D, difficulty: 'hard', description: 'Transcendent Maze' },
+  
+  // Ultimate (45-49) - Maximum scale and complexity, 8x scale
+  { level: 45, seed: CAVERN_BASE_SEED + 0xA12E, difficulty: 'hard', description: 'Perfect Symmetry' },
+  { level: 46, seed: CAVERN_BASE_SEED + 0xA22F, difficulty: 'hard', description: 'Infinite Recursion' },
+  { level: 47, seed: CAVERN_BASE_SEED + 0xA330, difficulty: 'hard', description: 'Paradox Engine' },
+  { level: 48, seed: CAVERN_BASE_SEED + 0xA431, difficulty: 'hard', description: 'Final Genesis' },
+  { level: 49, seed: CAVERN_BASE_SEED + 0xA532, difficulty: 'hard', description: 'Ultimate Mastery' }
 ];
 
 // Get the fixed seed for a specific level

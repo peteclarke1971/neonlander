@@ -57,38 +57,43 @@ export function generateCavernTopology(
     cavernCount = 5 + Math.floor(rand() * 5); // 5-9 caverns
   }
   
-  // Calculate cavern radii based on level with much more variation
+  // Progressive scaling - 8x growth from level 0 to 49
+  const scaleMultiplier = 1 + (level / 49) * 7; // 1x to 8x scaling
+  
+  // Calculate cavern radii with progressive scaling and shape-aware sizing
   const getRadius = () => {
     let baseRadius: number;
     const variation = rand();
     
-    if (level <= 3) {
-      // More variation: some very large caverns, some smaller
-      if (variation < 0.2) {
-        baseRadius = 300 + rand() * 100; // 20% chance for huge caverns (300-400)
-      } else if (variation < 0.5) {
-        baseRadius = 200 + rand() * 80; // 30% chance for large caverns (200-280) 
+    if (level <= 9) {
+      // Early levels: consistent medium-large caverns
+      if (variation < 0.3) {
+        baseRadius = (160 + rand() * 80) * scaleMultiplier; // Large caverns
       } else {
-        baseRadius = 140 + rand() * 60; // 50% chance for medium caverns (140-200)
+        baseRadius = (100 + rand() * 60) * scaleMultiplier; // Medium caverns
       }
-    } else if (level <= 9) {
-      if (variation < 0.15) {
-        baseRadius = 280 + rand() * 80; // 15% chance for huge caverns (280-360)
-      } else if (variation < 0.4) {
-        baseRadius = 180 + rand() * 70; // 25% chance for large caverns (180-250)
+    } else if (level <= 19) {
+      // Mid levels: more variation with complex shapes
+      if (variation < 0.2) {
+        baseRadius = (200 + rand() * 100) * scaleMultiplier; // Huge caverns
+      } else if (variation < 0.5) {
+        baseRadius = (130 + rand() * 70) * scaleMultiplier; // Large caverns
       } else {
-        baseRadius = 120 + rand() * 60; // 60% chance for medium caverns (120-180)
+        baseRadius = (80 + rand() * 50) * scaleMultiplier; // Medium caverns
       }
     } else {
-      if (variation < 0.1) {
-        baseRadius = 250 + rand() * 70; // 10% chance for huge caverns (250-320)
-      } else if (variation < 0.3) {
-        baseRadius = 160 + rand() * 60; // 20% chance for large caverns (160-220)
+      // Advanced levels: extreme variation for complex layouts
+      if (variation < 0.15) {
+        baseRadius = (250 + rand() * 150) * scaleMultiplier; // Massive caverns
+      } else if (variation < 0.4) {
+        baseRadius = (150 + rand() * 100) * scaleMultiplier; // Large caverns
       } else {
-        baseRadius = 100 + rand() * 50; // 70% chance for smaller caverns (100-150)
+        baseRadius = (60 + rand() * 80) * scaleMultiplier; // Variable caverns
       }
     }
-    return baseRadius;
+    
+    // Ensure minimum size for ship navigation
+    return Math.max(baseRadius, hShip * 4 * Math.sqrt(scaleMultiplier));
   };
   
   const nodes: CavernNode[] = [];
