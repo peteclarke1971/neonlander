@@ -6,7 +6,7 @@ import { CavernFXRenderer } from "./CavernFXRenderer";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad } from "./types";
 import { generateTerrain } from "./terrain";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
@@ -37,19 +37,21 @@ interface Props {
   lowGraphics?: boolean;
   showCavernFX?: boolean;
   cavernFXParams?: CavernFXParams;
+  seedOverride?: number;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams }) => {
+export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  const [levelSeed, setLevelSeed] = useState<number | null>(null);
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -142,14 +144,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Check if this is a cavern level - only in caverns mode
     const isCavernLevel = mode === "caverns";
     
-    // Determine seed based on mode and level type
+    // Determine seed based on override/mode and level type
     let seed: number;
-    if (isCavernLevel) {
+    if (typeof seedOverride === "number" && Number.isFinite(seedOverride)) {
+      seed = (Math.abs(Math.floor(seedOverride)) >>> 0);
+    } else if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
     } else {
       // For classic mode (non-caverns), always use random generation
-      seed = mode === "fixed" ? fixedSeed : (Math.floor(Math.random() * 1e9) ^ Date.now());
+      seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
     }
+    setLevelSeed(seed >>> 0);
     
     const terrain: TerrainData | CavernData = isCavernLevel 
       ? generateCavern(seed, level, difficulty)
@@ -735,6 +740,31 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       
       if (collisionDetected) {
         const pad = terrain.getPadAt(x);
+        let nearPad: Pad | null = null;
+        if (!isCavernLevel) {
+          const t = terrain as TerrainData;
+          const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
+          for (const p of t.pads) {
+            const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
+            const margin = Math.max(4, Math.min(10, w * 0.2));
+            let dist = 0;
+            if (p.xStart <= p.xEnd) {
+              if (xx < p.xStart) dist = p.xStart - xx;
+              else if (xx > p.xEnd) dist = xx - p.xEnd;
+              else dist = 0;
+            } else {
+              const inLeft = xx >= p.xStart;
+              const inRight = xx <= p.xEnd;
+              if (inLeft || inRight) dist = 0;
+              else {
+                const toStart = (p.xStart - xx + t.worldWidth) % t.worldWidth;
+                const toEnd = (xx - p.xEnd + t.worldWidth) % t.worldWidth;
+                dist = Math.min(toStart, toEnd);
+              }
+            }
+            if (dist <= margin) { nearPad = p; break; }
+          }
+        }
         const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
         const okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
         const okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
@@ -793,18 +823,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed });
             }, 700);
           }
-        } else if (pad && okAngle && okVy && okVx && fuel >= 0) {
+        } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
           // successful landing - end run (non-cavern levels)
-          y = pad.y - 8;
+          const landedPad = (pad || nearPad)!;
+          y = landedPad.y - 8;
           vy = 0; vx = 0; av = 0; angle = 0;
           const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
-          let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
-          const applied2x = !!pad.bonus2x;
+          let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
+          const applied2x = !!landedPad.bonus2x;
           if (applied2x) earned *= 2;
-          const pWidth = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-          const pCenter = (pad.xEnd >= pad.xStart)
-            ? (pad.xStart + pad.xEnd) / 2
-            : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
+          const pWidth = landedPad.width ?? (landedPad.xEnd >= landedPad.xStart ? (landedPad.xEnd - landedPad.xStart) : (terrain.worldWidth - landedPad.xStart + landedPad.xEnd));
+          const pCenter = (landedPad.xEnd >= landedPad.xStart)
+            ? (landedPad.xStart + landedPad.xEnd) / 2
+            : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
           let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
           const bullseye = Math.abs(dx) <= pWidth * 0.03;
           if (bullseye) { earned += 500; bullseyeT = 0; }
@@ -1379,7 +1410,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
         <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-          FPS: {Math.round(fps)}
+          FPS: {Math.round(fps)} • Seed: {levelSeed ?? "-"}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Difficulty, HighScore, Mode } from "./types";
 import { InitialsBadge } from "./InitialsBadge";
 import { HomeStarfield } from "./HomeStarfield";
@@ -14,7 +15,7 @@ const difficulties: { key: Difficulty; label: string; desc: string }[] = [
 ];
 
 interface Props {
-  onStart: (difficulty: Difficulty, startLevel: number | undefined, mode: Mode, lowGraphics?: boolean) => void;
+  onStart: (difficulty: Difficulty, startLevel: number | undefined, mode: Mode, lowGraphics?: boolean, seedOverride?: number) => void;
   highScoresClassic: HighScore[];
   highScoresFixed: HighScore[];
 }
@@ -48,6 +49,8 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
   const [onlineFixed, setOnlineFixed] = useState<{ initials: string; score: number; difficulty: Difficulty; created_at?: string }[]>([]);
 
 const navigate = useNavigate();
+
+  const [seedInput, setSeedInput] = useState("");
 
   // Gamepad UI navigation: mirror D-pad/LS to arrow/enter/escape
   useEffect(() => {
@@ -381,6 +384,37 @@ useEffect(() => {
     <ToggleGroupItem ref={modeClassicRef} value="classic" variant="outline" aria-label="Classic mode" onFocus={() => { lastModeFocus.current = "classic"; }}>Classic</ToggleGroupItem>
     <ToggleGroupItem ref={modeFixedRef} value="fixed" variant="outline" aria-label="Fixed mode" onFocus={() => { lastModeFocus.current = "fixed"; }}>Fixed</ToggleGroupItem>
   </ToggleGroup>
+        </div>
+
+        {/* Play by Seed */}
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Input
+            value={seedInput}
+            onChange={(e) => setSeedInput(e.target.value)}
+            placeholder="Enter seed"
+            className="w-48"
+            inputMode="numeric"
+          />
+          <Button
+            variant="outline"
+            onClick={() => {
+              const txt = seedInput.trim();
+              const n = parseInt(txt, 10);
+              let seedNum: number;
+              if (!isNaN(n)) {
+                seedNum = (Math.abs(Math.floor(n)) >>> 0);
+              } else if (txt.length > 0) {
+                let h = 2166136261 >>> 0; // FNV-like
+                for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 16777619); }
+                seedNum = h >>> 0;
+              } else {
+                seedNum = ((Math.random() * 0xffffffff) >>> 0);
+              }
+              onStart("easy", undefined, mode, lowGraphics, seedNum);
+            }}
+          >
+            Play
+          </Button>
         </div>
 
         <div className="mt-8 flex flex-col items-center gap-4">

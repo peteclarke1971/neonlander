@@ -72,6 +72,7 @@ const Index = () => {
   });
 
   const [goIndex, setGoIndex] = useState(0);
+  const [seedOverride, setSeedOverride] = useState<number | null>(null);
 
   // Refs for gameover navigation
   const contRef = useRef<HTMLButtonElement>(null);
@@ -122,11 +123,12 @@ const Index = () => {
     if (meta) meta.setAttribute("content", "Pilot a neon-glow lunar lander. Master thrust and rotation to score precision landings on procedural terrain.");
   }, []);
 
-  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean) => {
+  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number) => {
     setDifficulty(d);
     setMode(mode);
     const finalLowGfx = lowGfx ?? lowGraphics; // Use current setting if not explicitly provided
     setLowGraphics(finalLowGfx);
+    setSeedOverride(seedOverrideParam ?? null);
     // Save graphics preference
     try {
       localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
@@ -426,6 +428,7 @@ const retryGame = () => {
           level={carry?.level ?? successCount}
           mode={mode}
           lowGraphics={lowGraphics}
+          seedOverride={seedOverride ?? undefined}
         />
       )}
       {view === "gameover" && lastResult && (
