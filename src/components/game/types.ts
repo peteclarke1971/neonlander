@@ -41,6 +41,7 @@ export interface HUDSnapshot {
   score: number;
   time: number;
   difficulty: Difficulty;
+  levelSeed?: number;
 }
 
 export interface GameOverData {

@@ -51,7 +51,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
-  const [levelSeed, setLevelSeed] = useState<number | null>(null);
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -154,7 +153,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // For classic mode (non-caverns), always use random generation
       seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
     }
-    setLevelSeed(seed >>> 0);
+    let levelSeed = seed >>> 0;
     
     const terrain: TerrainData | CavernData = isCavernLevel 
       ? generateCavern(seed, level, difficulty)
@@ -371,7 +370,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       } else {
         altitude = Math.max(0, terrain.getHeightAt(x) - y);
       }
-      setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty });
+      setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty, levelSeed });
     };
 
     const spawnExplosion = () => {
@@ -1410,7 +1409,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
         <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-          FPS: {Math.round(fps)} • Seed: {levelSeed ?? "-"}
+          FPS: {Math.round(fps)} • Seed: {hud.levelSeed ?? "-"}
         </div>
       </div>
 
