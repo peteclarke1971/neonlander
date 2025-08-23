@@ -468,10 +468,10 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     ship.velocity.x *= damping;
     ship.velocity.y *= damping;
     
-    // Forward movement based on rotation and speed
+    // Forward movement based on rotation and speed (negative Z = into screen)
     const cos = Math.cos(ship.rotation.y);
     const sin = Math.sin(ship.rotation.y);
-    ship.velocity.z = ship.speed;
+    ship.velocity.z = -ship.speed;
 
     // Update position
     ship.position.x += ship.velocity.x * dt;
@@ -484,7 +484,7 @@ export const SpaceRaceEngine: React.FC<Props> = ({
   };
 
   const updateCamera = (camera: RaceCamera, ship: SpaceShip, dt: number) => {
-    const offset = { x: 0, y: 8, z: -25 };
+    const offset = { x: 0, y: 8, z: 25 }; // Camera behind ship (positive Z when ship moves negative Z)
     
     // Target position behind ship
     const targetPos = {
@@ -499,11 +499,11 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     camera.position.y += (targetPos.y - camera.position.y) * smoothing;
     camera.position.z += (targetPos.z - camera.position.z) * smoothing;
 
-    // Look ahead of ship
+    // Look ahead of ship (negative Z direction)
     const lookAhead = {
       x: ship.position.x,
       y: ship.position.y,
-      z: ship.position.z + 50
+      z: ship.position.z - 50
     };
 
     camera.target.x += (lookAhead.x - camera.target.x) * smoothing;
