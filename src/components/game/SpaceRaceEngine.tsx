@@ -437,17 +437,17 @@ export const SpaceRaceEngine: React.FC<Props> = ({
 
     // Analog strafe with left stick
     ship.velocity.x += (gamepad.axes[0] || 0) * strafeForce * 2; // X-axis
-    ship.velocity.y -= (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (inverted)
+    ship.velocity.y += (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (not inverted now)
 
     // Analog rotation with right stick  
     ship.rotation.y += (gamepad.axes[2] || 0) * rotationForce * 1.5; // yaw
-    ship.rotation.x -= (gamepad.axes[3] || 0) * rotationForce * 1.5; // pitch (inverted)
+    ship.rotation.x += (gamepad.axes[3] || 0) * rotationForce * 1.5; // pitch (not inverted now)
 
     // Triggers for speed control
     const throttle = Math.max(0, (gamepad.axes[7] || 0) + 1) / 2; // RT
     const brake = Math.max(0, (gamepad.axes[6] || 0) + 1) / 2; // LT
 
-    if (input.buttons.rotateLeft && ship.boostMeter > 0) { // Boost with LB
+    if (input.thrust > 0.5 && ship.boostMeter > 0) { // Boost with thrust button (same as lander)
       ship.speed = Math.min(ship.maxSpeed, ship.speed + 60 * dt);
       ship.boostMeter = Math.max(0, ship.boostMeter - dt * 0.6);
     } else if (brake > 0.1) {
@@ -468,10 +468,10 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     ship.velocity.x *= damping;
     ship.velocity.y *= damping;
     
-    // Forward movement based on rotation and speed (negative Z = into screen)
+    // Forward movement based on rotation and speed (positive Z = into screen)
     const cos = Math.cos(ship.rotation.y);
     const sin = Math.sin(ship.rotation.y);
-    ship.velocity.z = -ship.speed;
+    ship.velocity.z = ship.speed;
 
     // Update position
     ship.position.x += ship.velocity.x * dt;
@@ -484,7 +484,7 @@ export const SpaceRaceEngine: React.FC<Props> = ({
   };
 
   const updateCamera = (camera: RaceCamera, ship: SpaceShip, dt: number) => {
-    const offset = { x: 0, y: 8, z: 25 }; // Camera behind ship (positive Z when ship moves negative Z)
+    const offset = { x: 0, y: 8, z: -25 }; // Camera behind ship (negative Z when ship moves positive Z)
     
     // Target position behind ship
     const targetPos = {
@@ -499,11 +499,11 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     camera.position.y += (targetPos.y - camera.position.y) * smoothing;
     camera.position.z += (targetPos.z - camera.position.z) * smoothing;
 
-    // Look ahead of ship (negative Z direction)
+    // Look ahead of ship (positive Z direction)
     const lookAhead = {
       x: ship.position.x,
       y: ship.position.y,
-      z: ship.position.z - 50
+      z: ship.position.z + 50
     };
 
     camera.target.x += (lookAhead.x - camera.target.x) * smoothing;
