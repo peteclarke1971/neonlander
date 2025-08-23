@@ -55,6 +55,7 @@ export interface GameOverData {
   padBonus2x?: boolean;
   bullseye?: boolean;
   speedBonus?: boolean;
+  levelSeed?: number;
 }
 
 export interface HighScore {

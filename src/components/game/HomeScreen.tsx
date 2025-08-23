@@ -18,9 +18,10 @@ interface Props {
   onStart: (difficulty: Difficulty, startLevel: number | undefined, mode: Mode, lowGraphics?: boolean, seedOverride?: number) => void;
   highScoresClassic: HighScore[];
   highScoresFixed: HighScore[];
+  lastPlayedSeed?: number;
 }
 
-export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed }) => {
+export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed }) => {
   const audioRef = useRef(new AudioManager());
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
@@ -50,7 +51,14 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
 
 const navigate = useNavigate();
 
-  const [seedInput, setSeedInput] = useState("");
+  const [seedInput, setSeedInput] = useState(() => lastPlayedSeed?.toString() || "");
+
+  // Update seed input when lastPlayedSeed changes
+  useEffect(() => {
+    if (lastPlayedSeed !== undefined) {
+      setSeedInput(lastPlayedSeed.toString());
+    }
+  }, [lastPlayedSeed]);
 
   // Gamepad UI navigation: mirror D-pad/LS to arrow/enter/escape
   useEffect(() => {

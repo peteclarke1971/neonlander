@@ -703,7 +703,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed });
+          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed });
         }, 700);
       }
       
@@ -719,7 +719,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed });
+          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed });
         }, 700);
       }
 
@@ -805,7 +805,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
             running = false;
             setTimeout(() => {
-              onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus });
+              onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus, levelSeed });
             }, 500);
           } else {
             // crash on cavern walls/floor or invalid landing
@@ -819,7 +819,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             setTimeout(() => {
-              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed });
+              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed });
             }, 700);
           }
         } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
@@ -849,7 +849,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
-            onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus });
+            onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus, levelSeed });
           }, 500);
         } else {
           // crash
@@ -863,7 +863,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           cameraShake = 24;
           if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
           setTimeout(() => {
-            onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed });
+            onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed });
           }, 700);
         }
       }

@@ -73,6 +73,7 @@ const Index = () => {
 
   const [goIndex, setGoIndex] = useState(0);
   const [seedOverride, setSeedOverride] = useState<number | null>(null);
+  const [lastPlayedSeed, setLastPlayedSeed] = useState<number | null>(null);
 
   // Refs for gameover navigation
   const contRef = useRef<HTMLButtonElement>(null);
@@ -162,6 +163,7 @@ const Index = () => {
 
   const handleGameOver = (data: GameOverData) => {
     setLastResult(data);
+    setLastPlayedSeed(data.levelSeed ?? null);
     // Generate a fresh starfield/effect config for this screen
     setSfConfig(genSfConfig());
     if (data.cause === "success") {
@@ -416,7 +418,7 @@ const retryGame = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {view === "home" && (
-        <HomeScreen onStart={startGame} highScoresClassic={classicScores} highScoresFixed={fixedScores} />
+        <HomeScreen onStart={startGame} highScoresClassic={classicScores} highScoresFixed={fixedScores} lastPlayedSeed={lastPlayedSeed ?? undefined} />
       )}
       {view === "game" && (
         <GameEngine
