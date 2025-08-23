@@ -157,7 +157,7 @@ export const SpaceRaceEngine: React.FC<Props> = ({
       baseSpeed: settings.playerSpeed,
       maxSpeed: settings.playerSpeed * 1.5,
       alive: true,
-      boostMeter: 0,
+      boostMeter: 3,
       isPlayer: true,
       id: "player"
     };
@@ -437,11 +437,11 @@ export const SpaceRaceEngine: React.FC<Props> = ({
 
     // Analog strafe with left stick
     ship.velocity.x += (gamepad.axes[0] || 0) * strafeForce * 2; // X-axis
-    ship.velocity.y += (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (not inverted now)
+    ship.velocity.y -= (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (inverted)
 
     // Analog rotation with right stick  
     ship.rotation.y += (gamepad.axes[2] || 0) * rotationForce * 1.5; // yaw
-    ship.rotation.x += (gamepad.axes[3] || 0) * rotationForce * 1.5; // pitch (not inverted now)
+    ship.rotation.x -= (gamepad.axes[3] || 0) * rotationForce * 1.5; // pitch (inverted)
 
     // Triggers for speed control
     const throttle = Math.max(0, (gamepad.axes[7] || 0) + 1) / 2; // RT
@@ -499,11 +499,11 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     camera.position.y += (targetPos.y - camera.position.y) * smoothing;
     camera.position.z += (targetPos.z - camera.position.z) * smoothing;
 
-    // Look ahead of ship (positive Z direction)
+    // Look ahead of ship (negative Z direction to make approaching objects bigger)
     const lookAhead = {
       x: ship.position.x,
       y: ship.position.y,
-      z: ship.position.z + 50
+      z: ship.position.z - 50
     };
 
     camera.target.x += (lookAhead.x - camera.target.x) * smoothing;
