@@ -541,14 +541,14 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
   }, []);
 
   if (!config) {
-    return <div className="w-full h-full flex items-center justify-center">Loading...</div>;
+    return <div className="w-full h-screen flex items-center justify-center">Loading...</div>;
   }
 
   const altitude = ship.r - config.planet.radius;
   const tangentialVel = ship.r * ship.thetadot;
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-black relative">
+    <div ref={containerRef} className="w-full h-screen bg-black relative">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
