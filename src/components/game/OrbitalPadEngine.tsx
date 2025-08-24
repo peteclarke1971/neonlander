@@ -231,18 +231,16 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
           newShip.fuel -= 200 * thrustInput * dt;
         }
         
-        // Left/Right keys: Direct angular movement around planet (arcade style)
-        // Convert tangential thrust to direct angular velocity for consistent movement
-        const angularThrust = 0.8; // Direct angular velocity change
-        
+        // Left key: Decrease orbital velocity (move backward in orbit)
         if (leftInput > 0) {
-          newShip.theta -= angularThrust * leftInput * dt;
-          newShip.fuel -= 100 * leftInput * dt;
+          newShip.vtheta -= tangentialThrust * leftInput * dt;
+          newShip.fuel -= 150 * leftInput * dt;
         }
         
+        // Right key: Increase orbital velocity (move forward in orbit)
         if (rightInput > 0) {
-          newShip.theta += angularThrust * rightInput * dt;
-          newShip.fuel -= 100 * rightInput * dt;
+          newShip.vtheta += tangentialThrust * rightInput * dt;
+          newShip.fuel -= 150 * rightInput * dt;
         }
         
         newShip.fuel = Math.max(0, newShip.fuel);
@@ -270,9 +268,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       newShip.vr = Math.max(-maxRadialVel, Math.min(maxRadialVel, newShip.vr));
       newShip.vtheta = Math.max(-maxTangentialVel, Math.min(maxTangentialVel, newShip.vtheta));
       
-      // Update position - only radial position uses velocity, angular is direct
+      // Update position using polar velocities
       newShip.r += newShip.vr * dt;
-      // Angular position is updated directly by input above
+      newShip.theta += (newShip.vtheta / newShip.r) * dt;
       
       // Keep theta in range
       while (newShip.theta >= 2 * Math.PI) newShip.theta -= 2 * Math.PI;
