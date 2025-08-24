@@ -366,6 +366,9 @@ useEffect(() => {
           <a href="/neon-racing" className="inline-block">
             <Button variant="neon">🏁 NEON RACING</Button>
           </a>
+          <a href="/neon-docking" className="inline-block">
+            <Button variant="neon">🚀 NEON DOCKING</Button>
+          </a>
           <a href="/cavern-fx-demo" className="inline-block">
             <Button variant="neon">🌟 CAVERN FX DEMO</Button>
           </a>
