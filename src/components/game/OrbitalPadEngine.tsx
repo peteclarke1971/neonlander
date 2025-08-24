@@ -29,7 +29,7 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
   const rng = mulberry32(seed);
   
   // Arcade progression: smaller planet, faster rotation, more challenge
-  const baseRadius = 300 - Math.min(level * 6, 100); // 300 down to 200
+  const baseRadius = 240 - Math.min(level * 6, 80); // 240 down to 160 (20% smaller)
   const baseGravity = 80 + level * 3; // Moderate gravity increase
   const rotationRate = 0.008 + level * 0.002; // Much faster base rotation for arcade feel
   
@@ -202,23 +202,31 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       let rotInput = 0;
       let thrustInput = 0;
       
-      // Keyboard input
-      if (keys.current.ArrowLeft || keys.current.a || keys.current.A) rotInput -= 1;
-      if (keys.current.ArrowRight || keys.current.d || keys.current.D) rotInput += 1;
+      // Keyboard input - left/right for tangential movement
+      let leftInput = 0;
+      let rightInput = 0;
+      if (keys.current.ArrowLeft || keys.current.a || keys.current.A) leftInput = 1;
+      if (keys.current.ArrowRight || keys.current.d || keys.current.D) rightInput = 1;
       if (keys.current.ArrowUp || keys.current.w || keys.current.W || keys.current[' ']) thrustInput = 1;
       
       // Gamepad input
       const gp = anyGamepad();
       if (gp && gpProfileRef.current) {
         const input = readGamepad(gp, gpProfileRef.current);
-        rotInput += input.rotation;
+        if (input.rotation < 0) leftInput = Math.max(leftInput, -input.rotation);
+        if (input.rotation > 0) rightInput = Math.max(rightInput, input.rotation);
         thrustInput = Math.max(thrustInput, input.thrust);
       }
       
-      // Arcade-style rotation: rotate lander around planet orbit
-      const rotationSpeed = 2.0; // Fast rotation for arcade feel
-      newShip.thetadot += rotInput * rotationSpeed * dt;
-      newShip.thetadot *= 0.95; // Some damping for control
+      // Orbital movement: left/right modifies tangential velocity directly
+      const tangentialAccel = 100; // Acceleration for orbital movement
+      if (leftInput > 0) {
+        newShip.thetadot -= tangentialAccel * leftInput * dt / newShip.r;
+      }
+      if (rightInput > 0) {
+        newShip.thetadot += tangentialAccel * rightInput * dt / newShip.r;
+      }
+      newShip.thetadot *= 0.98; // Light damping for stability
       
       // Arcade thrust: simple radial movement
       const thrustPower = 150; // Strong thrust for responsive control
@@ -463,8 +471,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     ctx.save();
     ctx.translate(shipX, shipY);
     
-    // Ship always faces outward from planet
-    const shipAngle = ship.theta;
+    // Ship rotated 90 degrees right so thruster points toward planet
+    const shipAngle = ship.theta + Math.PI / 2;
     ctx.rotate(shipAngle);
     
     // Draw neon ship triangle with bright glow
@@ -504,23 +512,6 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     }
     
     ctx.restore();
-    
-    // Draw velocity vector (arcade style)
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = '#ffff00';
-    
-    const velScale = 5; // Make velocity vector more visible
-    const velX = ship.rdot * Math.cos(ship.theta) - ship.r * ship.thetadot * Math.sin(ship.theta);
-    const velY = ship.rdot * Math.sin(ship.theta) + ship.r * ship.thetadot * Math.cos(ship.theta);
-    
-    if (Math.abs(velX) > 1 || Math.abs(velY) > 1) {
-      ctx.beginPath();
-      ctx.moveTo(shipX, shipY);
-      ctx.lineTo(shipX + velX * velScale, shipY + velY * velScale);
-      ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
     
     ctx.restore();
   }, [config, ship, pad, debris]);
