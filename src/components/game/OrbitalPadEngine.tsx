@@ -75,12 +75,12 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
   
-  // Physics state - proper thrust-based physics
+  // Physics state - proper orbital mechanics with polar velocities
   const [ship, setShip] = useState({
     r: 0,           // distance from planet center
     theta: 0,       // angle around planet (0 = top)
-    vx: 0,          // cartesian velocity x
-    vy: 0,          // cartesian velocity y
+    vr: 0,          // radial velocity (positive = moving away from planet)
+    vtheta: 0,      // tangential velocity (positive = moving counterclockwise)
     fuel: 1000,
     thrust: 0
   });
@@ -110,8 +110,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const newShip = {
       r: startR,
       theta: startTheta,
-      vx: 0,
-      vy: 0, // Start stationary for easier control
+      vr: 0,          // Start with no radial velocity
+      vtheta: 0.8,    // Start with small orbital velocity for stability
       fuel: 1000,
       thrust: 0
     };
@@ -191,7 +191,7 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     };
   }, [gameEnded, onExit]);
 
-  // Proper thrust-based physics - like main lander game
+  // Proper orbital mechanics with polar velocity components
   const updatePhysics = useCallback((dt: number) => {
     if (!config || gameEnded || paused) return;
 
@@ -217,72 +217,71 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
         thrustInput = Math.max(thrustInput, input.thrust);
       }
       
-      // Convert current position to cartesian for physics calculations
-      const shipX = newShip.r * Math.cos(newShip.theta);
-      const shipY = newShip.r * Math.sin(newShip.theta);
-      
-      // Ship orientation (rotated 90 degrees right so thruster points toward planet)
-      const shipAngle = newShip.theta + Math.PI / 2;
-      
-      // Apply thrust forces if fuel available
+      // Set thrust display
       newShip.thrust = thrustInput;
-      const thrustPower = 300; // Strong thrust for responsive control
-      const lateralThrustPower = 250; // Strong lateral thrust for orbital movement
+      
+      // Apply thrust forces if fuel available (planet-relative directions)
+      const radialThrust = 200;    // Thrust away from planet
+      const tangentialThrust = 150; // Orbital velocity change
       
       if (newShip.fuel > 0) {
-        // Main thrust (up key) - thrust away from planet (forward direction of ship)
+        // Up key: Radial thrust (away from planet center)
         if (thrustInput > 0) {
-          const forwardAngle = shipAngle - Math.PI; // Ship points inward, thrust points outward
-          newShip.vx += Math.cos(forwardAngle) * thrustPower * thrustInput * dt;
-          newShip.vy += Math.sin(forwardAngle) * thrustPower * thrustInput * dt;
-          
-          // Consume fuel
+          newShip.vr += radialThrust * thrustInput * dt;
           newShip.fuel -= 200 * thrustInput * dt;
         }
         
-        // Lateral thrust (left/right keys) - sideways thrust for orbital movement
+        // Left key: Decrease orbital velocity (move backward in orbit)
         if (leftInput > 0) {
-          const leftAngle = shipAngle - Math.PI / 2; // 90 degrees left of ship orientation
-          newShip.vx += Math.cos(leftAngle) * lateralThrustPower * leftInput * dt;
-          newShip.vy += Math.sin(leftAngle) * lateralThrustPower * leftInput * dt;
-          
-          // Consume fuel for lateral thrust
+          newShip.vtheta -= tangentialThrust * leftInput * dt;
           newShip.fuel -= 150 * leftInput * dt;
         }
         
+        // Right key: Increase orbital velocity (move forward in orbit)
         if (rightInput > 0) {
-          const rightAngle = shipAngle + Math.PI / 2; // 90 degrees right of ship orientation
-          newShip.vx += Math.cos(rightAngle) * lateralThrustPower * rightInput * dt;
-          newShip.vy += Math.sin(rightAngle) * lateralThrustPower * rightInput * dt;
-          
-          // Consume fuel for lateral thrust
+          newShip.vtheta += tangentialThrust * rightInput * dt;
           newShip.fuel -= 150 * rightInput * dt;
         }
         
         newShip.fuel = Math.max(0, newShip.fuel);
       }
       
-      // Apply gravity toward planet center (cartesian forces)
-      const gravity = config.planet.gravity;
-      const distToCenter = Math.sqrt(shipX * shipX + shipY * shipY);
-      if (distToCenter > 0) {
-        const gravityForce = gravity / (distToCenter * distToCenter) * 10000; // Scale for playability
-        const gravityAngle = Math.atan2(-shipY, -shipX); // Point toward center
-        newShip.vx += Math.cos(gravityAngle) * gravityForce * dt;
-        newShip.vy += Math.sin(gravityAngle) * gravityForce * dt;
+      // Apply orbital mechanics
+      const gravity = config.planet.gravity * 800; // Scaled for orbital mechanics
+      
+      // Gravity acceleration (always pulls inward)
+      const gravityAccel = gravity / (newShip.r * newShip.r);
+      newShip.vr -= gravityAccel * dt;
+      
+      // Centrifugal force (outward acceleration from orbital motion)
+      const centrifugalAccel = (newShip.vtheta * newShip.vtheta) / newShip.r;
+      newShip.vr += centrifugalAccel * dt;
+      
+      // Apply orbital decay when not thrusting (ensures ship always comes down)
+      if (thrustInput === 0) {
+        newShip.vr -= 5 * dt; // Gentle decay
+        newShip.vtheta *= Math.pow(0.995, dt * 60); // Slight orbital drag
       }
       
-      // Update position using velocity
-      const newShipX = shipX + newShip.vx * dt;
-      const newShipY = shipY + newShip.vy * dt;
+      // Velocity limits to prevent escape
+      const maxRadialVel = 300;
+      const maxTangentialVel = 250;
+      newShip.vr = Math.max(-maxRadialVel, Math.min(maxRadialVel, newShip.vr));
+      newShip.vtheta = Math.max(-maxTangentialVel, Math.min(maxTangentialVel, newShip.vtheta));
       
-      // Convert back to polar coordinates
-      newShip.r = Math.sqrt(newShipX * newShipX + newShipY * newShipY);
-      newShip.theta = Math.atan2(newShipY, newShipX);
+      // Update position using polar velocities
+      newShip.r += newShip.vr * dt;
+      newShip.theta += (newShip.vtheta / newShip.r) * dt;
       
       // Keep theta in range
       while (newShip.theta >= 2 * Math.PI) newShip.theta -= 2 * Math.PI;
       while (newShip.theta < 0) newShip.theta += 2 * Math.PI;
+      
+      // Prevent going inside planet
+      if (newShip.r < config.planet.radius + 5) {
+        newShip.r = config.planet.radius + 5;
+        newShip.vr = Math.max(0, newShip.vr); // Stop inward velocity
+      }
       
       return newShip;
     });
@@ -324,8 +323,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
           const isOverPad = angleDiff <= pad.width / 2;
           
           if (isOverPad) {
-            // Arcade landing conditions - check cartesian velocity
-            const totalVel = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            // Arcade landing conditions - check polar velocities
+            const totalVel = Math.sqrt(ship.vr * ship.vr + ship.vtheta * ship.vtheta);
             
             const softLanding = totalVel < 40;
             
@@ -581,7 +580,6 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
   }
 
   const altitude = ship.r - config.planet.radius;
-  const tangentialVel = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
 
   return (
     <div ref={containerRef} className="w-full h-screen bg-black relative">
@@ -593,8 +591,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       
       <HUD 
         altitude={altitude}
-        vx={ship.vx}
-        vy={ship.vy}
+        vx={ship.vr}         // Use radial velocity for vertical component
+        vy={ship.vtheta}     // Use tangential velocity for horizontal component
         fuel={Math.max(0, ship.fuel / 10)} // Convert to 0-100 scale
         score={0} // Will be calculated at landing
         time={gameTime}
