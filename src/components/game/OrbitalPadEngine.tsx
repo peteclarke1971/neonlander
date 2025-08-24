@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { HUD } from "./HUD";
 import { AudioManager } from "./AudioManager";
+import { HomeStarfield } from "./HomeStarfield";
 import { 
   OrbitalDockingGameOverData, 
   LevelConfig
@@ -583,9 +584,14 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
 
   return (
     <div ref={containerRef} className="w-full h-screen bg-black relative">
+      {/* Starfield background */}
+      <div className="absolute inset-0 z-0">
+        <HomeStarfield />
+      </div>
+      
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full z-10"
         style={{ imageRendering: 'pixelated' }}
       />
       
