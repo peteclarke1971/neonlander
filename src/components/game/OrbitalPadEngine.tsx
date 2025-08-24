@@ -219,14 +219,14 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       }
       
       // Orbital movement: left/right modifies tangential velocity directly
-      const tangentialAccel = 100; // Acceleration for orbital movement
+      const tangentialAccel = 400; // Much stronger acceleration for snappy orbital movement
       if (leftInput > 0) {
         newShip.thetadot -= tangentialAccel * leftInput * dt / newShip.r;
       }
       if (rightInput > 0) {
         newShip.thetadot += tangentialAccel * rightInput * dt / newShip.r;
       }
-      newShip.thetadot *= 0.98; // Light damping for stability
+      newShip.thetadot *= 0.96; // Reduced damping for more inertia
       
       // Arcade thrust: simple radial movement
       const thrustPower = 150; // Strong thrust for responsive control
