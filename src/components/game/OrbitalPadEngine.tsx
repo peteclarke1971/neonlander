@@ -231,31 +231,32 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
           newShip.fuel -= 200 * thrustInput * dt;
         }
         
-        // Left key: Decrease orbital velocity (move backward in orbit)
+        // Left/Right keys: Direct angular movement around planet (arcade style)
+        // Convert tangential thrust to direct angular velocity for consistent movement
+        const angularThrust = 0.8; // Direct angular velocity change
+        
         if (leftInput > 0) {
-          newShip.vtheta -= tangentialThrust * leftInput * dt;
-          newShip.fuel -= 150 * leftInput * dt;
+          newShip.theta -= angularThrust * leftInput * dt;
+          newShip.fuel -= 100 * leftInput * dt;
         }
         
-        // Right key: Increase orbital velocity (move forward in orbit)
         if (rightInput > 0) {
-          newShip.vtheta += tangentialThrust * rightInput * dt;
-          newShip.fuel -= 150 * rightInput * dt;
+          newShip.theta += angularThrust * rightInput * dt;
+          newShip.fuel -= 100 * rightInput * dt;
         }
         
         newShip.fuel = Math.max(0, newShip.fuel);
       }
       
-      // Apply orbital mechanics
+      // Apply orbital mechanics - arcade style with separated movement
       const gravity = config.planet.gravity * 800; // Scaled for orbital mechanics
       
       // Gravity acceleration (always pulls inward)
       const gravityAccel = gravity / (newShip.r * newShip.r);
       newShip.vr -= gravityAccel * dt;
       
-      // Centrifugal force (outward acceleration from orbital motion)
-      const centrifugalAccel = (newShip.vtheta * newShip.vtheta) / newShip.r;
-      newShip.vr += centrifugalAccel * dt;
+      // Remove centrifugal force to prevent lateral movement from affecting altitude
+      // This creates arcade-style physics where left/right movement doesn't change orbit height
       
       // Apply orbital decay when not thrusting (ensures ship always comes down)
       if (thrustInput === 0) {
@@ -269,9 +270,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       newShip.vr = Math.max(-maxRadialVel, Math.min(maxRadialVel, newShip.vr));
       newShip.vtheta = Math.max(-maxTangentialVel, Math.min(maxTangentialVel, newShip.vtheta));
       
-      // Update position using polar velocities
+      // Update position - only radial position uses velocity, angular is direct
       newShip.r += newShip.vr * dt;
-      newShip.theta += (newShip.vtheta / newShip.r) * dt;
+      // Angular position is updated directly by input above
       
       // Keep theta in range
       while (newShip.theta >= 2 * Math.PI) newShip.theta -= 2 * Math.PI;
