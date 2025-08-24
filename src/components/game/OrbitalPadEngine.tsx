@@ -29,8 +29,8 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
   const rng = mulberry32(seed);
   
   // Arcade progression: smaller planet, faster rotation, more challenge
-  const baseRadius = 240 - Math.min(level * 6, 80); // 240 down to 160 (20% smaller)
-  const baseGravity = 80 + level * 3; // Moderate gravity increase
+  const baseRadius = (240 - Math.min(level * 6, 80)) * 0.8; // 20% smaller again (192 down to 128)
+  const baseGravity = (80 + level * 3) * 4; // 4x gravity for much faster descent
   const rotationRate = 0.008 + level * 0.002; // Much faster base rotation for arcade feel
   
   // Landing pad gets smaller for challenge
@@ -448,21 +448,36 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     // Reset shadow for craters
     ctx.shadowBlur = 0;
     
-    // Draw crater details on planet - make them more visible
+    // Draw crater details on planet - 4x more varied craters throughout interior
     ctx.strokeStyle = '#00aaaa';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     
-    // Draw a few craters for visual interest
+    // Generate 16 craters with varied sizes and positions throughout planet interior
     const craterPositions = [
-      { angle: 0.5, size: 20 },
-      { angle: 1.8, size: 15 },
-      { angle: 3.4, size: 18 },
-      { angle: 4.7, size: 12 }
+      // Edge craters
+      { angle: 0.5, distance: 0.85, size: 8 },
+      { angle: 1.2, distance: 0.9, size: 12 },
+      { angle: 1.8, distance: 0.8, size: 6 },
+      { angle: 2.7, distance: 0.95, size: 10 },
+      { angle: 3.4, distance: 0.85, size: 14 },
+      { angle: 4.1, distance: 0.9, size: 7 },
+      { angle: 4.7, distance: 0.8, size: 9 },
+      { angle: 5.5, distance: 0.95, size: 11 },
+      // Interior craters  
+      { angle: 0.8, distance: 0.6, size: 15 },
+      { angle: 1.5, distance: 0.4, size: 18 },
+      { angle: 2.2, distance: 0.7, size: 8 },
+      { angle: 2.9, distance: 0.5, size: 12 },
+      { angle: 3.7, distance: 0.3, size: 20 },
+      { angle: 4.4, distance: 0.65, size: 10 },
+      { angle: 5.1, distance: 0.45, size: 16 },
+      { angle: 5.8, distance: 0.55, size: 13 }
     ];
     
     craterPositions.forEach(crater => {
-      const craterX = (config.planet.radius - crater.size) * Math.cos(crater.angle);
-      const craterY = (config.planet.radius - crater.size) * Math.sin(crater.angle);
+      const radius = config.planet.radius * crater.distance;
+      const craterX = radius * Math.cos(crater.angle);
+      const craterY = radius * Math.sin(crater.angle);
       ctx.beginPath();
       ctx.arc(craterX, craterY, crater.size, 0, Math.PI * 2);
       ctx.stroke();
@@ -505,39 +520,39 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const shipAngle = ship.theta + Math.PI / 2;
     ctx.rotate(shipAngle);
     
-    // Draw neon ship triangle with bright glow
+    // Draw neon ship triangle with bright glow - half size
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;
     ctx.beginPath();
-    ctx.moveTo(0, -15); // Point away from planet - make it bigger
-    ctx.lineTo(-10, 10);
-    ctx.lineTo(10, 10);
+    ctx.moveTo(0, -7.5); // Point away from planet - half size
+    ctx.lineTo(-5, 5);
+    ctx.lineTo(5, 5);
     ctx.closePath();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.stroke();
     
-    // Draw thrust flame (same style as main game)
+    // Draw thrust flame (same style as main game) - half size
     if (ship.thrust > 0) {
-      const flameLength = 15 + ship.thrust * 15; // Make flame bigger and more visible
+      const flameLength = 7.5 + ship.thrust * 7.5; // Half size flame
       ctx.shadowColor = '#ff4500';
       ctx.shadowBlur = 15;
       
       ctx.beginPath();
-      ctx.moveTo(-6, 10);
-      ctx.lineTo(0, 10 + flameLength);
-      ctx.lineTo(6, 10);
+      ctx.moveTo(-3, 5);
+      ctx.lineTo(0, 5 + flameLength);
+      ctx.lineTo(3, 5);
       ctx.strokeStyle = '#ff4500';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3;
       ctx.stroke();
       
       // Inner flame
       ctx.beginPath();
-      ctx.moveTo(-3, 10);
-      ctx.lineTo(0, 10 + flameLength * 0.8);
-      ctx.lineTo(3, 10);
+      ctx.moveTo(-1.5, 5);
+      ctx.lineTo(0, 5 + flameLength * 0.8);
+      ctx.lineTo(1.5, 5);
       ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
     
