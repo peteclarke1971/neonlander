@@ -31,8 +31,8 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
   return {
     planet: {
       radius: 150 - (level * 5), // Smaller planets at higher levels
-      gravity: 0.8 + (level * 0.2), // Stronger gravity
-      rotationRate: 0.1 + (level * 0.15) // Faster rotation
+      gravity: 0.8 + (level * 0.1), // Stronger gravity, but slower increase
+      rotationRate: 0.05 + (level * 0.05) // Much slower rotation to start
     },
     pad: {
       width: Math.max(8, 20 - (level * 1.2)) // Smaller pads
@@ -273,9 +273,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       }))
     );
     
-    // Update pad position
+    // Update pad position (slow rotation)
     if (config) {
-      config.pad.position = config.pad.basePosition + config.planet.rotationRate * gameTime;
+      config.pad.position = config.pad.basePosition + config.planet.rotationRate * gameTime * 0.5;
     }
     
   }, [config, keys, paused, gameEnded, gameTime]);
@@ -452,29 +452,29 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Clear canvas
-    ctx.fillStyle = "hsl(var(--background))";
+    // Clear canvas with solid color
+    ctx.fillStyle = "#0a0a0a";
     ctx.fillRect(0, 0, width, height);
     
     // Calculate scale (planet should be ~1/3 of screen)
     const scale = Math.min(width, height) / (config.planet.radius * 6);
     
     // Draw planet
-    ctx.strokeStyle = "hsl(var(--border))";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(centerX, centerY, config.planet.radius * scale, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Draw planet surface markers (rotating)
-    ctx.strokeStyle = "hsl(var(--muted-foreground))";
+    // Draw planet surface markers (rotating slowly)
+    ctx.strokeStyle = "#64748b";
     ctx.lineWidth = 1;
     for (let i = 0; i < 8; i++) {
-      const angle = (i * Math.PI / 4) + (config.planet.rotationRate * gameTime);
+      const angle = (i * Math.PI / 4) + (config.planet.rotationRate * gameTime * 0.3); // Slow down rotation
       const x1 = centerX + Math.cos(angle) * config.planet.radius * scale;
       const y1 = centerY + Math.sin(angle) * config.planet.radius * scale;
-      const x2 = centerX + Math.cos(angle) * (config.planet.radius + 5) * scale;
-      const y2 = centerY + Math.sin(angle) * (config.planet.radius + 5) * scale;
+      const x2 = centerX + Math.cos(angle) * (config.planet.radius + 8) * scale;
+      const y2 = centerY + Math.sin(angle) * (config.planet.radius + 8) * scale;
       
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -486,15 +486,17 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const padStartAngle = config.pad.position - config.pad.width / 2;
     const padEndAngle = config.pad.position + config.pad.width / 2;
     
-    ctx.strokeStyle = "hsl(var(--accent))";
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#22c55e";
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.arc(centerX, centerY, config.planet.radius * scale, padStartAngle, padEndAngle);
     ctx.stroke();
     
     // Add glow effect to pad
-    ctx.shadowColor = "hsl(var(--accent))";
-    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#22c55e";
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = "#22c55e";
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(centerX, centerY, config.planet.radius * scale, padStartAngle, padEndAngle);
     ctx.stroke();
@@ -505,9 +507,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       const x = centerX + Math.cos(d.theta) * d.r * scale;
       const y = centerY + Math.sin(d.theta) * d.r * scale;
       
-      ctx.fillStyle = "hsl(var(--muted-foreground))";
+      ctx.fillStyle = "#64748b";
       ctx.beginPath();
-      ctx.arc(x, y, d.size, 0, Math.PI * 2);
+      ctx.arc(x, y, d.size * scale * 0.1, 0, Math.PI * 2);
       ctx.fill();
     });
     
@@ -519,40 +521,43 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const shipAngle = ship.theta + ship.psi;
     
     // Ship body
-    ctx.strokeStyle = "hsl(var(--foreground))";
+    ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff";
     ctx.lineWidth = 2;
     ctx.save();
     ctx.translate(shipX, shipY);
     ctx.rotate(shipAngle);
     
-    // Ship triangle
+    // Ship triangle (larger and filled)
+    const shipSize = 12;
     ctx.beginPath();
-    ctx.moveTo(8, 0);
-    ctx.lineTo(-4, -3);
-    ctx.lineTo(-4, 3);
+    ctx.moveTo(shipSize, 0);
+    ctx.lineTo(-shipSize * 0.5, -shipSize * 0.4);
+    ctx.lineTo(-shipSize * 0.5, shipSize * 0.4);
     ctx.closePath();
+    ctx.fill();
     ctx.stroke();
     
     // Thrust visualization
     if (ship.thrust > 0 && ship.fuel > 0) {
-      ctx.strokeStyle = "hsl(var(--accent))";
-      ctx.lineWidth = 1;
-      const thrustLength = ship.thrust * 15;
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 2;
+      const thrustLength = ship.thrust * 20;
       ctx.beginPath();
-      ctx.moveTo(-4, 0);
-      ctx.lineTo(-4 - thrustLength, 0);
+      ctx.moveTo(-shipSize * 0.5, 0);
+      ctx.lineTo(-shipSize * 0.5 - thrustLength, 0);
       ctx.stroke();
     }
     
     ctx.restore();
     
     // Draw velocity vector (for debugging/assistance)
-    const velScale = 20;
+    const velScale = 10; // Reduce scale to make it less overwhelming
     const velX = ship.rdot * Math.cos(ship.theta) - ship.r * ship.thetadot * Math.sin(ship.theta);
     const velY = ship.rdot * Math.sin(ship.theta) + ship.r * ship.thetadot * Math.cos(ship.theta);
     
-    ctx.strokeStyle = "hsl(var(--primary))";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(shipX, shipY);
     ctx.lineTo(shipX + velX * velScale, shipY + velY * velScale);
