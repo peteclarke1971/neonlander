@@ -221,33 +221,34 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       newShip.thrust = thrustInput;
       
       // Apply thrust forces if fuel available (planet-relative directions)
-      const radialThrust = 200;    // Thrust away from planet
-      const tangentialThrust = 150; // Orbital velocity change
+      // 30% heavier feel: reduced thrust effectiveness and higher fuel consumption
+      const radialThrust = 140;    // Reduced from 200 (30% less effective)
+      const tangentialThrust = 105; // Reduced from 150 (30% less effective)
       
       if (newShip.fuel > 0) {
         // Up key: Radial thrust (away from planet center)
         if (thrustInput > 0) {
           newShip.vr += radialThrust * thrustInput * dt;
-          newShip.fuel -= 200 * thrustInput * dt;
+          newShip.fuel -= 260 * thrustInput * dt; // 30% more fuel consumption
         }
         
         // Left key: Decrease orbital velocity (move backward in orbit)
         if (leftInput > 0) {
           newShip.vtheta -= tangentialThrust * leftInput * dt;
-          newShip.fuel -= 150 * leftInput * dt;
+          newShip.fuel -= 195 * leftInput * dt; // 30% more fuel consumption
         }
         
         // Right key: Increase orbital velocity (move forward in orbit)
         if (rightInput > 0) {
           newShip.vtheta += tangentialThrust * rightInput * dt;
-          newShip.fuel -= 150 * rightInput * dt;
+          newShip.fuel -= 195 * rightInput * dt; // 30% more fuel consumption
         }
         
         newShip.fuel = Math.max(0, newShip.fuel);
       }
       
-      // Apply orbital mechanics - arcade style with separated movement
-      const gravity = config.planet.gravity * 800; // Scaled for orbital mechanics
+      // Apply orbital mechanics - heavier feel with stronger gravity
+      const gravity = config.planet.gravity * 1040; // Increased from 800 (30% stronger gravity feel)
       
       // Gravity acceleration (always pulls inward)
       const gravityAccel = gravity / (newShip.r * newShip.r);
