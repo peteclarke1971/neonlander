@@ -390,25 +390,29 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     // Set up coordinate system with planet at center
     const centerX = width / 2;
     const centerY = height / 2;
-    const scale = Math.min(width, height) / (config.planet.radius * 2.8);
+    
+    // Use larger scale to make elements more visible
+    const scale = Math.min(width, height) / 600; // Much larger scale
     
     ctx.save();
     ctx.translate(centerX, centerY);
     ctx.scale(scale, scale);
     
-    // Draw neon planet outline with glow
+    // Draw neon planet outline with bright glow - make it bold and visible
     ctx.shadowColor = '#00ffff';
-    ctx.shadowBlur = 15 / scale;
+    ctx.shadowBlur = 20;
     ctx.beginPath();
     ctx.arc(0, 0, config.planet.radius, 0, Math.PI * 2);
     ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 3 / scale;
+    ctx.lineWidth = 4;
     ctx.stroke();
     
-    // Draw crater details on planet
+    // Reset shadow for craters
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#004d66';
-    ctx.lineWidth = 1 / scale;
+    
+    // Draw crater details on planet - make them more visible
+    ctx.strokeStyle = '#00aaaa';
+    ctx.lineWidth = 2;
     
     // Draw a few craters for visual interest
     const craterPositions = [
@@ -426,9 +430,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       ctx.stroke();
     });
     
-    // Draw neon landing pad with glow
+    // Draw neon landing pad with bright glow
     ctx.shadowColor = '#00ff00';
-    ctx.shadowBlur = 10 / scale;
+    ctx.shadowBlur = 15;
     
     const padStart = pad.position - pad.width / 2;
     const padEnd = pad.position + pad.width / 2;
@@ -436,18 +440,18 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     ctx.beginPath();
     ctx.arc(0, 0, config.planet.radius, padStart, padEnd);
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 6 / scale;
+    ctx.lineWidth = 8;
     ctx.stroke();
     
     // Draw debris as small neon dots
-    ctx.shadowBlur = 5 / scale;
+    ctx.shadowBlur = 8;
     debris.forEach(d => {
       const debrisX = d.r * Math.cos(d.theta);
       const debrisY = d.r * Math.sin(d.theta);
       
       ctx.shadowColor = '#ff6600';
       ctx.beginPath();
-      ctx.arc(debrisX, debrisY, d.size, 0, Math.PI * 2);
+      ctx.arc(debrisX, debrisY, d.size * 2, 0, Math.PI * 2); // Make debris bigger
       ctx.fillStyle = '#ff6600';
       ctx.fill();
     });
@@ -463,49 +467,49 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const shipAngle = ship.theta;
     ctx.rotate(shipAngle);
     
-    // Draw neon ship triangle with glow
+    // Draw neon ship triangle with bright glow
     ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 8 / scale;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
-    ctx.moveTo(0, -12); // Point away from planet
-    ctx.lineTo(-8, 8);
-    ctx.lineTo(8, 8);
+    ctx.moveTo(0, -15); // Point away from planet - make it bigger
+    ctx.lineTo(-10, 10);
+    ctx.lineTo(10, 10);
     ctx.closePath();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2 / scale;
+    ctx.lineWidth = 3;
     ctx.stroke();
     
     // Draw thrust flame (same style as main game)
     if (ship.thrust > 0) {
-      const flameLength = 12 + ship.thrust * 10;
+      const flameLength = 15 + ship.thrust * 15; // Make flame bigger and more visible
       ctx.shadowColor = '#ff4500';
-      ctx.shadowBlur = 12 / scale;
+      ctx.shadowBlur = 15;
       
       ctx.beginPath();
-      ctx.moveTo(-4, 8);
-      ctx.lineTo(0, 8 + flameLength);
-      ctx.lineTo(4, 8);
+      ctx.moveTo(-6, 10);
+      ctx.lineTo(0, 10 + flameLength);
+      ctx.lineTo(6, 10);
       ctx.strokeStyle = '#ff4500';
-      ctx.lineWidth = 3 / scale;
+      ctx.lineWidth = 4;
       ctx.stroke();
       
       // Inner flame
       ctx.beginPath();
-      ctx.moveTo(-2, 8);
-      ctx.lineTo(0, 8 + flameLength * 0.8);
-      ctx.lineTo(2, 8);
+      ctx.moveTo(-3, 10);
+      ctx.lineTo(0, 10 + flameLength * 0.8);
+      ctx.lineTo(3, 10);
       ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 1.5 / scale;
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
     
     ctx.restore();
     
     // Draw velocity vector (arcade style)
-    ctx.shadowBlur = 5 / scale;
+    ctx.shadowBlur = 8;
     ctx.shadowColor = '#ffff00';
     
-    const velScale = 3;
+    const velScale = 5; // Make velocity vector more visible
     const velX = ship.rdot * Math.cos(ship.theta) - ship.r * ship.thetadot * Math.sin(ship.theta);
     const velY = ship.rdot * Math.sin(ship.theta) + ship.r * ship.thetadot * Math.cos(ship.theta);
     
@@ -514,7 +518,7 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       ctx.moveTo(shipX, shipY);
       ctx.lineTo(shipX + velX * velScale, shipY + velY * velScale);
       ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 2 / scale;
+      ctx.lineWidth = 3;
       ctx.stroke();
     }
     
