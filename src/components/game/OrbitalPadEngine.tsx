@@ -435,11 +435,17 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     ctx.translate(centerX, centerY);
     ctx.scale(scale, scale);
     
-    // Draw neon planet outline with bright glow - make it bold and visible
+    // Draw planet with solid fill and neon outline - make it bold and visible
     ctx.shadowColor = '#00ffff';
     ctx.shadowBlur = 20;
     ctx.beginPath();
     ctx.arc(0, 0, config.planet.radius, 0, Math.PI * 2);
+    
+    // Fill planet with dark color to block starfield
+    ctx.fillStyle = '#001122';
+    ctx.fill();
+    
+    // Add neon outline
     ctx.strokeStyle = '#00ffff';
     ctx.lineWidth = 4;
     ctx.stroke();
