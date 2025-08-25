@@ -421,9 +421,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     const width = rect.width;
     const height = rect.height;
     
-    // Clear canvas with space black
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
+    // Clear canvas (transparent background to show starfield)
+    ctx.clearRect(0, 0, width, height);
     
     // Set up coordinate system with planet at center
     const centerX = width / 2;
@@ -591,7 +590,7 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full z-10"
+        className="absolute inset-0 w-full h-full z-10 bg-transparent"
         style={{ imageRendering: 'pixelated' }}
       />
       
