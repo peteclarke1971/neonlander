@@ -163,6 +163,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty);
         })();
     
+    // Debug moving pads presence
+    if (!isCavernLevel) {
+      const t = terrain as TerrainData;
+      const mpCount = t.movingPads?.length ?? 0;
+      if (mpCount > 0) {
+        const mp = t.movingPads![0];
+        console.log("[MovingPad] Generated", { level, difficulty, mode, mp });
+      } else {
+        console.warn("[MovingPad] None generated", { level, difficulty, mode });
+      }
+    }
     // Set cavern data for FX renderer and core composition
     if (isCavernLevel) {
       const cavernData = terrain as CavernData;
@@ -253,6 +264,18 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         return { x: padCenterX, y: spawnY };
       }
       
+      // Focus test: spawn above moving pad to ensure visibility on Easy L1-5 classic
+      if (difficulty === "easy" && mode === "classic" && level <= 5) {
+        const t = terrain as TerrainData;
+        if (t.movingPads && t.movingPads.length > 0) {
+          const mp = t.movingPads[0];
+          const sx = mp.currentPos.x;
+          const sy = mp.currentPos.y - 220;
+          console.log("[MovingPad] Spawning near moving pad", { sx, sy, mp });
+          return { x: sx, y: sy };
+        }
+      }
+      
       if (mode === "fixed") {
         const cx = WORLD_WIDTH / 2;
         const gy = terrain.getHeightAt(cx);
@@ -308,7 +331,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Camera zoom smoothing helpers
     let clearanceEMA = 220; // smoothed ground clearance
     let prevTargetZoom = 1;
-
+    let loggedMovingPadStart = false;
+    
     // Particles
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
@@ -680,6 +704,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (terrainData.movingPads) {
         for (const movingPad of terrainData.movingPads) {
           movingPadSystem.updateMovingPad(movingPad, dt);
+        }
+        const mp = terrainData.movingPads[0];
+        if (mp && !loggedMovingPadStart && mp.phase === "moving" && (Math.abs(mp.currentVelocity.x) + Math.abs(mp.currentVelocity.y)) > 0.1) {
+          console.log("[MovingPad] Movement started", { pos: mp.currentPos, vel: mp.currentVelocity, speed: mp.speed });
+          loggedMovingPadStart = true;
         }
       }
       

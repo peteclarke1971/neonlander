@@ -92,10 +92,10 @@ export class MovingPadSystem {
     };
     const speedBand = rand() < 0.4 ? "slow" : rand() < 0.8 ? "medium" : "fast";
     const speedRange = speedBands[speedBand];
-    const speed = speedRange.min + rand() * (speedRange.max - speedRange.min);
+    const speed = forced ? (130 + rand() * 50) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
 
     // Dwell time
-    const dwell = 1.6 + rand() * 1.2; // 1.6-2.8 seconds
+    const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
 
     // Score multiplier
     const scoreMult = speedBand === "fast" ? 3.0 : 2.0;
@@ -191,7 +191,7 @@ export class MovingPadSystem {
       dwell,
       currentPos: { ...pos0 },
       currentVelocity: { x: 0, y: 0 },
-      phase: "dwelling",
+      phase: "moving",
       phaseTimer: 0,
       direction: 1,
       scoreMult,
