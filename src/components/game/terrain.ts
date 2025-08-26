@@ -158,8 +158,11 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
-  // For testing: enable moving pads in first 5 levels of easy mode
-  const shouldGenerateMovingPad = difficulty === "hard" || (difficulty === "easy" && level <= 5);
+  
+  // Force moving pads on Easy levels 1-5 for testing
+  const isTestLevel = difficulty === "easy" && level <= 5;
+  const shouldGenerateMovingPad = difficulty === "hard" || isTestLevel;
+  
   if (shouldGenerateMovingPad) {
     const movingPad = movingPadSystem.generateMovingPad(
       seed ^ 0x4D4F5649, // "MOVI" in hex
@@ -169,10 +172,28 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       800, // worldHeight estimate for surface
       getHeightAt,
       pads,
-      false // not cavern
+      false, // not cavern
+      isTestLevel // forced generation for test levels
     );
     if (movingPad) {
       movingPads.push(movingPad);
+      
+      // Flatten terrain under moving pad path for safe movement (4x width corridor)
+      if (isTestLevel) {
+        const padWidth = movingPad.pos1.x - movingPad.pos0.x;
+        const corridorWidth = Math.abs(padWidth) * 4;
+        const corridorLeft = Math.min(movingPad.pos0.x, movingPad.pos1.x) - corridorWidth / 2;
+        const corridorRight = Math.max(movingPad.pos0.x, movingPad.pos1.x) + corridorWidth / 2;
+        const flattenY = Math.max(movingPad.pos0.y, movingPad.pos1.y) + 50; // 50px below pad
+        
+        // Find points in the corridor and flatten them
+        for (let i = 0; i < points.length; i++) {
+          const point = points[i];
+          if (point.x >= corridorLeft && point.x <= corridorRight) {
+            point.y = Math.max(point.y, flattenY); // Don't go above existing terrain, only flatten down
+          }
+        }
+      }
     }
   }
 

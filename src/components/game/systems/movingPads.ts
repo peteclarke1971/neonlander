@@ -62,11 +62,12 @@ export class MovingPadSystem {
     worldHeight: number,
     getHeightAt: (x: number) => number,
     existingPads: Pad[],
-    isCavern: boolean = false
+    isCavern: boolean = false,
+    forced: boolean = false
   ): MovingPad | null {
-    if (this.settings.enabled === "off") return null;
-    if (difficulty === "easy") return null; // Only on hard difficulty
-    if (isCavern && !this.settings.enabledInCaverns) return null;
+    if (this.settings.enabled === "off" && !forced) return null;
+    if (difficulty === "easy" && !forced) return null; // Only on hard difficulty unless forced
+    if (isCavern && !this.settings.enabledInCaverns && !forced) return null;
 
     const rand = mulberry32(seed ^ 0x4D4F5649); // "MOVI" in hex
 
@@ -75,12 +76,12 @@ export class MovingPadSystem {
     if (this.settings.enabled === "more") spawnChance *= 2;
     spawnChance = Math.min(spawnChance, 0.25); // Cap at 25%
 
-    if (rand() > spawnChance) return null;
+    if (!forced && rand() > spawnChance) return null;
 
-    // Choose motion type
+    // Choose motion type (prefer shuttle for forced generation)
     const motionTypes: MovingPad["motion"][] = isCavern 
       ? ["elevator", "shuttle"] 
-      : ["shuttle", "arc"];
+      : forced ? ["shuttle"] : ["shuttle", "arc"];
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
     // Speed band based on difficulty
@@ -143,12 +144,28 @@ export class MovingPadSystem {
       arcAngle1 = angle1;
     } else {
       // Shuttle movement (horizontal)
-      const y = getHeightAt(worldWidth / 2) - (100 + rand() * 100);
-      const width = 200 + rand() * 300; // 200-500 pixel width
-      const centerX = worldWidth * (0.2 + rand() * 0.6);
-      
-      pos0 = { x: centerX - width / 2, y };
-      pos1 = { x: centerX + width / 2, y };
+      if (forced) {
+        // For forced generation, use terrain minimum for safe placement
+        const samples = 20;
+        let minHeight = Infinity;
+        for (let i = 0; i < samples; i++) {
+          const x = worldWidth * (0.3 + (i / samples) * 0.4); // Sample middle 40%
+          minHeight = Math.min(minHeight, getHeightAt(x));
+        }
+        const y = minHeight - (80 + rand() * 40); // 80-120 pixels above lowest terrain
+        const width = 160 + rand() * 80; // 160-240 pixel width for forced pads
+        const centerX = worldWidth * (0.4 + rand() * 0.2); // Middle 20% for safety
+        
+        pos0 = { x: centerX - width / 2, y };
+        pos1 = { x: centerX + width / 2, y };
+      } else {
+        const y = getHeightAt(worldWidth / 2) - (100 + rand() * 100);
+        const width = 200 + rand() * 300; // 200-500 pixel width
+        const centerX = worldWidth * (0.2 + rand() * 0.6);
+        
+        pos0 = { x: centerX - width / 2, y };
+        pos1 = { x: centerX + width / 2, y };
+      }
     }
 
     // Validate path safety (simplified for now)
