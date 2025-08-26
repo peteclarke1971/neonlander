@@ -173,7 +173,7 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       getHeightAt,
       pads,
       false, // not cavern
-      isTestLevel // forced generation for test levels
+      false // no forced generation
     );
     if (movingPad) {
       movingPads.push(movingPad);

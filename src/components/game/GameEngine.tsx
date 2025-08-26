@@ -811,13 +811,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
         const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
         
-        // For moving pads, use relative velocity with relaxed thresholds
+        // For moving pads, use relative velocity with lenient horizontal thresholds
         let okVy: boolean, okVx: boolean;
         if (movingPadLanding) {
           const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, movingPadLanding);
-          // Relaxed thresholds for moving pad landings
-          okVy = Math.abs(relativeVel.y) < (difficulty === "easy" ? 2.2 : 1.6);
-          okVx = Math.abs(relativeVel.x) < (difficulty === "easy" ? 12.0 : 6.0);
+          // Strict on vertical (soft landing), very lenient on horizontal as long as within pad
+          okVy = Math.abs(relativeVel.y) < (difficulty === "easy" ? 2.0 : 1.5);
+          okVx = Math.abs(relativeVel.x) < 20.0; // Very lenient horizontal - just need to be within pad
         } else {
           okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
           okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);

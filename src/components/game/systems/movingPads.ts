@@ -87,15 +87,15 @@ export class MovingPadSystem {
       : forced ? ["shuttle"] : ["shuttle", "arc"];
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
-    // Speed band based on difficulty (reduced by another 50%)
+    // Speed band based on difficulty (reduced to 25% of original)
     const speedBands = {
-      slow: { min: 15, max: 20 },
-      medium: { min: 22, max: 30 },
-      fast: { min: 32, max: 40 }
+      slow: { min: 4, max: 5 },
+      medium: { min: 6, max: 8 },
+      fast: { min: 8, max: 10 }
     };
     const speedBand = rand() < 0.4 ? "slow" : rand() < 0.8 ? "medium" : "fast";
     const speedRange = speedBands[speedBand];
-    const speed = forced ? (32 + rand() * 12) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
+    const speed = speedRange.min + rand() * (speedRange.max - speedRange.min);
 
     // Dwell time
     const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
@@ -172,14 +172,14 @@ export class MovingPadSystem {
         }
         
         const y = getHeightAt(bestX); // Place flush with terrain
-        const width = 70 + rand() * 40; // 70-110 pixel width (reduced)
+        const width = 105 + rand() * 60; // 105-165 pixel width (50% bigger)
         
         pos0 = { x: bestX - width / 2, y };
         pos1 = { x: bestX + width / 2, y };
       } else {
         const centerX = worldWidth * (0.2 + rand() * 0.6);
         const y = getHeightAt(centerX); // Place flush with terrain
-        const width = 100 + rand() * 80; // 100-180 pixel width (reduced)
+        const width = 150 + rand() * 120; // 150-270 pixel width (50% bigger)
         
         pos0 = { x: centerX - width / 2, y };
         pos1 = { x: centerX + width / 2, y };
