@@ -164,7 +164,7 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   const shouldGenerateMovingPad = difficulty === "hard" || isTestLevel;
   
   if (shouldGenerateMovingPad) {
-    const movingPad = movingPadSystem.generateMovingPad(
+    let movingPad = movingPadSystem.generateMovingPad(
       seed ^ 0x4D4F5649, // "MOVI" in hex
       level,
       difficulty,
@@ -175,6 +175,39 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       false, // not cavern
       false // no forced generation
     );
+
+    // Fallback attempts: try a few more random seeds (non-forced)
+    if (!movingPad) {
+      for (let i = 1; i <= 3 && !movingPad; i++) {
+        movingPad = movingPadSystem.generateMovingPad(
+          (seed ^ 0x4D4F5649) + i,
+          level,
+          difficulty,
+          worldWidth,
+          800,
+          getHeightAt,
+          pads,
+          false,
+          false
+        );
+      }
+    }
+
+    // Final fallback: force generation
+    if (!movingPad) {
+      movingPad = movingPadSystem.generateMovingPad(
+        seed ^ 0x4D4F5649 ^ 0xF00,
+        level,
+        difficulty,
+        worldWidth,
+        800,
+        getHeightAt,
+        pads,
+        false,
+        true
+      );
+    }
+
     if (movingPad) {
       movingPads.push(movingPad);
       

@@ -69,7 +69,7 @@ export class MovingPadSystem {
     forced: boolean = false
   ): MovingPad | null {
     if (this.settings.enabled === "off" && !forced) return null;
-    if (difficulty === "easy" && !forced) return null; // Only on hard difficulty unless forced
+    // allow on easy difficulty; no early return
     if (isCavern && !this.settings.enabledInCaverns && !forced) return null;
 
     const rand = mulberry32(seed ^ 0x4D4F5649); // "MOVI" in hex
@@ -354,7 +354,12 @@ export class MovingPadSystem {
       const y = pos0.y + (pos1.y - pos0.y) * t;
       const terrainY = getHeightAt(x);
       
-      if (y + clearance > terrainY) return false; // Too close to ground
+      if (motion === "shuttle") {
+        // Allow flush tracks: permit pad path to be at ground height (not below it)
+        if (y > terrainY + 0.5) return false; // below terrain -> invalid
+      } else {
+        if (y + clearance > terrainY) return false; // Too close to ground
+      }
     }
 
   // Check distance from existing pads - ensure moving pad is on isolated flat terrain
