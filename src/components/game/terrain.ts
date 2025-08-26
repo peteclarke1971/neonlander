@@ -177,6 +177,22 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     );
     if (movingPad) {
       movingPads.push(movingPad);
+      
+      // Remove any static pads that overlap with moving pad area
+      const movingPadBuffer = 150; // Buffer zone around moving pad
+      const minMovingX = Math.min(movingPad.pos0.x, movingPad.pos1.x) - movingPadBuffer;
+      const maxMovingX = Math.max(movingPad.pos0.x, movingPad.pos1.x) + movingPadBuffer;
+      
+      for (let i = pads.length - 1; i >= 0; i--) {
+        const pad = pads[i];
+        const padOverlaps = !(pad.xEnd < minMovingX || pad.xStart > maxMovingX);
+        const heightDiff = Math.abs(pad.y - movingPad.currentPos.y);
+        
+        if (padOverlaps && heightDiff < 30) {
+          console.log("[MovingPad] Removing overlapping static pad", { staticPad: pad, movingPad });
+          pads.splice(i, 1);
+        }
+      }
     }
   }
 
@@ -194,8 +210,11 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   };
 
   const getMovingPadAt = (x: number, y: number): MovingPad | null => {
+    // Use lander "foot" position for collision detection (bottom center)
+    const footY = y + 8; // Lander foot is ~8 pixels below center
+    
     for (const mp of movingPads) {
-      if (movingPadSystem.isOnMovingPad(x, y, mp)) {
+      if (movingPadSystem.isOnMovingPad(x, footY, mp)) {
         return mp;
       }
     }

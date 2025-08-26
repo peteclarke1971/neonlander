@@ -172,14 +172,14 @@ export class MovingPadSystem {
         }
         
         const y = getHeightAt(bestX); // Place flush with terrain
-        const width = 100 + rand() * 60; // 100-160 pixel width (reduced by 2/3)
+        const width = 70 + rand() * 40; // 70-110 pixel width (reduced)
         
         pos0 = { x: bestX - width / 2, y };
         pos1 = { x: bestX + width / 2, y };
       } else {
         const centerX = worldWidth * (0.2 + rand() * 0.6);
         const y = getHeightAt(centerX); // Place flush with terrain
-        const width = 130 + rand() * 200; // 130-330 pixel width (reduced by 2/3)
+        const width = 100 + rand() * 80; // 100-180 pixel width (reduced)
         
         pos0 = { x: centerX - width / 2, y };
         pos1 = { x: centerX + width / 2, y };
