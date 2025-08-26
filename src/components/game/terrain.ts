@@ -158,18 +158,22 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
-  const movingPad = movingPadSystem.generateMovingPad(
-    seed ^ 0x4D4F5649, // "MOVI" in hex
-    level,
-    difficulty,
-    worldWidth,
-    800, // worldHeight estimate for surface
-    getHeightAt,
-    pads,
-    false // not cavern
-  );
-  if (movingPad) {
-    movingPads.push(movingPad);
+  // For testing: enable moving pads in first 5 levels of easy mode
+  const shouldGenerateMovingPad = difficulty === "hard" || (difficulty === "easy" && level <= 5);
+  if (shouldGenerateMovingPad) {
+    const movingPad = movingPadSystem.generateMovingPad(
+      seed ^ 0x4D4F5649, // "MOVI" in hex
+      level,
+      difficulty,
+      worldWidth,
+      800, // worldHeight estimate for surface
+      getHeightAt,
+      pads,
+      false // not cavern
+    );
+    if (movingPad) {
+      movingPads.push(movingPad);
+    }
   }
 
   const getPadAt = (x: number): Pad | null => {
