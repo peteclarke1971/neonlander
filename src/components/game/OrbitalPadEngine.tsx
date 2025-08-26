@@ -32,7 +32,7 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
   // Arcade progression: smaller planet, faster rotation, more challenge
   const baseRadius = (240 - Math.min(level * 6, 80)) * 0.8; // 20% smaller again (192 down to 128)
   const baseGravity = (80 + level * 3) * 4; // 4x gravity for much faster descent
-  const rotationRate = 0.008 + level * 0.002; // Much faster base rotation for arcade feel
+  const rotationRate = 0.008 * (1 + level * 0.9); // 10x speed by level 10 (0.008 to 0.08)
   
   // Landing pad gets smaller for challenge
   const padWidth = Math.max(15 - level * 1.2, 6); // 15 degrees down to 6
@@ -235,13 +235,17 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
           newShip.vr += radialThrust * thrustInput * dt;
           newShip.fuel -= 260 * thrustInput * dt; // 30% more fuel consumption
           
-          // Add particles for radial thrust
-          const nozzleX = newShip.r * Math.cos(newShip.theta + Math.PI / 2);
-          const nozzleY = newShip.r * Math.sin(newShip.theta + Math.PI / 2);
+          // Add particles for radial thrust - position at ship's location facing inward
+          const shipX = newShip.r * Math.cos(newShip.theta);
+          const shipY = newShip.r * Math.sin(newShip.theta);
+          // Offset slightly inward for nozzle position
+          const nozzleOffset = 8;
+          const nozzleX = shipX - Math.cos(newShip.theta) * nozzleOffset;
+          const nozzleY = shipY - Math.sin(newShip.theta) * nozzleOffset;
           setParticles(prev => {
             const newParticles = [...prev];
             for (let i = 0; i < 3; i++) {
-              const pa = newShip.theta + Math.PI / 2 + (Math.random() - 0.5) * 0.6 + Math.PI;
+              const pa = newShip.theta + Math.PI + (Math.random() - 0.5) * 0.6;
               const sp = 60 + Math.random() * 120 * thrustInput;
               newParticles.push({
                 x: nozzleX,
