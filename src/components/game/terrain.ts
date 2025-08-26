@@ -1,5 +1,6 @@
-import { Pad, TerrainData } from "./types";
+import { Pad, TerrainData, MovingPad } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
+import { movingPadSystem } from "./systems/movingPads";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -11,7 +12,7 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1): TerrainData {
+export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1, difficulty: "easy" | "hard" = "easy"): TerrainData {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
 
@@ -125,17 +126,6 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   // Re-sync seam after all modifications
   points[segments].y = points[0].y;
 
-  // Generate volcanoes for this level
-  const volcanoes = generateVolcanoes(seed ^ 0xCAFE, worldWidth, level, (x) => {
-    const xx = ((x % worldWidth) + worldWidth) % worldWidth;
-    let i = Math.floor((xx / worldWidth) * segments);
-    i = Math.max(0, Math.min(segments - 1, i));
-    const x0 = i * step;
-    const x1 = (i + 1) * step;
-    const t = (xx - x0) / (x1 - x0);
-    return points[i].y * (1 - t) + points[i + 1].y * t;
-  }, points, pads);
-
   const worldWidthLocal = worldWidth;
   const wrapX = (x: number) => {
     let xx = x % worldWidthLocal;
@@ -155,6 +145,33 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return y;
   };
 
+  // Generate volcanoes for this level
+  const volcanoes = generateVolcanoes(seed ^ 0xCAFE, worldWidth, level, (x) => {
+    const xx = ((x % worldWidth) + worldWidth) % worldWidth;
+    let i = Math.floor((xx / worldWidth) * segments);
+    i = Math.max(0, Math.min(segments - 1, i));
+    const x0 = i * step;
+    const x1 = (i + 1) * step;
+    const t = (xx - x0) / (x1 - x0);
+    return points[i].y * (1 - t) + points[i + 1].y * t;
+  }, points, pads);
+
+  // Generate moving pads for this level
+  const movingPads: MovingPad[] = [];
+  const movingPad = movingPadSystem.generateMovingPad(
+    seed ^ 0x4D4F5649, // "MOVI" in hex
+    level,
+    difficulty,
+    worldWidth,
+    800, // worldHeight estimate for surface
+    getHeightAt,
+    pads,
+    false // not cavern
+  );
+  if (movingPad) {
+    movingPads.push(movingPad);
+  }
+
   const getPadAt = (x: number): Pad | null => {
     const xx = wrapX(x);
     for (const p of pads) {
@@ -168,5 +185,14 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return null;
   };
 
-  return { worldWidth: worldWidthLocal, points, pads, volcanoes, getHeightAt, getPadAt };
+  const getMovingPadAt = (x: number, y: number): MovingPad | null => {
+    for (const mp of movingPads) {
+      if (movingPadSystem.isOnMovingPad(x, y, mp)) {
+        return mp;
+      }
+    }
+    return null;
+  };
+
+  return { worldWidth: worldWidthLocal, points, pads, movingPads, volcanoes, getHeightAt, getPadAt, getMovingPadAt };
 }

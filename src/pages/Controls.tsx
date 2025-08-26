@@ -202,6 +202,30 @@ export default function ControlsSettings() {
         </div>
 
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Gameplay Settings</h2>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Moving Pads</Label>
+                <div className="text-xs text-muted-foreground">Rare, high-value moving landing pads on hard difficulty</div>
+              </div>
+              <select 
+                className="px-3 py-2 rounded border border-border bg-background text-foreground"
+                defaultValue="default"
+                onChange={(e) => {
+                  // This would integrate with the moving pad system settings
+                  console.log('Moving pads setting:', e.target.value);
+                }}
+              >
+                <option value="off">Off</option>
+                <option value="default">Default</option>
+                <option value="more">More</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Remap Controls</h2>
           <FieldRow label="rotateLeftBtn" value={profile.map.rotateLeftBtn} type="button" onRebind={() => startListen("rotateLeftBtn", "button")} />
           <FieldRow label="rotateRightBtn" value={profile.map.rotateRightBtn} type="button" onRebind={() => startListen("rotateRightBtn", "button")} />

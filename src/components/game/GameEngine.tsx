@@ -6,8 +6,9 @@ import { CavernFXRenderer } from "./CavernFXRenderer";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad } from "./types";
 import { generateTerrain } from "./terrain";
+import { movingPadSystem } from "./systems/movingPads";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -159,7 +160,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       ? generateCavern(seed, level, difficulty)
       : (() => {
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
-          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level);
+          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty);
         })();
     
     // Set cavern data for FX renderer and core composition
@@ -674,6 +675,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Update moving hazards in non-cavern levels
       if (!isCavernLevel) { updateHazards(hazards, dt, terrain.worldWidth, BASE_HEIGHT); }
       
+      // Update moving pads
+      const terrainData = terrain as TerrainData;
+      if (terrainData.movingPads) {
+        for (const movingPad of terrainData.movingPads) {
+          movingPadSystem.updateMovingPad(movingPad, dt);
+        }
+      }
+      
       // Update volcanoes (only in terrain mode for now)
       if (!isCavernLevel) {
         const terrainData = terrain as TerrainData;
@@ -740,6 +749,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (collisionDetected) {
         const pad = terrain.getPadAt(x);
         let nearPad: Pad | null = null;
+        
+        // Check for moving pad collision first
+        let movingPadLanding: MovingPad | null = null;
+        const terrainData = terrain as TerrainData;
+        if (terrainData.movingPads && terrainData.getMovingPadAt) {
+          movingPadLanding = terrainData.getMovingPadAt(x, y);
+        }
         if (!isCavernLevel) {
           const t = terrain as TerrainData;
           const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
@@ -765,8 +781,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           }
         }
         const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
-        const okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
-        const okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
+        
+        // For moving pads, use relative velocity
+        let okVy: boolean, okVx: boolean;
+        if (movingPadLanding) {
+          const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, movingPadLanding);
+          okVy = Math.abs(relativeVel.y) < (difficulty === "easy" ? 1.8 : 1.2);
+          okVx = Math.abs(relativeVel.x) < (difficulty === "easy" ? 1.5 : 1.0);
+        } else {
+          okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
+          okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
+        }
 
         if (isCavernLevel) {
            const cav = terrain as CavernData;
@@ -822,6 +847,50 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed });
             }, 700);
           }
+        } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
+          // MEGA! Moving pad landing
+          const landedPad = movingPadLanding;
+          y = landedPad.currentPos.y - 8;
+          vy = landedPad.currentVelocity.y; 
+          vx = landedPad.currentVelocity.x; 
+          av = 0; angle = 0;
+          
+          // Calculate relative velocity for finesse bonus
+          const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, landedPad);
+          const finesse = Math.floor(200 * (1 - Math.max(Math.abs(relativeVel.x), Math.abs(relativeVel.y)) / 2));
+          let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
+          
+          // Apply MEGA multiplier!
+          earned = Math.floor(earned * landedPad.scoreMult);
+          
+          const pWidth = landedPad.width ?? 32;
+          const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
+          if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); bullseyeT = 0; }
+          const speedBonus = elapsed < 10;
+          if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
+          
+          score += earned;
+          landings += 1;
+          cameraShake = 8; // Extra camera shake for MEGA landing
+          audio.current.success();
+          audio.current.stopThruster();
+          try { audio.current.stopFuelAlarm(); } catch {}
+          if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
+          running = false;
+          setTimeout(() => {
+            onGameOver({ 
+              score, 
+              landings, 
+              cause: "success", 
+              difficulty, 
+              elapsed, 
+              lastEarned: earned, 
+              padBonus2x: false, 
+              bullseye, 
+              speedBonus, 
+              levelSeed 
+            });
+          }, 500);
         } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
           // successful landing - end run (non-cavern levels)
           const landedPad = (pad || nearPad)!;
@@ -1189,6 +1258,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           }
 
           ctx.restore();
+        }
+      }
+
+      // Moving pads
+      const terrainData = terrain as TerrainData;
+      if (terrainData.movingPads) {
+        for (const movingPad of terrainData.movingPads) {
+          movingPadSystem.renderMovingPad(
+            ctx,
+            movingPad,
+            cameraX,
+            anchor,
+            zoom,
+            viewWCull,
+            h / (zoom * dpr),
+            neonColor
+          );
         }
       }
 

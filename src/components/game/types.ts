@@ -1,6 +1,28 @@
 export type Difficulty = "easy" | "hard";
 export type Mode = "classic" | "fixed" | "caverns";
 
+export interface MovingPad extends Pad {
+  motion: "shuttle" | "elevator" | "arc";
+  pos0: { x: number; y: number };
+  pos1: { x: number; y: number };
+  speed: number; // px/s
+  dwell: number; // seconds at each end
+  currentPos: { x: number; y: number };
+  currentVelocity: { x: number; y: number };
+  phase: "moving" | "dwelling";
+  phaseTimer: number;
+  direction: 1 | -1; // movement direction
+  scoreMult: number; // MEGA multiplier (2.0x or 3.0x)
+  enabledInCaverns: boolean;
+  zIndex: number;
+  seed: number; // for deterministic behavior
+  // Arc-specific properties (optional)
+  arcCenter?: { x: number; y: number };
+  arcRadius?: number;
+  arcAngle0?: number;
+  arcAngle1?: number;
+}
+
 export interface Volcano {
   x: number;
   y: number;
@@ -27,9 +49,11 @@ export interface TerrainData {
   worldWidth: number;
   points: { x: number; y: number }[];
   pads: Pad[];
+  movingPads?: MovingPad[];
   volcanoes?: Volcano[];
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
+  getMovingPadAt?: (x: number, y: number) => MovingPad | null;
   isCavern?: false;
 }
 
