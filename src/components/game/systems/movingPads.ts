@@ -87,15 +87,15 @@ export class MovingPadSystem {
       : forced ? ["shuttle"] : ["shuttle", "arc"];
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
-    // Speed band based on difficulty
+    // Speed band based on difficulty (reduced by half)
     const speedBands = {
-      slow: { min: 60, max: 80 },
-      medium: { min: 90, max: 120 },
-      fast: { min: 130, max: 160 }
+      slow: { min: 30, max: 40 },
+      medium: { min: 45, max: 60 },
+      fast: { min: 65, max: 80 }
     };
     const speedBand = rand() < 0.4 ? "slow" : rand() < 0.8 ? "medium" : "fast";
     const speedRange = speedBands[speedBand];
-    const speed = forced ? (130 + rand() * 50) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
+    const speed = forced ? (65 + rand() * 25) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
 
     // Dwell time
     const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
@@ -148,23 +148,38 @@ export class MovingPadSystem {
     } else {
       // Shuttle movement (horizontal)
       if (forced) {
-        // For forced generation, use terrain minimum for safe placement
-        const samples = 20;
-        let minHeight = Infinity;
-        for (let i = 0; i < samples; i++) {
-          const x = worldWidth * (0.3 + (i / samples) * 0.4); // Sample middle 40%
-          minHeight = Math.min(minHeight, getHeightAt(x));
-        }
-        const y = minHeight - (80 + rand() * 40); // 80-120 pixels above lowest terrain
-        const width = 160 + rand() * 80; // 160-240 pixel width for forced pads
-        const centerX = worldWidth * (0.4 + rand() * 0.2); // Middle 20% for safety
+        // For forced generation, find flat terrain for flush placement
+        const samples = 30;
+        let bestX = worldWidth * 0.5;
+        let bestFlatness = Infinity;
         
-        pos0 = { x: centerX - width / 2, y };
-        pos1 = { x: centerX + width / 2, y };
+        // Find the flattest area in the middle section
+        for (let i = 0; i < samples; i++) {
+          const centerX = worldWidth * (0.3 + (i / samples) * 0.4); // Sample middle 40%
+          const sampleWidth = 50; // Check 50 pixels of terrain flatness
+          let maxVariation = 0;
+          const baseHeight = getHeightAt(centerX);
+          
+          for (let j = -sampleWidth; j <= sampleWidth; j += 5) {
+            const variation = Math.abs(getHeightAt(centerX + j) - baseHeight);
+            maxVariation = Math.max(maxVariation, variation);
+          }
+          
+          if (maxVariation < bestFlatness) {
+            bestFlatness = maxVariation;
+            bestX = centerX;
+          }
+        }
+        
+        const y = getHeightAt(bestX) - 2; // Place flush with terrain (2px above for visual clarity)
+        const width = 100 + rand() * 60; // 100-160 pixel width (reduced by 2/3)
+        
+        pos0 = { x: bestX - width / 2, y };
+        pos1 = { x: bestX + width / 2, y };
       } else {
-        const y = getHeightAt(worldWidth / 2) - (100 + rand() * 100);
-        const width = 200 + rand() * 300; // 200-500 pixel width
         const centerX = worldWidth * (0.2 + rand() * 0.6);
+        const y = getHeightAt(centerX) - 2; // Place flush with terrain
+        const width = 130 + rand() * 200; // 130-330 pixel width (reduced by 2/3)
         
         pos0 = { x: centerX - width / 2, y };
         pos1 = { x: centerX + width / 2, y };
