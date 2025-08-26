@@ -85,6 +85,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     fuel: 1000,
     thrust: 0
   });
+
+  // Particle system for thrust effects
+  const [particles, setParticles] = useState<any[]>([]);
   
   const [config, setConfig] = useState<LevelConfig | null>(null);
   const [debris, setDebris] = useState<any[]>([]);
@@ -231,18 +234,39 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
         if (thrustInput > 0) {
           newShip.vr += radialThrust * thrustInput * dt;
           newShip.fuel -= 260 * thrustInput * dt; // 30% more fuel consumption
+          
+          // Add particles for radial thrust
+          const nozzleX = newShip.r * Math.cos(newShip.theta + Math.PI / 2);
+          const nozzleY = newShip.r * Math.sin(newShip.theta + Math.PI / 2);
+          setParticles(prev => {
+            const newParticles = [...prev];
+            for (let i = 0; i < 3; i++) {
+              const pa = newShip.theta + Math.PI / 2 + (Math.random() - 0.5) * 0.6 + Math.PI;
+              const sp = 60 + Math.random() * 120 * thrustInput;
+              newParticles.push({
+                x: nozzleX,
+                y: nozzleY,
+                vx: Math.cos(pa) * sp,
+                vy: Math.sin(pa) * sp,
+                life: 0,
+                max: 0.5,
+                color: '#ff4500'
+              });
+            }
+            return newParticles;
+          });
         }
         
-        // Left key: Decrease orbital velocity (move backward in orbit)
+        // Left key: Decrease orbital velocity (move backward in orbit) - 25% fuel usage
         if (leftInput > 0) {
           newShip.vtheta -= tangentialThrust * leftInput * dt;
-          newShip.fuel -= 195 * leftInput * dt; // 30% more fuel consumption
+          newShip.fuel -= 65 * leftInput * dt; // 25% of radial fuel consumption
         }
         
-        // Right key: Increase orbital velocity (move forward in orbit)
+        // Right key: Increase orbital velocity (move forward in orbit) - 25% fuel usage
         if (rightInput > 0) {
           newShip.vtheta += tangentialThrust * rightInput * dt;
-          newShip.fuel -= 195 * rightInput * dt; // 30% more fuel consumption
+          newShip.fuel -= 65 * rightInput * dt; // 25% of radial fuel consumption
         }
         
         newShip.fuel = Math.max(0, newShip.fuel);
@@ -261,7 +285,7 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       // Apply orbital decay when not thrusting (ensures ship always comes down)
       if (thrustInput === 0) {
         newShip.vr -= 5 * dt; // Gentle decay
-        newShip.vtheta *= Math.pow(0.995, dt * 60); // Slight orbital drag
+        // Maintain tangential velocity - no automatic decay for left/right momentum
       }
       
       // Velocity limits to prevent escape
@@ -302,6 +326,19 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       if (!paused && !gameEnded) {
         setGameTime(prev => prev + deltaTime);
         updatePhysics(deltaTime);
+        
+        // Update particles
+        setParticles(prev => {
+          const updated = prev.map(p => ({
+            ...p,
+            life: p.life + deltaTime,
+            x: p.x + p.vx * deltaTime,
+            y: p.y + p.vy * deltaTime,
+            vx: p.vx * 0.98,
+            vy: p.vy * 0.98
+          })).filter(p => p.life <= p.max);
+          return updated;
+        });
         
         // Update debris with simple rotation
         setDebris(prev => prev.map(d => ({
@@ -537,7 +574,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     ctx.lineWidth = 3;
     ctx.stroke();
     
-    // Draw thrust flame (same style as main game) - half size
+    // FLAME THRUST (backup - can revert to this)
+    /*
     if (ship.thrust > 0) {
       const flameLength = 7.5 + ship.thrust * 7.5; // Half size flame
       ctx.shadowColor = '#ff4500';
@@ -560,11 +598,26 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
+    */
     
     ctx.restore();
     
+    // Draw particles (outside ship transform)
+    ctx.shadowBlur = 0;
+    particles.forEach(p => {
+      const alpha = 1 - (p.life / p.max);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    
     ctx.restore();
-  }, [config, ship, pad, debris]);
+  }, [config, ship, pad, debris, particles]);
 
   // Canvas resize
   useEffect(() => {
