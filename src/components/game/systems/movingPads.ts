@@ -188,7 +188,7 @@ export class MovingPadSystem {
 
     // Validate path safety (simplified for now)
     const pathClearance = motion === "shuttle" ? 4 : baseClearance;
-    const pathIsValid = this.validatePath(pos0, pos1, pathClearance, getHeightAt, existingPads, worldWidth, worldHeight);
+    const pathIsValid = this.validatePath(pos0, pos1, pathClearance, getHeightAt, existingPads, worldWidth, worldHeight, motion);
     if (!pathIsValid && !forced) {
       return null;
     }
@@ -334,7 +334,8 @@ export class MovingPadSystem {
     getHeightAt: (x: number) => number,
     existingPads: Pad[],
     worldWidth: number,
-    worldHeight: number
+    worldHeight: number,
+    motion?: "shuttle" | "elevator" | "arc"
   ): boolean {
     // Check bounds
     const minX = Math.min(pos0.x, pos1.x);
@@ -356,13 +357,34 @@ export class MovingPadSystem {
       if (y + clearance > terrainY) return false; // Too close to ground
     }
 
-    // Check distance from existing pads
+  // Check distance from existing pads - ensure moving pad is on isolated flat terrain
     for (const pad of existingPads) {
       const padCenterX = (pad.xStart + pad.xEnd) / 2;
-      const dist0 = Math.sqrt((pos0.x - padCenterX) ** 2 + (pos0.y - pad.y) ** 2);
-      const dist1 = Math.sqrt((pos1.x - padCenterX) ** 2 + (pos1.y - pad.y) ** 2);
+      const padWidth = pad.xEnd - pad.xStart;
       
-      if (dist0 < clearance * 2 || dist1 < clearance * 2) return false;
+      // For horizontal moving pads, ensure significant separation on same terrain level
+      if (motion === "shuttle") {
+        const minX = Math.min(pos0.x, pos1.x) - (24 + 16) / 2; // moving pad half-width
+        const maxX = Math.max(pos0.x, pos1.x) + (24 + 16) / 2; // moving pad half-width
+        const padMinX = pad.xStart;
+        const padMaxX = pad.xEnd;
+        
+        // Check horizontal overlap with buffer
+        const horizontalBuffer = Math.max(100, padWidth * 2); // At least 100px or 2x pad width
+        if (!(maxX + horizontalBuffer < padMinX || minX - horizontalBuffer > padMaxX)) {
+          // Check if on similar terrain level (within 20px height difference)
+          const heightDiff = Math.abs(pos0.y - pad.y);
+          if (heightDiff < 20) {
+            return false; // Too close on same terrain level
+          }
+        }
+      } else {
+        // For vertical/arc moving pads, use original distance check
+        const dist0 = Math.sqrt((pos0.x - padCenterX) ** 2 + (pos0.y - pad.y) ** 2);
+        const dist1 = Math.sqrt((pos1.x - padCenterX) ** 2 + (pos1.y - pad.y) ** 2);
+        
+        if (dist0 < clearance * 2 || dist1 < clearance * 2) return false;
+      }
     }
 
     return true;
@@ -476,14 +498,17 @@ export class MovingPadSystem {
   // Check if a position is on the moving pad (for landing detection)
   isOnMovingPad(x: number, y: number, pad: MovingPad): boolean {
     const padHalfWidth = (pad.width || 32) / 2;
-    const padThickness = 4;
+    const padThickness = 8; // Increased for better collision detection
     
-    return (
-      x >= pad.currentPos.x - padHalfWidth &&
-      x <= pad.currentPos.x + padHalfWidth &&
-      y >= pad.currentPos.y - padThickness &&
-      y <= pad.currentPos.y + padThickness
-    );
+    // Check horizontal bounds
+    const onPadHorizontally = x >= pad.currentPos.x - padHalfWidth && 
+                              x <= pad.currentPos.x + padHalfWidth;
+    
+    // Check vertical bounds - more generous for landing detection
+    const onPadVertically = y >= pad.currentPos.y - padThickness && 
+                            y <= pad.currentPos.y + padThickness;
+    
+    return onPadHorizontally && onPadVertically;
   }
 
   // Calculate relative velocity for landing checks
