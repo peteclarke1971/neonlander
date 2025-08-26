@@ -169,7 +169,8 @@ export class MovingPadSystem {
     }
 
     // Validate path safety (simplified for now)
-    if (!this.validatePath(pos0, pos1, clearance, getHeightAt, existingPads, worldWidth, worldHeight)) {
+    const pathIsValid = this.validatePath(pos0, pos1, clearance, getHeightAt, existingPads, worldWidth, worldHeight);
+    if (!pathIsValid && !forced) {
       return null;
     }
 
