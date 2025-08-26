@@ -87,15 +87,15 @@ export class MovingPadSystem {
       : forced ? ["shuttle"] : ["shuttle", "arc"];
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
-    // Speed band based on difficulty (reduced by half)
+    // Speed band based on difficulty (reduced by another 50%)
     const speedBands = {
-      slow: { min: 30, max: 40 },
-      medium: { min: 45, max: 60 },
-      fast: { min: 65, max: 80 }
+      slow: { min: 15, max: 20 },
+      medium: { min: 22, max: 30 },
+      fast: { min: 32, max: 40 }
     };
     const speedBand = rand() < 0.4 ? "slow" : rand() < 0.8 ? "medium" : "fast";
     const speedRange = speedBands[speedBand];
-    const speed = forced ? (65 + rand() * 25) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
+    const speed = forced ? (32 + rand() * 12) : (speedRange.min + rand() * (speedRange.max - speedRange.min));
 
     // Dwell time
     const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
@@ -112,7 +112,7 @@ export class MovingPadSystem {
     let arcAngle1: number | undefined;
 
     const shipHeight = 16;
-    const clearance = shipHeight * 1.5;
+    const baseClearance = shipHeight * 1.5;
 
     if (motion === "elevator") {
       // Vertical movement in caverns
@@ -171,14 +171,14 @@ export class MovingPadSystem {
           }
         }
         
-        const y = getHeightAt(bestX) - 2; // Place flush with terrain (2px above for visual clarity)
+        const y = getHeightAt(bestX); // Place flush with terrain
         const width = 100 + rand() * 60; // 100-160 pixel width (reduced by 2/3)
         
         pos0 = { x: bestX - width / 2, y };
         pos1 = { x: bestX + width / 2, y };
       } else {
         const centerX = worldWidth * (0.2 + rand() * 0.6);
-        const y = getHeightAt(centerX) - 2; // Place flush with terrain
+        const y = getHeightAt(centerX); // Place flush with terrain
         const width = 130 + rand() * 200; // 130-330 pixel width (reduced by 2/3)
         
         pos0 = { x: centerX - width / 2, y };
@@ -187,11 +187,12 @@ export class MovingPadSystem {
     }
 
     // Validate path safety (simplified for now)
-    const pathIsValid = this.validatePath(pos0, pos1, clearance, getHeightAt, existingPads, worldWidth, worldHeight);
+    const pathClearance = motion === "shuttle" ? 4 : baseClearance;
+    const pathIsValid = this.validatePath(pos0, pos1, pathClearance, getHeightAt, existingPads, worldWidth, worldHeight);
     if (!pathIsValid && !forced) {
       return null;
     }
-
+ 
     // Create pad dimensions
     const width = 24 + rand() * 16; // 24-40 pixels
     const padSeed = Math.floor(rand() * 1000000);

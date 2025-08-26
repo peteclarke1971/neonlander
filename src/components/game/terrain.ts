@@ -177,23 +177,6 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     );
     if (movingPad) {
       movingPads.push(movingPad);
-      
-      // Flatten terrain under moving pad path for safe movement (4x width corridor)
-      if (isTestLevel) {
-        const padWidth = movingPad.pos1.x - movingPad.pos0.x;
-        const corridorWidth = Math.abs(padWidth) * 4;
-        const corridorLeft = Math.min(movingPad.pos0.x, movingPad.pos1.x) - corridorWidth / 2;
-        const corridorRight = Math.max(movingPad.pos0.x, movingPad.pos1.x) + corridorWidth / 2;
-        const flattenY = Math.max(movingPad.pos0.y, movingPad.pos1.y) + 50; // 50px below pad
-        
-        // Find points in the corridor and flatten them
-        for (let i = 0; i < points.length; i++) {
-          const point = points[i];
-          if (point.x >= corridorLeft && point.x <= corridorRight) {
-            point.y = Math.max(point.y, flattenY); // Don't go above existing terrain, only flatten down
-          }
-        }
-      }
     }
   }
 
