@@ -38,6 +38,9 @@ function mulberry32(seed: number) {
   };
 }
 
+// Track which pads have been logged on first render
+const loggedRenderIds: Set<number> = new Set();
+
 export class MovingPadSystem {
   private settings: MovingPadSettings = {
     enabled: "default",
@@ -349,97 +352,107 @@ export class MovingPadSystem {
     return true;
   }
 
-  // Render moving pad and its path
+  // Render moving pad and its path (draw in WORLD COORDINATES; camera transform already applied)
   renderMovingPad(
     ctx: CanvasRenderingContext2D,
     pad: MovingPad,
-    cameraX: number,
-    cameraY: number,
-    zoom: number,
-    canvasWidth: number,
-    canvasHeight: number,
+    _cameraX: number,
+    _cameraY: number,
+    _zoom: number,
+    _canvasWidth: number,
+    _canvasHeight: number,
     neonColor: string
   ): void {
-    const screenX = (pad.currentPos.x - cameraX) * zoom + canvasWidth / 2;
-    const screenY = (pad.currentPos.y - cameraY) * zoom + canvasHeight / 2;
-    const padWidth = (pad.width || 32) * zoom;
-
-    // Render path (faint rail line)
-    if (this.settings.debug || true) { // Always show path for now
-      ctx.save();
-      ctx.strokeStyle = neonColor;
-      ctx.globalAlpha = 0.3;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
-
-      const path0X = (pad.pos0.x - cameraX) * zoom + canvasWidth / 2;
-      const path0Y = (pad.pos0.y - cameraY) * zoom + canvasHeight / 2;
-      const path1X = (pad.pos1.x - cameraX) * zoom + canvasWidth / 2;
-      const path1Y = (pad.pos1.y - cameraY) * zoom + canvasHeight / 2;
-
-      if (pad.motion === "arc" && pad.arcCenter && pad.arcRadius && pad.arcAngle0 !== undefined && pad.arcAngle1 !== undefined) {
-        // Draw arc path
-        const centerX = (pad.arcCenter.x - cameraX) * zoom + canvasWidth / 2;
-        const centerY = (pad.arcCenter.y - cameraY) * zoom + canvasHeight / 2;
-        const radius = pad.arcRadius * zoom;
-        
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, pad.arcAngle0, pad.arcAngle1);
-        ctx.stroke();
-      } else {
-        // Draw linear path
-        ctx.beginPath();
-        ctx.moveTo(path0X, path0Y);
-        ctx.lineTo(path1X, path1Y);
-        ctx.stroke();
-      }
-
-      ctx.restore();
+    // Safety: log first render per pad to verify visibility
+    try {
+      (loggedRenderIds as Set<number>);
+    } catch {}
+    if (!loggedRenderIds.has(pad.seed)) {
+      console.log("[MovingPad] Render", { pos: pad.currentPos, pos0: pad.pos0, pos1: pad.pos1, width: pad.width, speed: pad.speed, phase: pad.phase });
+      loggedRenderIds.add(pad.seed);
     }
 
-    // Render the pad itself (same style as regular pads but with MEGA indicator)
+    const x = pad.currentPos.x;
+    const y = pad.currentPos.y;
+    const padWidth = pad.width || 32;
+
+    // Render path (faint rail line)
     ctx.save();
-    ctx.fillStyle = neonColor;
-    ctx.shadowColor = neonColor;
-    ctx.shadowBlur = 8;
-    
+    ctx.strokeStyle = neonColor as any;
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 6]);
+
+    if (pad.motion === "arc" && pad.arcCenter && pad.arcRadius && pad.arcAngle0 !== undefined && pad.arcAngle1 !== undefined) {
+      // Draw arc path
+      ctx.beginPath();
+      ctx.arc(pad.arcCenter.x, pad.arcCenter.y, pad.arcRadius, pad.arcAngle0, pad.arcAngle1);
+      ctx.stroke();
+    } else {
+      // Draw linear path
+      ctx.beginPath();
+      ctx.moveTo(pad.pos0.x, pad.pos0.y);
+      ctx.lineTo(pad.pos1.x, pad.pos1.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Render the pad itself with strong glow to be obvious
+    ctx.save();
+    ctx.fillStyle = neonColor as any;
+    ctx.shadowColor = neonColor as any;
+    ctx.shadowBlur = 24;
+    ctx.globalAlpha = 0.95;
+
     // Pad base
-    ctx.fillRect(screenX - padWidth / 2, screenY - 2, padWidth, 4);
-    
-    // MEGA indicator
-    ctx.font = `${8 * zoom}px monospace`;
+    ctx.fillRect(x - padWidth / 2, y - 2, padWidth, 4);
+
+    // MEGA indicator label
+    ctx.font = `700 12px "Orbitron", sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("MEGA", screenX, screenY - 8 * zoom);
-    
-    // Movement indicator arrow
+    ctx.textBaseline = "bottom";
+    ctx.globalAlpha = 0.95;
+    ctx.fillText("MEGA", x, y - 8);
+
+    // Movement indicator arrow (horizontal or vertical)
     if (pad.phase === "moving") {
-      const arrowSize = 4 * zoom;
-      const arrowY = screenY + 10 * zoom;
-      const direction = pad.currentVelocity.x > 0 ? 1 : pad.currentVelocity.x < 0 ? -1 : 0;
-      
-      if (direction !== 0) {
-        ctx.beginPath();
-        ctx.moveTo(screenX - arrowSize * direction, arrowY);
-        ctx.lineTo(screenX + arrowSize * direction, arrowY);
-        ctx.lineTo(screenX + arrowSize * direction * 0.5, arrowY - arrowSize * 0.5);
-        ctx.moveTo(screenX + arrowSize * direction, arrowY);
-        ctx.lineTo(screenX + arrowSize * direction * 0.5, arrowY + arrowSize * 0.5);
-        ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      const vx = pad.currentVelocity.x;
+      const vy = pad.currentVelocity.y;
+      const arrow = 6;
+      if (Math.abs(vx) >= Math.abs(vy)) {
+        const dir = Math.sign(vx) || 1;
+        ctx.moveTo(x - arrow * dir, y + 10);
+        ctx.lineTo(x + arrow * dir, y + 10);
+        ctx.lineTo(x + (arrow * 0.5) * dir, y + 10 - arrow * 0.5);
+        ctx.moveTo(x + arrow * dir, y + 10);
+        ctx.lineTo(x + (arrow * 0.5) * dir, y + 10 + arrow * 0.5);
+      } else {
+        const dir = Math.sign(vy) || 1;
+        ctx.moveTo(x, y + 10 - arrow * dir);
+        ctx.lineTo(x, y + 10 + arrow * dir);
+        ctx.lineTo(x - arrow * 0.5, y + 10 + (arrow * 0.5) * dir);
+        ctx.moveTo(x, y + 10 + arrow * dir);
+        ctx.lineTo(x + arrow * 0.5, y + 10 + (arrow * 0.5) * dir);
       }
+      ctx.strokeStyle = neonColor as any;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
     ctx.restore();
 
-    // Debug info
+    // Optional debug info
     if (this.settings.debug) {
       ctx.save();
       ctx.fillStyle = "white";
-      ctx.font = `${10 * zoom}px monospace`;
+      ctx.font = `10px monospace`;
       ctx.textAlign = "left";
-      const debugY = screenY + 25 * zoom;
-      ctx.fillText(`Phase: ${pad.phase}`, screenX - padWidth / 2, debugY);
-      ctx.fillText(`Timer: ${pad.phaseTimer.toFixed(1)}s`, screenX - padWidth / 2, debugY + 12 * zoom);
-      ctx.fillText(`Vel: ${Math.sqrt(pad.currentVelocity.x ** 2 + pad.currentVelocity.y ** 2).toFixed(0)}px/s`, screenX - padWidth / 2, debugY + 24 * zoom);
+      const debugY = y + 22;
+      ctx.fillText(`Phase: ${pad.phase}`, x - padWidth / 2, debugY);
+      ctx.fillText(`Speed: ${pad.speed.toFixed(0)} px/s`, x - padWidth / 2, debugY + 12);
       ctx.restore();
     }
   }
