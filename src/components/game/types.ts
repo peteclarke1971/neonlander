@@ -63,6 +63,7 @@ export interface HUDSnapshot {
   vx: number;
   vy: number;
   fuel: number;
+  fuelCap?: number;
   score: number;
   time: number;
   difficulty: Difficulty;

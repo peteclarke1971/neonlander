@@ -4,7 +4,7 @@ interface Props extends HUDSnapshot {
   collectibles?: CollectiblesData;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, score, time, difficulty, rotateBoostActive, collectibles }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
@@ -20,7 +20,7 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, score, time, diff
         <div className="mt-3">
           <div className="flex items-center justify-between text-sm"><span className="text-accent">FUEL</span><span>{Math.max(0, fuel).toFixed(0)}</span></div>
           <div className="h-2 bg-secondary rounded-md overflow-hidden mt-1">
-            <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, fuel))}%` }} />
+            <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, (fuelCap ? (fuel / fuelCap * 100) : fuel)))}%` }} />
           </div>
         </div>
         <div className="mt-3 text-lg font-semibold">

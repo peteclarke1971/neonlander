@@ -327,6 +327,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     let baseFuel = difficulty === "easy" ? 100 : 60;
     let fuel = (level < 5 ? baseFuel * 1.5 : baseFuel); // 50% extra for first 5 missions
     fuel *= 2; // doubled fuel per level
+    const fuelCap = fuel; // track initial max fuel for HUD scaling
 
     const fuelConsumption = difficulty === "easy" ? 22 : 30; // units per second at full thrust
     const gravity = 0.02 * 0.75; // unify gravity across difficulties
@@ -418,7 +419,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       } else {
         altitude = Math.max(0, terrain.getHeightAt(x) - y);
       }
-      setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1 });
+      setHud({ altitude, vx, vy, fuel, fuelCap, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1 });
     };
 
     const spawnExplosion = () => {
@@ -811,8 +812,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (checkJunkPickup({ x, y }, 16, junk)) {
             const result = collectJunk(collectiblesRef.current, junk.id);
             if (result.fuelReward > 0) {
-              const maxFuel = level <= 8 ? 200 : 100; // Handle early levels with 200 fuel
-              fuel = Math.min(maxFuel, fuel + result.fuelReward);
+              fuel += result.fuelReward;
               audio.current.junkPickup();
             }
             if (result.points > 0) score += result.points;
