@@ -346,8 +346,43 @@ export class MovingPadSystem {
     if (minX < clearance || maxX > worldWidth - clearance) return false;
     if (minY < clearance || maxY > worldHeight - clearance) return false;
 
+    // For shuttle motion, check terrain constraints more carefully
+    if (motion === "shuttle") {
+      // Check that both endpoints are safely positioned
+      const padWidth = 32; // approximate pad width for safety check
+      
+      // Check pos0 endpoint
+      const terrainY0 = getHeightAt(pos0.x);
+      if (pos0.y > terrainY0 + 0.5) return false; // below terrain
+      
+      // Check terrain around pos0 for cliff detection
+      const checkRadius = padWidth;
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 5) {
+        const checkX = pos0.x + dx;
+        const checkTerrainY = getHeightAt(checkX);
+        // Ensure pad doesn't overhang by more than 10 pixels
+        if (Math.abs(checkTerrainY - terrainY0) > 10 && checkTerrainY > pos0.y + 10) {
+          return false; // cliff or steep drop detected
+        }
+      }
+      
+      // Check pos1 endpoint
+      const terrainY1 = getHeightAt(pos1.x);
+      if (pos1.y > terrainY1 + 0.5) return false; // below terrain
+      
+      // Check terrain around pos1 for cliff detection
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 5) {
+        const checkX = pos1.x + dx;
+        const checkTerrainY = getHeightAt(checkX);
+        // Ensure pad doesn't overhang by more than 10 pixels
+        if (Math.abs(checkTerrainY - terrainY1) > 10 && checkTerrainY > pos1.y + 10) {
+          return false; // cliff or steep drop detected
+        }
+      }
+    }
+
     // Check terrain clearance at several points along path
-    const steps = 10;
+    const steps = 20; // increased for better checking
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const x = pos0.x + (pos1.x - pos0.x) * t;

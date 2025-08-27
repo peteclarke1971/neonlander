@@ -159,9 +159,8 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
   
-  // Force moving pads on Easy levels 1-5 for testing
-  const isTestLevel = difficulty === "easy" && level <= 5;
-  const shouldGenerateMovingPad = difficulty === "hard" || isTestLevel;
+  // Generate moving pads for both easy and hard difficulties
+  const shouldGenerateMovingPad = true; // Always try to generate moving pads
   
   if (shouldGenerateMovingPad) {
     let movingPad = movingPadSystem.generateMovingPad(
