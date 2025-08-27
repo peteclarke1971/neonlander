@@ -811,7 +811,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (checkJunkPickup({ x, y }, 16, junk)) {
             const result = collectJunk(collectiblesRef.current, junk.id);
             if (result.fuelReward > 0) {
-              fuel = Math.min(100, fuel + result.fuelReward);
+              const maxFuel = level <= 8 ? 200 : 100; // Handle early levels with 200 fuel
+              fuel = Math.min(maxFuel, fuel + result.fuelReward);
               audio.current.junkPickup();
             }
             if (result.points > 0) score += result.points;

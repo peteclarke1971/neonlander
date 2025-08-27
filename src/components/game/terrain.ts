@@ -193,8 +193,8 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       }
     }
 
-    // Guarantee one moving pad on early levels (L1-5) for both difficulties
-    if (!movingPad && level <= 5) {
+    // Guarantee one mega moving pad on ALL levels with increasing speed
+    if (!movingPad) {
       movingPad = movingPadSystem.generateMovingPad(
         (seed ^ 0x4D4F5649) + 77777,
         level,

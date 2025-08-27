@@ -88,10 +88,12 @@ export class MovingPadSystem {
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
     // Speed band based on difficulty (reduced to 25% of original)
+    // Speed increases with level up to 5x starting speed
+    const levelSpeedMultiplier = Math.min(5, 1 + (level - 1) * 0.5); // 1x to 5x based on level
     const speedBands = {
-      slow: { min: 4, max: 5 },
-      medium: { min: 6, max: 8 },
-      fast: { min: 8, max: 10 }
+      slow: { min: 4 * levelSpeedMultiplier, max: 5 * levelSpeedMultiplier },
+      medium: { min: 6 * levelSpeedMultiplier, max: 8 * levelSpeedMultiplier },
+      fast: { min: 8 * levelSpeedMultiplier, max: 10 * levelSpeedMultiplier }
     };
     const speedBand = rand() < 0.4 ? "slow" : rand() < 0.8 ? "medium" : "fast";
     const speedRange = speedBands[speedBand];
