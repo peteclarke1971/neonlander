@@ -160,8 +160,8 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
   
-  // Generate moving pads for both easy and hard difficulties
-  const shouldGenerateMovingPad = true; // Always try to generate moving pads
+  // Generate moving pads for every level with increasing speed
+  const shouldGenerateMovingPad = true; // Always generate moving pads
   
   if (shouldGenerateMovingPad) {
     let movingPad = movingPadSystem.generateMovingPad(
@@ -271,7 +271,9 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       }
     };
     
-    collectibles = generateCollectibles(seed, context);
+    // Use a terrain-based color for collectibles
+    const terrainColor = "hsl(var(--primary))"; // Use primary color from design system
+    collectibles = generateCollectibles(seed, context, terrainColor);
   }
 
   return { 

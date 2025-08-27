@@ -161,12 +161,14 @@ export function renderSpaceJunk(
   tint: string,
   sparkles?: SparkleEffect[]
 ): void {
+  // Reduce size by 50%
+  const adjustedScale = scale * 0.5;
   const asset = SPACE_JUNK_ASSETS[shape];
   
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
-  ctx.scale(scale, scale);
+  ctx.scale(adjustedScale, adjustedScale);
   
   // Main shape with glow
   ctx.strokeStyle = tint;

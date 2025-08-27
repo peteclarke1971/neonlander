@@ -95,10 +95,10 @@ function isSafeSurfacePosition(
   // Check world bounds
   if (x < 50 || x > worldWidth - 50) return false;
   
-  // Check height above terrain
+  // Check height above terrain - prevent embedding in terrain
   const terrainY = getHeightAt(x);
   const minHeight = terrainY - shipHeight * config.minClearWallFactor;
-  if (y > minHeight) return false;
+  if (y >= minHeight) return false; // Must be clearly above terrain
   
   // Check terrain slope
   const slopeWindow = 30;
@@ -172,7 +172,8 @@ function isSafeCavernPosition(
 function generateSpaceJunkItem(
   levelSeed: number,
   index: number,
-  context: PlacementContext
+  context: PlacementContext,
+  terrainColor?: string
 ): SpaceJunk | null {
   const seed = createJunkSeed(levelSeed, index);
   const rng = mulberry32(seed);
@@ -197,8 +198,8 @@ function generateSpaceJunkItem(
         pos: { x, y },
         shape,
         spinDegPerSec: (rng() - 0.5) * 60, // -30 to +30 degrees per second
-        tint: JUNK_TINTS[shape],
-        radius: config.pickupRadius,
+        tint: terrainColor || JUNK_TINTS[shape],
+        radius: config.pickupRadius * 0.5,
         fuelRewardPct: config.fuelRewardPct,
         points: config.pointsPerPickup,
         collected: false,
@@ -258,7 +259,8 @@ function repairSpaceJunkPlacement(
 // Main collectibles generation function
 export function generateCollectibles(
   levelSeed: number,
-  context: PlacementContext
+  context: PlacementContext,
+  terrainColor?: string
 ): CollectiblesData {
   const config = COLLECTIBLES_CONFIG;
   const spaceJunk: SpaceJunk[] = [];
@@ -274,7 +276,7 @@ export function generateCollectibles(
   
   // Generate space junk items
   for (let i = 0; i < config.count; i++) {
-    let junk = generateSpaceJunkItem(levelSeed, i, context);
+    let junk = generateSpaceJunkItem(levelSeed, i, context, terrainColor);
     
     // Try repairs if initial placement failed
     if (!junk) {
@@ -285,8 +287,8 @@ export function generateCollectibles(
           pos: { x: context.worldWidth / 2, y: context.worldHeight / 2 },
           shape: selectShape(mulberry32(levelSeed + i)),
           spinDegPerSec: 0,
-          tint: JUNK_TINTS.panel,
-          radius: config.pickupRadius,
+          tint: terrainColor || JUNK_TINTS.panel,
+          radius: config.pickupRadius * 0.5,
           fuelRewardPct: config.fuelRewardPct,
           points: config.pointsPerPickup,
           collected: false,
@@ -312,8 +314,8 @@ export function generateCollectibles(
       },
       shape: "panel",
       spinDegPerSec: 15,
-      tint: JUNK_TINTS.panel,
-      radius: config.pickupRadius,
+      tint: terrainColor || JUNK_TINTS.panel,
+      radius: config.pickupRadius * 0.5,
       fuelRewardPct: config.fuelRewardPct + 2, // Extra reward for fallback
       points: config.pointsPerPickup,
       collected: false,

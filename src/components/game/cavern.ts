@@ -145,7 +145,9 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     checkCollision
   };
   
-  const collectibles = generateCollectibles(seed, context);
+  // Use terrain-based color for cavern collectibles
+  const terrainColor = "hsl(var(--primary))"; // Use primary color from design system
+  const collectibles = generateCollectibles(seed, context, terrainColor);
   
   return {
     worldWidth,
@@ -154,7 +156,7 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     endPad: bakeResult.endPad,
     walls,
     obstacles,
-    pads: [bakeResult.startPad, bakeResult.endPad],
+    pads: [bakeResult.startPad, bakeResult.endPad], // Only include cavern pads
     points,
     checkCollision,
     getHeightAt,

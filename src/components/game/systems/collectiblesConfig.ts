@@ -4,7 +4,7 @@ export const COLLECTIBLES_CONFIG = {
   minItemsGuaranteed: 1, // always place at least this many
   pointsPerPickup: 150,
   setBonus: 1000, // bonus for collecting all 3
-  fuelRewardPct: 3, // percentage of tank per pickup
+  fuelRewardPct: 6, // percentage of tank per pickup (doubled)
   fuelRewardPctCap: 10, // max total fuel reward per level
   minClearWallFactor: 1.5, // × shipHeight clearance from walls
   minDistPadFactor: 3.0, // × shipHeight from pads
