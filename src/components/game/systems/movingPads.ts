@@ -115,22 +115,28 @@ export class MovingPadSystem {
     const baseClearance = shipHeight * 1.5;
 
     if (motion === "elevator") {
-      // Vertical movement in caverns
+      // Vertical movement - ensure bottom position is flush with terrain
       const x = worldWidth * (0.2 + rand() * 0.6); // Middle 60% of world
       const baseY = getHeightAt(x);
-      const minY = Math.max(50, baseY - 200);
-      const maxY = Math.min(worldHeight - 50, baseY + 100);
       
-      pos0 = { x, y: minY };
-      pos1 = { x, y: maxY };
+      // Bottom position should be flush with terrain
+      const bottomY = baseY;
+      const topY = Math.max(50, baseY - 150 - rand() * 100); // 150-250 pixels above terrain
+      
+      pos0 = { x, y: topY };    // Top position
+      pos1 = { x, y: bottomY }; // Bottom position flush with terrain
     } else if (motion === "arc") {
-      // Circular arc movement
+      // Circular arc movement - ensure bottom of arc is flush with terrain
       const centerX = worldWidth * (0.3 + rand() * 0.4); // Middle 40% of world
-      const centerY = getHeightAt(centerX) - 100;
       const radius = 80 + rand() * 120; // 80-200 pixel radius
       
       const angle0 = -Math.PI / 3 + rand() * (Math.PI / 6); // -60° to -30°
       const angle1 = Math.PI / 3 - rand() * (Math.PI / 6);   // 30° to 60°
+      
+      // Find the lowest point of the arc to position it flush with terrain
+      const lowestAngle = Math.PI / 2; // Bottom of circle
+      const lowestY = getHeightAt(centerX) + radius; // Bottom point should touch terrain
+      const centerY = lowestY - radius; // Position center so bottom touches terrain
       
       pos0 = {
         x: centerX + Math.cos(angle0) * radius,
@@ -346,39 +352,59 @@ export class MovingPadSystem {
     if (minX < clearance || maxX > worldWidth - clearance) return false;
     if (minY < clearance || maxY > worldHeight - clearance) return false;
 
-    // For shuttle motion, check terrain constraints more carefully
+    // Enhanced terrain validation for different motion types
     if (motion === "shuttle") {
-      // Check that both endpoints are safely positioned
-      const padWidth = 32; // approximate pad width for safety check
+      // For horizontal movement, ensure both endpoints are on safe, flat terrain
+      const padWidth = 40; // Safer buffer for pad width
       
       // Check pos0 endpoint
       const terrainY0 = getHeightAt(pos0.x);
-      if (pos0.y > terrainY0 + 0.5) return false; // below terrain
+      if (pos0.y > terrainY0 + 1.0) return false; // Must be on or above terrain
       
-      // Check terrain around pos0 for cliff detection
-      const checkRadius = padWidth;
-      for (let dx = -checkRadius; dx <= checkRadius; dx += 5) {
+      // Check terrain flatness around pos0
+      const checkRadius = Math.max(padWidth, 60); // Larger safety area
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 8) {
         const checkX = pos0.x + dx;
         const checkTerrainY = getHeightAt(checkX);
-        // Ensure pad doesn't overhang by more than 10 pixels
-        if (Math.abs(checkTerrainY - terrainY0) > 10 && checkTerrainY > pos0.y + 10) {
-          return false; // cliff or steep drop detected
+        // Stricter cliff detection - no overhangs allowed
+        if (Math.abs(checkTerrainY - terrainY0) > 8) {
+          return false; // Too much terrain variation
         }
       }
       
       // Check pos1 endpoint
       const terrainY1 = getHeightAt(pos1.x);
-      if (pos1.y > terrainY1 + 0.5) return false; // below terrain
+      if (pos1.y > terrainY1 + 1.0) return false; // Must be on or above terrain
       
-      // Check terrain around pos1 for cliff detection
-      for (let dx = -checkRadius; dx <= checkRadius; dx += 5) {
+      // Check terrain flatness around pos1
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 8) {
         const checkX = pos1.x + dx;
         const checkTerrainY = getHeightAt(checkX);
-        // Ensure pad doesn't overhang by more than 10 pixels
-        if (Math.abs(checkTerrainY - terrainY1) > 10 && checkTerrainY > pos1.y + 10) {
-          return false; // cliff or steep drop detected
+        // Stricter cliff detection - no overhangs allowed
+        if (Math.abs(checkTerrainY - terrainY1) > 8) {
+          return false; // Too much terrain variation
         }
       }
+    } else if (motion === "elevator") {
+      // For vertical movement, ensure bottom position is on flat terrain
+      const terrainY = getHeightAt(pos1.x); // pos1 is bottom for elevator
+      if (Math.abs(pos1.y - terrainY) > 2.0) return false; // Bottom must be flush with terrain
+      
+      // Check terrain flatness around bottom position
+      for (let dx = -30; dx <= 30; dx += 5) {
+        const checkX = pos1.x + dx;
+        const checkTerrainY = getHeightAt(checkX);
+        if (Math.abs(checkTerrainY - terrainY) > 5) {
+          return false; // Bottom terrain must be reasonably flat
+        }
+      }
+    } else if (motion === "arc") {
+      // For arc movement, verify the lowest point of arc doesn't intersect terrain
+      // Note: The arc parameters are not available in this scope, so we do basic validation
+      // Check that both endpoints are above terrain
+      const terrainY0 = getHeightAt(pos0.x);
+      const terrainY1 = getHeightAt(pos1.x);
+      if (pos0.y > terrainY0 - 5 || pos1.y > terrainY1 - 5) return false;
     }
 
     // Check terrain clearance at several points along path
@@ -535,20 +561,39 @@ export class MovingPadSystem {
     }
   }
 
-  // Check if a position is on the moving pad (for landing detection)
+  // Check if lander is on moving pad (with generous tolerance for moving pads)
   isOnMovingPad(x: number, y: number, pad: MovingPad): boolean {
-    const padHalfWidth = (pad.width || 32) / 2;
-    const padThickness = 8; // Increased for better collision detection
+    const padWidth = pad.width || 32;
+    const footY = y + 8; // Lander foot is ~8 pixels below center
     
-    // Check horizontal bounds
-    const onPadHorizontally = x >= pad.currentPos.x - padHalfWidth && 
-                              x <= pad.currentPos.x + padHalfWidth;
+    // Debug log for vertical pads
+    if (pad.motion === "elevator" || pad.motion === "arc") {
+      console.log("[MovingPad] Collision check:", { 
+        landerX: x, 
+        footY, 
+        padPos: pad.currentPos, 
+        padWidth,
+        horizontalDist: Math.abs(x - pad.currentPos.x),
+        verticalDist: Math.abs(footY - pad.currentPos.y)
+      });
+    }
     
-    // Check vertical bounds - more generous for landing detection
-    const onPadVertically = y >= pad.currentPos.y - padThickness && 
-                            y <= pad.currentPos.y + padThickness;
+    // Check horizontal bounds with appropriate tolerance
+    const horizontalTolerance = pad.motion === "shuttle" ? 2 : 6; // More generous for vertical pads
+    if (x < pad.currentPos.x - padWidth / 2 - horizontalTolerance || 
+        x > pad.currentPos.x + padWidth / 2 + horizontalTolerance) {
+      return false;
+    }
     
-    return onPadHorizontally && onPadVertically;
+    // Check vertical bounds - be extra generous for moving pads
+    const verticalTolerance = 16; // Increased tolerance for all moving pads
+    const onPad = Math.abs(footY - pad.currentPos.y) <= verticalTolerance;
+    
+    if (onPad && (pad.motion === "elevator" || pad.motion === "arc")) {
+      console.log("[MovingPad] Landing detected on moving pad:", { motion: pad.motion, pos: pad.currentPos });
+    }
+    
+    return onPad;
   }
 
   // Calculate relative velocity for landing checks

@@ -175,11 +175,11 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       false // no forced generation
     );
 
-    // Fallback attempts: try a few more random seeds (non-forced)
+    // Reduced fallback attempts to prevent too many retries
     if (!movingPad) {
-      for (let i = 1; i <= 3 && !movingPad; i++) {
+      for (let i = 1; i <= 2 && !movingPad; i++) {
         movingPad = movingPadSystem.generateMovingPad(
-          (seed ^ 0x4D4F5649) + i,
+          (seed ^ 0x4D4F5649) + i * 1000, // More varied seeds
           level,
           difficulty,
           worldWidth,
@@ -190,21 +190,6 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
           false
         );
       }
-    }
-
-    // Final fallback: force generation
-    if (!movingPad) {
-      movingPad = movingPadSystem.generateMovingPad(
-        seed ^ 0x4D4F5649 ^ 0xF00,
-        level,
-        difficulty,
-        worldWidth,
-        800,
-        getHeightAt,
-        pads,
-        false,
-        true
-      );
     }
 
     if (movingPad) {
