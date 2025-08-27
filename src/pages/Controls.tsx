@@ -206,6 +206,24 @@ export default function ControlsSettings() {
           <div className="grid grid-cols-1 gap-4">
             <div className="flex items-center justify-between">
               <div>
+                <Label>Rotation Boost</Label>
+                <div className="text-xs text-muted-foreground">2× rotation speed while held (RT/Shift)</div>
+              </div>
+              <Switch 
+                checked={true} // Always enabled for now
+                onCheckedChange={() => {}}
+                disabled={true}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rotmultiplier">Rotation Multiplier</Label>
+              <div className="flex items-center gap-3">
+                <div className="w-56"><Slider id="rotmultiplier" value={[2.0]} min={1.5} max={3.0} step={0.1} onValueChange={() => {}} disabled /></div>
+                <span className="text-xs text-muted-foreground">2.0×</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
                 <Label>Moving Pads</Label>
                 <div className="text-xs text-muted-foreground">Rare, high-value moving landing pads on hard difficulty</div>
               </div>
@@ -229,6 +247,7 @@ export default function ControlsSettings() {
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Remap Controls</h2>
           <FieldRow label="rotateLeftBtn" value={profile.map.rotateLeftBtn} type="button" onRebind={() => startListen("rotateLeftBtn", "button")} />
           <FieldRow label="rotateRightBtn" value={profile.map.rotateRightBtn} type="button" onRebind={() => startListen("rotateRightBtn", "button")} />
+          <FieldRow label="rotateBoostBtn" value={profile.map.rotateBoostBtn} type="button" onRebind={() => startListen("rotateBoostBtn", "button")} />
           <FieldRow label="abortBtn" value={profile.map.abortBtn} type="button" onRebind={() => startListen("abortBtn", "button")} />
           <FieldRow label="pauseBtn" value={profile.map.pauseBtn} type="button" onRebind={() => startListen("pauseBtn", "button")} />
           <FieldRow label="thrustBtn" value={profile.map.thrustBtn} type="button" onRebind={() => startListen("thrustBtn", "button")} />

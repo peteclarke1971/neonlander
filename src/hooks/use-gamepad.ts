@@ -8,6 +8,7 @@ export type ControlProfile = {
   invertRotation: boolean;
   invertThrust: boolean;
   vibration: boolean;
+  triggerDeadzone: number; // 0.05 - 0.3 for RT analog
   // Simple remaps (buttons and axes indices)
   map: {
     rotateLeftBtn?: number; // LB default 4
@@ -15,6 +16,8 @@ export type ControlProfile = {
     thrustBtn?: number; // A / Cross default 0
     thrustAxis?: number; // RT default 7 (standard mapping)
     rotationAxis?: number; // LS-X default 0
+    rotateBoostBtn?: number; // RT as button default 7
+    rotateBoostAxis?: number; // RT as axis default 7
     abortBtn?: number; // Y / Triangle default 3
     pauseBtn?: number; // Start/Options default 9
     dpadUp?: number; // 12
@@ -27,6 +30,7 @@ export type ControlProfile = {
 export type NormalizedInput = {
   thrust: number; // 0..1
   rotation: number; // -1..1
+  rotateBoost: boolean; // rotation speed modifier
   buttons: { abort: boolean; pause: boolean; rotateLeft: boolean; rotateRight: boolean };
   ui: { up: boolean; down: boolean; left: boolean; right: boolean; select: boolean; back: boolean };
 };
@@ -36,12 +40,15 @@ const DEFAULT_PROFILE: ControlProfile = {
   invertRotation: false,
   invertThrust: false,
   vibration: true,
+  triggerDeadzone: 0.12,
   map: {
     rotateLeftBtn: 4,
     rotateRightBtn: 5,
     thrustBtn: 1,
     thrustAxis: 7,
     rotationAxis: 0,
+    rotateBoostBtn: 7, // RT as button
+    rotateBoostAxis: 7, // RT as axis
     abortBtn: 3,
     pauseBtn: 9,
     dpadUp: 12,
@@ -138,6 +145,18 @@ export const readGamepad = (gp: Gamepad, profile: ControlProfile): NormalizedInp
   const right = btn(m.rotateRightBtn);
   const abort = btn(m.abortBtn);
   const pause = btn(m.pauseBtn);
+  
+  // Rotation boost from RT trigger (prefer axis over button)
+  let rotateBoost = false;
+  if (m.rotateBoostAxis != null) {
+    let triggerVal = axis(m.rotateBoostAxis);
+    // Handle different trigger mappings: -1..1 or 0..1
+    if (triggerVal < 0) triggerVal = (triggerVal + 1) / 2; // map -1..1 to 0..1
+    triggerVal = Math.max(0, Math.min(1, triggerVal));
+    rotateBoost = triggerVal > (profile.triggerDeadzone || 0.12);
+  } else if (m.rotateBoostBtn != null) {
+    rotateBoost = btn(m.rotateBoostBtn);
+  }
 
   const UI_DZ = 0.1;
   const uiUp = btn(m.dpadUp) || (gp.axes[1] ?? 0) < -UI_DZ;
@@ -163,6 +182,7 @@ export const readGamepad = (gp: Gamepad, profile: ControlProfile): NormalizedInp
   return {
     thrust: rt,
     rotation: rx,
+    rotateBoost,
     buttons: { abort, pause, rotateLeft: left, rotateRight: right },
     ui: { up: uiUp, down: uiDown, left: uiLeft, right: uiRight, select: uiSelect, back: uiBack },
   };

@@ -66,6 +66,7 @@ export interface HUDSnapshot {
   time: number;
   difficulty: Difficulty;
   levelSeed?: number;
+  rotateBoostActive?: boolean;
 }
 
 export interface GameOverData {

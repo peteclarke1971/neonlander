@@ -2,7 +2,7 @@ import { HUDSnapshot } from "./types";
 
 interface Props extends HUDSnapshot {}
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, score, time, difficulty }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, score, time, difficulty, rotateBoostActive }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
@@ -21,7 +21,14 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, score, time, diff
             <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, fuel))}%` }} />
           </div>
         </div>
-        <div className="mt-3 text-lg font-semibold">Score: <span className="text-accent">{score}</span></div>
+        <div className="mt-3 text-lg font-semibold">
+          Score: <span className="text-accent">{score}</span>
+          {rotateBoostActive && (
+            <span className="ml-2 px-1 py-0.5 text-xs bg-accent/20 text-accent rounded border border-accent/40">
+              2× ROT
+            </span>
+          )}
+        </div>
       </div>
     </aside>
   );

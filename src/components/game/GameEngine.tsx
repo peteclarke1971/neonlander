@@ -26,6 +26,7 @@ import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision } from "./systems/hazards";
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
+import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
 
 interface Props {
   difficulty: Difficulty;
@@ -70,7 +71,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
 
   // Controls state
-  const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean }>({ left: false, right: false, thrust: false, abort: false });
+  const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean; rotateBoost: boolean }>({ left: false, right: false, thrust: false, abort: false, rotateBoost: false });
   const thrustAnalog = useRef(0);
   const lastThrust = useRef(0);
   const audio = useRef(new AudioManager());
@@ -80,6 +81,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const lastPauseDown = useRef(false);
   const lastAbortDown = useRef(false);
+  
+  // Rotation modifier state
+  const [rotModConfig] = useState<RotationModConfig>(DEFAULT_ROTATION_MOD_CONFIG);
+  const rotBoostActive = useRef(1.0); // current interpolated multiplier
+  const [showRotBoostHint, setShowRotBoostHint] = useState(false);
+  
+  // Hint system: show rotation boost hint on first hard level
+  useEffect(() => {
+    const hintShown = localStorage.getItem('ll-rotation-boost-hint-shown');
+    if (!hintShown && difficulty === "hard" && level === 1) {
+      setShowRotBoostHint(true);
+      setTimeout(() => {
+        setShowRotBoostHint(false);
+        localStorage.setItem('ll-rotation-boost-hint-shown', 'true');
+      }, 4000);
+    }
+  }, [difficulty, level]);
   useEffect(() => {
     const resize = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -104,6 +122,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (["d", "arrowright"].includes(k)) keys.current.right = down;
       if (["w", "arrowup"].includes(k)) keys.current.thrust = down;
       if (k === " " || k === "arrowdown") { keys.current.abort = down; if (down) abortAssist.current = true; }
+      if (["shift"].includes(k)) keys.current.rotateBoost = down; // Either shift key
       if (down) audio.current.resume();
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
@@ -395,7 +414,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       } else {
         altitude = Math.max(0, terrain.getHeightAt(x) - y);
       }
-      setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty, levelSeed });
+      setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1 });
     };
 
     const spawnExplosion = () => {
@@ -532,7 +551,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       // Controls
       // Gamepad hot-swap + read UI/analog
-      let gpLeft = false, gpRight = false, gpThrust = 0;
+      let gpLeft = false, gpRight = false, gpThrust = 0, gpRotateBoost = false;
       {
         const gp = anyGamepad?.();
         if (gp && gp.connected) {
@@ -544,6 +563,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           const input = readGamepad(gp, gpProfileRef.current);
           // Digital thrust is instant
           gpThrust = input.thrust;
+          gpRotateBoost = input.rotateBoost;
           // Apply analog rotation only when no digital rotation pressed
           gpLeft = input.buttons.rotateLeft;
           gpRight = input.buttons.rotateRight;
@@ -568,6 +588,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           lastAbortDown.current = input.buttons.abort;
         }
       }
+      
+      // Update rotation modifier
+      const rotBoostHeld = keys.current.rotateBoost || gpRotateBoost;
+      rotBoostActive.current = updateRotationModifier(
+        rotBoostActive.current,
+        rotBoostHeld,
+        dt * 1000, // convert to ms
+        rotModConfig
+      );
 
       // Gamepad thrust rumble ramp (0 -> 2.5s -> max)
       const gpThrusting = gpThrust > 0.001;
@@ -626,8 +655,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (fuelDepletedTime >= 0 && elapsed - fuelDepletedTime >= 3 && !anomaliesDisabled) {
         anomaliesDisabled = true;
       }
-      if (keys.current.left || gpLeft) av -= rotAccel * dt;
-      if (keys.current.right || gpRight) av += rotAccel * dt;
+      // Apply rotation modifier to rotation physics
+      const { angularAccel: modifiedRotAccel, maxAngularVel } = applyRotationModifier(
+        rotAccel,
+        8.0, // base max angular velocity
+        rotBoostActive.current,
+        rotModConfig
+      );
+      
+      if (keys.current.left || gpLeft) av -= modifiedRotAccel * dt;
+      if (keys.current.right || gpRight) av += modifiedRotAccel * dt;
+      
+      // Apply max angular velocity cap
+      av = Math.max(-maxAngularVel, Math.min(maxAngularVel, av));
       if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight) {
         if (rotFriction) {
           // friction towards zero (easy)
@@ -1557,6 +1597,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             <span className="select-none">Rotate ►</span>
           </Button>
           <Button 
+            variant="outline" 
+            size="sm"
+            className="select-none min-w-0 px-2"
+            onMouseDown={() => (keys.current.rotateBoost = true)} 
+            onMouseUp={() => (keys.current.rotateBoost = false)} 
+            onMouseLeave={() => (keys.current.rotateBoost = false)}
+            onTouchStart={(e) => { e.preventDefault(); keys.current.rotateBoost = true; }} 
+            onTouchEnd={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
+            onTouchCancel={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
+          >
+            <span className="select-none text-xs">2× ROT</span>
+          </Button>
+          <Button 
             variant="destructive" 
             className="select-none"
             onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
@@ -1570,6 +1623,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           </Button>
         </div>
       </div>
+
+      {/* Rotation boost hint */}
+      {showRotBoostHint && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 bg-card/90 backdrop-blur-sm border border-accent/60 rounded-lg p-4 text-center shadow-neon">
+          <div className="text-accent text-sm font-semibold mb-1">💡 Pro Tip</div>
+          <div className="text-foreground">Hold RT / Shift for 2× rotate</div>
+          <div className="text-muted-foreground text-xs mt-1">Great for tight tunnels!</div>
+        </div>
+      )}
 
       {/* Top controls */}
       <div className="absolute top-4 right-4 z-20 flex gap-2 select-none">
