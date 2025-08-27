@@ -507,4 +507,26 @@ export class AudioManager {
     this.stopLevelMusic();
     this.stopMissionSuccess();
   }
+
+  // ===== Collectibles audio =====
+  junkPickup() {
+    this.playNoise(0.15, Math.random() < 0.5 ? 0.5 : 0.7);
+  }
+
+  junkSetComplete() {
+    // Play a special success stinger for completing the set
+    this.playNoise(0.4, 0.8);
+    setTimeout(() => this.playNoise(0.4, 0.8), 100);
+    setTimeout(() => this.playNoise(0.4, 0.8), 200);
+  }
+
+  wormholeOpen() {
+    // Play a mysterious portal opening sound
+    this.playNoise(0.8, 0.6);
+  }
+
+  wormholeEnter() {
+    // Play a warping sound effect
+    this.playNoise(1.2, 0.7);
+  }
 }

@@ -6,7 +6,9 @@ import { CavernFXRenderer } from "./CavernFXRenderer";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad, CollectiblesData, SpaceJunk, WormholeDoor } from "./types";
+import { checkJunkPickup, checkWormholeEntry, collectJunk, generateWormholeDoor } from "./systems/collectibles";
+import { renderSpaceJunk, renderWormholeDoor, generateSparkles, updateSparkles, SPACE_JUNK_ASSETS } from "./systems/spaceJunkAssets";
 import { generateTerrain } from "./terrain";
 import { movingPadSystem } from "./systems/movingPads";
 
@@ -69,6 +71,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   
   // Volcano particles state
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
+  
+  // Collectibles state
+  const collectiblesRef = useRef<CollectiblesData | null>(null);
+  const sparklesRef = useRef<Map<string, any>>(new Map());
 
   // Controls state
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean; rotateBoost: boolean }>({ left: false, right: false, thrust: false, abort: false, rotateBoost: false });

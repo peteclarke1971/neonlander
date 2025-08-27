@@ -51,6 +51,7 @@ export interface TerrainData {
   pads: Pad[];
   movingPads?: MovingPad[];
   volcanoes?: Volcano[];
+  collectibles?: CollectiblesData;
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
   getMovingPadAt?: (x: number, y: number) => MovingPad | null;
@@ -88,4 +89,35 @@ export interface HighScore {
   score: number;
   difficulty: Difficulty;
   date: number; // epoch ms
+}
+
+// Collectibles system types
+export interface SpaceJunk {
+  id: string;
+  pos: { x: number; y: number };
+  shape: "panel" | "toolbox" | "antenna" | "circuit" | "canister" | "crystal";
+  spinDegPerSec: number;
+  tint: string;
+  radius: number;
+  fuelRewardPct: number;
+  points: number;
+  collected: boolean;
+  seed: number;
+}
+
+export interface WormholeDoor {
+  id: string;
+  pos: { x: number; y: number };
+  radius: number;
+  open: boolean;
+  seed: number;
+  targetBonus: "Asteroids" | "LightCycles" | "Random";
+}
+
+export interface CollectiblesData {
+  spaceJunk: SpaceJunk[];
+  wormholeDoor?: WormholeDoor;
+  collected: Set<string>;
+  totalCollected: number;
+  setComplete: boolean;
 }

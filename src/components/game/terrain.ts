@@ -1,6 +1,7 @@
-import { Pad, TerrainData, MovingPad } from "./types";
+import { Pad, TerrainData, MovingPad, CollectiblesData } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
+import { generateCollectibles, PlacementContext } from "./systems/collectibles";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -251,5 +252,38 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return null;
   };
 
-  return { worldWidth: worldWidthLocal, points, pads, movingPads, volcanoes, getHeightAt, getPadAt, getMovingPadAt };
+  // ===== Generate collectibles =====
+  let collectibles: CollectiblesData | undefined;
+  
+  if (level !== undefined) {
+    const context: PlacementContext = {
+      worldWidth: worldWidthLocal,
+      worldHeight: 800,
+      getHeightAt,
+      pads,
+      movingPads,
+      shipHeight: 32,
+      mode: "surface",
+      startPos: { x: worldWidthLocal / 2, y: 200 },
+      goalPos: { 
+        x: pads.length > 0 ? (pads[pads.length - 1].xStart + pads[pads.length - 1].xEnd) / 2 : worldWidthLocal - 100, 
+        y: pads.length > 0 ? pads[pads.length - 1].y : 400 
+      }
+    };
+    
+    collectibles = generateCollectibles(seed, context);
+  }
+
+  return { 
+    worldWidth: worldWidthLocal, 
+    points, 
+    pads, 
+    movingPads, 
+    volcanoes, 
+    collectibles,
+    getHeightAt, 
+    getPadAt, 
+    getMovingPadAt,
+    isCavern: false 
+  };
 }

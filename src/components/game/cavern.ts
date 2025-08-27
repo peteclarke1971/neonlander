@@ -1,6 +1,7 @@
-import { Pad } from "./types";
+import { Pad, CollectiblesData } from "./types";
 import { CavernBake, CavernBakeResult } from "./systems/cavernBake";
 import { Vec2 } from "./systems/sdf";
+import { generateCollectibles, PlacementContext } from "./systems/collectibles";
 
 export interface CavernWall {
   points: { x: number; y: number }[];
@@ -27,6 +28,7 @@ export interface CavernData {
   checkCollision: (x: number, y: number, radius: number) => boolean;
   getHeightAt: (x: number) => number; // simplified for compatibility
   getPadAt: (x: number) => Pad | null; // compatibility with TerrainData
+  collectibles?: CollectiblesData;
   isCavern: true;
   // New mesh-baked data
   bakeResult?: CavernBakeResult;
@@ -129,6 +131,21 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     }
     return null;
   };
+
+  // Generate collectibles for caverns
+  const context: PlacementContext = {
+    worldWidth,
+    worldHeight,
+    getHeightAt,
+    pads: [bakeResult.startPad, bakeResult.endPad],
+    shipHeight: 32,
+    mode: "caverns",
+    startPos: { x: bakeResult.startPad.xStart + (bakeResult.startPad.xEnd - bakeResult.startPad.xStart) / 2, y: bakeResult.startPad.y },
+    goalPos: { x: bakeResult.endPad.xStart + (bakeResult.endPad.xEnd - bakeResult.endPad.xStart) / 2, y: bakeResult.endPad.y },
+    checkCollision
+  };
+  
+  const collectibles = generateCollectibles(seed, context);
   
   return {
     worldWidth,
@@ -142,6 +159,7 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     checkCollision,
     getHeightAt,
     getPadAt,
+    collectibles,
     isCavern: true,
     bakeResult,
     outlinePolylines: bakeResult.outlinePolylines,
