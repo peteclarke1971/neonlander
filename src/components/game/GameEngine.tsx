@@ -186,7 +186,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       : (() => {
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty);
-        })();
+         })();
+    
+    // Initialize collectibles
+    collectiblesRef.current = terrain.collectibles || null;
+    if (collectiblesRef.current) {
+      collectiblesRef.current.spaceJunk.forEach(junk => {
+        sparklesRef.current.set(junk.id, generateSparkles(junk.seed));
+      });
+    }
     
     // Debug moving pads presence
     if (!isCavernLevel) {
@@ -796,6 +804,48 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed });
         }, 700);
       }
+      
+      // Check collectible pickups
+      if (collectiblesRef.current && !crashed) {
+        for (const junk of collectiblesRef.current.spaceJunk) {
+          if (checkJunkPickup({ x, y }, 16, junk)) {
+            const result = collectJunk(collectiblesRef.current, junk.id);
+            if (result.fuelReward > 0) {
+              fuel = Math.min(100, fuel + result.fuelReward);
+              audio.current.junkPickup();
+            }
+            if (result.points > 0) score += result.points;
+            if (result.setComplete) {
+              audio.current.junkSetComplete();
+              // Generate wormhole door
+              if (!collectiblesRef.current.wormholeDoor) {
+                const context = {
+                  worldWidth: terrain.worldWidth,
+                  worldHeight: isCavernLevel ? (terrain as any).worldHeight : 800,
+                  getHeightAt: terrain.getHeightAt,
+                  pads: terrain.pads,
+                  shipHeight: 32,
+                  mode: isCavernLevel ? "caverns" as const : "surface" as const,
+                  startPos: { x: terrain.worldWidth / 2, y: 200 },
+                  goalPos: { x: terrain.pads[terrain.pads.length - 1]?.xStart || terrain.worldWidth - 100, y: terrain.pads[terrain.pads.length - 1]?.y || 400 },
+                  checkCollision: isCavernLevel ? (terrain as any).checkCollision : undefined
+                };
+                collectiblesRef.current.wormholeDoor = generateWormholeDoor(seed, context);
+                if (collectiblesRef.current.wormholeDoor) {
+                  audio.current.wormholeOpen();
+                }
+              }
+            }
+          }
+        }
+        
+        // Check wormhole entry
+        if (collectiblesRef.current.wormholeDoor && checkWormholeEntry({ x, y }, 16, collectiblesRef.current.wormholeDoor)) {
+          audio.current.wormholeEnter();
+          // TODO: Launch bonus game
+          score += 2000; // Temporary bonus
+        }
+      }
 
       // Collision check against terrain or cavern
       let collisionDetected = false;
@@ -1357,6 +1407,51 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles, neonColor);
         }
       }
+      
+      // Collectibles (space junk and wormhole door)
+      if (collectiblesRef.current) {
+        // Update sparkles
+        collectiblesRef.current.spaceJunk.forEach(junk => {
+          const sparkles = sparklesRef.current.get(junk.id);
+          if (sparkles) {
+            updateSparkles(sparkles, elapsed);
+          }
+        });
+        
+        // Render space junk
+        collectiblesRef.current.spaceJunk.forEach(junk => {
+          if (junk.collected) return;
+          
+          // Check if visible in viewport
+          const junkLeft = junk.pos.x - 50;
+          const junkRight = junk.pos.x + 50;
+          if (junkRight < viewLeft || junkLeft > viewRight) return;
+          
+          const asset = SPACE_JUNK_ASSETS[junk.shape];
+          const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
+          const scale = 1.0 + 0.1 * Math.sin(elapsed * 2 + junk.seed * 0.001);
+          const sparkles = sparklesRef.current.get(junk.id);
+          
+          ctx.save();
+          ctx.globalAlpha = 0.9;
+          renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles);
+          ctx.restore();
+        });
+        
+        // Render wormhole door
+        if (collectiblesRef.current.wormholeDoor) {
+          const wormhole = collectiblesRef.current.wormholeDoor;
+          const whLeft = wormhole.pos.x - wormhole.radius;
+          const whRight = wormhole.pos.x + wormhole.radius;
+          
+          if (whRight >= viewLeft && whLeft <= viewRight) {
+            ctx.save();
+            ctx.globalAlpha = wormhole.open ? 1.0 : 0.3;
+            renderWormholeDoor(ctx, wormhole.pos.x, wormhole.pos.y, elapsed, wormhole.open, 1.0);
+            ctx.restore();
+          }
+        }
+      }
 
       // Lander
       if (!crashed) {
@@ -1557,7 +1652,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         />
       )}
 
-      <HUD {...hud} />
+      <HUD {...hud} collectibles={collectiblesRef.current || undefined} />
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
         <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
