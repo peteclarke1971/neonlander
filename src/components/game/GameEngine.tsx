@@ -283,17 +283,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         return { x: padCenterX, y: spawnY };
       }
       
-      // Focus test: spawn above moving pad to ensure visibility on Easy L1-5 classic
-      if (difficulty === "easy" && mode === "classic" && level <= 5) {
-        const t = terrain as TerrainData;
-        if (t.movingPads && t.movingPads.length > 0) {
-          const mp = t.movingPads[0];
-          const sx = mp.currentPos.x;
-          const sy = mp.currentPos.y - 220;
-          console.log("[MovingPad] Spawning near moving pad", { sx, sy, mp });
-          return { x: sx, y: sy };
-        }
-      }
+      
       
       if (mode === "fixed") {
         const cx = WORLD_WIDTH / 2;

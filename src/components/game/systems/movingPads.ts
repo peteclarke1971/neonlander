@@ -126,18 +126,46 @@ export class MovingPadSystem {
       pos0 = { x, y: topY };    // Top position
       pos1 = { x, y: bottomY }; // Bottom position flush with terrain
     } else if (motion === "arc") {
-      // Circular arc movement - ensure bottom of arc is flush with terrain
-      const centerX = worldWidth * (0.3 + rand() * 0.4); // Middle 40% of world
+      // Circular arc movement - ensure bottom of arc is flush with flat terrain
+      // Pick a center in middle 40% of world and choose radius/angles
+      let centerX = worldWidth * (0.3 + rand() * 0.4);
       const radius = 80 + rand() * 120; // 80-200 pixel radius
-      
       const angle0 = -Math.PI / 3 + rand() * (Math.PI / 6); // -60° to -30°
       const angle1 = Math.PI / 3 - rand() * (Math.PI / 6);   // 30° to 60°
-      
-      // Find the lowest point of the arc to position it flush with terrain
-      const lowestAngle = Math.PI / 2; // Bottom of circle
+
+      // Helper to measure flatness around bottom point
+      const flatnessAt = (cx: number) => {
+        const baseY = getHeightAt(cx);
+        let maxVar = 0;
+        for (let dx = -30; dx <= 30; dx += 5) {
+          const v = Math.abs(getHeightAt(cx + dx) - baseY);
+          if (v > maxVar) maxVar = v;
+        }
+        return maxVar;
+      };
+
+      // Ensure the bottom section is reasonably flat; if forced, search a better spot
+      let maxVar = flatnessAt(centerX);
+      if (maxVar > 5) {
+        if (forced) {
+          let bestX = centerX;
+          let bestVar = maxVar;
+          const samples = 24;
+          for (let i = 0; i < samples; i++) {
+            const cx = worldWidth * (0.3 + (i + rand()) / samples * 0.4);
+            const v = flatnessAt(cx);
+            if (v < bestVar) { bestVar = v; bestX = cx; }
+          }
+          centerX = bestX;
+        } else {
+          return null;
+        }
+      }
+
+      // Place center so lowest point is flush with terrain
       const lowestY = getHeightAt(centerX) + radius; // Bottom point should touch terrain
-      const centerY = lowestY - radius; // Position center so bottom touches terrain
-      
+      const centerY = lowestY - radius;
+
       pos0 = {
         x: centerX + Math.cos(angle0) * radius,
         y: centerY + Math.sin(angle0) * radius
@@ -146,7 +174,7 @@ export class MovingPadSystem {
         x: centerX + Math.cos(angle1) * radius,
         y: centerY + Math.sin(angle1) * radius
       };
-      
+
       arcCenter = { x: centerX, y: centerY };
       arcRadius = radius;
       arcAngle0 = angle0;
@@ -415,11 +443,9 @@ export class MovingPadSystem {
       const y = pos0.y + (pos1.y - pos0.y) * t;
       const terrainY = getHeightAt(x);
       
-      if (motion === "shuttle") {
+      if (motion === "shuttle" || motion === "elevator" || motion === "arc") {
         // Allow flush tracks: permit pad path to be at ground height (not below it)
         if (y > terrainY + 0.5) return false; // below terrain -> invalid
-      } else {
-        if (y + clearance > terrainY) return false; // Too close to ground
       }
     }
 

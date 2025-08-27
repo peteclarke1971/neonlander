@@ -192,6 +192,21 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       }
     }
 
+    // Guarantee one moving pad on early levels (L1-5) for both difficulties
+    if (!movingPad && level <= 5) {
+      movingPad = movingPadSystem.generateMovingPad(
+        (seed ^ 0x4D4F5649) + 77777,
+        level,
+        difficulty,
+        worldWidth,
+        800,
+        getHeightAt,
+        pads,
+        false,
+        true // forced generation
+      );
+    }
+
     if (movingPad) {
       movingPads.push(movingPad);
       
@@ -227,11 +242,9 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   };
 
   const getMovingPadAt = (x: number, y: number): MovingPad | null => {
-    // Use lander "foot" position for collision detection (bottom center)
-    const footY = y + 8; // Lander foot is ~8 pixels below center
-    
+    // Pass lander center Y; collision fn computes foot offset internally
     for (const mp of movingPads) {
-      if (movingPadSystem.isOnMovingPad(x, footY, mp)) {
+      if (movingPadSystem.isOnMovingPad(x, y, mp)) {
         return mp;
       }
     }
