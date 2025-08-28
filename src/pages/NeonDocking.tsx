@@ -54,10 +54,13 @@ const NeonDocking: React.FC = () => {
   const handleGameOver = (data: OrbitalDockingGameOverData) => {
     setLastResult(data);
     setView("gameover");
-    setTimeout(() => {
-      tryAgainRef.current?.focus();
-      setGoFocusIndex(0);
-    }, 10);
+    // Avoid auto-focusing default actions on crash screen
+    if (data.cause !== "crash") {
+      setTimeout(() => {
+        tryAgainRef.current?.focus();
+        setGoFocusIndex(0);
+      }, 10);
+    }
   };
 
   const handleInitialsSubmit = (initials: string) => {
@@ -300,10 +303,10 @@ const NeonDocking: React.FC = () => {
   // Game over view
   const isHighScore = lastResult && (highScores.length < 5 || highScores.some(score => lastResult.score > score.score));
   
-  // Add keyboard handling for game over screen
+  // Add keyboard/gamepad handling for game over screen (disabled on crash)
   useEffect(() => {
-    // Only add listeners when on game over screen and not entering initials
-    if (view === "gameover" && !isHighScore) {
+    // Only add listeners when on game over screen, not entering initials, and not on crash screen
+    if (view === "gameover" && !isHighScore && lastResult?.cause !== "crash") {
       const handleKeyDown = (e: KeyboardEvent) => {
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (tag === "input" || tag === "textarea") return;
@@ -337,7 +340,7 @@ const NeonDocking: React.FC = () => {
         clearInterval(gamepadInterval);
       };
     }
-  }, [view, isHighScore, goFocusIndex]);
+  }, [view, isHighScore, goFocusIndex, lastResult]);
   
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
