@@ -1658,7 +1658,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     const hudTimer = setInterval(updateHud, 120);
 
     return () => { cancelAnimationFrame(raf); clearInterval(hudTimer); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
-  }, [difficulty, onGameOver, paused, level, mode]);
+  }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
 
   return (
     <section className="relative h-[calc(100vh-0px)] w-full select-none">
