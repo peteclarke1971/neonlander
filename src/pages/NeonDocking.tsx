@@ -379,6 +379,13 @@ const NeonDocking: React.FC = () => {
               score={lastResult.score}
             />
           </div>
+        ) : lastResult?.cause === "crash" ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Ship destroyed.</p>
+            <a href="/" className="inline-block">
+              <Button variant="outline">Main Menu</Button>
+            </a>
+          </div>
         ) : (
           <div className="space-y-4">
             <Button ref={tryAgainRef} onClick={retryGame} variant="outline" size="lg" className={goFocusIndex === 0 ? "focus-visible:ring-2 focus-visible:ring-accent" : ""}>
