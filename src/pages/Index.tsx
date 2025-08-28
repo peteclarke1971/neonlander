@@ -76,6 +76,7 @@ const Index = () => {
   const [goIndex, setGoIndex] = useState(0);
   const [seedOverride, setSeedOverride] = useState<number | null>(null);
   const [lastPlayedSeed, setLastPlayedSeed] = useState<number | null>(null);
+  const [gameKey, setGameKey] = useState(0); // Force GameEngine remount
 
   // Refs for gameover navigation
   const contRef = useRef<HTMLButtonElement>(null);
@@ -141,11 +142,14 @@ const Index = () => {
   }, []);
 
   const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number) => {
+    console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel });
     setDifficulty(d);
     setMode(mode);
     const finalLowGfx = lowGfx ?? lowGraphics; // Use current setting if not explicitly provided
     setLowGraphics(finalLowGfx);
     setSeedOverride(seedOverrideParam ?? null);
+    // Force GameEngine remount to ensure fresh state
+    setGameKey(prev => prev + 1);
     // Save graphics preference
     try {
       localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
@@ -437,6 +441,7 @@ const retryGame = () => {
       )}
       {view === "game" && (
         <GameEngine
+          key={gameKey}
           difficulty={difficulty}
           onExit={() => setView("home")}
           onGameOver={handleGameOver}

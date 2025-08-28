@@ -187,6 +187,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   }, []);
 
   useEffect(() => {
+    console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride });
     let raf = 0;
     const c = canvasRef.current!;
     const ctx = c.getContext("2d")!;
@@ -208,13 +209,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     let seed: number;
     if (typeof seedOverride === "number" && Number.isFinite(seedOverride)) {
       seed = (Math.abs(Math.floor(seedOverride)) >>> 0);
+      console.log("🌱 Using seed override:", seed);
     } else if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
+      console.log("🕳️ Using cavern seed:", seed, "for level", level);
     } else {
       // For classic mode (non-caverns), always use random generation
       seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
+      console.log("🎲 Using", mode, "mode seed:", seed, "for level", level);
     }
     let levelSeed = seed >>> 0;
+    console.log("✅ Final levelSeed:", levelSeed);
     
     const terrain: TerrainData | CavernData = isCavernLevel 
       ? generateCavern(seed, level, difficulty)
