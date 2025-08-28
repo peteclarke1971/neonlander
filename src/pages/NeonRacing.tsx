@@ -354,40 +354,41 @@ const NeonRacing: React.FC = () => {
   
   // Add keyboard handling for game over screen
   useEffect(() => {
-    if (view !== "gameover" || isHighScore) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea") return;
-      if (e.key === "Enter") {
-        e.preventDefault();
-        retryGame(); // Default to retry game
-      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        setGoFocusIndex(prev => prev === 0 ? 1 : 0);
-        const refs = [tryAgainRef, mainMenuRef];
-        refs[goFocusIndex === 0 ? 1 : 0].current?.focus();
-      }
-    };
-    
-    // Gamepad handling
-    const handleGamepad = () => {
-      const gp = anyGamepad();
-      if (gp && gpProfileRef.current) {
-        const input = readGamepad(gp, gpProfileRef.current);
-        if (input.buttons.abort) { // Use abort button for retry
-          retryGame();
+    // Only add listeners when on game over screen and not entering initials
+    if (view === "gameover" && !isHighScore) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          retryGame(); // Default to retry game
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          e.preventDefault();
+          setGoFocusIndex(prev => prev === 0 ? 1 : 0);
+          const refs = [tryAgainRef, mainMenuRef];
+          refs[goFocusIndex === 0 ? 1 : 0].current?.focus();
         }
-      }
-    };
-    
-    window.addEventListener("keydown", handleKeyDown);
-    const gamepadInterval = setInterval(handleGamepad, 100);
-    
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      clearInterval(gamepadInterval);
-    };
+      };
+      
+      // Gamepad handling
+      const handleGamepad = () => {
+        const gp = anyGamepad();
+        if (gp && gpProfileRef.current) {
+          const input = readGamepad(gp, gpProfileRef.current);
+          if (input.buttons.abort) { // Use abort button for retry
+            retryGame();
+          }
+        }
+      };
+      
+      window.addEventListener("keydown", handleKeyDown);
+      const gamepadInterval = setInterval(handleGamepad, 100);
+      
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        clearInterval(gamepadInterval);
+      };
+    }
   }, [view, isHighScore, goFocusIndex]);
   
   return (
