@@ -322,7 +322,7 @@ const LightCycles: React.FC = () => {
   }
 
   // Game over view
-  const isHighScore = lastResult && highScores.length < 5 || (lastResult && highScores.some(score => lastResult.score > score.score));
+  const isHighScore = lastResult && (highScores.length < 5 || highScores.some(score => lastResult.score > score.score));
   
   // Add keyboard handling for game over screen
   useEffect(() => {
