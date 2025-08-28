@@ -5,6 +5,7 @@ export interface MovingPad extends Pad {
   pos0: { x: number; y: number };
   pos1: { x: number; y: number };
   speed: number; // px/s
+  baseSpeed?: number; // baseline 1x speed for fairness checks
   dwell: number; // seconds at each end
   currentPos: { x: number; y: number };
   currentVelocity: { x: number; y: number };
@@ -243,6 +244,7 @@ export class MovingPadSystem {
       pos0,
       pos1,
       speed,
+      baseSpeed: speed / levelSpeedMultiplier,
       dwell,
       currentPos: { ...pos0 },
       currentVelocity: { x: 0, y: 0 },
