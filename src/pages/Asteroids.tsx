@@ -187,16 +187,18 @@ const Asteroids: React.FC = () => {
   
   // Add keyboard handling for game over screen
   useEffect(() => {
-    if (view !== "gameover") return;
+    if (view !== "gameover" || isHighScore) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === "input" || targetTag === "textarea") return;
       if (e.key === "Enter") {
         e.preventDefault();
         retryGame(); // Default to retry game
       }
     };
     
-    // Gamepad handling
+    // Gamepad handling (only when not entering initials)
     const handleGamepad = () => {
       const gp = anyGamepad();
       if (gp) {
@@ -215,7 +217,7 @@ const Asteroids: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       clearInterval(gamepadInterval);
     };
-  }, [view]);
+  }, [view, isHighScore]);
   
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">

@@ -302,9 +302,11 @@ const NeonDocking: React.FC = () => {
   
   // Add keyboard handling for game over screen
   useEffect(() => {
-    if (view !== "gameover") return;
+    if (view !== "gameover" || isHighScore) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
       if (e.key === "Enter") {
         e.preventDefault();
         retryGame(); // Default to retry game
@@ -334,7 +336,7 @@ const NeonDocking: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       clearInterval(gamepadInterval);
     };
-  }, [view, goFocusIndex]);
+  }, [view, isHighScore, goFocusIndex]);
   
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
