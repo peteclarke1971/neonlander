@@ -30,7 +30,7 @@ export class CursorManager {
     this.isAttached = true;
 
     this.setupEventListeners();
-    this.showCursor();
+    this.applyInitialVisibility();
   }
 
   detach(): void {
@@ -53,6 +53,11 @@ export class CursorManager {
 
   forceShowCursor(): void {
     this.showCursor();
+    this.clearIdleTimer();
+  }
+
+  forceHideCursor(): void {
+    this.hideCursor();
     this.clearIdleTimer();
   }
 
@@ -153,6 +158,14 @@ export class CursorManager {
         this.hideCursor();
       }
     }, this.config.idleMs);
+  }
+
+  private applyInitialVisibility(): void {
+    if (this.config.autoHide) {
+      this.hideCursor();
+    } else {
+      this.showCursor();
+    }
   }
 
   private shouldUsePointerLock(): boolean {

@@ -16,6 +16,8 @@ import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
 import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
 import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave";
 import { AudioManager } from "@/components/game/AudioManager";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
@@ -122,6 +124,20 @@ const Index = () => {
     document.title = "Neon Lunar Lander — Vector Arcade";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Pilot a neon-glow lunar lander. Master thrust and rotation to score precision landings on procedural terrain.");
+  }, []);
+
+  // Page-level cursor manager: hide cursor on app start, no pointer lock
+  const pageContainerRef = useRef<HTMLDivElement | null>(null);
+  const pageCursorMgr = useRef<CursorManager | null>(null);
+  useEffect(() => {
+    if (!pageContainerRef.current) return;
+    const cfg = loadCursorConfig();
+    const cfgNoLock = { ...cfg, usePointerLock: "off" as const };
+    const mgr = new CursorManager(cfgNoLock);
+    pageCursorMgr.current = mgr;
+    mgr.attach(pageContainerRef.current, () => false);
+    mgr.forceHideCursor();
+    return () => { mgr.detach(); pageCursorMgr.current = null; };
   }, []);
 
   const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number) => {
@@ -416,7 +432,7 @@ const retryGame = () => {
    }, [view, lastResult]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div ref={pageContainerRef} className="min-h-screen bg-background text-foreground">
       {view === "home" && (
         <HomeScreen onStart={startGame} highScoresClassic={classicScores} highScoresFixed={fixedScores} lastPlayedSeed={lastPlayedSeed ?? undefined} />
       )}

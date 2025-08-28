@@ -156,6 +156,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // In GameEngine, the game is "active" when not paused and the game loop is running
     const isGameplayFn = () => !paused;
     cursorManager.current.attach(containerRef.current, isGameplayFn);
+    cursorManager.current.forceHideCursor();
     
     return () => {
       cursorManager.current?.detach();
@@ -169,6 +170,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       cursorManager.current?.forceShowCursor();
     }
   }, [paused]);
+
+  // Hide cursor at level start
+  useEffect(() => {
+    cursorManager.current?.forceHideCursor();
+  }, [level]);
 
   // Detect touch-capable devices (enable touch-to-thrust overlay)
   useEffect(() => {
