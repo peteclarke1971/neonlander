@@ -28,9 +28,9 @@ interface Props {
 }
 
 const DIFFICULTY_SETTINGS = {
-  "Easy": { playerSpeed: 60, aiSpeed: 45, aiCount: 2, assistsEnabled: true },
-  "Normal": { playerSpeed: 80, aiSpeed: 65, aiCount: 3, assistsEnabled: false },
-  "Hard": { playerSpeed: 100, aiSpeed: 80, aiCount: 4, assistsEnabled: false }
+  "Easy": { playerSpeed: 180, aiSpeed: 45, aiCount: 2, assistsEnabled: true },
+  "Normal": { playerSpeed: 240, aiSpeed: 65, aiCount: 3, assistsEnabled: false },
+  "Hard": { playerSpeed: 300, aiSpeed: 80, aiCount: 4, assistsEnabled: false }
 };
 
 const BASE_SCORE_PER_GATE = 100;
@@ -407,9 +407,9 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     if (keys.rollRight) ship.rotation.z += rotationForce;
 
     // Speed control
-    if (keys.boost && ship.boostMeter > 0) {
+    if (keys.boost) {
       ship.speed = Math.min(ship.maxSpeed, ship.speed + 60 * dt);
-      ship.boostMeter = Math.max(0, ship.boostMeter - dt * 0.6); // drain boost
+      // Unlimited boosting - no meter drain
     } else if (keys.airbrake) {
       ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 90 * dt);
     } else {
@@ -437,7 +437,7 @@ export const SpaceRaceEngine: React.FC<Props> = ({
 
     // Analog strafe with left stick
     ship.velocity.x += (gamepad.axes[0] || 0) * strafeForce * 2; // X-axis
-    ship.velocity.y -= (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (inverted)
+    ship.velocity.y += (gamepad.axes[1] || 0) * strafeForce * 2; // Y-axis (inverted for racing)
 
     // Analog rotation with right stick  
     ship.rotation.y += (gamepad.axes[2] || 0) * rotationForce * 1.5; // yaw
@@ -447,9 +447,9 @@ export const SpaceRaceEngine: React.FC<Props> = ({
     const throttle = Math.max(0, (gamepad.axes[7] || 0) + 1) / 2; // RT
     const brake = Math.max(0, (gamepad.axes[6] || 0) + 1) / 2; // LT
 
-    if (input.thrust > 0.5 && ship.boostMeter > 0) { // Boost with thrust button (same as lander)
+    if (input.thrust > 0.5) { // Boost with thrust button (unlimited)
       ship.speed = Math.min(ship.maxSpeed, ship.speed + 60 * dt);
-      ship.boostMeter = Math.max(0, ship.boostMeter - dt * 0.6);
+      // Unlimited boosting - no meter drain
     } else if (brake > 0.1) {
       ship.speed = Math.max(ship.baseSpeed * 0.5, ship.speed - 90 * brake * dt);
     } else {
