@@ -942,7 +942,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           // Slight forgiveness when pad is very fast and landing near center
           const pWidth = movingPadLanding.width ?? 32;
           const centerDist = Math.abs(x - movingPadLanding.currentPos.x);
-          const nearCenter = centerDist <= pWidth * 0.2;
+          const nearCenter = centerDist <= pWidth * 0.4;
           const baseSpeed = movingPadLanding.baseSpeed ?? movingPadLanding.speed;
           const isVeryFast = movingPadLanding.speed >= 3 * baseSpeed;
           if (isVeryFast && nearCenter && okAngle) {
