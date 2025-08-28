@@ -93,6 +93,9 @@ const NeonDocking: React.FC = () => {
 
   // Available levels
   const levels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  
+  // Gamepad profile ref for game over screen
+  const gpProfileRef = useRef(loadProfile(getLastDeviceId()));
 
   // Gamepad navigation
   useEffect(() => {
@@ -297,6 +300,42 @@ const NeonDocking: React.FC = () => {
   // Game over view
   const isHighScore = lastResult && highScores.some(score => lastResult.score > score.score);
   
+  // Add keyboard handling for game over screen
+  useEffect(() => {
+    if (view !== "gameover") return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        retryGame(); // Default to retry game
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setGoFocusIndex(prev => prev === 0 ? 1 : 0);
+        const refs = [tryAgainRef, mainMenuRef];
+        refs[goFocusIndex === 0 ? 1 : 0].current?.focus();
+      }
+    };
+    
+    // Gamepad handling
+    const handleGamepad = () => {
+      const gp = anyGamepad();
+      if (gp && gpProfileRef.current) {
+        const input = readGamepad(gp, gpProfileRef.current);
+        if (input.buttons.abort) { // Use abort button for retry
+          retryGame();
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    const gamepadInterval = setInterval(handleGamepad, 100);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearInterval(gamepadInterval);
+    };
+  }, [view, goFocusIndex]);
+  
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
@@ -336,10 +375,10 @@ const NeonDocking: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <Button onClick={retryGame} variant="outline" size="lg">
+            <Button ref={tryAgainRef} onClick={retryGame} variant="outline" size="lg" className={goFocusIndex === 0 ? "focus-visible:ring-2 focus-visible:ring-accent" : ""}>
               Try Again
             </Button>
-            <Button onClick={backToHome} variant="ghost">
+            <Button ref={mainMenuRef} onClick={backToHome} variant="ghost" className={goFocusIndex === 1 ? "focus-visible:ring-2 focus-visible:ring-accent" : ""}>
               Main Menu
             </Button>
           </div>

@@ -178,7 +178,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     cursorManager.current = new CursorManager(config);
     
     const isGameplayFn = () => !paused && gameStarted && !gameEnded;
-    cursorManager.current.attach(containerRef.current, isGameplayFn);
+    cursorManager.current.attach(containerRef.current, isGameplayFn, 'global');
+    cursorManager.current.forceHideCursor();
     
     return () => {
       cursorManager.current?.detach();

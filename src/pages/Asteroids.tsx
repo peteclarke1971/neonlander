@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AsteroidsEngine } from "@/components/game/AsteroidsEngine";
 import { HomeScreen } from "@/components/game/HomeScreen";
 import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
 import { AsteroidsGameOverData } from "@/components/game/types/asteroids";
 import { Button } from "@/components/ui/button";
+import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
 
 type View = "home" | "game" | "gameover";
 
@@ -184,6 +185,38 @@ const Asteroids: React.FC = () => {
   // Game over view
   const isHighScore = lastResult && highScores.some(score => lastResult.score > score.score);
   
+  // Add keyboard handling for game over screen
+  useEffect(() => {
+    if (view !== "gameover") return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        retryGame(); // Default to retry game
+      }
+    };
+    
+    // Gamepad handling
+    const handleGamepad = () => {
+      const gp = anyGamepad();
+      if (gp) {
+        const profile = loadProfile(getLastDeviceId());
+        const input = readGamepad(gp, profile);
+        if (input.buttons.abort) { // Use abort button for retry
+          retryGame();
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    const gamepadInterval = setInterval(handleGamepad, 100);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearInterval(gamepadInterval);
+    };
+  }, [view]);
+  
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
@@ -219,7 +252,7 @@ const Asteroids: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <Button onClick={retryGame} variant="outline" size="lg">
+            <Button onClick={retryGame} variant="outline" size="lg" autoFocus>
               Try Again
             </Button>
             <Button onClick={backToHome} variant="ghost">

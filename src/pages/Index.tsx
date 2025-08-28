@@ -379,9 +379,8 @@ const retryGame = () => {
       if (lastResult?.cause === "success") {
         continueGame();
       } else {
-        const order = [homeRef.current, retryCurrRef.current, retryRef.current];
-        const target = order[goIndex] ?? order.find(b => b && !b.disabled) ?? retryCurrRef.current;
-        target?.click();
+        // Default to "Retry Current Level" for mission failed
+        retryCurrentLevel();
       }
     };
     window.addEventListener("keydown", onKey);

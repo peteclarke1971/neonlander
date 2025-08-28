@@ -133,6 +133,23 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
   // Ensure UI mode is off during gameplay
   useEffect(() => { try { setUiMode(false); } catch {} }, []);
 
+  // Cursor management setup
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const config = loadCursorConfig();
+    cursorManager.current = new CursorManager(config);
+    
+    const isGameplayFn = () => !paused;
+    cursorManager.current.attach(containerRef.current, isGameplayFn, 'global');
+    cursorManager.current.forceHideCursor();
+    
+    return () => {
+      cursorManager.current?.detach();
+      cursorManager.current = null;
+    };
+  }, []);
+
   // Detect touch-capable devices
   useEffect(() => {
     try {
