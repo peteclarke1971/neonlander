@@ -55,7 +55,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
     // Resize and (re)init stars
     const reinitStars = () => {
-      const c = canvasRef.current!;
+      const c = canvasRef.current;
+      if (!c) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       c.width = Math.floor(c.clientWidth * dpr);
       c.height = Math.floor(c.clientHeight * dpr);
@@ -81,8 +82,10 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
     };
 
     useEffect(() => {
-      const c = canvasRef.current!;
-      const ctx = c.getContext("2d")!;
+      const c = canvasRef.current;
+      if (!c) return;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
       const resize = () => {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         c.width = Math.floor(c.clientWidth * dpr);
@@ -100,7 +103,17 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       let gpProfile = loadProfile(lastGpId || undefined);
       // Neon palette from CSS vars for gentle color cycling
       const styles = getComputedStyle(document.documentElement);
-      const parseHslVar = (name: string) => styles.getPropertyValue(name).trim().split(/\s+/).map(v => parseFloat(v.replace('%','')));
+      const parseHslVar = (name: string) => {
+        try {
+          const value = styles.getPropertyValue(name).trim();
+          if (!value) return [280, 70, 60]; // fallback neon purple
+          const parts = value.split(/\s+/).map(v => parseFloat(v.replace('%','')));
+          if (parts.length >= 3 && parts.every(p => !isNaN(p))) return parts;
+          return [280, 70, 60]; // fallback on invalid data
+        } catch {
+          return [280, 70, 60]; // fallback on error
+        }
+      };
       const neonPalette = ['--neon-p1','--neon-p2','--neon-p3','--neon-p4','--neon-p5','--neon-p6'].map(v => parseHslVar(v));
       const lerpHue = (a: number, b: number, t: number) => { const d = ((b - a + 540) % 360) - 180; return a + d * t; };
 
@@ -168,7 +181,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
         const fl = opts.current.focalLength;
         const trailLen = Math.max(0, Math.min(1, opts.current.trail)) * (0.5 + 0.5 * speed01);
-        const arr = arrRef.current!;
+        const arr = arrRef.current;
+        if (!arr) return;
         const N = starCountRef.current;
 
         ctx.fillStyle = "#000";
