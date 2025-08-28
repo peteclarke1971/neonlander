@@ -135,7 +135,7 @@ const Index = () => {
     const cfgNoLock = { ...cfg, usePointerLock: "off" as const };
     const mgr = new CursorManager(cfgNoLock);
     pageCursorMgr.current = mgr;
-    mgr.attach(pageContainerRef.current, () => false);
+    mgr.attach(pageContainerRef.current, () => false, 'global');
     mgr.forceHideCursor();
     return () => { mgr.detach(); pageCursorMgr.current = null; };
   }, []);

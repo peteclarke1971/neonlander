@@ -9,7 +9,8 @@ export class CursorManager {
   private isAttached = false;
   private pointerLockHintShown = false;
   private listeners: Array<() => void> = [];
-
+  private scope: 'container' | 'global' = 'container';
+  private forceHidden = false;
   constructor(config: CursorConfig) {
     this.config = config;
     this.loadPointerLockHintState();
@@ -19,7 +20,7 @@ export class CursorManager {
     this.config = config;
   }
 
-  attach(containerEl: HTMLElement, isGameplayFn: () => boolean): void {
+  attach(containerEl: HTMLElement, isGameplayFn: () => boolean, scope: 'container' | 'global' = 'container'): void {
     if (this.isAttached) {
       this.detach();
     }
@@ -27,6 +28,7 @@ export class CursorManager {
     this.container = containerEl;
     this.canvas = containerEl.querySelector('canvas');
     this.isGameplayFn = isGameplayFn;
+    this.scope = scope;
     this.isAttached = true;
 
     this.setupEventListeners();
@@ -52,11 +54,13 @@ export class CursorManager {
   }
 
   forceShowCursor(): void {
+    this.forceHidden = false;
     this.showCursor();
     this.clearIdleTimer();
   }
 
   forceHideCursor(): void {
+    this.forceHidden = true;
     this.hideCursor();
     this.clearIdleTimer();
   }
@@ -65,6 +69,7 @@ export class CursorManager {
     if (!this.container) return;
 
     const mouseMoveHandler = () => {
+      this.forceHidden = false;
       this.showCursor();
       this.scheduleHide();
     };
@@ -128,14 +133,17 @@ export class CursorManager {
   }
 
   private showCursor(): void {
-    if (this.container) {
-      this.container.classList.remove('hide-cursor');
+    const el = this.scope === 'global' ? document.documentElement : this.container;
+    if (el && !this.forceHidden) {
+      el.classList.remove('hide-cursor');
     }
   }
 
   private hideCursor(): void {
-    if (this.container && this.config.autoHide && this.isGameplayFn?.()) {
-      this.container.classList.add('hide-cursor');
+    const el = this.scope === 'global' ? document.documentElement : this.container;
+    if (!el) return;
+    if (this.forceHidden || (this.config.autoHide && this.isGameplayFn?.())) {
+      el.classList.add('hide-cursor');
     }
   }
 
@@ -161,11 +169,9 @@ export class CursorManager {
   }
 
   private applyInitialVisibility(): void {
-    if (this.config.autoHide) {
-      this.hideCursor();
-    } else {
-      this.showCursor();
-    }
+    // Start hidden until the user moves the mouse, regardless of gameplay state
+    this.forceHidden = true;
+    this.hideCursor();
   }
 
   private shouldUsePointerLock(): boolean {
