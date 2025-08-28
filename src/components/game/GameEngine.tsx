@@ -29,6 +29,8 @@ import { generateHazards, updateHazards, drawHazards, checkHazardCollision } fro
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
 
 interface Props {
   difficulty: Difficulty;
@@ -93,6 +95,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const rotBoostActive = useRef(1.0); // current interpolated multiplier
   const [showRotBoostHint, setShowRotBoostHint] = useState(false);
   
+  // Cursor management
+  const cursorManager = useRef<CursorManager | null>(null);
+  
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
     const hintShown = localStorage.getItem('ll-rotation-boost-hint-shown');
@@ -140,6 +145,30 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
   // Ensure UI mode is off during gameplay
   useEffect(() => { try { setUiMode(false); } catch {} }, []);
+
+  // Cursor management setup
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const config = loadCursorConfig();
+    cursorManager.current = new CursorManager(config);
+    
+    // In GameEngine, the game is "active" when not paused and the game loop is running
+    const isGameplayFn = () => !paused;
+    cursorManager.current.attach(containerRef.current, isGameplayFn);
+    
+    return () => {
+      cursorManager.current?.detach();
+      cursorManager.current = null;
+    };
+  }, []);
+  
+  // Update cursor manager when game state changes
+  useEffect(() => {
+    if (paused) {
+      cursorManager.current?.forceShowCursor();
+    }
+  }, [paused]);
 
   // Detect touch-capable devices (enable touch-to-thrust overlay)
   useEffect(() => {

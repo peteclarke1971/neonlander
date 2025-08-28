@@ -4,13 +4,21 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepad, saveProfile, setLastDeviceId } from "@/hooks/use-gamepad";
+import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
 
 export default function ControlsSettings() {
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
   const [platform, setPlatform] = useState<string>(() => getPlatformFromId(deviceId || ""));
   const [profile, setProfile] = useState(() => loadProfile(deviceId || undefined));
   const [listening, setListening] = useState<{ field: keyof typeof profile.map | null; type: "button" | "axis" | null }>({ field: null, type: null });
+  const [cursorConfig, setCursorConfig] = useState<CursorConfig>(loadCursorConfig);
+  
+  // Save cursor config when it changes
+  useEffect(() => {
+    saveCursorConfig(cursorConfig);
+  }, [cursorConfig]);
 
   // SEO
   useEffect(() => {
@@ -198,6 +206,61 @@ export default function ControlsSettings() {
               <Label>Vibration</Label>
               <Switch checked={profile.vibration} onCheckedChange={(v) => setProfile(p => ({ ...p, vibration: v }))} />
             </div>
+          </div>
+        </div>
+
+        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Mouse & Cursor</h2>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Auto-Hide Cursor</Label>
+                <div className="text-xs text-muted-foreground">Hide cursor after idle time during gameplay</div>
+              </div>
+              <Switch 
+                checked={cursorConfig.autoHide}
+                onCheckedChange={(checked) => setCursorConfig(prev => ({ ...prev, autoHide: checked }))}
+              />
+            </div>
+            {cursorConfig.autoHide && (
+              <div>
+                <Label htmlFor="idle-time">Idle Time (ms)</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56">
+                    <Slider 
+                      id="idle-time" 
+                      value={[cursorConfig.idleMs]} 
+                      min={1000} 
+                      max={3000} 
+                      step={100} 
+                      onValueChange={(value) => setCursorConfig(prev => ({ ...prev, idleMs: value[0] }))} 
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{cursorConfig.idleMs}ms</span>
+                </div>
+              </div>
+            )}
+            {isDesktop() && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Mouse Lock</Label>
+                  <div className="text-xs text-muted-foreground">Lock cursor for precision control (Esc to release)</div>
+                </div>
+                <Select 
+                  value={cursorConfig.usePointerLock} 
+                  onValueChange={(value: "off" | "on" | "desktop") => setCursorConfig(prev => ({ ...prev, usePointerLock: value }))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="desktop">Desktop Only</SelectItem>
+                    <SelectItem value="on">Always On</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
 

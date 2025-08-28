@@ -18,6 +18,8 @@ import {
 } from "./systems/lightcycle";
 import { updateAI, cleanupAI } from "./systems/lightcycleAI";
 import { anyGamepad, loadProfile, readGamepad, setUiMode } from "@/hooks/use-gamepad";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
 
 interface Props {
   difficulty: LightCyclesDifficulty;
@@ -57,6 +59,9 @@ export const LightCyclesEngine: React.FC<Props> = ({ difficulty, startLevel = 1,
     accelerating: false
   });
   const [paused, setPaused] = useState(false);
+  
+  // Cursor management
+  const cursorManager = useRef<CursorManager | null>(null);
 
   // Controls - using directional keys
   const keys = useRef<{ up: boolean; down: boolean; left: boolean; right: boolean; accelerate: boolean }>({
@@ -91,6 +96,29 @@ export const LightCyclesEngine: React.FC<Props> = ({ difficulty, startLevel = 1,
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
+
+  // Cursor management setup
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const config = loadCursorConfig();
+    cursorManager.current = new CursorManager(config);
+    
+    const isGameplayFn = () => !paused;
+    cursorManager.current.attach(containerRef.current, isGameplayFn);
+    
+    return () => {
+      cursorManager.current?.detach();
+      cursorManager.current = null;
+    };
+  }, []);
+  
+  // Update cursor manager when game state changes
+  useEffect(() => {
+    if (paused) {
+      cursorManager.current?.forceShowCursor();
+    }
+  }, [paused]);
 
   // Keyboard controls
   useEffect(() => {

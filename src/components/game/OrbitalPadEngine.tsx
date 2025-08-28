@@ -8,6 +8,8 @@ import {
 } from "./types/orbitaldocking";
 import { anyGamepad, readGamepad, loadProfile, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
 import { Button } from "@/components/ui/button";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
 
 interface Props {
   level: number;
@@ -70,6 +72,9 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audio = useRef(new AudioManager());
+  
+  // Cursor management
+  const cursorManager = useRef<CursorManager | null>(null);
   
   // Game state
   const [paused, setPaused] = useState(false);
@@ -164,6 +169,29 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     // Setup UI mode
     setUiMode(false);
   }, [level, seed]);
+
+  // Cursor management setup
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const config = loadCursorConfig();
+    cursorManager.current = new CursorManager(config);
+    
+    const isGameplayFn = () => !paused && gameStarted && !gameEnded;
+    cursorManager.current.attach(containerRef.current, isGameplayFn);
+    
+    return () => {
+      cursorManager.current?.detach();
+      cursorManager.current = null;
+    };
+  }, []);
+  
+  // Update cursor manager when game state changes
+  useEffect(() => {
+    if (paused || !gameStarted || gameEnded) {
+      cursorManager.current?.forceShowCursor();
+    }
+  }, [paused, gameStarted, gameEnded]);
 
   // Input handling
   useEffect(() => {

@@ -144,7 +144,7 @@ All colors MUST be HSL.
     animation: neonCycle 18s linear infinite, neonPulseSoft 2.6s ease-in-out infinite;
   }
 
-  /* Alternate neon palette for Fixed mode sections */
+/* Alternate neon palette for Fixed mode sections */
   .neon-fixed-theme {
     --neon: 320 100% 62%; /* Magenta */
     --neon-2: 280 100% 66%; /* Purple */
@@ -156,5 +156,11 @@ All colors MUST be HSL.
     --neon: 48 100% 60%; /* Neon gold */
     --neon-2: 28 100% 60%; /* Warm amber */
     --accent: 48 100% 60%;
+  }
+
+  /* Cursor management */
+  .hide-cursor, 
+  .hide-cursor * { 
+    cursor: none !important; 
   }
 }

@@ -13,6 +13,8 @@ import {
   drawProjectiles
 } from "./systems/asteroids";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
 import { 
   createUFOState, 
   updateUFOState, 
@@ -72,6 +74,9 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  
+  // Cursor management
+  const cursorManager = useRef<CursorManager | null>(null);
 
   // Controls state
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; fire: boolean }>({ 
