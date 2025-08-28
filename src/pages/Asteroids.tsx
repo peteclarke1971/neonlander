@@ -86,6 +86,44 @@ const Asteroids: React.FC = () => {
     } catch {}
   };
 
+  // Game over view
+  const isHighScore = lastResult && (highScores.length < 10 || highScores.some(score => lastResult.score > score.score));
+  
+  // Add keyboard handling for game over screen
+  useEffect(() => {
+    // Only add listeners when on game over screen and not entering initials
+    if (view === "gameover" && !isHighScore) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (targetTag === "input" || targetTag === "textarea") return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          retryGame(); // Default to retry game
+        }
+      };
+      
+      // Gamepad handling (only when not entering initials)
+      const handleGamepad = () => {
+        const gp = anyGamepad();
+        if (gp) {
+          const profile = loadProfile(getLastDeviceId());
+          const input = readGamepad(gp, profile);
+          if (input.buttons.abort) { // Use abort button for retry
+            retryGame();
+          }
+        }
+      };
+      
+      window.addEventListener("keydown", handleKeyDown);
+      const gamepadInterval = setInterval(handleGamepad, 100);
+      
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        clearInterval(gamepadInterval);
+      };
+    }
+  }, [view, isHighScore]);
+
   if (view === "home") {
     return (
       <div className="relative w-full h-screen bg-background overflow-hidden">
@@ -182,43 +220,6 @@ const Asteroids: React.FC = () => {
     );
   }
 
-  // Game over view
-  const isHighScore = lastResult && (highScores.length < 10 || highScores.some(score => lastResult.score > score.score));
-  
-  // Add keyboard handling for game over screen
-  useEffect(() => {
-    // Only add listeners when on game over screen and not entering initials
-    if (view === "gameover" && !isHighScore) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (targetTag === "input" || targetTag === "textarea") return;
-        if (e.key === "Enter") {
-          e.preventDefault();
-          retryGame(); // Default to retry game
-        }
-      };
-      
-      // Gamepad handling (only when not entering initials)
-      const handleGamepad = () => {
-        const gp = anyGamepad();
-        if (gp) {
-          const profile = loadProfile(getLastDeviceId());
-          const input = readGamepad(gp, profile);
-          if (input.buttons.abort) { // Use abort button for retry
-            retryGame();
-          }
-        }
-      };
-      
-      window.addEventListener("keydown", handleKeyDown);
-      const gamepadInterval = setInterval(handleGamepad, 100);
-      
-      return () => {
-        window.removeEventListener("keydown", handleKeyDown);
-        clearInterval(gamepadInterval);
-      };
-    }
-  }, [view, isHighScore]);
   
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">

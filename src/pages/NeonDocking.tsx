@@ -198,6 +198,47 @@ const NeonDocking: React.FC = () => {
     try { setUiMode(view !== "game"); } catch {}
   }, [view]);
 
+  // Game over view
+  const isHighScore = lastResult && (highScores.length < 5 || highScores.some(score => lastResult.score > score.score));
+
+  // Add keyboard/gamepad handling for game over screen (disabled on crash)
+  useEffect(() => {
+    if (view === "gameover" && !isHighScore && lastResult?.cause !== "crash") {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          retryGame(); // Default to retry game
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          e.preventDefault();
+          setGoFocusIndex(prev => prev === 0 ? 1 : 0);
+          const refs = [tryAgainRef, mainMenuRef];
+          refs[goFocusIndex === 0 ? 1 : 0].current?.focus();
+        }
+      };
+
+      // Gamepad handling
+      const handleGamepad = () => {
+        const gp = anyGamepad();
+        if (gp && gpProfileRef.current) {
+          const input = readGamepad(gp, gpProfileRef.current);
+          if (input.buttons.abort) { // Use abort button for retry
+            retryGame();
+          }
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      const gamepadInterval = setInterval(handleGamepad, 100);
+
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        clearInterval(gamepadInterval);
+      };
+    }
+  }, [view, isHighScore, goFocusIndex, lastResult]);
+
   if (view === "home") {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
@@ -300,47 +341,6 @@ const NeonDocking: React.FC = () => {
     );
   }
 
-  // Game over view
-  const isHighScore = lastResult && (highScores.length < 5 || highScores.some(score => lastResult.score > score.score));
-  
-  // Add keyboard/gamepad handling for game over screen (disabled on crash)
-  useEffect(() => {
-    // Only add listeners when on game over screen, not entering initials, and not on crash screen
-    if (view === "gameover" && !isHighScore && lastResult?.cause !== "crash") {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (tag === "input" || tag === "textarea") return;
-        if (e.key === "Enter") {
-          e.preventDefault();
-          retryGame(); // Default to retry game
-        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-          e.preventDefault();
-          setGoFocusIndex(prev => prev === 0 ? 1 : 0);
-          const refs = [tryAgainRef, mainMenuRef];
-          refs[goFocusIndex === 0 ? 1 : 0].current?.focus();
-        }
-      };
-      
-      // Gamepad handling
-      const handleGamepad = () => {
-        const gp = anyGamepad();
-        if (gp && gpProfileRef.current) {
-          const input = readGamepad(gp, gpProfileRef.current);
-          if (input.buttons.abort) { // Use abort button for retry
-            retryGame();
-          }
-        }
-      };
-      
-      window.addEventListener("keydown", handleKeyDown);
-      const gamepadInterval = setInterval(handleGamepad, 100);
-      
-      return () => {
-        window.removeEventListener("keydown", handleKeyDown);
-        clearInterval(gamepadInterval);
-      };
-    }
-  }, [view, isHighScore, goFocusIndex, lastResult]);
   
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
