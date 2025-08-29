@@ -27,6 +27,8 @@ import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind"
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision } from "./systems/hazards";
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
+import { updateCavernVolcanoParticles, createCavernVolcanoParticles } from "./systems/cavernVolcanoParticles";
+import { getCavernVolcanoConfigForLevel } from "./systems/cavernVolcano";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
 import { CursorManager } from "@/lib/cursorManager";
@@ -797,7 +799,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
       
-      // Update volcanoes (only in terrain mode for now)
+      // Update volcanoes
       if (!isCavernLevel) {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
@@ -811,6 +813,46 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             }
           }
           // Update volcano particles state with new particles
+          setVolcanoParticles([...volcanoParticles]);
+        }
+      } else {
+        const cavernData = terrain as CavernData;
+        if (cavernData.volcanoes && cavernData.volcanoes.length > 0) {
+          const cfg = getCavernVolcanoConfigForLevel(level);
+          let playSound = false;
+          for (const v of cavernData.volcanoes) {
+            if (v.isErupting) {
+              v.eruptionTimer -= dt;
+              const rate = cfg.particleCount / v.eruptionDuration;
+              v.emissionCarry = (v.emissionCarry ?? 0) + rate * dt;
+              const particlesThisFrame = Math.floor(v.emissionCarry);
+              v.emissionCarry -= particlesThisFrame;
+              if (particlesThisFrame > 0) {
+                const newParts = createCavernVolcanoParticles(v, cavernData, particlesThisFrame);
+                volcanoParticles.push(...newParts);
+              }
+              if (v.eruptionTimer <= 0) {
+                v.isErupting = false;
+                v.nextEruption = v.eruptionInterval * (0.8 + Math.random() * 0.4);
+              }
+            } else {
+              v.nextEruption -= dt;
+              if (v.nextEruption <= 0) {
+                v.isErupting = true;
+                v.eruptionTimer = v.eruptionDuration;
+                v.emissionCarry = 0;
+                playSound = true;
+              }
+            }
+          }
+          // Cavern-specific particle physics with wall collision
+          updateCavernVolcanoParticles(volcanoParticles, dt, cavernData);
+          if (playSound) {
+            try {
+              const eruptingX = cavernData.volcanoes.reduce((acc, vv) => vv.isErupting ? vv.x : acc, x);
+              audio.current.spatialExplosion(eruptingX, x, cavernData.worldWidth);
+            } catch {}
+          }
           setVolcanoParticles([...volcanoParticles]);
         }
       }
@@ -831,7 +873,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Volcano particle collisions (airborne)
-      if (!crashed && !isCavernLevel && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
+      if (!crashed && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1367,64 +1409,92 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         drawTerrain(terrain.worldWidth);
       }
 
-      // Pads (mobile-optimized rendering)
-      for (const pad of terrain.pads) {
-        const pulse = 1 + 0.6 * Math.sin(elapsed * 4 + pad.xStart * 0.01);
-        const width = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-        const center = (pad.xEnd >= pad.xStart)
-          ? (pad.xStart + pad.xEnd) / 2
-          : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
-        
-        for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
-          // Viewport culling for pads
-          const padLeft = Math.min(pad.xStart, pad.xEnd) + offset;
-          const padRight = Math.max(pad.xStart, pad.xEnd) + offset;
-          if (padRight < viewLeft || padLeft > viewRight) continue;
-          
+      // Pads
+      if (isCavernLevel) {
+        const cavernData = terrain as CavernData;
+        const padsToDraw = [cavernData.startPad, cavernData.endPad];
+        for (const pad of padsToDraw) {
+          const pulse = 1 + 0.6 * Math.sin(elapsed * 4 + pad.xStart * 0.01);
+          // Draw a single instance (no world wrapping in caverns)
+          if (pad.xEnd < viewLeft || pad.xStart > viewRight) continue;
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(pad.xStart + offset, pad.y);
-          ctx.lineTo(pad.xEnd + offset, pad.y);
-          
+          ctx.moveTo(pad.xStart, pad.y);
+          ctx.lineTo(pad.xEnd, pad.y);
           if (shouldOptimizePerformance) {
-            // Simplified mobile rendering
             ctx.strokeStyle = neonColor as any;
-            ctx.globalAlpha = 0.8;
+            ctx.globalAlpha = 0.9;
             ctx.lineWidth = 4 * pulse;
             ctx.shadowBlur = SHADOW_BLUR_MOBILE;
             ctx.stroke();
           } else {
-            // Full quality desktop rendering
-            // Outer glow
             ctx.strokeStyle = neonColor as any;
             ctx.globalAlpha = 0.6;
             ctx.lineWidth = 6 * pulse;
             ctx.shadowBlur = 36;
             ctx.stroke();
-            // Core line
             ctx.globalAlpha = 1;
             ctx.lineWidth = 3 * pulse;
             ctx.shadowBlur = 24;
             ctx.stroke();
           }
-
-          // Bonus label
-          if (pad.bonus2x) {
+          ctx.restore();
+        }
+      } else {
+        // Pads (mobile-optimized rendering)
+        for (const pad of terrain.pads) {
+          const pulse = 1 + 0.6 * Math.sin(elapsed * 4 + pad.xStart * 0.01);
+          const width = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+          const center = (pad.xEnd >= pad.xStart)
+            ? (pad.xStart + pad.xEnd) / 2
+            : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
+          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            // Viewport culling for pads
+            const padLeft = Math.min(pad.xStart, pad.xEnd) + offset;
+            const padRight = Math.max(pad.xStart, pad.xEnd) + offset;
+            if (padRight < viewLeft || padLeft > viewRight) continue;
             ctx.save();
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            ctx.font = `700 12px \"Orbitron\", sans-serif`;
-            ctx.shadowColor = neonColor as any;
-            ctx.shadowBlur = 18;
-            ctx.strokeStyle = neonColor as any;
-            ctx.lineWidth = 2;
-            ctx.globalAlpha = 0.95;
-            ctx.strokeText("2x", center + offset, pad.y + 8);
-            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.moveTo(pad.xStart + offset, pad.y);
+            ctx.lineTo(pad.xEnd + offset, pad.y);
+            if (shouldOptimizePerformance) {
+              // Simplified mobile rendering
+              ctx.strokeStyle = neonColor as any;
+              ctx.globalAlpha = 0.8;
+              ctx.lineWidth = 4 * pulse;
+              ctx.shadowBlur = SHADOW_BLUR_MOBILE;
+              ctx.stroke();
+            } else {
+              // Full quality desktop rendering
+              // Outer glow
+              ctx.strokeStyle = neonColor as any;
+              ctx.globalAlpha = 0.6;
+              ctx.lineWidth = 6 * pulse;
+              ctx.shadowBlur = 36;
+              ctx.stroke();
+              // Core line
+              ctx.globalAlpha = 1;
+              ctx.lineWidth = 3 * pulse;
+              ctx.shadowBlur = 24;
+              ctx.stroke();
+            }
+            // Bonus label
+            if (pad.bonus2x) {
+              ctx.save();
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.font = `700 12px \"Orbitron\", sans-serif`;
+              ctx.shadowColor = neonColor as any;
+              ctx.shadowBlur = 18;
+              ctx.strokeStyle = neonColor as any;
+              ctx.lineWidth = 2;
+              ctx.globalAlpha = 0.95;
+              ctx.strokeText("2x", center + offset, pad.y + 8);
+              ctx.globalAlpha = 1;
+              ctx.restore();
+            }
             ctx.restore();
           }
-
-          ctx.restore();
         }
       }
 
@@ -1451,8 +1521,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Moving hazards
       drawHazards(ctx, hazards, neonColor);
       
-      // Volcanoes and their particles (terrain mode only)
-      if (!isCavernLevel) {
+      // Volcanoes and their particles
+      if (isCavernLevel) {
+        const cavernData = terrain as CavernData;
+        if (cavernData.volcanoes && cavernData.volcanoes.length > 0) {
+          drawVolcanoes(ctx, cavernData.volcanoes, volcanoParticles, neonColor);
+        }
+      } else {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
           drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles, neonColor);
