@@ -6,10 +6,13 @@ import { CavernFXRenderer } from "./CavernFXRenderer";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, Mode } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, Mode, Volcano } from "./types";
 import { generateCavern, CavernData } from "./cavern";
 import { getFixedCavernSeed, isFixedCavernLevel } from "./systems/fixedCavernLevels";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
+import { VolcanoParticle, updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState } from "./systems/volcano";
+import { updateCavernVolcanoParticles, createCavernVolcanoParticles } from "./systems/cavernVolcanoParticles";
+import { getCavernVolcanoConfigForLevel } from "./systems/cavernVolcano";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -246,6 +249,9 @@ export const CavernEngine: React.FC<Props> = ({
     // Particles
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
+    
+    // Volcano particles (separate from regular particles)
+    const volcanoParticles: VolcanoParticle[] = [];
 
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
@@ -294,10 +300,6 @@ export const CavernEngine: React.FC<Props> = ({
       setHud({ altitude, vx, vy, fuel, score, time: elapsed, difficulty });
     };
 
-    // ... rest of game logic would go here (simplified for brevity)
-    // This would include the main game loop, collision detection, rendering, etc.
-    // For now, just set up basic rendering structure
-
     const gameLoop = (now: number) => {
       if (!running) return;
       
@@ -328,6 +330,134 @@ export const CavernEngine: React.FC<Props> = ({
           lowFpsStartTime = null;
         }
       }
+
+      // Update volcanoes if present
+      if (cavern.volcanoes && cavern.volcanoes.length > 0) {
+        const volcanoConfig = getCavernVolcanoConfigForLevel(level);
+        const volcanoUpdate = updateVolcanoes(cavern.volcanoes, volcanoParticles, dt, level);
+        
+        // Handle new particles with cavern-specific physics
+        if (volcanoUpdate.newParticles.length > 0) {
+          volcanoParticles.push(...volcanoUpdate.newParticles);
+        }
+        
+        // Update cavern volcano particles (with wall collision)
+        updateCavernVolcanoParticles(volcanoParticles, dt, cavern);
+        
+        // Play eruption sound
+        if (volcanoUpdate.shouldPlayEruptionSound) {
+          try {
+            // Use existing audio system - adjust volume based on distance to closest volcano
+            if (volcanoUpdate.eruptingVolcanoes.length > 0) {
+              const closestVolcano = volcanoUpdate.eruptingVolcanoes.reduce((closest, v) => {
+                const distToV = Math.abs(x - v.x);
+                const distToClosest = Math.abs(x - closest.x);
+                return distToV < distToClosest ? v : closest;
+              });
+              
+              const distance = Math.abs(x - closestVolcano.x);
+              const volume = Math.max(0.1, 1 - distance / 800); // Fade over 800 pixels
+              audio.current.resume();
+              // Note: We'd need to add a volcano eruption sound effect to AudioManager
+            }
+          } catch (e) {
+            console.warn("Failed to play volcano eruption sound:", e);
+          }
+        }
+        
+        // Check volcano particle collision with lander
+        if (checkVolcanoParticleCollision(volcanoParticles, x, y, 12)) {
+          if (!crashed) {
+            crashed = true;
+            running = false;
+            try { audio.current.setThruster(0); } catch {}
+            
+            // Create explosion debris
+            for (let i = 0; i < 12; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const speed = 20 + Math.random() * 80;
+              debris.push({
+                x: x + (Math.random() - 0.5) * 20,
+                y: y + (Math.random() - 0.5) * 20,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                angle: Math.random() * Math.PI * 2,
+                av: (Math.random() - 0.5) * 8,
+                life: 1,
+                max: 2 + Math.random() * 2,
+                size: 2 + Math.random() * 4,
+                kind: Math.random() < 0.6 ? "plate" : Math.random() < 0.8 ? "rod" : "chip"
+              });
+            }
+            
+            // Create shockwave
+            shockwaves.push({ x, y, life: 1, max: 0.8 });
+            flashT = 0.3;
+            
+            setTimeout(() => {
+              onGameOver({
+                score,
+                landings,
+                cause: "crash",
+                difficulty,
+                elapsed
+              });
+            }, 2000);
+          }
+        }
+      }
+      
+      // Basic rendering
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.scale(dprInit, dprInit);
+      
+      // Render cavern walls
+      if (cavern.walls) {
+        ctx.strokeStyle = neonColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (const wall of cavern.walls) {
+          if (wall.points.length > 0) {
+            ctx.moveTo(wall.points[0].x - cameraX, wall.points[0].y);
+            for (let i = 1; i < wall.points.length; i++) {
+              ctx.lineTo(wall.points[i].x - cameraX, wall.points[i].y);
+            }
+          }
+        }
+        ctx.stroke();
+      }
+      
+      // Render volcanoes and particles
+      if (cavern.volcanoes && cavern.volcanoes.length > 0) {
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        drawVolcanoes(ctx, cavern.volcanoes, volcanoParticles, neonColor);
+        ctx.restore();
+      }
+      
+      // Render landing pads
+      ctx.fillStyle = neonColor;
+      const padY = cavern.startPad.y;
+      const startPadX = cavern.startPad.xStart - cameraX;
+      const startPadWidth = cavern.startPad.xEnd - cavern.startPad.xStart;
+      ctx.fillRect(startPadX, padY, startPadWidth, 4);
+      
+      const endPadX = cavern.endPad.xStart - cameraX;
+      const endPadWidth = cavern.endPad.xEnd - cavern.endPad.xStart;
+      ctx.fillRect(endPadX, cavern.endPad.y, endPadWidth, 4);
+      
+      // Render lander (simple triangle)
+      ctx.save();
+      ctx.translate(x - cameraX, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo(-6, 6);
+      ctx.lineTo(6, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
       
       // Update camera state for FX renderer
       setCameraState({

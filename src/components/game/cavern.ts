@@ -1,7 +1,8 @@
-import { Pad, CollectiblesData } from "./types";
+import { Pad, CollectiblesData, Volcano } from "./types";
 import { CavernBake, CavernBakeResult } from "./systems/cavernBake";
 import { Vec2 } from "./systems/sdf";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
+import { generateCavernVolcanoes } from "./systems/cavernVolcano";
 
 export interface CavernWall {
   points: { x: number; y: number }[];
@@ -23,12 +24,13 @@ export interface CavernData {
   endPad: Pad;
   walls: CavernWall[];
   obstacles: Obstacle[];
-  pads: Pad[]; // compatibility with TerrainData
+  pads: Pad[]; // compatibility with TerrainData - ONLY startPad and endPad
   points: { x: number; y: number }[]; // compatibility with TerrainData for rendering
   checkCollision: (x: number, y: number, radius: number) => boolean;
   getHeightAt: (x: number) => number; // simplified for compatibility
   getPadAt: (x: number) => Pad | null; // compatibility with TerrainData
   collectibles?: CollectiblesData;
+  volcanoes?: Volcano[]; // Added volcano support for level 5+
   isCavern: true;
   // New mesh-baked data
   bakeResult?: CavernBakeResult;
@@ -148,6 +150,29 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
   // Use terrain-based color for cavern collectibles
   const terrainColor = "hsl(var(--primary))"; // Use primary color from design system
   const collectibles = generateCollectibles(seed, context, terrainColor);
+
+  // Generate volcanoes for level 5+
+  const cavernDataTemp: CavernData = {
+    worldWidth,
+    worldHeight,
+    startPad: bakeResult.startPad,
+    endPad: bakeResult.endPad,
+    walls,
+    obstacles,
+    pads: [bakeResult.startPad, bakeResult.endPad],
+    points,
+    checkCollision,
+    getHeightAt,
+    getPadAt,
+    collectibles,
+    isCavern: true,
+    bakeResult,
+    outlinePolylines: bakeResult.outlinePolylines,
+    collisionGrid: bakeResult.collisionGrid,
+    collisionCellSize: bakeResult.collisionCellSize
+  };
+  
+  const volcanoes = generateCavernVolcanoes(seed, level, cavernDataTemp);
   
   return {
     worldWidth,
@@ -156,12 +181,13 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     endPad: bakeResult.endPad,
     walls,
     obstacles,
-    pads: [bakeResult.startPad, bakeResult.endPad], // Only include cavern pads
+    pads: [bakeResult.startPad, bakeResult.endPad], // ONLY start and end pads - no extras
     points,
     checkCollision,
     getHeightAt,
     getPadAt,
     collectibles,
+    volcanoes,
     isCavern: true,
     bakeResult,
     outlinePolylines: bakeResult.outlinePolylines,
