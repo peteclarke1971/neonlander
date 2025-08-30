@@ -141,6 +141,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const cursorManagerRef = useRef<CursorManager | null>(null);
   const [fps, setFps] = useState(0);
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
+  const fpsRef = useRef(0);
 
   // Difficulty settings
   const difficultySettings = {
@@ -912,7 +913,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     // FPS Counter (large, bottom-right)
     ctx.fillStyle = 'hsl(60, 100%, 80%)';
     ctx.font = '48px monospace';
-    const fpsText = `${fps} FPS`;
+    const fpsValue = fpsRef.current || fps;
+    const fpsText = `${Math.round(fpsValue)} FPS`;
     const fpsWidth = ctx.measureText(fpsText).width;
     ctx.fillText(fpsText, WORLD_W - fpsWidth - 40, WORLD_H - 40);
     
@@ -969,14 +971,18 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       // FPS calculation
       const fpsCounter = fpsCounterRef.current;
       fpsCounter.frames++;
-      if (currentTime - fpsCounter.lastTime >= 1000) {
-        setFps(Math.round((fpsCounter.frames * 1000) / (currentTime - fpsCounter.lastTime)));
+      const elapsed = currentTime - fpsCounter.lastTime;
+      if (elapsed >= 1000) {
+        const computedFps = (fpsCounter.frames * 1000) / elapsed;
+        fpsRef.current = computedFps;
+        setFps(Math.round(computedFps));
         fpsCounter.frames = 0;
         fpsCounter.lastTime = currentTime;
       }
       
-      if (dt < 100) { // Cap delta time to prevent large jumps
-        updateGame(Math.min(dt, 16.67)); // Cap at ~60fps equivalent (16.67ms)
+      if (dt < 250) { // Cap delta time to prevent large jumps
+        const clampedDt = Math.min(dt, 33.33); // Allow down to ~30 FPS without slowing time
+        updateGame(clampedDt);
       }
       
       renderGame();
@@ -984,7 +990,10 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       animationId = requestAnimationFrame(gameLoop);
     };
     
-    lastTimeRef.current = performance.now();
+    const now = performance.now();
+    lastTimeRef.current = now;
+    fpsCounterRef.current.frames = 0;
+    fpsCounterRef.current.lastTime = now;
     animationId = requestAnimationFrame(gameLoop);
     
     return () => {
