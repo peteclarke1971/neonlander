@@ -786,19 +786,42 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Draw parallax stars (scaled for 1920x1080)
-    ctx.fillStyle = 'hsl(200, 100%, 80%)';
+    // Draw dense, twinkling starfield (scaled for 1920x1080)
     for (let layer = 0; layer < 3; layer++) {
-      const layerSpeed = [0.4, 0.7, 1.0][layer];
-      const starCount = [120, 80, 50][layer]; // More stars for larger world
+      const layerSpeed = [0.2, 0.5, 0.8][layer];
+      const starCount = [400, 250, 150][layer]; // Much denser starfield
+      const baseAlpha = [0.4, 0.6, 0.8][layer];
       
       for (let i = 0; i < starCount; i++) {
-        const x = (i * 137.5) % WORLD_W;
-        const y = ((state.scrollY * layerSpeed + i * 23.7) % (WORLD_H + 200)) - 100;
-        const size = 1 + layer;
+        // More random distribution
+        const seed = i * 7919; // Large prime for randomness
+        const x = (seed * 1.618033) % WORLD_W; // Golden ratio for even distribution
+        const y = ((state.scrollY * layerSpeed + seed * 0.7853) % (WORLD_H + 200)) - 100;
         
-        ctx.globalAlpha = 0.3 + layer * 0.3;
-        ctx.fillRect(x, y, size, size);
+        // Random size variation
+        const sizeVariation = ((seed * 2.718281) % 1000) / 1000; // e for randomness
+        const size = 0.5 + layer + sizeVariation * 2;
+        
+        // Twinkling effect
+        const twinklePhase = (Date.now() * 0.001 + seed * 0.1) % (Math.PI * 2);
+        const twinkleFactor = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(twinklePhase));
+        const alpha = baseAlpha * twinkleFactor;
+        
+        // Color variation for stars
+        const hue = 200 + ((seed * 1.414213) % 1000) / 1000 * 60; // Vary hue from blue to white
+        const brightness = 70 + ((seed * 1.732050) % 1000) / 1000 * 30;
+        
+        ctx.fillStyle = `hsl(${hue}, 100%, ${brightness}%)`;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(x - size/2, y - size/2, size, size);
+        
+        // Add glow for larger stars
+        if (size > 2) {
+          ctx.shadowColor = `hsl(${hue}, 100%, ${brightness}%)`;
+          ctx.shadowBlur = size;
+          ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+          ctx.shadowBlur = 0;
+        }
       }
     }
     ctx.globalAlpha = 1;
@@ -833,9 +856,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
 
-    // Draw asteroids (scaled for 1920x1080)
+    // Draw asteroids (scaled for 1920x1080) - opaque like main game
     ctx.strokeStyle = 'hsl(200, 100%, 60%)';
     ctx.lineWidth = 3;
+    ctx.shadowColor = 'hsl(200, 100%, 60%)';
+    ctx.shadowBlur = 8;
+    
     for (const asteroid of state.asteroids) {
       ctx.save();
       ctx.translate(asteroid.x, asteroid.y);
@@ -850,9 +876,15 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         }
       }
       ctx.closePath();
+      
+      // Fill to make asteroids opaque (occlude stars behind them)
+      ctx.fillStyle = "black";
+      ctx.fill();
       ctx.stroke();
       ctx.restore();
     }
+    
+    ctx.shadowBlur = 0;
 
     // Draw enemies (scaled for 1920x1080)
     ctx.strokeStyle = 'hsl(300, 100%, 70%)';
