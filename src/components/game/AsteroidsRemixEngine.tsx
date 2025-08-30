@@ -909,10 +909,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.fillText(`Score: ${state.score.toLocaleString()}`, 40, 80);
     ctx.fillText(`Stage: ${state.stage}`, 40, 140);
     
-    // FPS Counter (large, top-left)
+    // FPS Counter (large, bottom-right)
     ctx.fillStyle = 'hsl(60, 100%, 80%)';
     ctx.font = '48px monospace';
-    ctx.fillText(`${fps} FPS`, 40, 200);
+    const fpsText = `${fps} FPS`;
+    const fpsWidth = ctx.measureText(fpsText).width;
+    ctx.fillText(fpsText, WORLD_W - fpsWidth - 40, WORLD_H - 40);
     
     // Lives display (top-right, mini ship icons)
     ctx.save();
@@ -973,8 +975,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         fpsCounter.lastTime = currentTime;
       }
       
-      if (dt < 100) { // Cap delta time
-        updateGame(dt);
+      if (dt < 100) { // Cap delta time to prevent large jumps
+        updateGame(Math.min(dt, 16.67)); // Cap at ~60fps equivalent (16.67ms)
       }
       
       renderGame();
