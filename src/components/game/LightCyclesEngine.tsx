@@ -335,10 +335,10 @@ export const LightCyclesEngine: React.FC<Props> = ({ difficulty, startLevel = 1,
           cycles = cycles.map(c => c.id === "player" ? turnLightCycle(c, 3) : c);
         }
         
-        // Update acceleration based on input
+        // Update acceleration based on input (tripled boost power)
         if (keys.current.accelerate) {
           const settings = DIFFICULTY_SETTINGS[difficulty];
-          const targetSpeed = Math.min(settings.maxSpeed, playerCycle.speed + 120 * dt);
+          const targetSpeed = Math.min(settings.maxSpeed, playerCycle.speed + 360 * dt); // 3x boost power
           cycles = cycles.map(c => c.id === "player" ? { ...c, speed: targetSpeed } : c);
           acceleratingRef.current = true;
         } else {
@@ -379,10 +379,10 @@ export const LightCyclesEngine: React.FC<Props> = ({ difficulty, startLevel = 1,
           }
           prevRotAxis = rot;
           
-          // Gamepad acceleration (thrust)
+          // Gamepad acceleration (thrust) (tripled boost power)
           if (input.thrust > 0.1) {
             const settings = DIFFICULTY_SETTINGS[difficulty];
-            const targetSpeed = Math.min(settings.maxSpeed, playerCycle.speed + 120 * dt);
+            const targetSpeed = Math.min(settings.maxSpeed, playerCycle.speed + 360 * dt); // 3x boost power
             cycles = cycles.map(c => c.id === "player" ? { ...c, speed: targetSpeed } : c);
             acceleratingRef.current = true;
           } else {

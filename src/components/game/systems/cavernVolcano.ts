@@ -26,7 +26,7 @@ export function getCavernVolcanoConfigForLevel(level: number): CavernVolcanoConf
   
   if (baseLevel <= 3) {
     return {
-      power: 0.6,
+      power: 2.4, // 4x power (300% more)
       baseInterval: 8, // 8 seconds between eruptions
       eruptionDuration: 2,
       particleCount: 15,
@@ -34,7 +34,7 @@ export function getCavernVolcanoConfigForLevel(level: number): CavernVolcanoConf
     };
   } else if (baseLevel <= 8) {
     return {
-      power: 0.8,
+      power: 3.2, // 4x power (300% more)
       baseInterval: 6,
       eruptionDuration: 2.5,
       particleCount: 25,
@@ -42,7 +42,7 @@ export function getCavernVolcanoConfigForLevel(level: number): CavernVolcanoConf
     };
   } else if (baseLevel <= 35) {
     return {
-      power: 1.0,
+      power: 4.0, // 4x power (300% more)
       baseInterval: 4,
       eruptionDuration: 3,
       particleCount: 35,
@@ -51,7 +51,7 @@ export function getCavernVolcanoConfigForLevel(level: number): CavernVolcanoConf
   } else {
     // Level 40+ equivalent (level 45+ in caverns)
     return {
-      power: 1.2,
+      power: 4.8, // 4x power (300% more)
       baseInterval: 3,
       eruptionDuration: 3.5,
       particleCount: 45,
