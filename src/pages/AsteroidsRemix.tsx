@@ -1,25 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { AsteroidsEngine } from "@/components/game/AsteroidsEngine";
-import { HomeScreen } from "@/components/game/HomeScreen";
+import { AsteroidsRemixEngine } from "@/components/game/AsteroidsRemixEngine";
 import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
-import { AsteroidsGameOverData } from "@/components/game/types/asteroids";
 import { Button } from "@/components/ui/button";
 import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
 
 type View = "home" | "game" | "gameover";
 
-interface HighScore {
+interface RemixGameOverData {
+  score: number;
+  wave: number;
+  cause: "destroyed" | "abort" | "victory";
+  difficulty: string;
+  elapsed: number;
+  clearTime?: number;
+}
+
+interface RemixHighScore {
   initials: string;
   score: number;
   difficulty: string;
+  clearTime?: number;
   date: number;
 }
 
-const Asteroids: React.FC = () => {
+const AsteroidsRemix: React.FC = () => {
   const [view, setView] = useState<View>("home");
   const [difficulty, setDifficulty] = useState<string>("normal");
-  const [lastResult, setLastResult] = useState<AsteroidsGameOverData | null>(null);
+  const [lastResult, setLastResult] = useState<RemixGameOverData | null>(null);
   const [swapButtons, setSwapButtons] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem("asteroids-swap-buttons");
@@ -28,9 +36,9 @@ const Asteroids: React.FC = () => {
       return false;
     }
   });
-  const [highScores, setHighScores] = useState<HighScore[]>(() => {
+  const [highScores, setHighScores] = useState<RemixHighScore[]>(() => {
     try {
-      const saved = localStorage.getItem("asteroids-high-scores");
+      const saved = localStorage.getItem("asteroids-remix-high-scores");
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -42,17 +50,18 @@ const Asteroids: React.FC = () => {
     setView("game");
   };
 
-  const handleGameOver = (data: AsteroidsGameOverData) => {
+  const handleGameOver = (data: RemixGameOverData) => {
     setLastResult(data);
     setView("gameover");
   };
 
   const handleInitialsSubmit = (initials: string) => {
     if (lastResult) {
-      const newScore: HighScore = {
+      const newScore: RemixHighScore = {
         initials,
         score: lastResult.score,
         difficulty: lastResult.difficulty,
+        clearTime: lastResult.clearTime,
         date: Date.now()
       };
       
@@ -63,7 +72,7 @@ const Asteroids: React.FC = () => {
       setHighScores(updatedScores);
       
       try {
-        localStorage.setItem("asteroids-high-scores", JSON.stringify(updatedScores));
+        localStorage.setItem("asteroids-remix-high-scores", JSON.stringify(updatedScores));
       } catch {}
     }
     
@@ -86,29 +95,25 @@ const Asteroids: React.FC = () => {
     } catch {}
   };
 
-  // Game over view
   const isHighScore = lastResult && (highScores.length < 10 || highScores.some(score => lastResult.score > score.score));
   
-  // Add keyboard handling for game over screen
   useEffect(() => {
-    // Only add listeners when on game over screen and not entering initials
     if (view === "gameover" && !isHighScore) {
       const handleKeyDown = (e: KeyboardEvent) => {
         const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (targetTag === "input" || targetTag === "textarea") return;
         if (e.key === "Enter") {
           e.preventDefault();
-          retryGame(); // Default to retry game
+          retryGame();
         }
       };
       
-      // Gamepad handling (only when not entering initials)
       const handleGamepad = () => {
         const gp = anyGamepad();
         if (gp) {
           const profile = loadProfile(getLastDeviceId());
           const input = readGamepad(gp, profile);
-          if (input.buttons.abort) { // Use abort button for retry
+          if (input.buttons.abort) {
             retryGame();
           }
         }
@@ -136,8 +141,11 @@ const Asteroids: React.FC = () => {
             <h1 className="text-6xl font-bold text-accent drop-shadow-neon animate-pulse">
               NEON ASTEROIDS
             </h1>
+            <h2 className="text-3xl font-bold text-primary">
+              🚀 REMIX MODE
+            </h2>
             <p className="text-xl text-muted-foreground">
-              Blast asteroids in retro vector style
+              Vertical scrolling shooter with boss battles
             </p>
           </div>
 
@@ -154,7 +162,7 @@ const Asteroids: React.FC = () => {
               </Button>
             </div>
             
-            <h2 className="text-2xl font-semibold text-accent">Select Difficulty</h2>
+            <h3 className="text-2xl font-semibold text-accent">Select Difficulty</h3>
             <div className="space-y-2">
               <Button
                 onClick={() => startGame("Easy")}
@@ -178,33 +186,26 @@ const Asteroids: React.FC = () => {
                 size="lg"
                 className="w-48 text-lg"
               >
-                Hard - Fast Asteroids
+                Hard - Snipers
               </Button>
             </div>
 
-            <div className="mt-6">
-              <Button
-                onClick={() => window.location.href = "/asteroids-remix"}
-                variant="default"
-                size="lg"
-                className="w-48 text-lg bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                🚀 REMIX MODE
-              </Button>
-              <p className="text-sm text-muted-foreground mt-2">
-                Vertical scrolling shooter
+            <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                <strong>REMIX Controls:</strong> Left/Right = Strafe • Space = Fire • Auto-scroll
               </p>
             </div>
           </div>
 
           {highScores.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xl font-semibold text-accent">High Scores</h3>
+              <h3 className="text-xl font-semibold text-accent">REMIX High Scores</h3>
               <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-4">
                 {highScores.slice(0, 5).map((score, index) => (
                   <div key={index} className="flex justify-between text-sm font-mono">
                     <span>{score.initials}</span>
                     <span>{score.score.toLocaleString()}</span>
+                    {score.clearTime && <span>{score.clearTime.toFixed(1)}s</span>}
                   </div>
                 ))}
               </div>
@@ -216,7 +217,7 @@ const Asteroids: React.FC = () => {
             variant="ghost"
             className="text-muted-foreground"
           >
-            ← Back to Main Menu
+            ← Back to Asteroids
           </Button>
         </div>
       </div>
@@ -225,7 +226,7 @@ const Asteroids: React.FC = () => {
 
   if (view === "game") {
     return (
-      <AsteroidsEngine
+      <AsteroidsRemixEngine
         difficulty={difficulty}
         onExit={backToHome}
         onGameOver={handleGameOver}
@@ -234,7 +235,6 @@ const Asteroids: React.FC = () => {
     );
   }
 
-  
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
@@ -244,7 +244,8 @@ const Asteroids: React.FC = () => {
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8">
         <div className="space-y-4">
           <h1 className="text-4xl font-bold text-destructive">
-            {lastResult?.cause === "destroyed" ? "SHIP DESTROYED" : "MISSION ABORTED"}
+            {lastResult?.cause === "destroyed" ? "SHIP DESTROYED" : 
+             lastResult?.cause === "victory" ? "MISSION COMPLETE!" : "MISSION ABORTED"}
           </h1>
           
           {lastResult && (
@@ -252,10 +253,15 @@ const Asteroids: React.FC = () => {
               <div className="text-2xl font-bold text-accent">
                 Score: {lastResult.score.toLocaleString()}
               </div>
-              <div className="text-lg">Wave: {lastResult.wave}</div>
+              <div className="text-lg">Stage: {lastResult.wave}</div>
               <div className="text-sm text-muted-foreground">
                 Time: {lastResult.elapsed.toFixed(1)}s
               </div>
+              {lastResult.clearTime && (
+                <div className="text-sm text-accent">
+                  Clear Time: {lastResult.clearTime.toFixed(1)}s
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -283,4 +289,4 @@ const Asteroids: React.FC = () => {
   );
 };
 
-export default Asteroids;
+export default AsteroidsRemix;
