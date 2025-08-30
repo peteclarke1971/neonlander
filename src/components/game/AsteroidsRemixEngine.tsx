@@ -8,7 +8,7 @@ interface RemixPlayer {
   y: number;
   vx: number;
   vy: number;
-  lean: number; // visual lean for strafing
+  visualLean: number; // visual lean for strafing
   invulnerable: number;
   lastShot?: number;
 }
@@ -156,7 +156,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         y: 500,
         vx: 0,
         vy: 0,
-        lean: 0,
+        visualLean: 0,
         invulnerable: 0
       },
       projectiles: [],
@@ -231,8 +231,26 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     return splits;
   };
 
+  // REMIX UFO tuning for less aggressive early game
+  const remixUfoTuning = {
+    Easy: { fireEveryMs: [1200, 2000], accuracy: 0.35, bulletSpeed: 260 },
+    Normal: { fireEveryMs: [900, 1600], accuracy: 0.45, bulletSpeed: 290 },
+    Hard: { fireEveryMs: [800, 1400], accuracy: 0.55, bulletSpeed: 310 }
+  };
+
   // Create enemy
   const createEnemy = (type: "grunt" | "saucer" | "sniper", x: number, y: number): RemixEnemy => {
+    const cfg = remixUfoTuning[difficulty as keyof typeof remixUfoTuning] || remixUfoTuning.Normal;
+    let fireCooldownMin = cfg.fireEveryMs[0];
+    let fireCooldownMax = cfg.fireEveryMs[1];
+    
+    // Apply early-game UFO nerfs for first 45 seconds
+    const state = gameStateRef.current;
+    if (state && state.stageTimer < 45000 && type === "saucer") {
+      fireCooldownMin *= 1.25;
+      fireCooldownMax *= 1.25;
+    }
+
     return {
       x,
       y,
@@ -240,7 +258,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       vy: 50 + mulberry32() * 30,
       type,
       hp: type === "sniper" ? 2 : 1,
-      shootTimer: 1000 + mulberry32() * 2000,
+      shootTimer: fireCooldownMin + mulberry32() * (fireCooldownMax - fireCooldownMin),
       pattern: Math.floor(mulberry32() * 3)
     };
   };
@@ -432,9 +450,9 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const state = gameStateRef.current;
     if (!state || !state.gameStarted || state.gameOver || state.paused) return;
 
-    // Handle input
+    // Handle input - 2-axis strafe
     const gp = anyGamepad();
-    let input = { left: false, right: false, fire: false, thrust: false, abort: false };
+    let input = { left: false, right: false, up: false, down: false, fire: false, thrust: false, abort: false };
     
     if (gp) {
       const profile = loadProfile(getLastDeviceId());
@@ -442,13 +460,17 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       input.abort = gamepadInput.buttons.abort;
       input.left = gamepadInput.buttons.rotateLeft;
       input.right = gamepadInput.buttons.rotateRight;
-      input.fire = gamepadInput.thrust > 0.5; // Use thrust axis as fire button
+      input.up = gamepadInput.thrust > 0.5; // Use thrust as up movement
+      input.down = false; // Add down if needed
+      input.fire = gamepadInput.thrust > 0.5;
       input.thrust = gamepadInput.thrust > 0.5;
     }
 
-    // Keyboard input
+    // Keyboard input - add WASD/arrow up/down
     input.left = input.left || keysRef.current.has('ArrowLeft') || keysRef.current.has('a') || keysRef.current.has('A');
     input.right = input.right || keysRef.current.has('ArrowRight') || keysRef.current.has('d') || keysRef.current.has('D');
+    input.up = input.up || keysRef.current.has('ArrowUp') || keysRef.current.has('w') || keysRef.current.has('W');
+    input.down = input.down || keysRef.current.has('ArrowDown') || keysRef.current.has('s') || keysRef.current.has('S');
     input.fire = input.fire || keysRef.current.has(' ');
     input.abort = input.abort || keysRef.current.has('Escape');
 
@@ -480,27 +502,42 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       player.invulnerable -= dt;
     }
 
-    // Player horizontal movement
-    const accel = 500;
-    const maxSpeed = 260;
+    // Player 2-axis strafe movement
+    const accelX = 500;
+    const accelY = 500;
+    const maxVX = 260;
+    const maxVY = 220;
     const drag = 0.92;
 
-    if (input.left) {
-      player.vx -= accel * dt / 1000;
-    }
-    if (input.right) {
-      player.vx += accel * dt / 1000;
-    }
+    let ax = 0, ay = 0;
+    if (input.left) ax -= accelX;
+    if (input.right) ax += accelX;
+    if (input.up) ay -= accelY;    // move up screen
+    if (input.down) ay += accelY;  // move down screen
 
-    player.vx = Math.max(-maxSpeed, Math.min(maxSpeed, player.vx));
+    player.vx += ax * dt / 1000;
+    player.vy += ay * dt / 1000;
+
+    // Speed clamps
+    player.vx = Math.max(-maxVX, Math.min(maxVX, player.vx));
+    player.vy = Math.max(-maxVY, Math.min(maxVY, player.vy));
+
+    // Drag (frame-rate independent)
     player.vx *= Math.pow(drag, dt / 16.67);
+    player.vy *= Math.pow(drag, dt / 16.67);
+
+    // Integrate position
     player.x += player.vx * dt / 1000;
+    player.y += player.vy * dt / 1000;
 
-    // Clamp player to screen
-    player.x = Math.max(20, Math.min(780, player.x));
+    // Clamp to world bounds (800x600 logical world)
+    const r = 8; // player radius
+    player.x = Math.max(r, Math.min(800 - r, player.x));
+    player.y = Math.max(r, Math.min(600 - r, player.y));
 
-    // Player lean effect
-    player.lean = player.vx * 0.01;
+    // Visual lean proportional to velocity
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+    player.visualLean = clamp(player.vx / maxVX, -1, 1) * 4; // ±4px skew
 
     // Player firing
     if (input.fire) {
@@ -550,19 +587,30 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       enemy.x += enemy.vx * dt / 1000;
       enemy.y += enemy.vy * dt / 1000;
       
-      // Enemy shooting
+      // Enemy shooting with REMIX tuning
       enemy.shootTimer -= dt;
       if (enemy.shootTimer <= 0) {
+        const cfg = remixUfoTuning[difficulty as keyof typeof remixUfoTuning] || remixUfoTuning.Normal;
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        const speed = 200;
+        
+        // Apply accuracy based on difficulty
+        const aimAccuracy = cfg.accuracy;
+        const spread = (1 - aimAccuracy) * Math.PI * 0.25; // up to 45 degree spread
+        const aimAngle = angle + (Math.random() - 0.5) * spread;
+        
+        const speed = cfg.bulletSpeed;
         state.enemyBullets.push({
           x: enemy.x,
           y: enemy.y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
+          vx: Math.cos(aimAngle) * speed,
+          vy: Math.sin(aimAngle) * speed,
           life: 4000
         });
-        enemy.shootTimer = 2000 + Math.random() * 3000;
+        
+        // Reset timer with difficulty-based cooldown
+        const cooldownMin = cfg.fireEveryMs[0];
+        const cooldownMax = cfg.fireEveryMs[1];
+        enemy.shootTimer = cooldownMin + Math.random() * (cooldownMax - cooldownMin);
       }
       
       return enemy.y < 650 && enemy.hp > 0;
@@ -700,6 +748,21 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     }
   };
 
+  // World constants for cover scaling
+  const WORLD_W = 800;
+  const WORLD_H = 600;
+
+  // Apply cover transform (fill screen)
+  const applyCoverTransform = (ctx: CanvasRenderingContext2D, cw: number, ch: number) => {
+    const sx = cw / WORLD_W;
+    const sy = ch / WORLD_H;
+    const scale = Math.max(sx, sy); // COVER (fills screen)
+    const ox = (cw - WORLD_W * scale) * 0.5; // center
+    const oy = (ch - WORLD_H * scale) * 0.5;
+    ctx.setTransform(scale, 0, 0, scale, ox, oy); // draws in world units
+    return { scale, ox, oy };
+  };
+
   // Render game
   const renderGame = () => {
     const canvas = canvasRef.current;
@@ -714,24 +777,28 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    
+    // Apply cover scaling
+    const canvasWidth = rect.width;
+    const canvasHeight = rect.height;
+    const transform = applyCoverTransform(ctx, canvasWidth, canvasHeight);
 
-    // Clear with gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+    // Clear with gradient background (in world coordinates)
+    const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_H);
     gradient.addColorStop(0, 'hsl(240, 100%, 2%)');
     gradient.addColorStop(1, 'hsl(260, 100%, 5%)');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Draw parallax stars
+    // Draw parallax stars (in world coordinates)
     ctx.fillStyle = 'hsl(200, 100%, 80%)';
     for (let layer = 0; layer < 3; layer++) {
       const layerSpeed = [0.4, 0.7, 1.0][layer];
       const starCount = [50, 30, 20][layer];
       
       for (let i = 0; i < starCount; i++) {
-        const x = (i * 137.5) % rect.width;
-        const y = ((state.scrollY * layerSpeed + i * 23.7) % (rect.height + 100)) - 50;
+        const x = (i * 137.5) % WORLD_W;
+        const y = ((state.scrollY * layerSpeed + i * 23.7) % (WORLD_H + 100)) - 50;
         const size = 1 + layer;
         
         ctx.globalAlpha = 0.3 + layer * 0.3;
@@ -744,7 +811,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const player = state.player;
     ctx.save();
     ctx.translate(player.x, player.y);
-    ctx.rotate(player.lean);
+    ctx.rotate(player.visualLean * 0.1); // Convert to radians
     
     // Player ship (simple triangle)
     ctx.strokeStyle = player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 ? 
@@ -815,10 +882,10 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       ctx.strokeRect(-30, -10, 60, 20);
       ctx.restore();
       
-      // Boss health bar
+      // Boss health bar (in world coordinates)
       const barWidth = 300;
       const barHeight = 10;
-      const barX = (rect.width - barWidth) / 2;
+      const barX = (WORLD_W - barWidth) / 2;
       const barY = 30;
       
       ctx.fillStyle = 'hsl(0, 0%, 20%)';
@@ -853,20 +920,20 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.font = '12px monospace';
     ctx.fillText('REMIX', 20, 100);
 
-    // Stage timer
+    // Stage timer (in world coordinates)
     ctx.fillStyle = 'hsl(200, 100%, 80%)';
     ctx.font = '16px monospace';
     const timeText = `Time: ${(state.stageTimer / 1000).toFixed(1)}s`;
     const timeWidth = ctx.measureText(timeText).width;
-    ctx.fillText(timeText, (rect.width - timeWidth) / 2, 30);
+    ctx.fillText(timeText, (WORLD_W - timeWidth) / 2, 30);
 
-    // Boss warning
+    // Boss warning (in world coordinates)
     if (state.bossWarning) {
       ctx.fillStyle = 'hsl(0, 100%, 70%)';
       ctx.font = 'bold 24px monospace';
       const warningText = '⚠ BOSS APPROACHING ⚠';
       const warningWidth = ctx.measureText(warningText).width;
-      ctx.fillText(warningText, (rect.width - warningWidth) / 2, rect.height / 2);
+      ctx.fillText(warningText, (WORLD_W - warningWidth) / 2, WORLD_H / 2);
     }
   };
 
