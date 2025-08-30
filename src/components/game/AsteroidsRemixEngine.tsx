@@ -175,7 +175,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       lives: settings.lives,
       stage: 1,
       scrollY: 0,
-      scrollSpeed: 110 * settings.scrollSpeedMultiplier,
+      scrollSpeed: 220 * settings.scrollSpeedMultiplier,
       stageTimer: 0,
       gameStarted: true,
       gameOver: false,
@@ -204,8 +204,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     return {
       x,
       y,
-      vx: vx + (mulberry32() - 0.5) * 50,
-      vy: vy + 30 + mulberry32() * 40,
+      vx: vx + (mulberry32() - 0.5) * 100,
+      vy: vy + 60 + mulberry32() * 80,
       r,
       angle: 0,
       av: (mulberry32() - 0.5) * 4,
@@ -224,7 +224,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      const speed = 50 + mulberry32() * 50;
+      const speed = 100 + mulberry32() * 100;
       splits.push(createAsteroid(
         asteroid.x,
         asteroid.y,
@@ -262,8 +262,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     return {
       x,
       y,
-      vx: (mulberry32() - 0.5) * 100,
-      vy: 50 + mulberry32() * 30,
+      vx: (mulberry32() - 0.5) * 200,
+      vy: 100 + mulberry32() * 60,
       type,
       hp: type === "sniper" ? 2 : 1,
       shootTimer: fireCooldownMin + mulberry32() * (fireCooldownMax - fireCooldownMin),
@@ -294,11 +294,11 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     // Update scroll speed curve
     if (state.stageTimer < 40000) {
       const progress = state.stageTimer / 40000;
-      state.scrollSpeed = (110 + progress * 40) * settings.scrollSpeedMultiplier;
+      state.scrollSpeed = (220 + progress * 80) * settings.scrollSpeedMultiplier;
     } else if (state.stageTimer < 55000) {
-      state.scrollSpeed = 150 * settings.scrollSpeedMultiplier;
+      state.scrollSpeed = 300 * settings.scrollSpeedMultiplier;
     } else {
-      state.scrollSpeed = 130 * settings.scrollSpeedMultiplier;
+      state.scrollSpeed = 260 * settings.scrollSpeedMultiplier;
     }
 
     // Boss warning
@@ -362,7 +362,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const boss = state.boss;
     
     // Movement - horizontal oscillation
-    boss.vx = Math.sin(state.stageTimer / 2000) * 60;
+    boss.vx = Math.sin(state.stageTimer / 2000) * 120;
     boss.x += boss.vx * dt / 1000;
     boss.y += Math.sin(state.stageTimer / 1000) * 0.5;
 
@@ -386,12 +386,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           // Spiral spread
           for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2 + state.stageTimer / 500;
-            const speed = 200;
+            const speed = 400;
             state.enemyBullets.push({
               x: boss.x,
               y: boss.y + 20,
               vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed + 50,
+              vy: Math.sin(angle) * speed + 100,
               life: 5000
             });
           }
@@ -403,7 +403,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
               x: boss.x + offsetX,
               y: boss.y + 40,
               vx: 0,
-              vy: 300,
+              vy: 600,
               life: 3000
             });
           }
@@ -412,7 +412,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           for (let i = 0; i < 3; i++) {
             const angle = Math.atan2(state.player.y - boss.y, state.player.x - boss.x);
             const spread = (i - 1) * 0.3;
-            const speed = 150;
+            const speed = 300;
             state.enemyBullets.push({
               x: boss.x,
               y: boss.y + 20,
@@ -443,8 +443,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       state.particles.push({
         x,
         y,
-        vx: (mulberry32() - 0.5) * 200,
-        vy: (mulberry32() - 0.5) * 200,
+        vx: (mulberry32() - 0.5) * 400,
+        vy: (mulberry32() - 0.5) * 400,
         life: 1000 + mulberry32() * 1000,
         maxLife: 2000,
         size: 2 + mulberry32() * 4,
@@ -495,11 +495,11 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       player.invulnerable -= dt;
     }
 
-    // Player 2-axis strafe movement (20% speed boost for 1920x1080)
-    const accelX = 600; // +20% from 500
-    const accelY = 600; // +20% from 500
-    const maxVX = 312;  // +20% from 260
-    const maxVY = 264;  // +20% from 220
+    // Player 2-axis strafe movement (doubled speed for compensation)
+    const accelX = 1200; // doubled from 600
+    const accelY = 1200; // doubled from 600
+    const maxVX = 624;   // doubled from 312
+    const maxVY = 528;   // doubled from 264
     const drag = 0.92;
 
     let ax = 0, ay = 0;
@@ -540,7 +540,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           x: player.x,
           y: player.y - 10,
           vx: 0,
-          vy: -600,
+          vy: -1200,
           life: 3000
         });
         state.player.lastShot = now;
