@@ -74,6 +74,7 @@ interface RemixGameOverData {
 
 interface AsteroidsRemixEngineProps {
   difficulty: string;
+  startLevel?: number;
   onExit: () => void;
   onGameOver: (data: RemixGameOverData) => void;
   swapButtons?: boolean;
@@ -85,6 +86,7 @@ if (gameSeed <= 0) gameSeed += 2147483646;
 
 export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   difficulty,
+  startLevel = 1,
   onExit,
   onGameOver,
   swapButtons = false
@@ -132,7 +134,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       particles: [],
       score: 0,
       lives: settings.lives,
-      stage: 1,
+      stage: startLevel,
       scrollY: 0,
       scrollSpeed: 220 * settings.scrollSpeedMultiplier,
       stageTimer: 0,
@@ -412,16 +414,18 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
 
   // Convert dt to seconds for physics systems
     const dtSec = dt / 1000;
+    // Slow down asteroids and enemies by 30% (0.7x speed)
+    const gameplayDtSec = dtSec * 0.7;
     
     // Update systems using new modular functions
-    updateAsteroids(state.asteroids, dtSec, 1920, 1080);
-    updateEnemies(state.enemies, dtSec, 1920, 1080, mulberry32(gameSeed));
-    updatePowerups(state.powerups.items, dtSec, 1080);
+    updateAsteroids(state.asteroids, gameplayDtSec, 1920, 1080);
+    updateEnemies(state.enemies, gameplayDtSec, 1920, 1080, mulberry32(gameSeed));
+    updatePowerups(state.powerups.items, gameplayDtSec, 1080);
     updateActivePowerups(state.powerups.active, dt); // Keep in ms for this one
     
-    // Update boss
+    // Update boss (also slowed down)
     if (state.boss) {
-      const bossProjectiles = updateBoss(state.boss, dtSec, 1920, 1080, state.player.x, state.player.y);
+      const bossProjectiles = updateBoss(state.boss, gameplayDtSec, 1920, 1080, state.player.x, state.player.y);
       // Convert boss projectile life back to ms
       for (const bp of bossProjectiles) {
         bp.life *= 1000;
@@ -690,6 +694,9 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         renderBossHUD(ctx, state.boss, WORLD_W);
       }
       renderPowerupHUD(ctx, state.powerups.active);
+      
+      // Render game HUD
+      renderGameHUD(ctx, state, WORLD_W, WORLD_H);
 
     } catch (error) {
       console.error("Render error:", error);
@@ -722,6 +729,38 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.lineTo(10, 10);
     ctx.closePath();
     ctx.stroke();
+    
+    ctx.restore();
+  };
+
+  // Helper render function for game HUD
+  const renderGameHUD = (ctx: CanvasRenderingContext2D, state: RemixGameState, worldW: number, worldH: number) => {
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px monospace';
+    
+    // Score
+    ctx.fillText(`SCORE: ${state.score.toLocaleString()}`, 20, 40);
+    
+    // Lives
+    ctx.fillText(`LIVES: ${state.lives}`, 20, 70);
+    
+    // Level
+    ctx.fillText(`LEVEL: ${state.stage}`, 20, 100);
+    
+    // Stage timer
+    const stageTime = (state.stageTimer / 1000).toFixed(1);
+    ctx.fillText(`TIME: ${stageTime}s`, 20, 130);
+    
+    // Boss warning
+    if (state.bossWarning) {
+      ctx.save();
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 48px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('BOSS INCOMING!', worldW / 2, worldH / 2);
+      ctx.restore();
+    }
     
     ctx.restore();
   };
@@ -823,7 +862,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       />
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full z-10"
         style={{ touchAction: 'none' }}
       />
     </div>

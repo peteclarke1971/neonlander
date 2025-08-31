@@ -27,6 +27,7 @@ interface RemixHighScore {
 const AsteroidsRemix: React.FC = () => {
   const [view, setView] = useState<View>("home");
   const [difficulty, setDifficulty] = useState<string>("normal");
+  const [selectedLevel, setSelectedLevel] = useState<number>(1);
   const [lastResult, setLastResult] = useState<RemixGameOverData | null>(null);
   const [swapButtons, setSwapButtons] = useState<boolean>(() => {
     try {
@@ -45,8 +46,9 @@ const AsteroidsRemix: React.FC = () => {
     }
   });
 
-  const startGame = (selectedDifficulty: string) => {
+  const startGame = (selectedDifficulty: string, level?: number) => {
     setDifficulty(selectedDifficulty);
+    if (level !== undefined) setSelectedLevel(level);
     setView("game");
   };
 
@@ -162,6 +164,21 @@ const AsteroidsRemix: React.FC = () => {
               </Button>
             </div>
             
+            <h3 className="text-2xl font-semibold text-accent">Select Level</h3>
+            <div className="flex flex-wrap justify-center gap-2 mb-6">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((level) => (
+                <Button
+                  key={level}
+                  onClick={() => setSelectedLevel(level)}
+                  variant={selectedLevel === level ? "default" : "outline"}
+                  size="sm"
+                  className="w-12 h-12"
+                >
+                  {level}
+                </Button>
+              ))}
+            </div>
+
             <h3 className="text-2xl font-semibold text-accent">Select Difficulty</h3>
             <div className="space-y-2">
               <Button
@@ -228,6 +245,7 @@ const AsteroidsRemix: React.FC = () => {
     return (
       <AsteroidsRemixEngine
         difficulty={difficulty}
+        startLevel={selectedLevel}
         onExit={backToHome}
         onGameOver={handleGameOver}
         swapButtons={swapButtons}
