@@ -638,22 +638,152 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Render starfield component
-    return (
-      <div className="relative w-full h-screen bg-background overflow-hidden">
-        <RemixStarfield
-          scrollY={state.scrollY}
-          scrollSpeed={state.scrollSpeed}
-          width={WORLD_W}
-          height={WORLD_H}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{ touchAction: 'none' }}
-        />
-      </div>
-    );
+    // Render asteroids
+    for (const asteroid of state.asteroids) {
+      renderAsteroid(ctx, asteroid);
+    }
+
+    // Render enemies
+    for (const enemy of state.enemies) {
+      renderEnemy(ctx, enemy);
+    }
+
+    // Render power-ups
+    for (const powerup of state.powerups.items) {
+      renderPowerup(ctx, powerup);
+    }
+
+    // Render boss
+    if (state.boss) {
+      renderBoss(ctx, state.boss);
+    }
+
+    // Render player (with shield if active)
+    const hasShieldActive = hasShield(state.powerups.active);
+    renderPlayer(ctx, state.player, hasShieldActive);
+
+    // Render projectiles
+    ctx.fillStyle = '#ffffff';
+    for (const p of state.projectiles) {
+      ctx.fillRect(p.x - 1, p.y - 2, 2, 4);
+    }
+
+    // Render enemy bullets
+    ctx.fillStyle = '#ff4444';
+    for (const p of state.enemyBullets) {
+      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+    }
+
+    // Render boss projectiles
+    ctx.fillStyle = '#ff8800';
+    for (const p of state.bossProjectiles) {
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+
+    // Render particles
+    for (const p of state.particles) {
+      const alpha = p.life / 1000;
+      ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+    }
+  };
+
+  // Helper render functions
+  const renderPlayer = (ctx: CanvasRenderingContext2D, player: any, hasShield: boolean) => {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    
+    // Shield bubble
+    if (hasShield) {
+      ctx.strokeStyle = '#0066ff88';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 25, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // Player ship
+    ctx.strokeStyle = player.invulnerable > 0 ? '#888888' : '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -15);
+    ctx.lineTo(-10, 10);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(10, 10);
+    ctx.closePath();
+    ctx.stroke();
+    
+    ctx.restore();
+  };
+
+  const renderAsteroid = (ctx: CanvasRenderingContext2D, asteroid: any) => {
+    ctx.save();
+    ctx.translate(asteroid.x, asteroid.y);
+    ctx.rotate(asteroid.rotation);
+    ctx.strokeStyle = '#888888';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const radius = asteroid.size === 'giant' ? 72 : asteroid.size === 'large' ? 40 : asteroid.size === 'medium' ? 25 : 15;
+    for (let i = 0; i < asteroid.vertices.length; i++) {
+      const angle = (i / asteroid.vertices.length) * Math.PI * 2;
+      const r = radius * asteroid.vertices[i];
+      const x = Math.cos(angle) * r;
+      const y = Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const renderEnemy = (ctx: CanvasRenderingContext2D, enemy: any) => {
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2;
+    
+    switch (enemy.type) {
+      case 'grunt':
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case 'saucer':
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      default:
+        ctx.beginPath();
+        ctx.rect(-10, -10, 20, 20);
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+  };
+
+  const renderPowerup = (ctx: CanvasRenderingContext2D, powerup: any) => {
+    ctx.save();
+    ctx.translate(powerup.x, powerup.y);
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(-8, -8, 16, 16);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const renderBoss = (ctx: CanvasRenderingContext2D, boss: any) => {
+    ctx.save();
+    ctx.translate(boss.x, boss.y);
+    ctx.strokeStyle = '#ff8800';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.rect(-40, -40, 80, 80);
+    ctx.stroke();
+    ctx.restore();
   };
 
   // Game loop
@@ -679,6 +809,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       if (dt < 250) {
         const clampedDt = Math.min(dt, 33.33);
         updateGame(clampedDt);
+        renderGame();
       }
       
       animationId = requestAnimationFrame(gameLoop);
