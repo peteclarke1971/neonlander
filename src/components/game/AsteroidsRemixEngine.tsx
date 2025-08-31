@@ -410,15 +410,22 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       }
     }
 
+  // Convert dt to seconds for physics systems
+    const dtSec = dt / 1000;
+    
     // Update systems using new modular functions
-    updateAsteroids(state.asteroids, dt, 1920, 1080);
-    updateEnemies(state.enemies, dt, 1920, 1080, mulberry32(gameSeed));
-    updatePowerups(state.powerups.items, dt, 1080);
-    updateActivePowerups(state.powerups.active, dt);
+    updateAsteroids(state.asteroids, dtSec, 1920, 1080);
+    updateEnemies(state.enemies, dtSec, 1920, 1080, mulberry32(gameSeed));
+    updatePowerups(state.powerups.items, dtSec, 1080);
+    updateActivePowerups(state.powerups.active, dt); // Keep in ms for this one
     
     // Update boss
     if (state.boss) {
-      const bossProjectiles = updateBoss(state.boss, dt, 1920, 1080, state.player.x, state.player.y);
+      const bossProjectiles = updateBoss(state.boss, dtSec, 1920, 1080, state.player.x, state.player.y);
+      // Convert boss projectile life back to ms
+      for (const bp of bossProjectiles) {
+        bp.life *= 1000;
+      }
       state.bossProjectiles.push(...bossProjectiles);
     }
 
@@ -603,13 +610,13 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const WORLD_H = 1080;
 
   // Apply cover transform
-  const applyCoverTransform = (ctx: CanvasRenderingContext2D, cw: number, ch: number) => {
+  const applyCoverTransform = (ctx: CanvasRenderingContext2D, cw: number, ch: number, dpr: number) => {
     const sx = cw / WORLD_W;
     const sy = ch / WORLD_H;
     const scale = Math.max(sx, sy);
     const ox = (cw - WORLD_W * scale) * 0.5;
     const oy = (ch - WORLD_H * scale) * 0.5;
-    ctx.setTransform(scale, 0, 0, scale, ox, oy);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, ox * dpr, oy * dpr);
     return { scale, ox, oy };
   };
 
@@ -622,77 +629,79 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    
-    // Apply cover scaling
-    applyCoverTransform(ctx, rect.width, rect.height);
+    try {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      
+      // Apply cover scaling with proper HiDPI support
+      applyCoverTransform(ctx, rect.width, rect.height, dpr);
 
-    // Clear with gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_H);
-    gradient.addColorStop(0, 'hsl(240, 100%, 2%)');
-    gradient.addColorStop(1, 'hsl(260, 100%, 5%)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      // Clear with gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+      gradient.addColorStop(0, 'hsl(240, 100%, 2%)');
+      gradient.addColorStop(1, 'hsl(260, 100%, 5%)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Render asteroids
-    for (const asteroid of state.asteroids) {
-      renderAsteroid(ctx, asteroid);
-    }
+      // Use imported render functions from systems
+      renderAsteroids(ctx, state.asteroids, '#4fc3f7', difficulty);
+      renderEnemies(ctx, state.enemies, '#ff4444');
+      renderMines(ctx, state.mines);
+      renderPowerups(ctx, state.powerups.items);
+      
+      if (state.boss) {
+        renderBoss(ctx, state.boss, '#ff8800');
+      }
 
-    // Render enemies
-    for (const enemy of state.enemies) {
-      renderEnemy(ctx, enemy);
-    }
+      // Render player (with shield if active)
+      const hasShieldActive = hasShield(state.powerups.active);
+      renderPlayer(ctx, state.player, hasShieldActive);
 
-    // Render power-ups
-    for (const powerup of state.powerups.items) {
-      renderPowerup(ctx, powerup);
-    }
+      // Render projectiles
+      ctx.fillStyle = '#ffffff';
+      for (const p of state.projectiles) {
+        ctx.fillRect(p.x - 1, p.y - 2, 2, 4);
+      }
 
-    // Render boss
-    if (state.boss) {
-      renderBoss(ctx, state.boss);
-    }
+      // Render enemy bullets
+      ctx.fillStyle = '#ff4444';
+      for (const p of state.enemyBullets) {
+        ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+      }
 
-    // Render player (with shield if active)
-    const hasShieldActive = hasShield(state.powerups.active);
-    renderPlayer(ctx, state.player, hasShieldActive);
+      // Render boss projectiles
+      ctx.fillStyle = '#ff8800';
+      for (const p of state.bossProjectiles) {
+        ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+      }
 
-    // Render projectiles
-    ctx.fillStyle = '#ffffff';
-    for (const p of state.projectiles) {
-      ctx.fillRect(p.x - 1, p.y - 2, 2, 4);
-    }
+      // Render particles
+      for (const p of state.particles) {
+        const alpha = p.life / 1000;
+        ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+      }
 
-    // Render enemy bullets
-    ctx.fillStyle = '#ff4444';
-    for (const p of state.enemyBullets) {
-      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
-    }
+      // Render HUDs after world content
+      if (state.boss) {
+        renderBossHUD(ctx, state.boss, WORLD_W);
+      }
+      renderPowerupHUD(ctx, state.powerups.active);
 
-    // Render boss projectiles
-    ctx.fillStyle = '#ff8800';
-    for (const p of state.bossProjectiles) {
-      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
-    }
-
-    // Render particles
-    for (const p of state.particles) {
-      const alpha = p.life / 1000;
-      ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+    } catch (error) {
+      console.error("Render error:", error);
     }
   };
 
-  // Helper render functions
-  const renderPlayer = (ctx: CanvasRenderingContext2D, player: any, hasShield: boolean) => {
+  // Helper render function for player
+  const renderPlayer = (ctx: CanvasRenderingContext2D, player: RemixPlayer, hasShield: boolean) => {
     ctx.save();
     ctx.translate(player.x, player.y);
-    ctx.rotate(player.angle);
+    // Use visual lean instead of rotation for subtle tilt
+    ctx.rotate(player.visualLean * 0.1);
     
     // Shield bubble
     if (hasShield) {
@@ -714,75 +723,6 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.closePath();
     ctx.stroke();
     
-    ctx.restore();
-  };
-
-  const renderAsteroid = (ctx: CanvasRenderingContext2D, asteroid: any) => {
-    ctx.save();
-    ctx.translate(asteroid.x, asteroid.y);
-    ctx.rotate(asteroid.rotation);
-    ctx.strokeStyle = '#888888';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const radius = asteroid.size === 'giant' ? 72 : asteroid.size === 'large' ? 40 : asteroid.size === 'medium' ? 25 : 15;
-    for (let i = 0; i < asteroid.vertices.length; i++) {
-      const angle = (i / asteroid.vertices.length) * Math.PI * 2;
-      const r = radius * asteroid.vertices[i];
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  const renderEnemy = (ctx: CanvasRenderingContext2D, enemy: any) => {
-    ctx.save();
-    ctx.translate(enemy.x, enemy.y);
-    ctx.strokeStyle = '#ff4444';
-    ctx.lineWidth = 2;
-    
-    switch (enemy.type) {
-      case 'grunt':
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.stroke();
-        break;
-      case 'saucer':
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        break;
-      default:
-        ctx.beginPath();
-        ctx.rect(-10, -10, 20, 20);
-        ctx.stroke();
-    }
-    
-    ctx.restore();
-  };
-
-  const renderPowerup = (ctx: CanvasRenderingContext2D, powerup: any) => {
-    ctx.save();
-    ctx.translate(powerup.x, powerup.y);
-    ctx.strokeStyle = '#00ff88';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.rect(-8, -8, 16, 16);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  const renderBoss = (ctx: CanvasRenderingContext2D, boss: any) => {
-    ctx.save();
-    ctx.translate(boss.x, boss.y);
-    ctx.strokeStyle = '#ff8800';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.rect(-40, -40, 80, 80);
-    ctx.stroke();
     ctx.restore();
   };
 
