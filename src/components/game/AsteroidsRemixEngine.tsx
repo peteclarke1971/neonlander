@@ -3,6 +3,12 @@ import { AudioManager } from "./AudioManager";
 import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
 import { CursorManager } from "@/lib/cursorManager";
 import { DEFAULT_CURSOR_CONFIG } from "@/lib/cursorConfig";
+import { RemixStarfield } from "./RemixStarfield";
+import { REMIX_STAGES, getStageConfig, mulberry32, mix } from "./systems/stageConfig";
+import { RemixEnemy, createEnemy, updateEnemies, renderEnemies, Mine, createMine, updateMines, renderMines } from "./systems/remixEnemies";
+import { PowerupItem, ActivePowerup, PowerupState, createPowerup, spawnPowerupInSafeLane, updatePowerups, activatePowerup, updateActivePowerups, getWeaponMultiplier, hasShield, checkPowerupCollision, renderPowerups, renderPowerupHUD } from "./systems/powerups";
+import { RemixAsteroid, createAsteroid, splitAsteroid, updateAsteroids, spawnAsteroidSafely, getAsteroidScore, checkAsteroidCollision, renderAsteroids } from "./systems/remixAsteroids";
+import { RemixBoss, createBoss, updateBoss, renderBoss, renderBossHUD, BossProjectile } from "./systems/remixBosses";
 
 // Remix-specific types
 interface RemixPlayer {
@@ -23,49 +29,20 @@ interface RemixProjectile {
   life: number;
 }
 
-interface RemixAsteroid {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-  angle: number;
-  av: number;
-  size: "large" | "medium" | "small";
-  points: { x: number; y: number }[];
-}
+// Using RemixAsteroid from systems/remixAsteroids.ts
 
-interface RemixEnemy {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  type: "grunt" | "saucer" | "sniper";
-  hp: number;
-  shootTimer: number;
-  pattern?: number;
-}
-
-interface RemixBoss {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  hp: number;
-  maxHp: number;
-  pattern: number;
-  patternTimer: number;
-  attackTimer: number;
-  telegraphTimer: number;
-}
+// Using RemixEnemy and RemixBoss from systems
 
 interface RemixGameState {
   player: RemixPlayer;
   projectiles: RemixProjectile[];
   enemyBullets: RemixProjectile[];
+  bossProjectiles: BossProjectile[];
   asteroids: RemixAsteroid[];
   enemies: RemixEnemy[];
   boss: RemixBoss | null;
+  mines: Mine[];
+  powerups: PowerupState;
   particles: Array<{
     x: number;
     y: number;
@@ -87,6 +64,7 @@ interface RemixGameState {
   paused: boolean;
   victory: boolean;
   bossWarning: boolean;
+  lastPowerupSpawn: number;
 }
 
 interface RemixGameOverData {
@@ -105,27 +83,11 @@ interface AsteroidsRemixEngineProps {
   swapButtons?: boolean;
 }
 
-// Mulberry32 PRNG for seeded randomness
-let seed = Date.now() % 2147483647;
-if (seed <= 0) seed += 2147483646;
+// Use seeded randomness from stageConfig
+let gameSeed = Date.now() % 2147483647;
+if (gameSeed <= 0) gameSeed += 2147483646;
 
-const mulberry32 = () => {
-  let t = seed += 0x6D2B79F5;
-  t = Math.imul(t ^ t >>> 15, t | 1);
-  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-  return ((t ^ t >>> 14) >>> 0) / 4294967296;
-};
-
-const mix = (...args: (string | number)[]) => {
-  const str = args.join('|');
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-};
+const rng = mulberry32(gameSeed);
 
 export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   difficulty,
@@ -158,8 +120,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     
     return {
       player: {
-        x: 960,  // Center of 1920px world
-        y: 900,  // Near bottom of 1080px world
+        x: 960,
+        y: 900,
         vx: 0,
         vy: 0,
         visualLean: 0,
@@ -167,9 +129,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       },
       projectiles: [],
       enemyBullets: [],
+      bossProjectiles: [],
       asteroids: [],
       enemies: [],
       boss: null,
+      mines: [],
+      powerups: { items: [], active: [], shieldHits: 0 },
       particles: [],
       score: 0,
       lives: settings.lives,
@@ -181,7 +146,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       gameOver: false,
       paused: false,
       victory: false,
-      bossWarning: false
+      bossWarning: false,
+      lastPowerupSpawn: 0
     };
   }, [settings.lives, settings.scrollSpeedMultiplier]);
 
