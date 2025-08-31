@@ -204,11 +204,11 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     return {
       x,
       y,
-      vx: vx + (mulberry32() - 0.5) * 100,
-      vy: vy + 60 + mulberry32() * 80,
+      vx: vx + (mulberry32() - 0.5) * 200, // Doubled from 100
+      vy: vy + 120 + mulberry32() * 160,   // Doubled from 60+80
       r,
       angle: 0,
-      av: (mulberry32() - 0.5) * 4,
+      av: (mulberry32() - 0.5) * 8,       // Doubled from 4
       size,
       points
     };
@@ -262,8 +262,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     return {
       x,
       y,
-      vx: (mulberry32() - 0.5) * 200,
-      vy: 100 + mulberry32() * 60,
+      vx: (mulberry32() - 0.5) * 400,     // Doubled from 200
+      vy: 200 + mulberry32() * 120,       // Doubled from 100+60
       type,
       hp: type === "sniper" ? 2 : 1,
       shootTimer: fireCooldownMin + mulberry32() * (fireCooldownMax - fireCooldownMin),
@@ -362,7 +362,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const boss = state.boss;
     
     // Movement - horizontal oscillation
-    boss.vx = Math.sin(state.stageTimer / 2000) * 120;
+    boss.vx = Math.sin(state.stageTimer / 2000) * 240; // Doubled from 120
     boss.x += boss.vx * dt / 1000;
     boss.y += Math.sin(state.stageTimer / 1000) * 0.5;
 
@@ -438,17 +438,41 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const createParticles = (x: number, y: number, count: number, color: string) => {
     const state = gameStateRef.current;
     if (!state) return;
-
+    
     for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 100 + Math.random() * 200; // Doubled from 50+100
       state.particles.push({
         x,
         y,
-        vx: (mulberry32() - 0.5) * 400,
-        vy: (mulberry32() - 0.5) * 400,
-        life: 1000 + mulberry32() * 1000,
-        maxLife: 2000,
-        size: 2 + mulberry32() * 4,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1000 + Math.random() * 500,
+        maxLife: 1500,
+        size: 2 + Math.random() * 3,
         color
+      });
+    }
+  };
+
+  // Create massive explosion like in main asteroids
+  const spawnExplosion = (x: number, y: number) => {
+    const state = gameStateRef.current;
+    if (!state) return;
+    
+    // Massive particle burst - same as main asteroids
+    for (let i = 0; i < 220; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = 240 + Math.random() * 520; // Doubled speeds for remix
+      state.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: 800 + Math.random() * 700,
+        maxLife: 1500,
+        size: 1 + Math.random() * 4,
+        color: `hsla(${180 + Math.random() * 20},100%,60%,1)`
       });
     }
   };
@@ -495,11 +519,11 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       player.invulnerable -= dt;
     }
 
-    // Player 2-axis strafe movement (doubled speed for compensation)
-    const accelX = 1200; // doubled from 600
-    const accelY = 1200; // doubled from 600
-    const maxVX = 624;   // doubled from 312
-    const maxVY = 528;   // doubled from 264
+    // Player movement (scaled for 1920x1080, doubled for remix speed)
+    const accelX = 2400; // doubled from 1200 (originally 600)
+    const accelY = 1600; // doubled from 800 (originally 600, but corrected to accelY)
+    const maxVX = 1200;  // doubled from 600 (originally 312)
+    const maxVY = 800;   // doubled from 400 (originally 264)
     const drag = 0.92;
 
     let ax = 0, ay = 0;
@@ -630,8 +654,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           state.enemyBullets.splice(i, 1);
           state.lives--;
           player.invulnerable = 2000;
-          createParticles(player.x, player.y, 10, '#ff6b6b');
-          audioRef.current?.abort();
+          spawnExplosion(player.x, player.y); // Use same explosion as main asteroids
+          audioRef.current?.explosion(); // Use explosion sound instead of abort
           
           if (state.lives <= 0) {
             onGameOver({
@@ -653,8 +677,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         if (checkCollision(player.x, player.y, 15, asteroid.x, asteroid.y, asteroid.r)) { // Scaled collision
           state.lives--;
           player.invulnerable = 2000;
-          createParticles(player.x, player.y, 10, '#ff6b6b');
-          audioRef.current?.abort();
+          spawnExplosion(player.x, player.y); // Use same explosion as main asteroids
+          audioRef.current?.explosion(); // Use explosion sound instead of abort
           
           if (state.lives <= 0) {
             onGameOver({
@@ -688,7 +712,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           state.asteroids.push(...splits);
           
           createParticles(asteroid.x, asteroid.y, 8, '#4fc3f7');
-          audioRef.current?.explosion();
+          audioRef.current?.explosion(); // Keep asteroid destruction sound
           break;
         }
       }
@@ -786,44 +810,79 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-    // Draw dense, twinkling starfield (scaled for 1920x1080)
+    // Draw rich twinkling starfield with shooting stars (based on CavernStarfield)
     for (let layer = 0; layer < 3; layer++) {
-      const layerSpeed = [0.2, 0.5, 0.8][layer];
-      const starCount = [400, 250, 150][layer]; // Much denser starfield
-      const baseAlpha = [0.4, 0.6, 0.8][layer];
+      const layerSpeed = [0.3, 0.6, 1.0][layer];
+      const starCount = [320, 180, 80][layer]; // Dense starfield like cavern
+      const baseAlpha = [0.4, 0.7, 0.9][layer];
       
       for (let i = 0; i < starCount; i++) {
-        // More random distribution
-        const seed = i * 7919; // Large prime for randomness
-        const x = (seed * 1.618033) % WORLD_W; // Golden ratio for even distribution
-        const y = ((state.scrollY * layerSpeed + seed * 0.7853) % (WORLD_H + 200)) - 100;
+        // Better random distribution using prime multiples
+        const seed = (i * 7919 + layer * 2311) % 65536;
+        const x = (seed * 1.618033988749) % WORLD_W;
+        const y = ((state.scrollY * layerSpeed + seed * 0.7853981634) % (WORLD_H + 400)) - 200;
         
-        // Random size variation
-        const sizeVariation = ((seed * 2.718281) % 1000) / 1000; // e for randomness
-        const size = 0.5 + layer + sizeVariation * 2;
+        // Size with more variation for distant stars
+        const sizeBase = [0.8, 1.5, 2.2][layer];
+        const sizeVar = ((seed * 2.718281828) % 1000) / 1000;
+        const size = sizeBase + sizeVar * 1.5;
         
-        // Twinkling effect
-        const twinklePhase = (Date.now() * 0.001 + seed * 0.1) % (Math.PI * 2);
-        const twinkleFactor = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(twinklePhase));
-        const alpha = baseAlpha * twinkleFactor;
+        // Rich twinkling with varying frequencies
+        const twinkleSpeed = [0.8, 1.2, 1.8][layer];
+        const twinklePhase = (Date.now() * 0.001 * twinkleSpeed + seed * 0.314159) % (Math.PI * 2);
+        const twinkle = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(twinklePhase));
+        const alpha = baseAlpha * twinkle;
         
-        // Color variation for stars
-        const hue = 200 + ((seed * 1.414213) % 1000) / 1000 * 60; // Vary hue from blue to white
-        const brightness = 70 + ((seed * 1.732050) % 1000) / 1000 * 30;
+        // Color variation - blue to white spectrum
+        const hue = 200 + ((seed * 1.414213562) % 1000) / 1000 * 80;
+        const sat = 60 + ((seed * 1.732050808) % 1000) / 1000 * 40;
+        const brightness = 60 + ((seed * 1.41421356237) % 1000) / 1000 * 40;
         
-        ctx.fillStyle = `hsl(${hue}, 100%, ${brightness}%)`;
+        ctx.fillStyle = `hsl(${hue}, ${sat}%, ${brightness}%)`;
         ctx.globalAlpha = alpha;
+        
+        // Draw star with shadow/glow
+        if (size > 1.8) {
+          ctx.shadowColor = `hsl(${hue}, ${sat}%, ${brightness}%)`;
+          ctx.shadowBlur = size * 1.5;
+        }
         ctx.fillRect(x - size/2, y - size/2, size, size);
         
-        // Add glow for larger stars
-        if (size > 2) {
-          ctx.shadowColor = `hsl(${hue}, 100%, ${brightness}%)`;
-          ctx.shadowBlur = size;
-          ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+        if (size > 1.8) {
           ctx.shadowBlur = 0;
         }
       }
     }
+    
+    // Add shooting stars
+    const shootingStarSeed = Math.floor(Date.now() / 8000) + state.stage; // Change every 8 seconds
+    if (shootingStarSeed % 3 === 0) { // 1 in 3 chance
+      const starPhase = (Date.now() % 8000) / 8000;
+      if (starPhase < 0.6) { // Active for 60% of cycle
+        const startX = 100 + (shootingStarSeed * 1.618) % (WORLD_W - 200);
+        const startY = -50 + starPhase * WORLD_H * 0.3;
+        const endX = startX + 300;
+        const endY = startY + 400;
+        
+        // Draw shooting star trail
+        const alpha = Math.sin(starPhase * Math.PI) * 0.8;
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = 'hsl(60, 100%, 80%)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        
+        // Bright head
+        ctx.fillStyle = 'hsl(60, 100%, 90%)';
+        ctx.shadowColor = 'hsl(60, 100%, 80%)';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(endX - 2, endY - 2, 4, 4);
+        ctx.shadowBlur = 0;
+      }
+    }
+    
     ctx.globalAlpha = 1;
 
     // Draw player
@@ -950,21 +1009,52 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     const fpsWidth = ctx.measureText(fpsText).width;
     ctx.fillText(fpsText, WORLD_W - fpsWidth - 40, WORLD_H - 40);
     
-    // Lives display (top-right, mini ship icons)
+    // Lives display - EXACT same as main asteroids (top-right with card background)
     ctx.save();
-    ctx.translate(WORLD_W - 120, 120);
+    
+    // Draw backdrop card (like main asteroids HUD)
+    const cardX = WORLD_W - 160;
+    const cardY = 40;
+    const cardW = 120;
+    const cardH = 80;
+    
+    // Card background with border
+    ctx.fillStyle = 'hsla(0, 0%, 8%, 0.6)'; // Same as main asteroids card bg
+    ctx.strokeStyle = 'hsla(0, 0%, 20%, 0.6)'; // Same border
+    ctx.lineWidth = 1;
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+    ctx.strokeRect(cardX, cardY, cardW, cardH);
+    
+    // "LIVES" label
+    ctx.fillStyle = 'hsl(0, 0%, 65%)'; // muted-foreground color
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('LIVES', cardX + cardW/2, cardY + 20);
+    
+    // Mini lander icons (same as AsteroidsHUD)
+    ctx.translate(cardX + cardW/2, cardY + 50);
+    const spacing = Math.min(20, (cardW - 20) / Math.max(1, state.lives - 1));
+    const startX = -(state.lives - 1) * spacing / 2;
+    
     for (let i = 0; i < state.lives; i++) {
       ctx.save();
-      ctx.translate(i * -100, 0);
-      ctx.scale(0.6, 0.6);
-      ctx.strokeStyle = 'hsl(120, 100%, 70%)';
-      ctx.lineWidth = 3;
+      ctx.translate(startX + i * spacing, 0);
+      ctx.scale(1.2, 1.2); // Slightly larger like the main game
+      ctx.strokeStyle = 'hsl(200, 100%, 60%)'; // accent color
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(0, -24);
-      ctx.lineTo(-16, 16);
-      ctx.lineTo(0, 8);
-      ctx.lineTo(16, 16);
+      // Mini lander shape (same as MiniLander component)
+      ctx.moveTo(0, -6);    // Top point
+      ctx.lineTo(4, 2);     // Right bottom
+      ctx.lineTo(-4, 2);    // Left bottom
       ctx.closePath();
+      ctx.stroke();
+      // Landing legs
+      ctx.beginPath();
+      ctx.moveTo(-2, 1);
+      ctx.lineTo(-5, 3);
+      ctx.moveTo(2, 1);
+      ctx.lineTo(5, 3);
       ctx.stroke();
       ctx.restore();
     }
