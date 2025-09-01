@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AsteroidsColorHUD } from "./AsteroidsColorHUD";
 import { AudioManager } from "@/components/game/AudioManager";
 import { ColorOrderGameOverData, ColorOrderHUDSnapshot, ColorOrderGameState, ColorProjectile } from "./types/asteroidsColor";
 import {
@@ -27,7 +28,7 @@ import {
   drawUFOs,
   drawUFOBullets
 } from "./systems/ufo";
-import { UFO_DIFFICULTY_PRESETS } from "./systems/ufoConfig";
+import { UFO_DIFFICULTY_PRESETS, getScaledConfig } from "./systems/ufoConfig";
 import type { UFOState, UFOEvents } from "./types/ufo";
 
 interface Props {
@@ -95,6 +96,11 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const lastPauseDown = useRef(false);
 
+  // Touch controls state  
+  const touchInputRef = useRef({ left: false, right: false, up: false, down: false, fire: false });
+  const dpadTouchRef = useRef<{ id: number; startX: number; startY: number } | null>(null);
+  const fireTouchRef = useRef<number | null>(null);
+
   // Resize canvas
   useEffect(() => {
     const resize = () => {
@@ -103,18 +109,69 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       const parent = containerRef.current!;
       const w = parent.clientWidth;
       const h = parent.clientHeight;
-      c.width = w * dpr;
-      c.height = h * dpr;
-      c.style.width = w + "px";
-      c.style.height = h + "px";
-      
-      const ctx = c.getContext("2d")!;
-      ctx.scale(dpr, dpr);
+      c.width = Math.floor(w * dpr);
+      c.height = Math.floor(h * dpr);
+      c.style.width = `${w}px`;
+      c.style.height = `${h}px`;
     };
-    
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
+  }, []);
+
+  // Keyboard controls
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent, down: boolean) => {
+      const k = e.key.toLowerCase();
+      if (["a", "arrowleft"].includes(k)) keys.current.left = down;
+      if (["d", "arrowright"].includes(k)) keys.current.right = down;
+      if (["w", "arrowup"].includes(k)) keys.current.thrust = down;
+      if (k === " ") { 
+        e.preventDefault();
+        keys.current.fire = down; 
+      }
+      if (k === "escape" && down) {
+        e.preventDefault();
+        setPaused(!paused);
+      }
+      
+      if (down) audio.current.resume();
+    };
+    const kd = (e: KeyboardEvent) => { onKey(e, true); try { audio.current.resume(); } catch {} };
+    const ku = (e: KeyboardEvent) => onKey(e, false);
+    window.addEventListener("keydown", kd);
+    window.addEventListener("keyup", ku);
+    return () => { window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); };
+  }, [paused]);
+
+  // Ensure UI mode is off during gameplay
+  useEffect(() => { try { setUiMode(false); } catch {} }, []);
+
+  // Cursor management setup
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const config = loadCursorConfig();
+    cursorManager.current = new CursorManager(config);
+    
+    const isGameplayFn = () => !paused;
+    cursorManager.current.attach(containerRef.current, isGameplayFn, 'global');
+    cursorManager.current.forceHideCursor();
+    
+    return () => {
+      cursorManager.current?.detach();
+      cursorManager.current = null;
+    };
+  }, []);
+
+  // Detect touch-capable devices
+  useEffect(() => {
+    try {
+      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
+      setIsTouch(!!hasTouch);
+    } catch {
+      setIsTouch(false);
+    }
   }, []);
 
   // Game state
@@ -129,92 +186,606 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     target: "green",
     gameStarted: false,
     gameOver: false,
-    paused: false
+    paused: false,
+    elapsed: 0
   });
 
   const worldSeed = useRef(Math.floor(Math.random() * 1000000));
-  const ufoState = useRef<UFOState>(createUFOState(UFO_DIFFICULTY_PRESETS.normal, worldSeed.current, "asteroids-color"));
   const gameStartTime = useRef(Date.now());
   const lastTime = useRef(0);
   const lastFireTime = useRef(0);
   const frameCount = useRef(0);
 
-  // Game loop
-  useEffect(() => {
-    let animationId: number;
+  // Progressive UFO difficulty based on wave
+  const getUFOConfig = () => {
+    let baseConfig = UFO_DIFFICULTY_PRESETS.easy;
     
-    const gameLoop = (timestamp: number) => {
+    // No UFOs in first 2 waves for Easy/Normal
+    if ((difficulty === "Easy" || difficulty === "Normal") && game.current.wave <= 2) {
+      return { ...baseConfig, spawnInterval: 999999 }; // Effectively disable
+    }
+    
+    // Start with easy UFOs and gradually increase difficulty
+    if (game.current.wave <= 4) {
+      baseConfig = UFO_DIFFICULTY_PRESETS.easy;
+    } else if (game.current.wave <= 8) {
+      baseConfig = UFO_DIFFICULTY_PRESETS.normal;
+    } else {
+      baseConfig = UFO_DIFFICULTY_PRESETS.hard;
+    }
+    
+    // Apply scaling based on score and wave
+    return getScaledConfig(baseConfig, game.current.score, game.current.wave);
+  };
+
+  const ufoState = useRef<UFOState>(createUFOState(getUFOConfig(), worldSeed.current, "asteroids-color"));
+
+  // Main game loop with enhanced starfield
+  useEffect(() => {
+    if (paused) return;
+
+    const c = canvasRef.current!;
+    const ctx = c.getContext("2d")!;
+    let raf: number;
+
+    // Enhanced starfield with shooting stars (copied from AsteroidsEngine)
+    type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
+    type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
+    type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+    type Shockwave = { x: number; y: number; life: number; max: number };
+    type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; color: string };
+    const stars: Star[] = [];
+    const shooting: Shooting[] = [];
+    const particles: Particle[] = [];
+    const shockwaves: Shockwave[] = [];
+    const debris: Debris[] = [];
+    let flashT = 0;
+    let cameraShake = 0;
+    let nextShooting = 0.6 + Math.random() * 1.6;
+
+    const dprInit = Math.min(2, window.devicePixelRatio || 1);
+    const pxW = c.width / dprInit;
+    const pxH = c.height / dprInit;
+    // Screen-space static stars covering full screen
+    for (let i = 0; i < 320; i++) {
+      const sx = Math.random() * pxW;
+      const sy = Math.random() * pxH;
+      const bright = Math.random() < 0.15;
+      stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: bright ? 0.95 : 0.6, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
+    }
+
+    const spawnShooting = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const viewWpx = c.width / dpr;
+      const viewHpx = c.height / dpr;
+      
+      const side = Math.floor(Math.random() * 4);
+      let sx, sy, svx, svy;
+      
+      const speed = 200 + Math.random() * 300;
+      if (side === 0) { // top
+        sx = Math.random() * viewWpx;
+        sy = -20;
+        svx = (Math.random() - 0.5) * speed * 0.5;
+        svy = speed;
+      } else if (side === 1) { // right
+        sx = viewWpx + 20;
+        sy = Math.random() * viewHpx;
+        svx = -speed;
+        svy = (Math.random() - 0.5) * speed * 0.5;
+      } else if (side === 2) { // bottom
+        sx = Math.random() * viewWpx;
+        sy = viewHpx + 20;
+        svx = (Math.random() - 0.5) * speed * 0.5;
+        svy = -speed;
+      } else { // left
+        sx = -20;
+        sy = Math.random() * viewHpx;
+        svx = speed;
+        svy = (Math.random() - 0.5) * speed * 0.5;
+      }
+      
+      shooting.push({ x: sx, y: sy, vx: svx, vy: svy, life: 0, max: 1.2 + Math.random() * 0.8 });
+    };
+
+    const spawnExplosion = (x: number, y: number) => {
+      // Add screen flash and camera shake
+      flashT = 0.28;
+      cameraShake = 24;
+      
+      // Spawn explosion particles
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const speed = 80 + Math.random() * 60;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0,
+          max: 0.8 + Math.random() * 0.4,
+          color: i % 2 ? "hsl(315, 100%, 70%)" : "hsl(210, 100%, 70%)"
+        });
+      }
+      
+      // Add shockwave
+      shockwaves.push({ x, y, life: 0, max: 0.8 });
+    };
+
+    const spawnAsteroidDebris = (asteroid: any, impactX: number, impactY: number) => {
+      const colors = ["hsl(120, 100%, 70%)", "hsl(60, 100%, 70%)", "hsl(15, 100%, 70%)"];
+      const debrisColor = colors[Math.floor(Math.random() * colors.length)];
+      
+      // Spawn 8-12 debris pieces at the impact point
+      const count = 8 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 40 + Math.random() * 80;
+        const size = 2 + Math.random() * 4;
+        
+        debris.push({
+          x: impactX,
+          y: impactY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          angle: Math.random() * Math.PI * 2,
+          av: (Math.random() - 0.5) * 8,
+          life: 0,
+          max: 2 + Math.random() * 2,
+          size,
+          color: debrisColor
+        });
+      }
+    };
+
+    const loop = (timestamp: number) => {
       if (!game.current.gameStarted || game.current.gameOver) {
-        animationId = requestAnimationFrame(gameLoop);
+        raf = requestAnimationFrame(loop);
         return;
       }
 
-      // Delta time calculation with 30% slowdown for everything except player and bullets
+      // Delta time calculation
       let dt = lastTime.current ? (timestamp - lastTime.current) / 1000 : 0;
       dt = Math.min(dt, 1/30); // Cap to 30fps minimum
       lastTime.current = timestamp;
+      game.current.elapsed = (timestamp - gameStartTime.current) / 1000;
 
       if (paused) {
-        animationId = requestAnimationFrame(gameLoop);
+        raf = requestAnimationFrame(loop);
         return;
       }
 
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      const ctx = canvas.getContext("2d")!;
-      const { width: worldWidth, height: worldHeight, scale, viewWidth, viewHeight } = getWorldDimensionsAndScale(canvas.width, canvas.height);
+      const { width: WORLD_WIDTH, height: WORLD_HEIGHT, scale, viewWidth, viewHeight } = getWorldDimensionsAndScale(canvas.width, canvas.height);
+      const w = viewWidth;
+      const h = viewHeight;
 
       // Clear screen
       ctx.fillStyle = "black";
-      ctx.fillRect(0, 0, viewWidth, viewHeight);
+      ctx.fillRect(0, 0, w, h);
 
-      // Apply world scaling and centering
+      // Apply world scaling and centering with camera shake
       ctx.save();
-      const offsetX = (viewWidth - worldWidth * scale) / 2;
-      const offsetY = (viewHeight - worldHeight * scale) / 2;
-      ctx.translate(offsetX, offsetY);
+      const offsetX = (w - WORLD_WIDTH * scale) / 2;
+      const offsetY = (h - WORLD_HEIGHT * scale) / 2;
+      const shakeX = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
+      const shakeY = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
+      ctx.translate(offsetX + shakeX, offsetY + shakeY);
       ctx.scale(scale, scale);
 
-      // Update physics with slowdown (30% slower for asteroids, UFOs, etc.)
-      const slowedDt = dt * 0.7; // 30% slowdown
+      const neonColors = [
+        "hsl(315, 100%, 70%)", // magenta
+        "hsl(210, 100%, 70%)", // cyan  
+        "hsl(120, 100%, 70%)", // green
+        "hsl(60, 100%, 70%)",  // yellow
+        "hsl(15, 100%, 70%)",  // orange
+        "hsl(270, 100%, 70%)", // purple
+        "hsl(345, 100%, 70%)"  // hot pink
+      ];
+      const colorIndex = (game.current.wave - 1) % neonColors.length;
+      const neonColor = neonColors[colorIndex];
 
-      // Update asteroids (with slowdown)
-      updateAsteroids(game.current.asteroids, slowedDt, worldWidth, worldHeight);
+      // Handle input (combine keyboard, gamepad, and touch)
+      const gp = anyGamepad();
+      if (gp) {
+        const profile = gpProfileRef.current;
+        const input = readGamepad(gp, profile);
+        
+        // Map gamepad to keyboard-style controls
+        keys.current.left = input.buttons.rotateLeft || input.rotation < -0.3;
+        keys.current.right = input.buttons.rotateRight || input.rotation > 0.3;
+        keys.current.thrust = input.thrust > 0.1;
+        thrustAnalog.current = input.thrust;
+        
+        // Fire button with exact same logic as main asteroids
+        const firePressed = swapButtons ? (input.thrust > 0.5) : (gp.buttons[1]?.pressed || false);
+        keys.current.fire = firePressed;
+        
+        // Pause
+        if (input.buttons.pause && !lastPauseDown.current) {
+          setPaused(!paused);
+        }
+        lastPauseDown.current = input.buttons.pause;
+      }
 
-      // Update projectiles (no slowdown)
-      updateProjectiles(game.current.projectiles, dt, worldWidth, worldHeight);
+      // Combine touch input with other inputs
+      keys.current.left = keys.current.left || touchInputRef.current.left;
+      keys.current.right = keys.current.right || touchInputRef.current.right;
+      keys.current.thrust = keys.current.thrust || touchInputRef.current.up;
+      keys.current.fire = keys.current.fire || touchInputRef.current.fire;
 
-      // Update UFO (with slowdown)
-      updateUFOState(ufoState.current, slowedDt, Date.now(), game.current.score, game.current.wave, 
-        game.current.player.x, game.current.player.y, worldWidth, worldHeight, 0, worldSeed.current, "asteroids-color");
+      const player = game.current.player;
+      const now = Date.now();
 
-      // Handle input
-      handleInput(dt);
+      // Player rotation
+      if (keys.current.left) {
+        player.angle -= 5 * dt; // 5 radians/second
+      }
+      if (keys.current.right) {
+        player.angle += 5 * dt;
+      }
 
-      // Update player (no slowdown for movement)
-      updatePlayer(dt, worldWidth, worldHeight);
+      // Player thrust with analog support
+      if (keys.current.thrust) {
+        const thrustPower = thrustAnalog.current > 0 ? thrustAnalog.current : 1.0;
+        const thrustInput = thrustPower * 1.2; // Slightly faster than main asteroids
+        
+        const thrustX = Math.cos(player.angle - Math.PI / 2) * 180 * thrustInput;
+        const thrustY = Math.sin(player.angle - Math.PI / 2) * 180 * thrustInput;
+        
+        player.vx += thrustX * dt;
+        player.vy += thrustY * dt;
+        
+        player.thrust = thrustInput;
+        audio.current.setThruster(thrustInput);
+      } else {
+        player.thrust = 0;
+        audio.current.setThruster(0);
+      }
 
-      // Check collisions and apply color order logic
-      handleCollisions(worldWidth, worldHeight);
+      // Apply minimal drag
+      const drag = 0.995;
+      player.vx *= Math.pow(drag, dt);
+      player.vy *= Math.pow(drag, dt);
+
+      // Update player position with screen wrapping
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      if (player.x < 0) player.x = WORLD_WIDTH;
+      if (player.x > WORLD_WIDTH) player.x = 0;
+      if (player.y < 0) player.y = WORLD_HEIGHT;
+      if (player.y > WORLD_HEIGHT) player.y = 0;
+
+      // Update invulnerability
+      if (game.current.player.invulnerable > 0) {
+        game.current.player.invulnerable -= dt;
+      }
+
+      // Fire projectiles with rate limiting
+      if (keys.current.fire && now - lastFireTime.current > 150) {
+        const projectileSpeed = 400;
+        const projectile: ColorProjectile = {
+          x: player.x + Math.cos(player.angle - Math.PI / 2) * 12,
+          y: player.y + Math.sin(player.angle - Math.PI / 2) * 12,
+          vx: player.vx + Math.cos(player.angle - Math.PI / 2) * projectileSpeed,
+          vy: player.vy + Math.sin(player.angle - Math.PI / 2) * projectileSpeed,
+          life: 1.5
+        };
+        game.current.projectiles.push(projectile);
+        lastFireTime.current = now;
+        audio.current.click();
+      }
+
+      // Update game objects
+      updateAsteroids(game.current.asteroids, dt, WORLD_WIDTH, WORLD_HEIGHT);
+      updateProjectiles(game.current.projectiles, dt, WORLD_WIDTH, WORLD_HEIGHT);
+
+      // Progressive UFO system
+      ufoState.current.config = getUFOConfig();
+      updateUFOState(
+        ufoState.current,
+        dt,
+        game.current.elapsed,
+        game.current.score,
+        game.current.wave,
+        game.current.player.x,
+        game.current.player.y,
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        0,
+        worldSeed.current,
+        "asteroids-color",
+        {
+          onSpawn: () => {},
+          onDestroyed: (ufo, cause) => {
+            if (cause === "player") {
+              game.current.score += 500;
+              spawnExplosion(ufo.x, ufo.y);
+            }
+          }
+        }
+      );
+
+      // Collision detection
+      const { destroyedAsteroids, destroyedProjectiles, newAsteroids, score, wrongHits } =
+        checkProjectileAsteroidCollisions(
+          game.current.projectiles,
+          game.current.asteroids,
+          game.current.target,
+          difficulty,
+          player.x,
+          player.y,
+          mulberry32(worldSeed.current + game.current.score)
+        );
+
+      // Handle collision results
+      if (destroyedProjectiles.length && destroyedAsteroids.length) {
+        for (let i = 0; i < destroyedAsteroids.length; i++) {
+          const asteroidIndex = destroyedAsteroids[i];
+          const projectileIndex = destroyedProjectiles[i];
+          if (asteroidIndex < game.current.asteroids.length && projectileIndex < game.current.projectiles.length) {
+            const asteroid = game.current.asteroids[asteroidIndex];
+            const projectile = game.current.projectiles[projectileIndex];
+            spawnAsteroidDebris(asteroid, projectile.x, projectile.y);
+          }
+        }
+      }
+      
+      if (destroyedProjectiles.length) {
+        for (let i = destroyedProjectiles.length - 1; i >= 0; i--) {
+          game.current.projectiles.splice(destroyedProjectiles[i], 1);
+        }
+      }
+      if (destroyedAsteroids.length) {
+        for (let i = destroyedAsteroids.length - 1; i >= 0; i--) {
+          game.current.asteroids.splice(destroyedAsteroids[i], 1);
+        }
+        audio.current.explosion();
+      }
+      if (newAsteroids.length) {
+        game.current.asteroids.push(...newAsteroids);
+      }
+      if (score) {
+        game.current.score += score;
+      }
+
+      // Player-asteroid collision
+      if (game.current.player.invulnerable <= 0) {
+        if (checkPlayerAsteroidCollision(player.x, player.y, PLAYER_RADIUS, game.current.asteroids)) {
+          game.current.lives--;
+          game.current.player.invulnerable = RESPAWN_INVULNERABILITY;
+          spawnExplosion(player.x, player.y);
+          vibrate(300, 0.5, 0.8);
+          
+          if (game.current.lives <= 0) {
+            game.current.gameOver = true;
+          }
+        }
+      }
 
       // Check target phase advancement
-      checkPhaseAdvancement();
+      const currentTargetAsteroids = game.current.asteroids.filter(a => a.color === game.current.target);
+      if (currentTargetAsteroids.length === 0) {
+        // Move to next target color
+        if (game.current.target === "green") {
+          game.current.target = "amber";
+        } else if (game.current.target === "amber") {
+          game.current.target = "red";  
+        } else {
+          // All colors cleared, advance to next wave
+          game.current.wave++;
+          game.current.target = "green";
+          game.current.asteroids.push(
+            ...generateAsteroidField(
+              game.current.wave,
+              WORLD_WIDTH,
+              WORLD_HEIGHT,
+              Math.floor(Math.random() * 1e9)
+            )
+          );
+        }
+      }
 
-      // Render starfield (stationary twinkling stars)
-      drawStarfield(ctx, worldWidth, worldHeight);
+      // Update shooting stars
+      for (let i = shooting.length - 1; i >= 0; i--) {
+        const s = shooting[i];
+        s.life += dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        if (s.life > s.max) shooting.splice(i, 1);
+      }
+
+      // Spawn shooting stars periodically
+      if (game.current.elapsed >= nextShooting) {
+        nextShooting = game.current.elapsed + 0.6 + Math.random() * 1.6;
+        spawnShooting();
+      }
+
+      // Update particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 200 * dt; // gravity
+        if (p.life > p.max) particles.splice(i, 1);
+      }
+
+      // Update shockwaves
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.life += dt;
+        if (sw.life > sw.max) shockwaves.splice(i, 1);
+      }
+
+      // Update debris particles
+      for (let i = debris.length - 1; i >= 0; i--) {
+        const d = debris[i];
+        d.life += dt;
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.angle += d.av * dt;
+        
+        d.vx *= Math.pow(0.98, dt);
+        d.vy *= Math.pow(0.98, dt);
+        d.vy += 100 * dt;
+        
+        if (d.x < 0) d.x = WORLD_WIDTH;
+        if (d.x > WORLD_WIDTH) d.x = 0;
+        if (d.y < 0) d.y = WORLD_HEIGHT;
+        if (d.y > WORLD_HEIGHT) d.y = 0;
+        
+        if (d.life > d.max) debris.splice(i, 1);
+      }
+
+      // Update flash and camera shake
+      if (flashT > 0) flashT -= dt;
+      if (cameraShake > 0) cameraShake -= 120 * dt;
+
+      // Draw enhanced starfield
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const wpx = ctx.canvas.width / dpr;
+      const hpx = ctx.canvas.height / dpr;
+      
+      ctx.save();
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = neonColor;
+      ctx.scale(dpr, dpr);
+      
+      // Static twinkling stars in screen space
+      for (const s of stars) {
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + game.current.elapsed * s.tw));
+        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        const x = (s.x % wpx + wpx) % wpx;
+        const y = Math.max(0, Math.min(hpx, s.y));
+        ctx.fillRect(x, y, s.size, s.size);
+      }
+      ctx.globalAlpha = 1;
+      
+      // Shooting stars
+      for (const sh of shooting) {
+        const t = 1 - Math.min(1, sh.life / sh.max);
+        ctx.globalAlpha = t;
+        ctx.beginPath();
+        ctx.moveTo(sh.x, sh.y);
+        ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = neonColor;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // Draw particles
+      ctx.save();
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 8;
+      for (const p of particles) {
+        const t = p.life / p.max;
+        const alpha = Math.max(0, 1 - t);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        const size = 3 * (1 - t * 0.5);
+        ctx.fillRect(p.x - size/2, p.y - size/2, size, size);
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      // Draw debris
+      ctx.save();
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 4;
+      for (const d of debris) {
+        const t = d.life / d.max;
+        const alpha = Math.max(0, 1 - t);
+        ctx.globalAlpha = alpha;
+        
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        ctx.rotate(d.angle);
+        
+        ctx.fillStyle = d.color;
+        ctx.shadowColor = d.color;
+        
+        const scale = 1 - t * 0.3;
+        ctx.scale(scale, scale);
+        
+        ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      // Draw shockwaves
+      for (const sw of shockwaves) {
+        const t = sw.life / sw.max;
+        const radius = t * 180;
+        ctx.strokeStyle = neonColor;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 20;
+        ctx.lineWidth = 6 * (1 - t);
+        ctx.globalAlpha = 1 - t;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
 
       // Render game objects
       drawColorAsteroids(ctx, game.current.asteroids);
-      drawColorProjectiles(ctx, game.current.projectiles, "#00ff00");
+      drawColorProjectiles(ctx, game.current.projectiles, neonColor);
       drawUFOs(ctx, ufoState.current.ufos);
       drawUFOBullets(ctx, ufoState.current.bullets);
-      drawPlayer(ctx);
 
-      // Render effects
-      drawEffects(ctx);
+      // Draw player
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.angle);
+      ctx.strokeStyle = neonColor;
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+
+      // Flicker during invulnerability
+      if (game.current.player.invulnerable > 0 && Math.floor(game.current.elapsed * 8) % 2) {
+        ctx.globalAlpha = 0.3;
+      }
+
+      // Draw ship triangle
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(-7, 10);
+      ctx.lineTo(7, 10);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Draw thrust flame
+      if (player.thrust > 0) {
+        ctx.strokeStyle = "hsl(15, 100%, 70%)";
+        ctx.shadowColor = "hsl(15, 100%, 70%)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-3, 10);
+        ctx.lineTo(0, 18 + Math.random() * 5);
+        ctx.lineTo(3, 10);
+        ctx.stroke();
+      }
 
       ctx.restore();
+      ctx.globalAlpha = 1;
+
+      ctx.restore();
+
+      // Flash effect overlay
+      if (flashT > 0) {
+        const intensity = flashT / 0.28;
+        ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.4})`;
+        ctx.fillRect(0, 0, w, h);
+      }
 
       // Update HUD
       setHud({
@@ -247,544 +818,189 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         return;
       }
 
-      animationId = requestAnimationFrame(gameLoop);
+      raf = requestAnimationFrame(loop);
     };
 
-    animationId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(animationId);
-  }, [paused, difficulty, onGameOver]);
+    // Initialize game
+    game.current.asteroids = generateAsteroidField(1, REFERENCE_WIDTH, REFERENCE_HEIGHT, worldSeed.current);
+    game.current.gameStarted = true;
 
-  const handleInput = (dt: number) => {
-    // Gamepad input
-    const gp = anyGamepad();
-    if (gp) {
-      const profile = gpProfileRef.current;
-      const input = readGamepad(gp, profile);
-      
-      // Map gamepad to keyboard-style controls
-      keys.current.left = input.buttons.rotateLeft || input.rotation < -0.3;
-      keys.current.right = input.buttons.rotateRight || input.rotation > 0.3;
-      keys.current.thrust = input.thrust > 0.1;
-      thrustAnalog.current = input.thrust;
-      
-      // Fire button with swap
-      const firePressed = swapButtons ? (input.thrust > 0.5) : (gp.buttons[1]?.pressed || false);
-      keys.current.fire = firePressed;
-      
-      // Pause
-      if (input.buttons.pause && !lastPauseDown.current) {
-        setPaused(!paused);
-      }
-      lastPauseDown.current = input.buttons.pause;
-    }
+    // Preload SFX and start level music
+    try { (audio.current as any).preloadSFX(); } catch {}
+    try { (audio.current as any).stopAllAudio(); } catch {}
+    try { (audio.current as any).playLevelTrackByIndex(0); } catch {}
 
-    // Fire rate limiting
-    const now = Date.now();
-    const canFire = now - lastFireTime.current > 150; // 150ms minimum between shots
+    raf = requestAnimationFrame(loop);
 
-    if (keys.current.fire && !lastFire.current && canFire) {
-      fireProjectile();
-      lastFireTime.current = now;
-    }
-    lastFire.current = keys.current.fire;
-  };
-
-  const updatePlayer = (dt: number, worldWidth: number, worldHeight: number) => {
-    const player = game.current.player;
-    
-    // Rotation
-    if (keys.current.left) {
-      player.angle -= 5 * dt; // 5 radians/second
-    }
-    if (keys.current.right) {
-      player.angle += 5 * dt;
-    }
-
-    // Thrust
-    if (keys.current.thrust) {
-      const thrustPower = thrustAnalog.current > 0 ? thrustAnalog.current : 1;
-      const thrust = 400 * thrustPower; // pixels/second²
-      player.vx += Math.cos(player.angle) * thrust * dt;
-      player.vy += Math.sin(player.angle) * thrust * dt;
-      player.thrust = thrustPower;
-    } else {
-      player.thrust = 0;
-    }
-
-    // Apply drag
-    player.vx *= 0.995;
-    player.vy *= 0.995;
-
-    // Update position
-    player.x += player.vx * dt;
-    player.y += player.vy * dt;
-
-    // Screen wrapping
-    if (player.x < 0) player.x += worldWidth;
-    if (player.x > worldWidth) player.x -= worldWidth;
-    if (player.y < 0) player.y += worldHeight;
-    if (player.y > worldHeight) player.y -= worldHeight;
-
-    // Update invulnerability
-    if (player.invulnerable > 0) {
-      player.invulnerable -= dt;
-    }
-  };
-
-  const fireProjectile = () => {
-    const player = game.current.player;
-    const speed = 500; // pixels/second
-    
-    const projectile: ColorProjectile = {
-      x: player.x + Math.cos(player.angle) * 12,
-      y: player.y + Math.sin(player.angle) * 12,
-      vx: Math.cos(player.angle) * speed + player.vx,
-      vy: Math.sin(player.angle) * speed + player.vy,
-      life: 2 // 2 seconds
-    };
-    
-    game.current.projectiles.push(projectile);
-    
-    // Play sound
-    audio.current.click();
-  };
-
-  const handleCollisions = (worldWidth: number, worldHeight: number) => {
-    const rng = mulberry32(mixSeed(worldSeed.current, "COLLISION", game.current.wave, Date.now()));
-    
-    // Projectile-asteroid collisions with color logic
-    const collisionResult = checkProjectileAsteroidCollisions(
-      game.current.projectiles,
-      game.current.asteroids,
-      game.current.target,
-      difficulty,
-      game.current.player.x,
-      game.current.player.y,
-      rng
-    );
-
-    // Remove destroyed projectiles and asteroids
-    for (let i = collisionResult.destroyedProjectiles.length - 1; i >= 0; i--) {
-      game.current.projectiles.splice(collisionResult.destroyedProjectiles[i], 1);
-    }
-    for (let i = collisionResult.destroyedAsteroids.length - 1; i >= 0; i--) {
-      game.current.asteroids.splice(collisionResult.destroyedAsteroids[i], 1);
-    }
-
-    // Add new asteroids (splits or penalties)
-    game.current.asteroids.push(...collisionResult.newAsteroids);
-
-    // Update score
-    game.current.score = Math.max(0, game.current.score + collisionResult.score);
-
-    // Handle wrong hits visual feedback
-    if (collisionResult.wrongHits.length > 0) {
-      for (const hit of collisionResult.wrongHits) {
-        game.current.wrongHitEffect = {
-          startTime: Date.now(),
-          x: hit.x,
-          y: hit.y
-        };
-        // Play error sound
-        audio.current.click(); // Use click for now, could add error sound
-      }
-    }
-
-    // Player-asteroid collision
-    if (game.current.player.invulnerable <= 0) {
-      if (checkPlayerAsteroidCollision(game.current.player.x, game.current.player.y, PLAYER_RADIUS, game.current.asteroids)) {
-        // Player destroyed
-        game.current.lives--;
-        if (game.current.lives > 0) {
-          respawnPlayer();
-        }
-      }
-    }
-
-    // UFO collisions (unchanged from classic)
-    // Player-UFO collision
-    if (game.current.player.invulnerable <= 0 && checkUFOPlayerCollision(ufoState.current.ufos, game.current.player.x, game.current.player.y, PLAYER_RADIUS)) {
-      game.current.lives--;
-      if (game.current.lives > 0) {
-        respawnPlayer();
-      }
-    }
-
-    // UFO bullet collisions  
-    if (game.current.player.invulnerable <= 0 && checkUFOBulletPlayerCollision(ufoState.current.bullets, game.current.player.x, game.current.player.y, PLAYER_RADIUS)) {
-      game.current.lives--;
-      if (game.current.lives > 0) {
-        respawnPlayer();
-      }
-    }
-  };
-
-  const checkPhaseAdvancement = () => {
-    const targetColor = game.current.target;
-    const hasTargetColor = game.current.asteroids.some(asteroid => asteroid.color === targetColor);
-    
-    if (!hasTargetColor && game.current.asteroids.length > 0) {
-      // Advance to next color
-      const colorOrder: ("green" | "amber" | "red")[] = ["green", "amber", "red"];
-      const currentIndex = colorOrder.indexOf(targetColor);
-      const nextIndex = (currentIndex + 1) % colorOrder.length;
-      game.current.target = colorOrder[nextIndex];
-      
-      // Phase completion bonus
-      const bonuses = { Easy: 250, Normal: 500, Hard: 750 };
-      game.current.score += bonuses[difficulty as keyof typeof bonuses] || 500;
-      
-      // Visual effect
-      game.current.phaseAdvanceEffect = {
-        startTime: Date.now(),
-        color: ASTEROID_COLORS[game.current.target]
-      };
-      
-      // Play phase advance sound
-      audio.current.click(); // Use click for now, could add phase advance sound
-    }
-    
-    // Check if wave is complete (all asteroids destroyed)
-    if (game.current.asteroids.length === 0) {
-      startNextWave();
-    }
-  };
-
-  const startNextWave = () => {
-    game.current.wave++;
-    game.current.target = "green"; // Reset to green for new wave
-    
-    // Generate new asteroid field
-    const newAsteroids = generateAsteroidField(
-      game.current.wave,
-      REFERENCE_WIDTH,
-      REFERENCE_HEIGHT,
-      mixSeed(worldSeed.current, "WAVE", game.current.wave, 0)
-    );
-    game.current.asteroids = newAsteroids;
-  };
-
-  const respawnPlayer = () => {
-    const player = game.current.player;
-    player.x = REFERENCE_WIDTH / 2;
-    player.y = REFERENCE_HEIGHT / 2;
-    player.vx = 0;
-    player.vy = 0;
-    player.angle = 0;
-    player.thrust = 0;
-    player.invulnerable = RESPAWN_INVULNERABILITY;
-  };
-
-  const drawPlayer = (ctx: CanvasRenderingContext2D) => {
-    const player = game.current.player;
-    
-    // Skip drawing if invulnerable and blinking
-    if (player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2) {
-      return;
-    }
-
-    ctx.save();
-    ctx.translate(player.x, player.y);
-    ctx.rotate(player.angle);
-    
-    ctx.strokeStyle = "#00ff00";
-    ctx.lineWidth = 2;
-    ctx.shadowColor = "#00ff00";
-    ctx.shadowBlur = 8;
-    
-    // Draw ship
-    ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-8, -6);
-    ctx.lineTo(-4, 0);
-    ctx.lineTo(-8, 6);
-    ctx.closePath();
-    ctx.stroke();
-    
-    // Draw thrust
-    if (player.thrust > 0) {
-      ctx.strokeStyle = "#ff6600";
-      ctx.shadowColor = "#ff6600";
-      ctx.beginPath();
-      ctx.moveTo(-4, 0);
-      ctx.lineTo(-12 - player.thrust * 8, 0);
-      ctx.stroke();
-    }
-    
-    ctx.restore();
-  };
-
-  const drawStarfield = (ctx: CanvasRenderingContext2D, worldWidth: number, worldHeight: number) => {
-    // Static twinkling stars
-    const starCount = 200;
-    const time = Date.now() * 0.001;
-    
-    for (let i = 0; i < starCount; i++) {
-      const x = (i * 127) % worldWidth;
-      const y = (i * 311) % worldHeight;
-      const brightness = 0.3 + 0.7 * Math.sin(time + i) * 0.5 + 0.5;
-      
-      ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  };
-
-  const drawEffects = (ctx: CanvasRenderingContext2D) => {
-    const now = Date.now();
-    
-    // Phase advance effect
-    if (game.current.phaseAdvanceEffect) {
-      const elapsed = now - game.current.phaseAdvanceEffect.startTime;
-      if (elapsed < 1000) { // 1 second effect
-        const progress = elapsed / 1000;
-        const radius = 50 + progress * 100;
-        const alpha = 1 - progress;
-        
-        ctx.strokeStyle = game.current.phaseAdvanceEffect.color;
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 3;
-        ctx.shadowColor = game.current.phaseAdvanceEffect.color;
-        ctx.shadowBlur = 10;
-        
-        ctx.beginPath();
-        ctx.arc(REFERENCE_WIDTH / 2, REFERENCE_HEIGHT / 2, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.globalAlpha = 1;
-      } else {
-        game.current.phaseAdvanceEffect = undefined;
-      }
-    }
-    
-    // Wrong hit effect
-    if (game.current.wrongHitEffect) {
-      const elapsed = now - game.current.wrongHitEffect.startTime;
-      if (elapsed < 300) { // 300ms effect
-        const progress = elapsed / 300;
-        const alpha = 1 - progress;
-        
-        ctx.strokeStyle = "#ff0000";
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 4;
-        ctx.shadowColor = "#ff0000";
-        ctx.shadowBlur = 8;
-        
-        // Draw X
-        const size = 15;
-        const x = game.current.wrongHitEffect.x;
-        const y = game.current.wrongHitEffect.y;
-        
-        ctx.beginPath();
-        ctx.moveTo(x - size, y - size);
-        ctx.lineTo(x + size, y + size);
-        ctx.moveTo(x + size, y - size);
-        ctx.lineTo(x - size, y + size);
-        ctx.stroke();
-        
-        ctx.globalAlpha = 1;
-      } else {
-        game.current.wrongHitEffect = undefined;
-      }
-    }
-  };
-
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.code) {
-        case "ArrowLeft":
-        case "KeyA":
-          keys.current.left = true;
-          break;
-        case "ArrowRight":
-        case "KeyD":
-          keys.current.right = true;
-          break;
-        case "ArrowUp":
-        case "KeyW":
-          keys.current.thrust = true;
-          break;
-        case "Space":
-          e.preventDefault();
-          keys.current.fire = true;
-          break;
-        case "Escape":
-          e.preventDefault();
-          setPaused(!paused);
-          break;
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      switch (e.code) {
-        case "ArrowLeft":
-        case "KeyA":
-          keys.current.left = false;
-          break;
-        case "ArrowRight":
-        case "KeyD":
-          keys.current.right = false;
-          break;
-        case "ArrowUp":
-        case "KeyW":
-          keys.current.thrust = false;
-          break;
-        case "Space":
-          e.preventDefault();
-          keys.current.fire = false;
-          break;
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-    
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
+      if (raf) cancelAnimationFrame(raf);
+      try { audio.current.stopThruster(); } catch {}
+      try { (audio.current as any).stopLevelMusic(); } catch {}
+      try { (audio.current as any).stopAllAudio(); } catch {}
     };
-  }, [paused]);
+  }, [difficulty, onExit, onGameOver, paused]);
 
-  // Start game
-  useEffect(() => {
-    if (!game.current.gameStarted) {
-      // Initialize first wave
-      const initialAsteroids = generateAsteroidField(
-        1,
-        REFERENCE_WIDTH,
-        REFERENCE_HEIGHT,
-        mixSeed(worldSeed.current, "WAVE", 1, 0)
-      );
-      game.current.asteroids = initialAsteroids;
-      game.current.gameStarted = true;
-      gameStartTime.current = Date.now();
-    }
-  }, []);
+  // Touch control helpers
+  const updateDpadFromTouch = (localX: number, localY: number, startX: number, startY: number) => {
+    const deltaX = localX - startX;
+    const deltaY = localY - startY;
+    const deadzone = 20;
 
-  // Initialize cursor manager
-  useEffect(() => {
-    cursorManager.current = new CursorManager(loadCursorConfig());
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
-
-  // Detect touch-capable devices
-  useEffect(() => {
-    try {
-      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
-      setIsTouch(!!hasTouch);
-    } catch {
-      setIsTouch(false);
-    }
-  }, []);
+    touchInputRef.current.left = deltaX < -deadzone;
+    touchInputRef.current.right = deltaX > deadzone;
+    touchInputRef.current.up = deltaY < -deadzone;
+    touchInputRef.current.down = deltaY > deadzone;
+  };
 
   return (
-    <div ref={containerRef} className="fixed inset-0 bg-black overflow-hidden">
+    <div ref={containerRef} className="relative w-full h-screen bg-background overflow-hidden select-none">
       <canvas
         ref={canvasRef}
-        className="w-full h-full"
-        onContextMenu={(e) => e.preventDefault()}
+        className="block w-full h-full select-none"
+        style={{ imageRendering: "pixelated" }}
       />
-      
-      {/* HUD */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="flex justify-between items-start p-4 text-green-400 font-mono">
-          <div className="space-y-1">
-            <div>SCORE: {hud.score.toLocaleString()}</div>
-            <div>LIVES: {hud.lives}</div>
-            <div>WAVE: {hud.wave}</div>
-          </div>
-          
-          {/* Target indicator */}
-          <div className="text-center">
-            <div className="text-sm opacity-60">TARGET:</div>
-            <div 
-              className="text-xl font-bold border-2 px-3 py-1 rounded"
-              style={{ 
-                color: ASTEROID_COLORS[hud.target],
-                borderColor: ASTEROID_COLORS[hud.target],
-                textShadow: `0 0 8px ${ASTEROID_COLORS[hud.target]}`
-              }}
-            >
-              {hud.target.toUpperCase()}
-            </div>
-          </div>
-          
-          <div className="text-right space-y-1">
-            <div>FPS: {fps}</div>
-            <div className="text-xs opacity-60">{difficulty.toUpperCase()}</div>
-          </div>
+
+      <AsteroidsColorHUD {...hud} />
+
+      <div className="pointer-events-none absolute bottom-2 right-3 z-40">
+        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[10px] font-mono text-muted-foreground">
+          FPS: {Math.round(fps)}
         </div>
-        
-        {/* Instructions (first 10 seconds) */}
-        {game.current.gameStarted && (Date.now() - gameStartTime.current) < 10000 && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-center text-green-400 text-sm">
-            <div className="bg-black/70 px-4 py-2 rounded border border-green-400/30">
-              Destroy <span style={{ color: ASTEROID_COLORS.green }}>GREEN</span> first, then{" "}
-              <span style={{ color: ASTEROID_COLORS.amber }}>AMBER</span>, then{" "}
-              <span style={{ color: ASTEROID_COLORS.red }}>RED</span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Pause overlay */}
       {paused && (
-        <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl font-bold text-green-400">PAUSED</h2>
-            <p className="text-green-400/70">Press ESC to resume</p>
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-30">
+          <div className="bg-card border border-border rounded-lg p-6 text-center space-y-4">
+            <h2 className="text-2xl font-bold text-accent">PAUSED</h2>
+            <p className="text-muted-foreground">Press ESC or gamepad Start to resume</p>
+            <Button onClick={() => { try { audio.current.resume(); } catch {}; setPaused(false); }} variant="outline">
+              Resume Game
+            </Button>
           </div>
         </div>
       )}
 
       {/* Exit button */}
-      <Button
-        onClick={onExit}
-        variant="ghost"
-        size="sm"
-        className="absolute top-4 left-4 text-green-400 hover:bg-green-400/10 pointer-events-auto"
-      >
-        ← Exit
-      </Button>
+      <div className="absolute top-4 right-16 z-20">
+        <Button
+          onClick={() => {
+            try { audio.current.stopAllAudio(); } catch {}
+            onExit();
+          }}
+          variant="outline"
+          size="sm"
+        >
+          EXIT
+        </Button>
+      </div>
 
       {/* Touch controls overlay for mobile */}
       {isTouch && (
         <div className="absolute inset-0 pointer-events-none z-10 select-none">
-          {/* Right side button - moved in from corner */}
+          {/* D-pad (swappable with fire button) */}
           <div
-            className={`absolute bottom-8 right-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-red-600/20 border-red-600/50' : 'bg-blue-600/20 border-blue-600/50'}`}
-            onTouchStart={() => { audio.current.resume(); if (swapButtons) { keys.current.fire = true; } else { keys.current.thrust = true; } }}
-            onTouchEnd={() => { if (swapButtons) { keys.current.fire = false; } else { keys.current.thrust = false; } }}
+            className={`absolute bottom-8 ${swapButtons ? 'right-8' : 'left-8'} w-32 h-32 rounded-full border-2 pointer-events-auto select-none`}
+            style={{
+              background: `radial-gradient(circle, hsl(var(--accent) / 0.1) 0%, hsl(var(--accent) / 0.05) 70%, transparent 100%)`,
+              borderColor: 'hsl(var(--accent) / 0.5)'
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              audio.current?.resume();
+              if (dpadTouchRef.current) return;
+              const touch = e.changedTouches[0];
+              if (!touch) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              const startX = rect.width / 2;
+              const startY = rect.height / 2;
+              dpadTouchRef.current = { id: touch.identifier, startX, startY };
+              const localX = touch.clientX - rect.left;
+              const localY = touch.clientY - rect.top;
+              updateDpadFromTouch(localX, localY, startX, startY);
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              if (!dpadTouchRef.current) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              for (const t of Array.from(e.changedTouches)) {
+                if (t.identifier === dpadTouchRef.current.id) {
+                  const localX = t.clientX - rect.left;
+                  const localY = t.clientY - rect.top;
+                  updateDpadFromTouch(localX, localY, dpadTouchRef.current.startX, dpadTouchRef.current.startY);
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
+                  dpadTouchRef.current = null;
+                  touchInputRef.current.left = false;
+                  touchInputRef.current.right = false;
+                  touchInputRef.current.up = false;
+                  touchInputRef.current.down = false;
+                }
+              }
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
+                  dpadTouchRef.current = null;
+                  touchInputRef.current.left = false;
+                  touchInputRef.current.right = false;
+                  touchInputRef.current.up = false;
+                  touchInputRef.current.down = false;
+                }
+              }
+            }}
           >
-            <span className="text-sm text-accent select-none">{swapButtons ? 'FIRE' : 'THRUST'}</span>
+            {/* Directional indicators around the circle */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-full h-full">
+                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 text-xs text-accent opacity-70">↑</div>
+                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-accent opacity-70">↓</div>
+                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 text-xs text-accent opacity-70">←</div>
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-accent opacity-70">→</div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs text-accent font-mono font-bold">MOVE</span>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          {/* Left side button - moved in from corner */}
+
+          {/* Fire button (swappable with movement) */}
           <div
-            className={`absolute bottom-8 left-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-blue-600/20 border-blue-600/50' : 'bg-red-600/20 border-red-600/50'}`}
-            onTouchStart={() => { audio.current.resume(); if (swapButtons) { keys.current.thrust = true; } else { keys.current.fire = true; } }}
-            onTouchEnd={() => { if (swapButtons) { keys.current.thrust = false; } else { keys.current.fire = false; } }}
+            className={`absolute bottom-8 ${swapButtons ? 'left-8' : 'right-8'} w-28 h-28 rounded-full border-2 border-red-500/50 bg-red-600/20 flex items-center justify-center pointer-events-auto select-none`}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              audio.current?.resume();
+              if (fireTouchRef.current !== null) return;
+              const touch = e.changedTouches[0];
+              if (!touch) return;
+              fireTouchRef.current = touch.identifier;
+              touchInputRef.current.fire = true;
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
+                  fireTouchRef.current = null;
+                  touchInputRef.current.fire = false;
+                }
+              }
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
+                  fireTouchRef.current = null;
+                  touchInputRef.current.fire = false;
+                }
+              }
+            }}
           >
-            <span className="text-sm text-accent select-none">{swapButtons ? 'THRUST' : 'FIRE'}</span>
-          </div>
-          
-          {/* Touch rotation areas - positioned higher to avoid collision */}
-          <div
-            className="absolute bottom-40 left-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
-            onTouchStart={() => { audio.current.resume(); keys.current.left = true; }}
-            onTouchEnd={() => { keys.current.left = false; }}
-          >
-            <span className="text-sm text-accent select-none">←</span>
-          </div>
-          
-          <div
-            className="absolute bottom-40 right-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
-            onTouchStart={() => { audio.current.resume(); keys.current.right = true; }}
-            onTouchEnd={() => { keys.current.right = false; }}
-          >
-            <span className="text-sm text-accent select-none">→</span>
+            <span className="text-sm text-red-400 font-mono font-bold">FIRE</span>
           </div>
         </div>
       )}

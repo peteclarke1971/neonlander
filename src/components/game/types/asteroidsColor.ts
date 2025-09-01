@@ -40,6 +40,7 @@ export interface ColorOrderGameState {
   gameStarted: boolean;
   gameOver: boolean;
   paused: boolean;
+  elapsed: number;
   phaseAdvanceEffect?: {
     startTime: number;
     color: string;

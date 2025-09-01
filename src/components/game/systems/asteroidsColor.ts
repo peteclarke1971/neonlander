@@ -74,7 +74,7 @@ export function createAsteroid(
   };
 }
 
-// Generate asteroid field for a wave with balanced color distribution
+// Generate asteroid field for a wave with progressive color distribution
 export function generateAsteroidField(
   wave: number,
   worldWidth: number,
@@ -83,14 +83,38 @@ export function generateAsteroidField(
 ): ColorAsteroid[] {
   const asteroids: ColorAsteroid[] = [];
   const count = Math.min(4 + wave * 2, 16); // Max 16 asteroids
-  const colors: ("green" | "amber" | "red")[] = ["green", "amber", "red"];
+  
+  // Progressive color distribution based on wave
+  let greenPercent: number, amberPercent: number, redPercent: number;
+  
+  if (wave === 1) {
+    greenPercent = 0.8; amberPercent = 0.1; redPercent = 0.1;
+  } else if (wave === 2) {
+    greenPercent = 0.7; amberPercent = 0.15; redPercent = 0.15;
+  } else if (wave === 3) {
+    greenPercent = 0.6; amberPercent = 0.2; redPercent = 0.2;
+  } else if (wave === 4) {
+    greenPercent = 0.5; amberPercent = 0.25; redPercent = 0.25;
+  } else if (wave === 5) {
+    greenPercent = 0.4; amberPercent = 0.3; redPercent = 0.3;
+  } else {
+    greenPercent = 0.33; amberPercent = 0.33; redPercent = 0.34;
+  }
   
   for (let i = 0; i < count; i++) {
     const colorSeed = mixSeed(seed, "COLOR", wave, i);
     const rng = mulberry32(colorSeed);
     
-    // Assign colors in balanced thirds
-    const color = colors[i % 3];
+    // Assign colors based on progressive percentages
+    const colorRoll = rng();
+    let color: "green" | "amber" | "red";
+    if (colorRoll < greenPercent) {
+      color = "green";
+    } else if (colorRoll < greenPercent + amberPercent) {
+      color = "amber";
+    } else {
+      color = "red";
+    }
     
     // Generate safe spawn position (at least 150px from center)
     let x, y;
@@ -227,8 +251,9 @@ export function applyWrongColorPenalty(
   // Set cooldown to prevent chain reactions
   asteroid.penaltyCooldown = 300; // 300ms
   
-  if (difficulty === "Easy") {
-    // Clone x1 at offset
+  // Fixed behavior: Amber asteroids always clone, Red asteroids always size up
+  if (asteroid.color === "amber") {
+    // Clone asteroid at same size
     const offset = 18;
     const angle = rng() * Math.PI * 2;
     const newX = asteroid.x + Math.cos(angle) * offset;
@@ -248,19 +273,22 @@ export function applyWrongColorPenalty(
       );
       newAsteroids.push(clone);
     }
-  } else if (difficulty === "Normal") {
-    // Size up once
+  } else if (asteroid.color === "red") {
+    // Size up the asteroid
     if (asteroid.size === "small") {
       asteroid.size = "medium";
       asteroid.r = 25;
+      asteroid.points = generateAsteroidShape("medium", rng);
     } else if (asteroid.size === "medium") {
       asteroid.size = "large";
       asteroid.r = 40;
+      asteroid.points = generateAsteroidShape("large", rng);
     } else if (asteroid.size === "large") {
       asteroid.size = "giant";
       asteroid.r = 66;
+      asteroid.points = generateAsteroidShape("giant", rng);
     } else if (asteroid.size === "giant") {
-      // Spawn 2 small clones
+      // Split into 2 large asteroids if already giant
       for (let i = 0; i < 2; i++) {
         const angle = rng() * Math.PI * 2;
         const distance = 30;
@@ -270,7 +298,7 @@ export function applyWrongColorPenalty(
         const distToPlayer = Math.sqrt((newX - playerX)**2 + (newY - playerY)**2);
         if (distToPlayer > 24) {
           const clone = createAsteroid(
-            "small",
+            "large",
             newX,
             newY,
             Math.cos(angle) * 40,
@@ -281,48 +309,6 @@ export function applyWrongColorPenalty(
           newAsteroids.push(clone);
         }
       }
-    }
-    // Regenerate shape for size change
-    if (asteroid.size !== "giant" || newAsteroids.length === 0) {
-      asteroid.points = generateAsteroidShape(asteroid.size, rng);
-    }
-  } else if (difficulty === "Hard") {
-    // Size up AND clone
-    // Size up first
-    const originalSize = asteroid.size;
-    if (asteroid.size === "small") {
-      asteroid.size = "medium";
-      asteroid.r = 25;
-    } else if (asteroid.size === "medium") {
-      asteroid.size = "large";
-      asteroid.r = 40;
-    } else if (asteroid.size === "large") {
-      asteroid.size = "giant";
-      asteroid.r = 66;
-    }
-    // Regenerate shape for size change
-    if (originalSize !== asteroid.size) {
-      asteroid.points = generateAsteroidShape(asteroid.size, rng);
-    }
-    
-    // Then clone
-    const offset = 24;
-    const angle = rng() * Math.PI * 2;
-    const newX = asteroid.x + Math.cos(angle) * offset;
-    const newY = asteroid.y + Math.sin(angle) * offset;
-    
-    const distToPlayer = Math.sqrt((newX - playerX)**2 + (newY - playerY)**2);
-    if (distToPlayer > 24) {
-      const clone = createAsteroid(
-        originalSize, // Clone keeps original size
-        newX,
-        newY,
-        asteroid.vx + (rng() - 0.5) * 30,
-        asteroid.vy + (rng() - 0.5) * 30,
-        asteroid.color,
-        rng
-      );
-      newAsteroids.push(clone);
     }
   }
   
