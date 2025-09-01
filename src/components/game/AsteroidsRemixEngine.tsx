@@ -1005,6 +1005,56 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
               background: `radial-gradient(circle, hsl(var(--accent) / 0.1) 0%, hsl(var(--accent) / 0.05) 70%, transparent 100%)`,
               borderColor: 'hsl(var(--accent) / 0.5)'
             }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              audioRef.current?.resume();
+              if (dpadTouchRef.current) return;
+              const touch = e.changedTouches[0];
+              if (!touch) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              const startX = rect.width / 2;
+              const startY = rect.height / 2;
+              dpadTouchRef.current = { id: touch.identifier, startX, startY };
+              const localX = touch.clientX - rect.left;
+              const localY = touch.clientY - rect.top;
+              updateDpadFromTouch(localX, localY, startX, startY);
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              if (!dpadTouchRef.current) return;
+              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              for (const t of Array.from(e.changedTouches)) {
+                if (t.identifier === dpadTouchRef.current.id) {
+                  const localX = t.clientX - rect.left;
+                  const localY = t.clientY - rect.top;
+                  updateDpadFromTouch(localX, localY, dpadTouchRef.current.startX, dpadTouchRef.current.startY);
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
+                  dpadTouchRef.current = null;
+                  touchInputRef.current.left = false;
+                  touchInputRef.current.right = false;
+                  touchInputRef.current.up = false;
+                  touchInputRef.current.down = false;
+                }
+              }
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
+                  dpadTouchRef.current = null;
+                  touchInputRef.current.left = false;
+                  touchInputRef.current.right = false;
+                  touchInputRef.current.up = false;
+                  touchInputRef.current.down = false;
+                }
+              }
+            }}
           >
             {/* Directional indicators around the circle */}
             <div className="absolute inset-0 flex items-center justify-center">
@@ -1024,6 +1074,33 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
           {/* Fire button (swappable with movement) */}
           <div
             className={`absolute bottom-8 ${swapButtons ? 'left-8' : 'right-8'} w-28 h-28 rounded-full border-2 border-red-500/50 bg-red-600/20 flex items-center justify-center pointer-events-auto select-none`}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              audioRef.current?.resume();
+              if (fireTouchRef.current !== null) return;
+              const touch = e.changedTouches[0];
+              if (!touch) return;
+              fireTouchRef.current = touch.identifier;
+              touchInputRef.current.fire = true;
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
+                  fireTouchRef.current = null;
+                  touchInputRef.current.fire = false;
+                }
+              }
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault();
+              for (const t of Array.from(e.changedTouches)) {
+                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
+                  fireTouchRef.current = null;
+                  touchInputRef.current.fire = false;
+                }
+              }
+            }}
           >
             <span className="text-sm text-red-400 font-mono font-bold">FIRE</span>
           </div>
