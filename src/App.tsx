@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ControlsSettings from "./pages/Controls";
 import Asteroids from "./pages/Asteroids";
+import AsteroidsColor from "./pages/AsteroidsColor";
 import AsteroidsRemix from "./pages/AsteroidsRemix";
 import LightCycles from "./pages/LightCycles";
 import CavernFXDemo from "./pages/CavernFXDemo";
@@ -24,6 +25,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/asteroids" element={<Asteroids />} />
+          <Route path="/asteroids-color" element={<AsteroidsColor />} />
           <Route path="/asteroids-remix" element={<AsteroidsRemix />} />
           <Route path="/lightcycles" element={<LightCycles />} />
           <Route path="/neon-racing" element={<NeonRacing />} />

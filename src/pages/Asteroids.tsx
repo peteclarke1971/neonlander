@@ -182,12 +182,14 @@ const Asteroids: React.FC = () => {
               </Button>
             </div>
 
-            <div className="mt-6">
-              <Button
-                onClick={() => window.location.href = "/asteroids-remix"}
-                variant="default"
-                size="lg"
-                className="w-48 text-lg bg-accent text-accent-foreground hover:bg-accent/90"
+            <div className="mt-6 space-y-3">
+              <Link to="/asteroids-color">
+                <Button variant="outline" size="lg" className="w-48 text-lg">
+                  COLOR ORDER
+                </Button>
+              </Link>
+              <Link to="/asteroids-remix">
+                <Button variant="default" size="lg" className="w-48 text-lg bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 🚀 REMIX MODE
               </Button>
