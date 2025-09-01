@@ -19,9 +19,10 @@ interface Props {
   highScoresClassic: HighScore[];
   highScoresFixed: HighScore[];
   lastPlayedSeed?: number;
+  lastPlayedLevel?: number;
 }
 
-export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed }) => {
+export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel }) => {
   const audioRef = useRef(new AudioManager());
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
@@ -421,7 +422,7 @@ useEffect(() => {
               } else {
                 seedNum = ((Math.random() * 0xffffffff) >>> 0);
               }
-              onStart("easy", undefined, mode, lowGraphics, seedNum);
+              onStart("easy", lastPlayedLevel && lastPlayedLevel > 0 ? lastPlayedLevel + 1 : undefined, mode, lowGraphics, seedNum);
             }}
           >
             Play
