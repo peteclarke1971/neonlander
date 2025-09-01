@@ -669,6 +669,16 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     };
   }, []);
 
+  // Detect touch-capable devices
+  useEffect(() => {
+    try {
+      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
+      setIsTouch(!!hasTouch);
+    } catch {
+      setIsTouch(false);
+    }
+  }, []);
+
   return (
     <div ref={containerRef} className="fixed inset-0 bg-black overflow-hidden">
       <canvas
@@ -738,6 +748,46 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       >
         ← Exit
       </Button>
+
+      {/* Touch controls overlay for mobile */}
+      {isTouch && (
+        <div className="absolute inset-0 pointer-events-none z-10 select-none">
+          {/* Right side button - moved in from corner */}
+          <div
+            className={`absolute bottom-8 right-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-red-600/20 border-red-600/50' : 'bg-blue-600/20 border-blue-600/50'}`}
+            onTouchStart={() => { audio.current.resume(); if (swapButtons) { keys.current.fire = true; } else { keys.current.thrust = true; } }}
+            onTouchEnd={() => { if (swapButtons) { keys.current.fire = false; } else { keys.current.thrust = false; } }}
+          >
+            <span className="text-sm text-accent select-none">{swapButtons ? 'FIRE' : 'THRUST'}</span>
+          </div>
+          
+          {/* Left side button - moved in from corner */}
+          <div
+            className={`absolute bottom-8 left-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-blue-600/20 border-blue-600/50' : 'bg-red-600/20 border-red-600/50'}`}
+            onTouchStart={() => { audio.current.resume(); if (swapButtons) { keys.current.thrust = true; } else { keys.current.fire = true; } }}
+            onTouchEnd={() => { if (swapButtons) { keys.current.thrust = false; } else { keys.current.fire = false; } }}
+          >
+            <span className="text-sm text-accent select-none">{swapButtons ? 'THRUST' : 'FIRE'}</span>
+          </div>
+          
+          {/* Touch rotation areas - positioned higher to avoid collision */}
+          <div
+            className="absolute bottom-40 left-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
+            onTouchStart={() => { audio.current.resume(); keys.current.left = true; }}
+            onTouchEnd={() => { keys.current.left = false; }}
+          >
+            <span className="text-sm text-accent select-none">←</span>
+          </div>
+          
+          <div
+            className="absolute bottom-40 right-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
+            onTouchStart={() => { audio.current.resume(); keys.current.right = true; }}
+            onTouchEnd={() => { keys.current.right = false; }}
+          >
+            <span className="text-sm text-accent select-none">→</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
