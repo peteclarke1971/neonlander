@@ -100,6 +100,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const [fps, setFps] = useState(0);
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
   const fpsRef = useRef(0);
+  const [isTouch, setIsTouch] = useState(false);
+
+  // Touch controls state
+  const touchInputRef = useRef({ left: false, right: false, up: false, down: false, fire: false });
+  const dpadTouchRef = useRef<{ id: number; startX: number; startY: number } | null>(null);
+  const fireTouchRef = useRef<number | null>(null);
 
   // Difficulty settings
   const difficultySettings = {
@@ -302,6 +308,13 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     input.up = input.up || keysRef.current.has('ArrowUp') || keysRef.current.has('w') || keysRef.current.has('W');
     input.down = input.down || keysRef.current.has('ArrowDown') || keysRef.current.has('s') || keysRef.current.has('S');
     input.fire = input.fire || keysRef.current.has(' ');
+
+    // Touch input
+    input.left = input.left || touchInputRef.current.left;
+    input.right = input.right || touchInputRef.current.right;
+    input.up = input.up || touchInputRef.current.up;
+    input.down = input.down || touchInputRef.current.down;
+    input.fire = input.fire || touchInputRef.current.fire;
 
     // Update scroll
     state.scrollY += state.scrollSpeed * dt / 1000;
@@ -833,6 +846,119 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     };
   }, [initGameState]);
 
+  // Touch helper functions
+  const updateDpadFromTouch = (touchX: number, touchY: number, startX: number, startY: number) => {
+    const dx = touchX - startX;
+    const dy = touchY - startY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Dead zone
+    if (distance < 20) {
+      touchInputRef.current.left = false;
+      touchInputRef.current.right = false;
+      touchInputRef.current.up = false;
+      touchInputRef.current.down = false;
+      return;
+    }
+    
+    // Normalize to unit circle
+    const nx = dx / distance;
+    const ny = dy / distance;
+    
+    // Convert to directional inputs (higher threshold for more precise control)
+    touchInputRef.current.left = nx < -0.4;
+    touchInputRef.current.right = nx > 0.4;
+    touchInputRef.current.up = ny < -0.4;
+    touchInputRef.current.down = ny > 0.4;
+  };
+
+  // Touch event handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    audioRef.current?.resume();
+    
+    for (const touch of Array.from(e.changedTouches)) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      
+      // Determine touch areas (using viewport coordinates)
+      const isLeftSide = x < rect.width / 2;
+      const dpadSide = swapButtons ? rect.width - 140 : 70; // Account for swapping
+      const fireSide = swapButtons ? 70 : rect.width - 70;
+      
+      // D-pad area (movement)
+      const dpadCenterX = swapButtons ? rect.width - 70 : 70;
+      const dpadCenterY = rect.height - 70;
+      const dpadDistance = Math.sqrt((x - dpadCenterX) ** 2 + (y - dpadCenterY) ** 2);
+      
+      // Fire button area
+      const fireCenterX = swapButtons ? 70 : rect.width - 70;
+      const fireCenterY = rect.height - 70;
+      const fireDistance = Math.sqrt((x - fireCenterX) ** 2 + (y - fireCenterY) ** 2);
+      
+      if (dpadDistance < 60 && !dpadTouchRef.current) {
+        // D-pad touch
+        dpadTouchRef.current = { id: touch.identifier, startX: dpadCenterX, startY: dpadCenterY };
+        updateDpadFromTouch(x, y, dpadCenterX, dpadCenterY);
+      } else if (fireDistance < 50 && !fireTouchRef.current) {
+        // Fire button touch
+        fireTouchRef.current = touch.identifier;
+        touchInputRef.current.fire = true;
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    for (const touch of Array.from(e.changedTouches)) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      
+      // Update D-pad if this is the d-pad touch
+      if (dpadTouchRef.current && touch.identifier === dpadTouchRef.current.id) {
+        updateDpadFromTouch(x, y, dpadTouchRef.current.startX, dpadTouchRef.current.startY);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    for (const touch of Array.from(e.changedTouches)) {
+      // Release D-pad
+      if (dpadTouchRef.current && touch.identifier === dpadTouchRef.current.id) {
+        dpadTouchRef.current = null;
+        touchInputRef.current.left = false;
+        touchInputRef.current.right = false;
+        touchInputRef.current.up = false;
+        touchInputRef.current.down = false;
+      }
+      
+      // Release fire button
+      if (fireTouchRef.current && touch.identifier === fireTouchRef.current) {
+        fireTouchRef.current = null;
+        touchInputRef.current.fire = false;
+      }
+    }
+  };
+
+  // Touch detection
+  useEffect(() => {
+    try {
+      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
+      setIsTouch(!!hasTouch);
+    } catch {
+      setIsTouch(false);
+    }
+  }, []);
+
   // Keyboard event handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -864,7 +990,45 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         ref={canvasRef}
         className="absolute inset-0 w-full h-full z-10"
         style={{ touchAction: 'none' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
+
+      {/* Touch controls overlay for mobile */}
+      {isTouch && (
+        <div className="absolute inset-0 pointer-events-none z-20 select-none">
+          {/* Movement D-pad (swappable with fire button) */}
+          <div
+            className={`absolute bottom-8 ${swapButtons ? 'right-8' : 'left-8'} w-32 h-32 rounded-full border-2 border-accent/50 bg-accent/10 pointer-events-auto select-none`}
+            style={{ 
+              background: `radial-gradient(circle, hsl(var(--accent) / 0.1) 0%, hsl(var(--accent) / 0.05) 70%, transparent 100%)`,
+              borderColor: 'hsl(var(--accent) / 0.5)'
+            }}
+          >
+            {/* Directional indicators around the circle */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-20 h-20">
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-accent/70 text-xs">▲</div>
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-accent/70 text-xs">▼</div>
+                <div className="absolute left-0 top-1/2 transform -translate-y-1/2 text-accent/70 text-xs">◄</div>
+                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 text-accent/70 text-xs">►</div>
+              </div>
+            </div>
+            {/* Center label */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xs text-accent/80 font-mono">MOVE</span>
+            </div>
+          </div>
+          
+          {/* Fire button (swappable with movement) */}
+          <div
+            className={`absolute bottom-8 ${swapButtons ? 'left-8' : 'right-8'} w-28 h-28 rounded-full border-2 border-red-500/50 bg-red-600/20 flex items-center justify-center pointer-events-auto select-none`}
+          >
+            <span className="text-sm text-red-400 font-mono font-bold">FIRE</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
