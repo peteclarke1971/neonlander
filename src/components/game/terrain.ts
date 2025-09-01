@@ -242,10 +242,10 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return null;
   };
 
-  const getMovingPadAt = (x: number, y: number): MovingPad | null => {
+  const getMovingPadAt = (x: number, y: number, level?: number): MovingPad | null => {
     // Pass lander center Y; collision fn computes foot offset internally
     for (const mp of movingPads) {
-      if (movingPadSystem.isOnMovingPad(x, y, mp)) {
+      if (movingPadSystem.isOnMovingPad(x, y, mp, level)) {
         return mp;
       }
     }

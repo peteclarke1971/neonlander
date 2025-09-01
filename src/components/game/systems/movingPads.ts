@@ -592,7 +592,7 @@ export class MovingPadSystem {
   }
 
   // Check if lander is on moving pad (with generous tolerance for moving pads)
-  isOnMovingPad(x: number, y: number, pad: MovingPad): boolean {
+  isOnMovingPad(x: number, y: number, pad: MovingPad, level?: number): boolean {
     const padWidth = pad.width || 32;
     const footY = y + 8; // Lander foot is ~8 pixels below center
     
@@ -616,7 +616,13 @@ export class MovingPadSystem {
     }
     
     // Check vertical bounds - be extra generous for moving pads
-    const verticalTolerance = 16; // Increased tolerance for all moving pads
+    let verticalTolerance = 16; // Base tolerance for all moving pads
+    
+    // Increase tolerance after level 5 for high-level forgiveness
+    if (level && level > 5) {
+      verticalTolerance = 20; // Increased to 20px for levels 6+
+    }
+    
     const onPad = Math.abs(footY - pad.currentPos.y) <= verticalTolerance;
     
     if (onPad && (pad.motion === "elevator" || pad.motion === "arc")) {

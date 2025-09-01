@@ -952,7 +952,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         let movingPadLanding: MovingPad | null = null;
         const terrainData = terrain as TerrainData;
         if (terrainData.movingPads && terrainData.getMovingPadAt) {
-          movingPadLanding = terrainData.getMovingPadAt(x, y);
+          movingPadLanding = terrainData.getMovingPadAt(x, y, level);
         }
         if (!isCavernLevel) {
           const t = terrain as TerrainData;
@@ -986,17 +986,25 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, movingPadLanding);
           // Base vertical threshold
           let vyThresh = (difficulty === "easy" ? 2.0 : 1.5);
-          // Slight forgiveness when pad is very fast and landing near center
+          
+          // Progressive level-based forgiveness after level 5
+          if (level > 5) {
+            const levelForgiveness = (level - 5) * 0.15;
+            vyThresh += levelForgiveness;
+          }
+          
+          // Enhanced forgiveness for fast moving pads
           const pWidth = movingPadLanding.width ?? 32;
           const centerDist = Math.abs(x - movingPadLanding.currentPos.x);
-          const nearCenter = centerDist <= pWidth * 0.4;
+          const nearCenter = centerDist <= pWidth * 0.5; // Expanded from 40% to 50%
           const baseSpeed = movingPadLanding.baseSpeed ?? movingPadLanding.speed;
-          const isVeryFast = movingPadLanding.speed >= 3 * baseSpeed;
+          const isVeryFast = movingPadLanding.speed >= 2 * baseSpeed; // Lowered from 3x to 2x
           if (isVeryFast && nearCenter && okAngle) {
-            vyThresh *= 1.35; // small forgiveness at high pad speeds
+            vyThresh *= 1.6; // Increased from 1.35x to 1.6x forgiveness
           }
+          
           okVy = Math.abs(relativeVel.y) < vyThresh;
-          okVx = Math.abs(relativeVel.x) < 20.0; // Very lenient horizontal - just need to be within pad
+          okVx = Math.abs(relativeVel.x) < 25.0; // Increased from 20.0 to 25.0 for moving pads
         } else {
           okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
           okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);

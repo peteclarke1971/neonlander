@@ -55,7 +55,7 @@ export interface TerrainData {
   collectibles?: CollectiblesData;
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
-  getMovingPadAt?: (x: number, y: number) => MovingPad | null;
+  getMovingPadAt?: (x: number, y: number, level?: number) => MovingPad | null;
   isCavern?: false;
 }
 
