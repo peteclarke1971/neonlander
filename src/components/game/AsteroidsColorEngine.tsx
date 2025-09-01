@@ -132,8 +132,8 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     paused: false
   });
 
-  const ufoState = useRef<UFOState>(createUFOState(UFO_DIFFICULTY_PRESETS[difficulty] || UFO_DIFFICULTY_PRESETS.Normal, REFERENCE_WIDTH, REFERENCE_HEIGHT));
   const worldSeed = useRef(Math.floor(Math.random() * 1000000));
+  const ufoState = useRef<UFOState>(createUFOState(UFO_DIFFICULTY_PRESETS.normal, worldSeed.current, "asteroids-color"));
   const gameStartTime = useRef(Date.now());
   const lastTime = useRef(0);
   const lastFireTime = useRef(0);
@@ -186,9 +186,8 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       updateProjectiles(game.current.projectiles, dt, worldWidth, worldHeight);
 
       // Update UFO (with slowdown)
-      const ufoEvents: UFOEvents = { explosions: [], score: 0 };
-      updateUFOState(ufoState.current, slowedDt, game.current.player.x, game.current.player.y, worldWidth, worldHeight, 
-        game.current.score, game.current.wave, Date.now(), ufoEvents, audio.current.click, () => {}, mulberry32(worldSeed.current));
+      updateUFOState(ufoState.current, slowedDt, Date.now(), game.current.score, game.current.wave, 
+        game.current.player.x, game.current.player.y, worldWidth, worldHeight, 0, worldSeed.current, "asteroids-color");
 
       // Handle input
       handleInput(dt);
@@ -208,8 +207,8 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       // Render game objects
       drawColorAsteroids(ctx, game.current.asteroids);
       drawColorProjectiles(ctx, game.current.projectiles, "#00ff00");
-      drawUFOs(ctx, ufoState.current.ufos, "#00ff00");
-      drawUFOBullets(ctx, ufoState.current.bullets, "#00ff00");
+      drawUFOs(ctx, ufoState.current.ufos);
+      drawUFOBullets(ctx, ufoState.current.bullets);
       drawPlayer(ctx);
 
       // Render effects
@@ -404,15 +403,15 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
     // UFO collisions (unchanged from classic)
     // Player-UFO collision
-    if (game.current.player.invulnerable <= 0 && checkUFOPlayerCollision(ufoState.current.ufos, game.current.player.x, game.current.player.y)) {
+    if (game.current.player.invulnerable <= 0 && checkUFOPlayerCollision(ufoState.current.ufos, game.current.player.x, game.current.player.y, PLAYER_RADIUS)) {
       game.current.lives--;
       if (game.current.lives > 0) {
         respawnPlayer();
       }
     }
 
-    // UFO bullet collisions
-    if (game.current.player.invulnerable <= 0 && checkUFOBulletPlayerCollision(ufoState.current.bullets, game.current.player.x, game.current.player.y)) {
+    // UFO bullet collisions  
+    if (game.current.player.invulnerable <= 0 && checkUFOBulletPlayerCollision(ufoState.current.bullets, game.current.player.x, game.current.player.y, PLAYER_RADIUS)) {
       game.current.lives--;
       if (game.current.lives > 0) {
         respawnPlayer();

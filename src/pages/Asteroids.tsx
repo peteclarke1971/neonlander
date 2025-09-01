@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { AsteroidsEngine } from "@/components/game/AsteroidsEngine";
 import { HomeScreen } from "@/components/game/HomeScreen";
 import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
@@ -189,10 +190,10 @@ const Asteroids: React.FC = () => {
                 </Button>
               </Link>
               <Link to="/asteroids-remix">
-                <Button variant="default" size="lg" className="w-48 text-lg bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                🚀 REMIX MODE
-              </Button>
+                <Button variant="default" size="lg" className="w-48 text-lg bg-accent text-accent-foreground hover:bg-accent/90">
+                  🚀 REMIX MODE
+                </Button>
+              </Link>
               <p className="text-sm text-muted-foreground mt-2">
                 Vertical scrolling shooter
               </p>
