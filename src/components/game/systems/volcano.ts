@@ -194,12 +194,17 @@ export function updateVolcanoes(
   volcanoes: Volcano[],
   particles: VolcanoParticle[],
   dt: number,
-  level: number
+  level: number,
+  viewLeft?: number,
+  viewRight?: number
 ): { newParticles: VolcanoParticle[]; shouldPlayEruptionSound: boolean; eruptingVolcanoes: { x: number }[] } {
   const config = getVolcanoConfigForLevel(level);
   const newParticles: VolcanoParticle[] = [];
   let shouldPlayEruptionSound = false;
   const eruptingVolcanoes: { x: number }[] = [];
+  
+  // Level-based particle limit to prevent performance degradation
+  const maxParticles = Math.min(config.particleCount, level > 20 ? 25 : level > 10 ? 30 : 35);
 
   for (const volcano of volcanoes) {
     if (volcano.isErupting) {
@@ -213,7 +218,10 @@ export function updateVolcanoes(
         const particlesThisFrame = Math.floor(volcano.emissionCarry);
         volcano.emissionCarry -= particlesThisFrame;
         
-        for (let i = 0; i < particlesThisFrame; i++) {
+        // Respect particle limit to prevent performance issues
+        const actualParticles = Math.min(particlesThisFrame, maxParticles - newParticles.length);
+        
+        for (let i = 0; i < actualParticles; i++) {
           // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
           const angle = (Math.random() - 0.5) * Math.PI * 0.6 - Math.PI / 2; // mostly upward
           
@@ -258,9 +266,20 @@ export function updateVolcanoes(
     }
   }
 
-  // Update existing particles
+  // Update existing particles with viewport culling
   for (let i = particles.length - 1; i >= 0; i--) {
     const particle = particles[i];
+    
+    // Viewport culling - only update particles that could be visible
+    const margin = 100; // Allow some particles just outside viewport to stay alive
+    const inViewport = viewLeft === undefined || viewRight === undefined || 
+      (particle.x >= viewLeft - margin && particle.x <= viewRight + margin);
+    
+    if (!inViewport && particle.life < 0.9) {
+      // Remove particles that are outside viewport and not newly created
+      particles.splice(i, 1);
+      continue;
+    }
     
     // Physics
     particle.x += particle.vx * dt;
@@ -287,15 +306,24 @@ export function drawVolcanoes(
   ctx: CanvasRenderingContext2D,
   volcanoes: Volcano[],
   particles: VolcanoParticle[],
-  levelColor?: string
+  levelColor?: string,
+  viewLeft?: number,
+  viewRight?: number
 ) {
-  // Draw volcano craters
+  // Draw volcano craters with viewport culling
   ctx.save();
   ctx.strokeStyle = '#8B4513'; // brown crater rim
   ctx.fillStyle = '#2F1B14'; // dark crater interior
   ctx.lineWidth = 2;
 
   for (const volcano of volcanoes) {
+    // Skip volcanoes outside viewport
+    if (viewLeft !== undefined && viewRight !== undefined) {
+      if (volcano.x + volcano.size < viewLeft || volcano.x - volcano.size > viewRight) {
+        continue;
+      }
+    }
+    
     // Crater rim
     ctx.beginPath();
     ctx.arc(volcano.x, volcano.y, volcano.size / 2, 0, Math.PI * 2);
@@ -316,10 +344,17 @@ export function drawVolcanoes(
     }
   }
 
-  // Draw particles
+  // Draw particles with viewport culling
   for (const particle of particles) {
     const alpha = particle.life;
     if (alpha <= 0) continue;
+    
+    // Skip particles outside viewport
+    if (viewLeft !== undefined && viewRight !== undefined) {
+      if (particle.x < viewLeft - 50 || particle.x > viewRight + 50) {
+        continue;
+      }
+    }
     
     // Color based on temperature - use level color shades if provided
     let color: string;

@@ -596,17 +596,7 @@ export class MovingPadSystem {
     const padWidth = pad.width || 32;
     const footY = y + 8; // Lander foot is ~8 pixels below center
     
-    // Debug log for vertical pads
-    if (pad.motion === "elevator" || pad.motion === "arc") {
-      console.log("[MovingPad] Collision check:", { 
-        landerX: x, 
-        footY, 
-        padPos: pad.currentPos, 
-        padWidth,
-        horizontalDist: Math.abs(x - pad.currentPos.x),
-        verticalDist: Math.abs(footY - pad.currentPos.y)
-      });
-    }
+    // Performance optimization: removed debug logging
     
     // Check horizontal bounds with appropriate tolerance
     const horizontalTolerance = pad.motion === "shuttle" ? 2 : 6; // More generous for vertical pads
@@ -623,13 +613,7 @@ export class MovingPadSystem {
       verticalTolerance = 20; // Increased to 20px for levels 6+
     }
     
-    const onPad = Math.abs(footY - pad.currentPos.y) <= verticalTolerance;
-    
-    if (onPad && (pad.motion === "elevator" || pad.motion === "arc")) {
-      console.log("[MovingPad] Landing detected on moving pad:", { motion: pad.motion, pos: pad.currentPos });
-    }
-    
-    return onPad;
+    return Math.abs(footY - pad.currentPos.y) <= verticalTolerance;
   }
 
   // Calculate relative velocity for landing checks

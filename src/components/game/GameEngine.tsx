@@ -795,7 +795,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         const mp = terrainData.movingPads[0];
         if (mp && !loggedMovingPadStart && mp.phase === "moving" && (Math.abs(mp.currentVelocity.x) + Math.abs(mp.currentVelocity.y)) > 0.1) {
           console.log("[MovingPad] Movement started", { pos: mp.currentPos, vel: mp.currentVelocity, speed: mp.speed });
-          loggedMovingPadStart = true;
+        loggedMovingPadStart = true;
         }
       }
       
@@ -856,6 +856,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           setVolcanoParticles([...volcanoParticles]);
         }
       }
+      
+      // Update HUD at 8Hz instead of separate timer (integrated into main loop for performance)
+      hudUpdateTimer += dt;
+      if (hudUpdateTimer >= 0.12) { // 120ms = 8.33 Hz
+        updateHud();
+        hudUpdateTimer = 0;
+      }
+      
       // Hazard collisions (airborne)
       if (!crashed && checkHazardCollision(hazards, x, y, 10)) {
         running = false;
@@ -1534,12 +1542,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (isCavernLevel) {
         const cavernData = terrain as CavernData;
         if (cavernData.volcanoes && cavernData.volcanoes.length > 0) {
-          drawVolcanoes(ctx, cavernData.volcanoes, volcanoParticles, neonColor);
+          drawVolcanoes(ctx, cavernData.volcanoes, volcanoParticles, neonColor, viewLeft, viewRight);
         }
       } else {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
-          drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles, neonColor);
+          drawVolcanoes(ctx, terrainData.volcanoes, volcanoParticles, neonColor, viewLeft, viewRight);
         }
       }
       
@@ -1743,10 +1751,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       ctx.restore();
     };
 
+    // HUD update timer integrated into main loop
+    let hudUpdateTimer = 0;
+    
     raf = requestAnimationFrame(loop);
-    const hudTimer = setInterval(updateHud, 120);
 
-    return () => { cancelAnimationFrame(raf); clearInterval(hudTimer); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
+    return () => { cancelAnimationFrame(raf); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
 
   return (
