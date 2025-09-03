@@ -803,19 +803,24 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         setFps(Math.round(1000 / (timestamp - lastTime.current + 1)));
       }
 
-      // Check game over
-      if (game.current.lives <= 0 && !game.current.gameOver) {
-        game.current.gameOver = true;
-        const elapsed = (Date.now() - gameStartTime.current) / 1000;
-        onGameOver({
-          score: game.current.score,
-          wave: game.current.wave,
-          cause: "destroyed",
-          difficulty,
-          elapsed,
-          seed: worldSeed.current
-        });
-        return;
+      // Check game over - trigger immediately when lives reach 0
+      if (game.current.lives <= 0) {
+        if (!game.current.gameOver) {
+          game.current.gameOver = true;
+          game.current.gameStarted = false; // Stop the game loop
+          const elapsed = (Date.now() - gameStartTime.current) / 1000;
+          
+          // Call onGameOver which should trigger the game over screen
+          onGameOver({
+            score: game.current.score,
+            wave: game.current.wave,
+            cause: "destroyed",
+            difficulty,
+            elapsed,
+            seed: worldSeed.current
+          });
+        }
+        return; // Exit the game loop immediately
       }
 
       raf = requestAnimationFrame(loop);
