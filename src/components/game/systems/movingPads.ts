@@ -185,19 +185,19 @@ export class MovingPadSystem {
     } else {
       // Shuttle movement (horizontal)
       if (forced) {
-        // For forced generation, find flat terrain for flush placement
-        const samples = 30;
+      // For forced generation, find flat terrain for flush placement with STRICTER requirements
+        const samples = 40; // More samples for better placement
         let bestX = worldWidth * 0.5;
         let bestFlatness = Infinity;
         
         // Find the flattest area in the middle section
         for (let i = 0; i < samples; i++) {
           const centerX = worldWidth * (0.3 + (i / samples) * 0.4); // Sample middle 40%
-          const sampleWidth = 50; // Check 50 pixels of terrain flatness
+          const sampleWidth = 80; // Check larger area for terrain flatness
           let maxVariation = 0;
           const baseHeight = getHeightAt(centerX);
           
-          for (let j = -sampleWidth; j <= sampleWidth; j += 5) {
+          for (let j = -sampleWidth; j <= sampleWidth; j += 3) {
             const variation = Math.abs(getHeightAt(centerX + j) - baseHeight);
             maxVariation = Math.max(maxVariation, variation);
           }
@@ -208,18 +208,29 @@ export class MovingPadSystem {
           }
         }
         
-        const y = getHeightAt(bestX); // Place flush with terrain
+        // Use the maximum terrain height across the pad width for perfect flush placement
         const width = 105 + rand() * 60; // 105-165 pixel width (50% bigger)
+        let maxTerrainY = getHeightAt(bestX);
+        for (let checkX = bestX - width/2; checkX <= bestX + width/2; checkX += 5) {
+          maxTerrainY = Math.max(maxTerrainY, getHeightAt(checkX));
+        }
         
-        pos0 = { x: bestX - width / 2, y };
-        pos1 = { x: bestX + width / 2, y };
+        pos0 = { x: bestX - width / 2, y: maxTerrainY };
+        pos1 = { x: bestX + width / 2, y: maxTerrainY };
+        
+        console.log(`[MovingPad] Forced shuttle pad at y=${maxTerrainY.toFixed(1)}, flatness=${bestFlatness.toFixed(1)}`);
       } else {
         const centerX = worldWidth * (0.2 + rand() * 0.6);
-        const y = getHeightAt(centerX); // Place flush with terrain
         const width = 150 + rand() * 120; // 150-270 pixel width (50% bigger)
         
-        pos0 = { x: centerX - width / 2, y };
-        pos1 = { x: centerX + width / 2, y };
+        // Use the maximum terrain height across the pad width for perfect flush placement
+        let maxTerrainY = getHeightAt(centerX);
+        for (let checkX = centerX - width/2; checkX <= centerX + width/2; checkX += 5) {
+          maxTerrainY = Math.max(maxTerrainY, getHeightAt(checkX));
+        }
+        
+        pos0 = { x: centerX - width / 2, y: maxTerrainY };
+        pos1 = { x: centerX + width / 2, y: maxTerrainY };
       }
     }
 
@@ -386,37 +397,42 @@ export class MovingPadSystem {
 
     // Enhanced terrain validation for different motion types
     if (motion === "shuttle") {
-      // For horizontal movement, ensure both endpoints are on safe, flat terrain
+      // For horizontal movement, ensure both endpoints are on safe, flat terrain with STRICTER tolerance
       const padWidth = 40; // Safer buffer for pad width
       
-      // Check pos0 endpoint
+      // Check pos0 endpoint - require better terrain match
       const terrainY0 = getHeightAt(pos0.x);
-      if (pos0.y > terrainY0 + 1.0) return false; // Must be on or above terrain
+      if (pos0.y > terrainY0 + 0.5) return false; // Must be nearly flush with terrain
       
-      // Check terrain flatness around pos0
+      // Check terrain flatness around pos0 - MUCH stricter
       const checkRadius = Math.max(padWidth, 60); // Larger safety area
-      for (let dx = -checkRadius; dx <= checkRadius; dx += 8) {
+      let maxVariation = 0;
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 4) {
         const checkX = pos0.x + dx;
         const checkTerrainY = getHeightAt(checkX);
-        // Stricter cliff detection - no overhangs allowed
-        if (Math.abs(checkTerrainY - terrainY0) > 8) {
-          return false; // Too much terrain variation
-        }
+        const variation = Math.abs(checkTerrainY - terrainY0);
+        maxVariation = Math.max(maxVariation, variation);
       }
+      if (maxVariation > 2.0) return false; // Much stricter: max 2px variation
       
-      // Check pos1 endpoint
+      // Check pos1 endpoint - require better terrain match
       const terrainY1 = getHeightAt(pos1.x);
-      if (pos1.y > terrainY1 + 1.0) return false; // Must be on or above terrain
+      if (pos1.y > terrainY1 + 0.5) return false; // Must be nearly flush with terrain
       
-      // Check terrain flatness around pos1
-      for (let dx = -checkRadius; dx <= checkRadius; dx += 8) {
+      // Check terrain flatness around pos1 - MUCH stricter
+      maxVariation = 0;
+      for (let dx = -checkRadius; dx <= checkRadius; dx += 4) {
         const checkX = pos1.x + dx;
         const checkTerrainY = getHeightAt(checkX);
-        // Stricter cliff detection - no overhangs allowed
-        if (Math.abs(checkTerrainY - terrainY1) > 8) {
-          return false; // Too much terrain variation
-        }
+        const variation = Math.abs(checkTerrainY - terrainY1);
+        maxVariation = Math.max(maxVariation, variation);
       }
+      if (maxVariation > 2.0) return false; // Much stricter: max 2px variation
+      
+      // For shuttle pads, ensure they're placed at the HIGHEST point of their track to prevent sinking
+      const trackMaxY = Math.max(terrainY0, terrainY1);
+      pos0.y = trackMaxY;
+      pos1.y = trackMaxY;
     } else if (motion === "elevator") {
       // For vertical movement, ensure bottom position is on flat terrain
       const terrainY = getHeightAt(pos1.x); // pos1 is bottom for elevator

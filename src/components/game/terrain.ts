@@ -98,11 +98,31 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     
     const y = targetY; // use the exact flattened height
 
-    // Check for overlap with existing pads before adding
+    // Check for overlap with existing pads before adding (handle world wrap)
     let overlaps = false;
     for (const existingPad of pads) {
-      const existingWidth = existingPad.xEnd - existingPad.xStart;
-      const overlap = !(xEnd < existingPad.xStart || xStart > existingPad.xEnd);
+      let overlap = false;
+      
+      if (xStart <= xEnd) {
+        // Normal pad (no wrap)
+        if (existingPad.xStart <= existingPad.xEnd) {
+          // Both normal
+          overlap = !(xEnd < existingPad.xStart || xStart > existingPad.xEnd);
+        } else {
+          // Existing wraps, new doesn't
+          overlap = (xStart <= existingPad.xEnd || xEnd >= existingPad.xStart);
+        }
+      } else {
+        // New pad wraps around world seam
+        if (existingPad.xStart <= existingPad.xEnd) {
+          // New wraps, existing doesn't
+          overlap = (existingPad.xStart <= xEnd || existingPad.xEnd >= xStart);
+        } else {
+          // Both wrap - always overlap
+          overlap = true;
+        }
+      }
+      
       if (overlap) {
         overlaps = true;
         break;
@@ -211,14 +231,36 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     if (movingPad) {
       movingPads.push(movingPad);
       
-      // Remove any static pads that overlap with moving pad area
+      // Remove any static pads that overlap with moving pad area (handle world wrap)
       const movingPadBuffer = 150; // Buffer zone around moving pad
       const minMovingX = Math.min(movingPad.pos0.x, movingPad.pos1.x) - movingPadBuffer;
       const maxMovingX = Math.max(movingPad.pos0.x, movingPad.pos1.x) + movingPadBuffer;
       
       for (let i = pads.length - 1; i >= 0; i--) {
         const pad = pads[i];
-        const padOverlaps = !(pad.xEnd < minMovingX || pad.xStart > maxMovingX);
+        let padOverlaps = false;
+        
+        // Check overlap considering world wrap
+        if (minMovingX >= 0 && maxMovingX < worldWidthLocal) {
+          // Moving pad doesn't wrap
+          if (pad.xStart <= pad.xEnd) {
+            // Static pad doesn't wrap
+            padOverlaps = !(pad.xEnd < minMovingX || pad.xStart > maxMovingX);
+          } else {
+            // Static pad wraps
+            padOverlaps = (pad.xStart <= maxMovingX || pad.xEnd >= minMovingX);
+          }
+        } else {
+          // Moving pad area might wrap - be conservative and check overlap
+          const padCenterX = (pad.xStart + pad.xEnd) / 2;
+          const movingCenterX = (movingPad.pos0.x + movingPad.pos1.x) / 2;
+          const dist = Math.min(
+            Math.abs(padCenterX - movingCenterX),
+            worldWidthLocal - Math.abs(padCenterX - movingCenterX)
+          );
+          padOverlaps = dist < movingPadBuffer * 2;
+        }
+        
         const heightDiff = Math.abs(pad.y - movingPad.currentPos.y);
         
         if (padOverlaps && heightDiff < 30) {
@@ -252,6 +294,29 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     return null;
   };
 
+  // ===== POST-PROCESS TERRAIN FIXES =====
+  // Fix static pads: snap to exact terrain height and flatten
+  for (const pad of pads) {
+    const padCenterX = (pad.xStart + pad.xEnd) / 2;
+    const padIdx = Math.floor((padCenterX / worldWidthLocal) * segments);
+    const clampedIdx = Math.max(0, Math.min(segments - 1, padIdx));
+    
+    // Use exact terrain height at pad center
+    const exactTerrainY = getHeightAt(padCenterX);
+    pad.y = exactTerrainY;
+    
+    // Re-flatten terrain around pad with wider area
+    const padWidth = pad.xEnd - pad.xStart;
+    const halfCount = Math.max(2, Math.round((padWidth / step) * 1.5));
+    
+    for (let j = -halfCount; j <= halfCount; j++) {
+      const idx = ((clampedIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
+      points[idx].y = exactTerrainY;
+    }
+    
+    console.log(`[Terrain] Post-fixed static pad at (${padCenterX.toFixed(1)}, ${exactTerrainY.toFixed(1)}) width=${padWidth.toFixed(1)}`);
+  }
+
   // ===== Generate collectibles =====
   let collectibles: CollectiblesData | undefined;
   
@@ -274,6 +339,26 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     // Use a terrain-based color for collectibles
     const terrainColor = "hsl(var(--primary))"; // Use primary color from design system
     collectibles = generateCollectibles(seed, context, terrainColor);
+    
+    // ===== SANITIZE COLLECTIBLES =====
+    // Ensure no collectibles are buried under terrain
+    if (collectibles) {
+      let fixCount = 0;
+      for (const junk of collectibles.spaceJunk) {
+        const terrainY = getHeightAt(junk.pos.x);
+        const minAllowedY = terrainY - 40; // Must be 40px above terrain
+        
+        if (junk.pos.y >= minAllowedY) {
+          const oldY = junk.pos.y;
+          junk.pos.y = minAllowedY - 5; // Place safely above terrain
+          fixCount++;
+          console.log(`[Terrain] Raised buried collectible from y=${oldY.toFixed(1)} to y=${junk.pos.y.toFixed(1)} (terrain=${terrainY.toFixed(1)})`);
+        }
+      }
+      if (fixCount > 0) {
+        console.log(`[Terrain] Fixed ${fixCount} buried collectibles`);
+      }
+    }
   }
 
   return { 

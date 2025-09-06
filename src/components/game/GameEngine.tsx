@@ -230,6 +230,22 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty);
          })();
     
+    // ===== RUNTIME SANITY CHECKS =====
+    if (!isCavernLevel && terrain.pads) {
+      let issueCount = 0;
+      for (const pad of terrain.pads) {
+        const terrainY = terrain.getHeightAt((pad.xStart + pad.xEnd) / 2);
+        const padError = Math.abs(pad.y - terrainY);
+        if (padError > 1.0) {
+          console.warn(`[GameEngine] SANITY CHECK: Static pad misaligned by ${padError.toFixed(1)}px at x=${((pad.xStart + pad.xEnd) / 2).toFixed(1)}`);
+          issueCount++;
+        }
+      }
+      if (issueCount > 0) {
+        console.warn(`[GameEngine] Found ${issueCount} misaligned static pads`);
+      }
+    }
+    
     // Initialize collectibles
     collectiblesRef.current = terrain.collectibles || null;
     if (collectiblesRef.current) {
