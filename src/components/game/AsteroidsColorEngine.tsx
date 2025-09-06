@@ -195,6 +195,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
   const lastTime = useRef(0);
   const lastFireTime = useRef(0);
   const frameCount = useRef(0);
+  const gameOverNotified = useRef(false);
 
   // Progressive UFO difficulty based on wave
   const getUFOConfig = () => {
@@ -338,8 +339,23 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     };
 
     const loop = (timestamp: number) => {
-      if (!game.current.gameStarted || game.current.gameOver) {
+      if (!game.current.gameStarted) {
         raf = requestAnimationFrame(loop);
+        return;
+      }
+      if (game.current.gameOver) {
+        if (!gameOverNotified.current) {
+          gameOverNotified.current = true;
+          const elapsed = (Date.now() - gameStartTime.current) / 1000;
+          onGameOver({
+            score: game.current.score,
+            wave: game.current.wave,
+            cause: "destroyed",
+            difficulty,
+            elapsed,
+            seed: worldSeed.current
+          });
+        }
         return;
       }
 
@@ -805,9 +821,10 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
       // Check game over - trigger immediately when lives reach 0
       if (game.current.lives <= 0) {
-        if (!game.current.gameOver) {
+        if (!gameOverNotified.current) {
           game.current.gameOver = true;
           game.current.gameStarted = false; // Stop the game loop
+          gameOverNotified.current = true;
           const elapsed = (Date.now() - gameStartTime.current) / 1000;
           
           // Call onGameOver which should trigger the game over screen
