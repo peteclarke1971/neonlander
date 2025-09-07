@@ -266,17 +266,17 @@ export function updateVolcanoes(
     }
   }
 
-  // Update existing particles with viewport culling
+  // Update existing particles with aggressive viewport culling
   for (let i = particles.length - 1; i >= 0; i--) {
     const particle = particles[i];
     
-    // Viewport culling - only update particles that could be visible
-    const margin = 100; // Allow some particles just outside viewport to stay alive
+    // Aggressive viewport culling for performance
+    const margin = 50; // Reduced margin for better performance
     const inViewport = viewLeft === undefined || viewRight === undefined || 
       (particle.x >= viewLeft - margin && particle.x <= viewRight + margin);
     
-    if (!inViewport && particle.life < 0.9) {
-      // Remove particles that are outside viewport and not newly created
+    if (!inViewport && particle.life < 0.95) {
+      // More aggressive culling - remove particles sooner when off-screen
       particles.splice(i, 1);
       continue;
     }

@@ -33,6 +33,8 @@ import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vib
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
+import { PerformanceManager } from "./utils/performanceManager";
+import { particlePool, debrisPool } from "./utils/objectPool";
 
 interface Props {
   difficulty: Difficulty;
@@ -59,6 +61,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  const [performanceManager] = useState(() => new PerformanceManager());
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -69,9 +72,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [hasRandomEffects, setHasRandomEffects] = useState(false);
   const [randomEffectParams, setRandomEffectParams] = useState<CavernFXParams | undefined>(undefined);
   
-  // Mobile detection and low-gfx mode for performance optimizations
+  // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const shouldOptimizePerformance = isMobile || lowGraphics;
+  const [performanceGoverning, setPerformanceGoverning] = useState(false);
+  const frameTimeAccumulator = useRef(0);
+  const lastPerformanceCheck = useRef(0);
   
   // Volcano particles state
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
@@ -481,11 +487,22 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     };
 
     const spawnExplosion = () => {
-      // Massive particle burst
-      for (let i = 0; i < 220; i++) {
+      // Performance-aware particle burst using object pool
+      const perfUpdate = performanceManager.update(0);
+      const maxParticles = perfUpdate.settings.particleCount * 4; // Explosion gets 4x normal
+      
+      for (let i = 0; i < maxParticles; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 120 + Math.random() * 260;
-        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: 0.8 + Math.random() * 0.7, color: `hsla(${180 + Math.random() * 20},100%,60%,1)` });
+        const particle = particlePool.get();
+        particle.x = x;
+        particle.y = y;
+        particle.vx = Math.cos(a) * s;
+        particle.vy = Math.sin(a) * s;
+        particle.life = 0;
+        particle.max = 0.8 + Math.random() * 0.7;
+        particle.color = `hsla(${180 + Math.random() * 20},100%,60%,1)`;
+        particles.push(particle);
       }
       // Add shockwave ring and screen flash
       shockwaves.push({ x, y, life: 0, max: 0.7 });
@@ -799,8 +816,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         vy = 0;
       }
 
-      // Update moving hazards in non-cavern levels
-      if (!isCavernLevel) { updateHazards(hazards, dt, terrain.worldWidth, BASE_HEIGHT); }
+      // Update moving hazards in non-cavern levels with performance optimization
+      if (!isCavernLevel) { 
+        // Only update hazards that are near the camera
+        const viewWidth = c.width / dprInit;
+        const nearbyHazards = hazards.filter(h => {
+          const dx = Math.abs(h.x - cameraX);
+          const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
+          return wrappedDx < viewWidth + 200; // Screen width + margin
+        });
+        updateHazards(nearbyHazards, dt, terrain.worldWidth, BASE_HEIGHT);
+      }
       
       // Update moving pads
       const terrainData = terrain as TerrainData;
@@ -815,11 +841,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
       
-      // Update volcanoes
+      // Update volcanoes with performance optimization
       if (!isCavernLevel) {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
-          const volcanoUpdate = updateVolcanoes(terrainData.volcanoes, volcanoParticles, dt, level);
+          const viewWidth = c.width / dprInit;
+          const viewLeft = cameraX - viewWidth / 2;
+          const viewRight = cameraX + viewWidth / 2;
+          
+          const volcanoUpdate = updateVolcanoes(terrainData.volcanoes, volcanoParticles, dt, level, viewLeft, viewRight);
           if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0) {
             // Play spatial audio for each erupting volcano
             for (const volcano of volcanoUpdate.eruptingVolcanoes) {
@@ -1233,17 +1263,27 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       if (cameraShake > 0) cameraShake -= 60 * dt;
 
-      // Particles update
+      // Particles update with performance limiting
+      const maxParticles = shouldOptimizePerformance ? 30 : 60;
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vx *= 0.98; p.vy *= 0.98;
-        if (p.life > p.max) particles.splice(i, 1);
+        if (p.life > p.max) {
+          particlePool.release(p);
+          particles.splice(i, 1);
+        }
+      }
+      // Limit total particle count for performance
+      while (particles.length > maxParticles) {
+        const p = particles.shift();
+        if (p) particlePool.release(p);
       }
 
-      // Debris update with wrapping and terrain bounces
+      // Debris update with wrapping and terrain bounces + performance limiting
+      const maxDebris = shouldOptimizePerformance ? 20 : 40;
       for (let i = debris.length - 1; i >= 0; i--) {
         const d = debris[i];
         d.life += dt;
@@ -1266,7 +1306,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (Math.abs(d.vx) < 6) d.vx *= 0.95;
         }
         // lifetime
-        if (d.life > d.max) debris.splice(i, 1);
+        if (d.life > d.max) {
+          debrisPool.release(d);
+          debris.splice(i, 1);
+        }
+      }
+      // Limit debris count for performance
+      while (debris.length > maxDebris) {
+        const d = debris.shift();
+        if (d) debrisPool.release(d);
       }
 
       // Shooting stars update
@@ -1384,11 +1432,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         coreComposition.render(ctx, { x: cameraX, y: y, zoom: zoom });
       }
       
-      // Optimized neon settings with state tracking
+      // Optimized neon settings with performance-based shadow blur
       ctx.strokeStyle = neonColor as any;
       ctx.shadowColor = neonColor as any;
       ctx.lineWidth = 2;
-      const shadowBlur = shouldOptimizePerformance ? SHADOW_BLUR_MOBILE : SHADOW_BLUR_DESKTOP;
+      const shadowBlur = shouldOptimizePerformance ? 3 : 8; // Significantly reduced shadow blur
       ctx.shadowBlur = shadowBlur;
       
       // Viewport culling bounds
@@ -1551,8 +1599,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Wind vectors and anomaly hints
       if (WIND_ENABLED) drawWindVectors(ctx, windZones, terrain.worldWidth, elapsed, neonColor);
       drawAnomaliesField(ctx, anomalies, elapsed, neonColor);
-      // Moving hazards
-      drawHazards(ctx, hazards, neonColor);
+      // Moving hazards with viewport culling
+      const visibleHazards = hazards.filter(h => {
+        const dx = Math.abs(h.x - cameraX);
+        const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
+        return wrappedDx < viewWCull / 2 + 100;
+      });
+      drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
       
       // Volcanoes and their particles
       if (isCavernLevel) {
@@ -1677,14 +1730,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         ctx.restore();
       }
 
-      // Particles
-      for (const p of particles) {
-        ctx.beginPath();
-        ctx.strokeStyle = p.color as any;
-        ctx.lineWidth = 1.8;
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
-        ctx.stroke();
+      // Particles with performance optimization
+      if (particles.length > 0) {
+        ctx.save();
+        ctx.shadowBlur = shouldOptimizePerformance ? 0 : 2; // Minimal or no shadow for particles
+        for (const p of particles) {
+          ctx.beginPath();
+          ctx.strokeStyle = p.color as any;
+          ctx.lineWidth = 1.8;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
 
       // Screen-space overlays
@@ -1720,12 +1778,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       const hpx = ctx.canvas.height / dpr;
       ctx.save();
       ctx.shadowColor = neonColor as any;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = shouldOptimizePerformance ? 2 : 4; // Reduced shadow blur for stars
       ctx.fillStyle = neonColor as any;
       // Map CSS px to device px
       ctx.scale(dpr, dpr);
-      // Static twinkling stars in screen space
-      for (const s of stars) {
+      // Static twinkling stars in screen space - render fewer stars on low performance
+      const starLimit = shouldOptimizePerformance ? Math.min(100, stars.length) : stars.length;
+      for (let i = 0; i < starLimit; i++) {
+        const s = stars[i];
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
         const x = (s.x % wpx + wpx) % wpx;

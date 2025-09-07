@@ -37,7 +37,9 @@ export function generateHazards(seed: number, worldWidth: number, baseHeight: nu
   return arr;
 }
 
-export function updateHazards(hazards: Hazard[], dt: number, worldWidth: number, baseHeight: number) {
+export function updateHazards(hazards: Hazard[], dt: number, worldWidth: number, baseHeight: number, skipPhysics = false) {
+  if (skipPhysics) return; // Allow skipping physics for off-screen hazards
+  
   const yMin = baseHeight - 440; // keep within sky band
   const yMax = baseHeight - 100;
   for (const h of hazards) {
@@ -52,10 +54,19 @@ export function updateHazards(hazards: Hazard[], dt: number, worldWidth: number,
   }
 }
 
-export function drawHazards(ctx: CanvasRenderingContext2D, hazards: Hazard[], neonColor: string) {
+export function drawHazards(ctx: CanvasRenderingContext2D, hazards: Hazard[], neonColor: string, shadowBlur = 0) {
+  if (hazards.length === 0) return; // Early exit for empty arrays
+  
   ctx.save();
   ctx.strokeStyle = neonColor as any;
   ctx.globalAlpha = 0.9;
+  
+  // Optimize shadow settings
+  if (shadowBlur > 0) {
+    ctx.shadowColor = neonColor;
+    ctx.shadowBlur = shadowBlur;
+  }
+  
   for (const h of hazards) {
     ctx.save();
     ctx.translate(h.x, h.y);

@@ -338,9 +338,10 @@ export class CavernFX {
     
     const { worldBounds, collisionGrid, collisionCellSize } = this.cavernData;
     
-    // Performance optimization: Use even lower resolution for low-gfx mode
+    // Performance optimization: Use even lower resolution for performance
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const fieldWidth = isMobile ? 256 : 512; // Half resolution on mobile
+    const isLowPerformance = this.performanceGoverned || this.currentFPS < 50;
+    const fieldWidth = isLowPerformance ? 128 : (isMobile ? 256 : 512); // Quarter resolution when performance governed
     const fieldHeight = Math.floor(fieldWidth * worldBounds.height / worldBounds.width);
     
     const distanceData = new Float32Array(fieldWidth * fieldHeight * 4); // RGBA
