@@ -453,6 +453,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Performance optimization constants
     const PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 4;
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 10; // Enhanced thruster particles for high graphics
     const STAR_COUNT = shouldOptimizePerformance ? 150 : 320;
     const SHADOW_BLUR_DESKTOP = 14;
     const SHADOW_BLUR_MOBILE = 6;
@@ -714,13 +715,16 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           vy += ay;
           fuel -= fuelConsumption * thrust * dt;
           if (fuel <= 0) fuel = 0;
-          // particles from engine (spawn at nozzle at lander base) - mobile-optimized count
+          // Enhanced thruster particles - much more impressive for high graphics
           const nozzleX = x - Math.sin(angle) * 10;
           const nozzleY = y + Math.cos(angle) * 10;
-          for (let i = 0; i < PARTICLE_COUNT; i++) {
+          for (let i = 0; i < THRUSTER_PARTICLE_COUNT; i++) {
             const pa = angle + (Math.random() - 0.5) * 0.6 + Math.PI;
-            const sp = 60 + Math.random() * 120 * thrust;
-            particles.push({ x: nozzleX, y: nozzleY, vx: Math.sin(pa) * sp, vy: -Math.cos(pa) * sp, life: 0, max: 0.5, color: neonColor });
+            const sp = shouldOptimizePerformance ? 
+              (60 + Math.random() * 120 * thrust) : 
+              (80 + Math.random() * 160 * thrust); // Enhanced speed range for high graphics
+            const lifespan = shouldOptimizePerformance ? 0.5 : 0.8; // Extended lifespan for high graphics
+            particles.push({ x: nozzleX, y: nozzleY, vx: Math.sin(pa) * sp, vy: -Math.cos(pa) * sp, life: 0, max: lifespan, color: neonColor });
           }
         }
       }
@@ -1730,10 +1734,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         ctx.restore();
       }
 
-      // Particles with performance optimization
+      // Enhanced particle rendering with impressive thruster effects
       if (particles.length > 0) {
         ctx.save();
-        ctx.shadowBlur = shouldOptimizePerformance ? 0 : 2; // Minimal or no shadow for particles
+        // Determine if this is likely a thruster particle by checking color and properties
+        const hasThrusters = particles.some(p => p.color === neonColor && p.life < p.max);
+        const shadowBlur = shouldOptimizePerformance ? 0 : (hasThrusters ? 15 : 2); // Enhanced shadow blur for thruster particles
+        ctx.shadowBlur = shadowBlur;
+        ctx.shadowColor = neonColor as any;
         for (const p of particles) {
           ctx.beginPath();
           ctx.strokeStyle = p.color as any;
