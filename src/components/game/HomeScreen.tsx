@@ -28,9 +28,9 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
       const saved = localStorage.getItem("ll-low-graphics");
-      return saved === "true";
+      return saved !== "false";
     } catch {
-      return false;
+      return true;
     }
   });
   const [mode, setMode] = useState<Mode>(() => {
