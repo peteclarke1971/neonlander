@@ -453,7 +453,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Performance optimization constants
     const PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 4;
-    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 10; // Enhanced thruster particles for high graphics
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25; // Dramatically enhanced thruster particles for high graphics
     const STAR_COUNT = shouldOptimizePerformance ? 150 : 320;
     const SHADOW_BLUR_DESKTOP = 14;
     const SHADOW_BLUR_MOBILE = 6;
@@ -715,16 +715,47 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           vy += ay;
           fuel -= fuelConsumption * thrust * dt;
           if (fuel <= 0) fuel = 0;
-          // Enhanced thruster particles - much more impressive for high graphics
-          const nozzleX = x - Math.sin(angle) * 10;
-          const nozzleY = y + Math.cos(angle) * 10;
-          for (let i = 0; i < THRUSTER_PARTICLE_COUNT; i++) {
-            const pa = angle + (Math.random() - 0.5) * 0.6 + Math.PI;
-            const sp = shouldOptimizePerformance ? 
-              (60 + Math.random() * 120 * thrust) : 
-              (80 + Math.random() * 160 * thrust); // Enhanced speed range for high graphics
-            const lifespan = shouldOptimizePerformance ? 0.5 : 0.8; // Extended lifespan for high graphics
-            particles.push({ x: nozzleX, y: nozzleY, vx: Math.sin(pa) * sp, vy: -Math.cos(pa) * sp, life: 0, max: lifespan, color: neonColor });
+          // Spectacular multi-nozzle thruster effect - incredibly impressive for high graphics
+          const nozzlePositions = shouldOptimizePerformance ? [
+            { x: x - Math.sin(angle) * 10, y: y + Math.cos(angle) * 10 }
+          ] : [
+            // Center nozzle
+            { x: x - Math.sin(angle) * 10, y: y + Math.cos(angle) * 10 },
+            // Left nozzle 
+            { x: x - Math.sin(angle) * 10 - Math.cos(angle) * 3, y: y + Math.cos(angle) * 10 + Math.sin(angle) * 3 },
+            // Right nozzle
+            { x: x - Math.sin(angle) * 10 + Math.cos(angle) * 3, y: y + Math.cos(angle) * 10 - Math.sin(angle) * 3 }
+          ];
+          
+          for (const nozzle of nozzlePositions) {
+            const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
+            for (let i = 0; i < particlesPerNozzle; i++) {
+              // Much wider angle spread for dramatic effect
+              const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
+              const pa = angle + (Math.random() - 0.5) * angleSpread + Math.PI;
+              
+              // Enhanced speed range with more variation
+              const sp = shouldOptimizePerformance ? 
+                (60 + Math.random() * 120 * thrust) : 
+                (100 + Math.random() * 200 * thrust); // Dramatically enhanced speed range
+              
+              // Double the lifespan as requested
+              const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
+              
+              // Add slight color variation for high graphics
+              const particleColor = shouldOptimizePerformance ? neonColor : 
+                (Math.random() > 0.7 ? neonColor.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColor);
+              
+              particles.push({ 
+                x: nozzle.x, 
+                y: nozzle.y, 
+                vx: Math.sin(pa) * sp, 
+                vy: -Math.cos(pa) * sp, 
+                life: 0, 
+                max: lifespan, 
+                color: particleColor 
+              });
+            }
           }
         }
       }
@@ -1267,14 +1298,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       if (cameraShake > 0) cameraShake -= 60 * dt;
 
-      // Particles update with performance limiting
-      const maxParticles = shouldOptimizePerformance ? 30 : 60;
+      // Enhanced particles update with thruster-friendly limits
+      const maxParticles = shouldOptimizePerformance ? 30 : 300; // Allow 300 particles for spectacular thruster effects
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vx *= 0.98; p.vy *= 0.98;
+        
+        // Variable damping - less for newer particles (more realistic physics)
+        const ageRatio = p.life / p.max;
+        const dampening = shouldOptimizePerformance ? 0.98 : (0.96 + ageRatio * 0.04); // 0.96 to 1.0 based on age
+        p.vx *= dampening; 
+        p.vy *= dampening;
+        
         if (p.life > p.max) {
           particlePool.release(p);
           particles.splice(i, 1);
@@ -1734,18 +1771,30 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         ctx.restore();
       }
 
-      // Enhanced particle rendering with impressive thruster effects
+      // Spectacular particle rendering with dramatically enhanced thruster effects
       if (particles.length > 0) {
         ctx.save();
-        // Determine if this is likely a thruster particle by checking color and properties
-        const hasThrusters = particles.some(p => p.color === neonColor && p.life < p.max);
-        const shadowBlur = shouldOptimizePerformance ? 0 : (hasThrusters ? 15 : 2); // Enhanced shadow blur for thruster particles
-        ctx.shadowBlur = shadowBlur;
-        ctx.shadowColor = neonColor as any;
+        
         for (const p of particles) {
+          // Determine if this is a thruster particle
+          const isThruster = p.color === neonColor || p.color.includes('hsla');
+          
+          // Age-based fade and size variation for thruster particles
+          const ageRatio = p.life / p.max;
+          const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
+          
+          // Dramatic shadow blur for thruster particles
+          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+          ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
+          
           ctx.beginPath();
+          ctx.globalAlpha = alpha;
           ctx.strokeStyle = p.color as any;
-          ctx.lineWidth = 1.8;
+          
+          // Variable line width for thruster particles - thicker when young
+          const lineWidth = shouldOptimizePerformance ? 1.8 : 
+            (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8); // 1.5-2.5px for thrusters
+          ctx.lineWidth = lineWidth;
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
           ctx.stroke();
