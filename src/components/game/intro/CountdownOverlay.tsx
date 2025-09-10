@@ -163,14 +163,6 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.arc(targetX, targetY, ringRadius + ringJitter, 0, Math.PI * 2);
           ctx.stroke();
           
-          // Extra micro-ring for GO
-          if (isGO && !lowGraphics) {
-            ctx.globalAlpha = ringAlpha * 0.6;
-            ctx.beginPath();
-            ctx.arc(targetX, targetY, ringRadius * 1.3 + ringJitter, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-          
           ctx.restore();
         }
 
