@@ -174,10 +174,12 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.restore();
         }
 
-        // Draw dotted circle around lander (appears throughout countdown and GO, fades out when player gains control)
+        // Draw dotted circle around lander (visible from the start of countdown; fades when player gains control)
         if (shipPosition && !photosensitive) {
-          const circleAlpha = alpha * 0.8; // Match the text fade
+          // Keep circle fully visible during countdown, then fade with GO
+          const circleAlpha = state.phase === "countdown" ? 1 : alpha;
           const circleRadius = 25; // Fixed radius around the lander
+          const circleYOffset = 4; // Slight downward adjustment to better center on lander
           
           ctx.save();
           ctx.globalAlpha = circleAlpha;
@@ -185,7 +187,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]); // Dotted line pattern
           ctx.beginPath();
-          ctx.arc(shipPosition.x, shipPosition.y, circleRadius, 0, Math.PI * 2);
+          ctx.arc(shipPosition.x, shipPosition.y + circleYOffset, circleRadius, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
