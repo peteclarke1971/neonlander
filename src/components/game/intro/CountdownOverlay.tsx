@@ -174,6 +174,22 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.restore();
         }
 
+        // Draw dotted circle around lander (appears throughout countdown and GO, fades out when player gains control)
+        if (shipPosition && !photosensitive) {
+          const circleAlpha = alpha * 0.8; // Match the text fade
+          const circleRadius = 25; // Fixed radius around the lander
+          
+          ctx.save();
+          ctx.globalAlpha = circleAlpha;
+          ctx.strokeStyle = '#00ffff';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]); // Dotted line pattern
+          ctx.beginPath();
+          ctx.arc(shipPosition.x, shipPosition.y, circleRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
         // Warp-in effect for GO phase
         if (state.phase === "go" && state.variant === "warp" && shipPosition) {
           const warpProgress = Math.min(state.timeInPhase / 200, 1);
@@ -196,18 +212,13 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           // Ship materialization effect
           if (warpProgress > 0.3) {
             const shipAlpha = (warpProgress - 0.3) / 0.7;
-            const isDashed = !lowGraphics && shipAlpha < 0.8;
             
             ctx.save();
             ctx.globalAlpha = shipAlpha;
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             
-            if (isDashed) {
-              ctx.setLineDash([5, 5]);
-            }
-            
-            // Simple ship outline (triangle)
+            // Simple ship outline (triangle) - no dashed outline needed since dotted circle handles it
             ctx.beginPath();
             ctx.moveTo(shipPosition.x, shipPosition.y - 10);
             ctx.lineTo(shipPosition.x - 8, shipPosition.y + 8);
@@ -215,10 +226,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
             ctx.closePath();
             ctx.stroke();
             
-            if (!isDashed) {
-              ctx.fillStyle = '#333333';
-              ctx.fill();
-            }
+            ctx.fillStyle = '#333333';
+            ctx.fill();
             
             // Vertical noise shimmer effect
             if (!lowGraphics && shipAlpha > 0.8) {
