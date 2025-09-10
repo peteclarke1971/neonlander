@@ -177,7 +177,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]); // Dotted line pattern
           ctx.beginPath();
-          ctx.arc(shipPosition.x, shipPosition.y + circleYOffset, circleRadius, 0, Math.PI * 2);
+          // Ship position is in CSS pixels, but canvas is scaled by dpr, so we need to account for that
+          ctx.arc(shipPosition.x / dpr, (shipPosition.y + circleYOffset) / dpr, circleRadius, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
