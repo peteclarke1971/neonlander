@@ -36,6 +36,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let rafId: number | null = null;
+
     // iOS performance optimizations
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -50,20 +52,25 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     canvas.height = height * dpr;
     canvas.style.width = width + 'px';
     canvas.style.height = height + 'px';
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const render = () => {
       if (state.phase === "inactive") return;
       if (state.phase === "done") { 
         // Clear entire canvas buffer and reset all state
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
         return; 
       }
 
-      // Clear entire canvas buffer (not just CSS dimensions)
+      // Reset transform and clear entire canvas buffer (not just CSS dimensions)
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Re-apply drawing scale for this frame
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       
       // Reset all canvas state at start of each frame
       ctx.shadowBlur = 0;
@@ -229,9 +236,10 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
 
       // Continue animation until GO fades out completely
       if (state.phase === "countdown" || (state.phase === "go" && state.timeInPhase < 600)) {
-        requestAnimationFrame(render);
+        rafId = requestAnimationFrame(render);
       } else {
         // Final cleanup - clear entire canvas buffer and reset all state
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
@@ -240,6 +248,16 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     };
 
     render();
+
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      // Ensure full clear on unmount/effect re-run
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    };
   }, [state, lowGraphics, photosensitive, shipPosition]);
 
   if (state.phase === "inactive") {
