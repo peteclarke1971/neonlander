@@ -168,14 +168,28 @@ export function createCountdownIntro(): IntroHandle {
 
     skip() {
       if (state.canSkip && handle.isActive()) {
+        // Fast-forward to GO exactly like natural flow
         state.phase = "go";
         state.currentWord = "GO";
         state.timeInPhase = 0;
-        
+
+        // Trigger GO side-effects (controls enable, sfx), and warp if variant
+        options.onGo();
+        if (options.variant === "warp") {
+          options.onWarp();
+        }
+
+        // Ensure the animation loop continues so timeInPhase advances and the overlay can fade out
+        lastTime = performance.now();
+        if (animationFrameId === null) {
+          animationFrameId = requestAnimationFrame(updateState);
+        }
+
+        // Wait for GO to fade out completely (match natural 600ms)
         setTimeout(() => {
           state.phase = "done";
           if (onDoneCallback) onDoneCallback();
-        }, 200);
+        }, 600);
       }
     }
   };
