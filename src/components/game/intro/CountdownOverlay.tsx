@@ -36,11 +36,21 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Match game canvas size
-    canvas.width = gameCanvas.width;
-    canvas.height = gameCanvas.height;
-    canvas.style.width = gameCanvas.style.width;
-    canvas.style.height = gameCanvas.style.height;
+    // iOS performance optimizations
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    // Clamp canvas resolution on mobile devices to prevent performance issues
+    const dpr = isIOS ? Math.min(window.devicePixelRatio || 1, 2) : (window.devicePixelRatio || 1);
+    const rect = gameCanvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.scale(dpr, dpr);
 
     const render = () => {
       if (state.phase === "inactive" || state.phase === "done") return;
@@ -87,17 +97,17 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Glow effect (unless low graphics)
-        if (!lowGraphics) {
-          ctx.shadowColor = '#00ffff';
-          ctx.shadowBlur = 20;
+        // Apply glow effect (but disable on iOS to prevent performance issues)
+        if (!isIOS && !photosensitive && !lowGraphics) {
+          ctx.shadowColor = isGO ? '#ff6b6b' : '#4a9eff';
+          ctx.shadowBlur = Math.min(baseSize * 0.2, 20); // Reduced from 0.4 and 40
         }
         
         ctx.strokeStyle = '#00ffff';
         ctx.lineWidth = 3;
         ctx.strokeText(state.currentWord, centerX + jiggleX, centerY + jiggleY);
         
-        if (!lowGraphics) {
+        if (!isIOS && !lowGraphics) {
           ctx.shadowBlur = 0;
         }
         
@@ -204,13 +214,16 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       // Continue animation until GO fades out completely
       if (state.phase === "countdown" || (state.phase === "go" && state.timeInPhase < 600)) {
         requestAnimationFrame(render);
+      } else {
+        // Clear canvas when animation is complete
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     };
 
     render();
   }, [state, lowGraphics, photosensitive, shipPosition]);
 
-  if (state.phase === "inactive" || state.phase === "done") {
+  if (state.phase === "inactive") {
     return null;
   }
 

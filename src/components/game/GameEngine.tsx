@@ -743,11 +743,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         rumbleNext = now;
       }
 
-      let thrust = Math.max(
-        gpThrust,
-        thrustAnalog.current,
-        keys.current.thrust ? 1 : 0
-      );
+      // Prevent thrust input during countdown intro
+      let thrust = 0;
+      if (!worldPaused && !playerLocked) {
+        thrust = Math.max(
+          gpThrust,
+          thrustAnalog.current,
+          keys.current.thrust ? 1 : 0
+        );
+      }
       if (thrust > 0) {
         if (fuel > 0) {
           // Lift-off assist: when first thrusting from a static start-pad rest in caverns
@@ -846,8 +850,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
 
-      // Abort assist: latch until stabilized, then auto-disengage
-      if ((keys.current.abort || abortAssist.current) && fuel > 0) {
+      // Abort assist: latch until stabilized, then auto-disengage (but not during countdown)
+      if ((keys.current.abort || abortAssist.current) && fuel > 0 && !worldPaused && !playerLocked) {
         // Upright and hover assist
         angle = 0; av = 0; // recenter rotation
         const THRUST_ACCEL = 9.8;
@@ -1973,7 +1977,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           className="absolute inset-0 z-10 touch-none select-none"
           onTouchStart={(e) => { 
             e.preventDefault(); 
-            if (e.touches.length > 0) { 
+            if (e.touches.length > 0 && !worldPaused && !playerLocked) { 
               keys.current.thrust = true; 
               audio.current.resume(); 
             } 
