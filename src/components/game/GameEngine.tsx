@@ -2106,14 +2106,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         shipPosition={shipScreenPos ?? undefined}
       />
       
-      {/* Invulnerability indicator */}
-      {invulnerabilityTimer.current > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-40">
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
-          </div>
-        </div>
-      )}
     </section>
   );
 };
