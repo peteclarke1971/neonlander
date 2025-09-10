@@ -54,9 +54,21 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
 
     const render = () => {
       if (state.phase === "inactive") return;
-      if (state.phase === "done") { ctx.clearRect(0, 0, width, height); return; }
+      if (state.phase === "done") { 
+        // Clear entire canvas buffer and reset all state
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
+        return; 
+      }
 
-      ctx.clearRect(0, 0, width, height);
+      // Clear entire canvas buffer (not just CSS dimensions)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Reset all canvas state at start of each frame
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
 
       const centerX = width / 2;
       const centerY = height / 2;
@@ -219,8 +231,11 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       if (state.phase === "countdown" || (state.phase === "go" && state.timeInPhase < 600)) {
         requestAnimationFrame(render);
       } else {
-        // Clear canvas when animation is complete
-        ctx.clearRect(0, 0, width, height);
+        // Final cleanup - clear entire canvas buffer and reset all state
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
       }
     };
 
