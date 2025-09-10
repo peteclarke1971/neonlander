@@ -125,6 +125,9 @@ export function createCountdownIntro(): IntroHandle {
           if (onDoneCallback) onDoneCallback();
         }, 600);
       }
+    } else if (state.phase === "go") {
+      // During GO phase, just advance timeInPhase for fade-out
+      // The timeout in the countdown transition or skip() will handle the "done" transition
     }
 
     if (state.phase === "countdown" || state.phase === "go") {
