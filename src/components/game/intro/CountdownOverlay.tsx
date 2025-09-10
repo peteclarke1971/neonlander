@@ -53,14 +53,18 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     ctx.scale(dpr, dpr);
 
     const render = () => {
-      if (state.phase === "inactive" || state.phase === "done") return;
+      if (state.phase === "inactive") return;
+      if (state.phase === "done") { ctx.clearRect(0, 0, width, height); return; }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, width, height);
 
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const minDim = Math.min(canvas.width, canvas.height);
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const minDim = Math.min(width, height);
       const baseSize = minDim * 0.24; // 24% of viewport
+
+      const targetX = (shipPosition?.x ?? centerX);
+      const targetY = (shipPosition?.y ?? centerY);
 
       // Create deterministic randomness for this state
       const rng = mulberry32(mix(0, "INTRO_RENDER", state.wordIndex));
@@ -105,14 +109,14 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         
         ctx.strokeStyle = '#00ffff';
         ctx.lineWidth = 3;
-        ctx.strokeText(state.currentWord, centerX + jiggleX, centerY + jiggleY);
+        ctx.strokeText(state.currentWord, targetX + jiggleX, targetY + jiggleY);
         
         if (!isIOS && !lowGraphics) {
           ctx.shadowBlur = 0;
         }
         
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(state.currentWord, centerX + jiggleX, centerY + jiggleY);
+        ctx.fillText(state.currentWord, targetX + jiggleX, targetY + jiggleY);
         
         ctx.restore();
 
@@ -131,14 +135,14 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.strokeStyle = '#00ffff';
           ctx.lineWidth = lowGraphics ? 1 : 2;
           ctx.beginPath();
-          ctx.arc(centerX, centerY, ringRadius + ringJitter, 0, Math.PI * 2);
+          ctx.arc(targetX, targetY, ringRadius + ringJitter, 0, Math.PI * 2);
           ctx.stroke();
           
           // Extra micro-ring for GO
           if (isGO && !lowGraphics) {
             ctx.globalAlpha = ringAlpha * 0.6;
             ctx.beginPath();
-            ctx.arc(centerX, centerY, ringRadius * 1.3 + ringJitter, 0, Math.PI * 2);
+            ctx.arc(targetX, targetY, ringRadius * 1.3 + ringJitter, 0, Math.PI * 2);
             ctx.stroke();
           }
           
@@ -216,7 +220,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         requestAnimationFrame(render);
       } else {
         // Clear canvas when animation is complete
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, width, height);
       }
     };
 

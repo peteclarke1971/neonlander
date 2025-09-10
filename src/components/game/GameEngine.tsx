@@ -70,6 +70,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [introState, setIntroState] = useState<any>({ phase: "inactive" });
   const [worldPaused, setWorldPaused] = useState(false);
   const [playerLocked, setPlayerLocked] = useState(false);
+  const worldPausedRef = useRef(false);
+  const playerLockedRef = useRef(false);
   const invulnerabilityTimer = useRef(0);
   
   // Camera and cavern state for FX renderer
@@ -192,6 +194,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   useEffect(() => {
     cursorManager.current?.forceHideCursor();
   }, [level]);
+
+  // Keep refs in sync with state for game loop
+  useEffect(() => { worldPausedRef.current = worldPaused; }, [worldPaused]);
+  useEffect(() => { playerLockedRef.current = playerLocked; }, [playerLocked]);
 
   // Detect touch-capable devices (enable touch-to-thrust overlay)
   useEffect(() => {
@@ -618,10 +624,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     if (!introRef.current) {
       introRef.current = createCountdownIntro();
       introRef.current.onDone(() => {
-        setWorldPaused(false);
-        setPlayerLocked(false);
-        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
-        try { audio.current.playIntroGo(); } catch {}
+        // Gameplay resumes on 'GO' start; ensure overlay clears fully on done
       });
       
       // Start countdown with "freeze" variant for lander
@@ -630,11 +633,16 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         variant: "freeze",
         seed: introSeed,
         onTick: () => { try { audio.current.playIntroTick(); } catch {} },
-        onGo: () => { try { audio.current.playIntroGo(); } catch {} },
+        onGo: () => { 
+          setWorldPaused(false); worldPausedRef.current = false;
+          setPlayerLocked(false); playerLockedRef.current = false;
+          invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+          try { audio.current.playIntroGo(); } catch {} 
+        },
         onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
       });
-      setWorldPaused(true);
-      setPlayerLocked(true);
+      setWorldPaused(true); worldPausedRef.current = true;
+      setPlayerLocked(true); playerLockedRef.current = true;
     }
 
     const loop = () => {
@@ -674,7 +682,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       elapsed += dt;
-      if (!worldPaused && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
+      if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
         nextBgSat = elapsed + (5 + Math.random() * 7);
         // ensure periodic spawn
@@ -745,7 +753,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       // Prevent thrust input during countdown intro
       let thrust = 0;
-      if (!worldPaused && !playerLocked) {
+      if (!worldPausedRef.current && !playerLockedRef.current) {
         thrust = Math.max(
           gpThrust,
           thrustAnalog.current,
@@ -851,7 +859,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
 
       // Abort assist: latch until stabilized, then auto-disengage (but not during countdown)
-      if ((keys.current.abort || abortAssist.current) && fuel > 0 && !worldPaused && !playerLocked) {
+      if ((keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
         // Upright and hover assist
         angle = 0; av = 0; // recenter rotation
         const THRUST_ACCEL = 9.8;
@@ -874,7 +882,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       angle += av * dt;
 
       // Skip all physics during countdown intro
-      if (worldPaused || playerLocked) {
+      if (worldPausedRef.current || playerLockedRef.current) {
         // Keep lander stationary during countdown
         vx = 0;
         vy = 0;
@@ -2076,7 +2084,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         state={introState} 
         canvasRef={canvasRef}
         lowGraphics={lowGraphics}
-        shipPosition={{ x: 400, y: 300 }} // Will be updated with actual position
       />
       
       {/* Invulnerability indicator */}
