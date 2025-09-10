@@ -14,8 +14,15 @@ const difficulties: { key: Difficulty; label: string; desc: string }[] = [
   { key: "hard", label: "Hard", desc: "Higher gravity, minimal fuel, free spin" },
 ];
 
+interface GameSettings {
+  introVariant: "auto" | "freeze" | "warp";
+  skipCountdowns: "never" | "first" | "always";
+  photosensitive: boolean;
+  lowGraphics: boolean;
+}
+
 interface Props {
-  onStart: (difficulty: Difficulty, startLevel: number | undefined, mode: Mode, lowGraphics?: boolean, seedOverride?: number) => void;
+  onStart: (difficulty: Difficulty, startLevel: number | undefined, mode: Mode, lowGraphics?: boolean, seedOverride?: number, gameSettings?: GameSettings) => void;
   highScoresClassic: HighScore[];
   highScoresFixed: HighScore[];
   lastPlayedSeed?: number;
@@ -31,6 +38,34 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
       return saved !== "false";
     } catch {
       return true;
+    }
+  });
+  
+  // Countdown intro settings
+  const [introVariant, setIntroVariant] = useState<"auto" | "freeze" | "warp">(() => {
+    try {
+      const saved = localStorage.getItem("ll-intro-variant");
+      return (saved as any) || "auto";
+    } catch {
+      return "auto";
+    }
+  });
+  
+  const [skipCountdowns, setSkipCountdowns] = useState<"never" | "first" | "always">(() => {
+    try {
+      const saved = localStorage.getItem("ll-skip-countdowns");
+      return (saved as any) || "never";
+    } catch {
+      return "never";
+    }
+  });
+  
+  const [photosensitive, setPhotosensitive] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ll-photosensitive");
+      return saved === "true";
+    } catch {
+      return false;
     }
   });
   const [mode, setMode] = useState<Mode>(() => {
@@ -60,6 +95,25 @@ const navigate = useNavigate();
       setSeedInput(lastPlayedSeed.toString());
     }
   }, [lastPlayedSeed]);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("ll-intro-variant", introVariant);
+    } catch {}
+  }, [introVariant]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ll-skip-countdowns", skipCountdowns);
+    } catch {}
+  }, [skipCountdowns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ll-photosensitive", photosensitive.toString());
+    } catch {}
+  }, [photosensitive]);
 
   // Gamepad UI navigation: mirror D-pad/LS to arrow/enter/escape
   useEffect(() => {
@@ -422,7 +476,12 @@ useEffect(() => {
               } else {
                 seedNum = ((Math.random() * 0xffffffff) >>> 0);
               }
-              onStart("easy", lastPlayedLevel && lastPlayedLevel > 0 ? lastPlayedLevel + 1 : undefined, mode, lowGraphics, seedNum);
+              onStart("easy", lastPlayedLevel && lastPlayedLevel > 0 ? lastPlayedLevel + 1 : undefined, mode, lowGraphics, seedNum, {
+                introVariant,
+                skipCountdowns,
+                photosensitive,
+                lowGraphics
+              });
             }}
           >
             Play
@@ -449,7 +508,12 @@ useEffect(() => {
                       variant="outline"
                       size="sm"
                       className="w-full"
-                      onClick={() => onStart(d.key, L, mode, lowGraphics)}
+                      onClick={() => onStart(d.key, L, mode, lowGraphics, undefined, {
+                        introVariant,
+                        skipCountdowns,
+                        photosensitive,
+                        lowGraphics
+                      })}
                     >
                       {L}
                     </Button>
@@ -478,7 +542,12 @@ useEffect(() => {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => onStart("easy", L, "caverns", lowGraphics)}
+                    onClick={() => onStart("easy", L, "caverns", lowGraphics, undefined, {
+                      introVariant,
+                      skipCountdowns,
+                      photosensitive,
+                      lowGraphics
+                    })}
                   >
                     {L}
                   </Button>

@@ -30,6 +30,13 @@ export class AudioManager {
   private isPreloaded = false;
   private preloadPromise?: Promise<void>;
 
+  // Intro sound effect sources - will be loaded on demand
+  private introSounds = {
+    tick: '/audio/intro_tick.mp3',
+    go: '/audio/intro_go.mp3', 
+    warp: '/audio/intro_warp.mp3'
+  };
+
   // Level music playlist
   private musicGain?: GainNode;
   private musicSource?: AudioBufferSourceNode | null;
@@ -523,6 +530,52 @@ export class AudioManager {
   wormholeOpen() {
     // Play a mysterious portal opening sound
     this.playNoise(0.8, 0.6);
+  }
+
+  // Intro countdown sound effects
+  async playIntroTick() {
+    if (!this.ctx || !this.master) return;
+    
+    try {
+      const buffer = await this.loadBuffer(this.introSounds.tick);
+      if (buffer) {
+        this.playOneShot(buffer, 0.6);
+      }
+    } catch (error) {
+      console.warn('Failed to play intro tick sound:', error);
+      // Fallback to synthesized tick
+      this.click();
+    }
+  }
+
+  async playIntroGo() {
+    if (!this.ctx || !this.master) return;
+    
+    try {
+      const buffer = await this.loadBuffer(this.introSounds.go);
+      if (buffer) {
+        this.playOneShot(buffer, 0.8);
+      }
+    } catch (error) {
+      console.warn('Failed to play intro go sound:', error);
+      // Fallback to synthesized sound
+      this.playNoise(0.25, 0.7);
+    }
+  }
+
+  async playIntroWarp() {
+    if (!this.ctx || !this.master) return;
+    
+    try {
+      const buffer = await this.loadBuffer(this.introSounds.warp);
+      if (buffer) {
+        this.playOneShot(buffer, 0.7);
+      }
+    } catch (error) {
+      console.warn('Failed to play intro warp sound:', error);
+      // Fallback to shimmer effect
+      this.playNoise(0.5, 0.6);
+    }
   }
 
   wormholeEnter() {
