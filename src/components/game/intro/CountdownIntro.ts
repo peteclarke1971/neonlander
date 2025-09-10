@@ -119,11 +119,11 @@ export function createCountdownIntro(): IntroHandle {
           options.onWarp();
         }
         
-        // Brief pause for GO display
+        // Wait for GO to fade out completely (600ms)
         setTimeout(() => {
           state.phase = "done";
           if (onDoneCallback) onDoneCallback();
-        }, 200);
+        }, 600);
       }
     }
 

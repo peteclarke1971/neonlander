@@ -60,15 +60,22 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       const jiggleY = (rng() - 0.5) * 12;
 
       if (state.phase === "countdown" || state.phase === "go") {
-        // Calculate fade-in animation
-        const fadeProgress = Math.min(state.timeInPhase / 120, 1); // 120ms fade-in
-        const holdTime = 520; // 520ms hold
-        const isHolding = state.timeInPhase > 120 && state.timeInPhase < (120 + holdTime);
-        const isRinging = state.timeInPhase > (120 + holdTime);
+        let alpha = 0;
+        
+        if (state.phase === "countdown") {
+          // Calculate fade-in animation for countdown
+          const fadeProgress = Math.min(state.timeInPhase / 120, 1); // 120ms fade-in
+          const holdTime = 520; // 520ms hold
+          const isHolding = state.timeInPhase > 120 && state.timeInPhase < (120 + holdTime);
+          const isRinging = state.timeInPhase > (120 + holdTime);
 
-        let alpha = fadeProgress;
-        if (isHolding) alpha = 1;
-        if (isRinging) alpha = Math.max(0, 1 - ((state.timeInPhase - 120 - holdTime) / 200));
+          alpha = fadeProgress;
+          if (isHolding) alpha = 1;
+          if (isRinging) alpha = Math.max(0, 1 - ((state.timeInPhase - 120 - holdTime) / 200));
+        } else if (state.phase === "go") {
+          // GO phase - fade out over 600ms
+          alpha = Math.max(0, 1 - state.timeInPhase / 600);
+        }
 
         // Draw the current word
         const isGO = state.currentWord === "GO";
@@ -99,9 +106,10 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         
         ctx.restore();
 
-        // Draw expanding ring during ring phase
+        // Draw expanding ring during ring phase (only for countdown, not GO)
+        const isRinging = state.phase === "countdown" && state.timeInPhase > (120 + 520);
         if (isRinging && !photosensitive) {
-          const ringProgress = (state.timeInPhase - 120 - holdTime) / 200;
+          const ringProgress = (state.timeInPhase - 120 - 520) / 200;
           const ringRadius = baseSize * 0.8 * (1 + ringProgress * 2);
           const ringAlpha = Math.max(0, 1 - ringProgress);
           
@@ -193,8 +201,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         }
       }
 
-      // Continue animation
-      if (state.phase === "countdown" || state.phase === "go") {
+      // Continue animation until GO fades out completely
+      if (state.phase === "countdown" || (state.phase === "go" && state.timeInPhase < 600)) {
         requestAnimationFrame(render);
       }
     };
