@@ -27,6 +27,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
   shipPosition
 }) => {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const goPhaseStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     const canvas = overlayCanvasRef.current;
@@ -63,7 +64,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
-        return; 
+        goPhaseStartRef.current = null;
+        return;
       }
 
       // Reset transform and clear entire canvas buffer (not just CSS dimensions)
@@ -106,8 +108,12 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           if (isHolding) alpha = 1;
           if (isRinging) alpha = Math.max(0, 1 - ((state.timeInPhase - 120 - holdTime) / 200));
         } else if (state.phase === "go") {
-          // GO phase - fade out over 600ms
-          alpha = Math.max(0, 1 - state.timeInPhase / 600);
+          // GO phase - fade out over 600ms (use local timer to avoid reliance on external state updates)
+          if (goPhaseStartRef.current == null) {
+            goPhaseStartRef.current = performance.now() - state.timeInPhase;
+          }
+          const goElapsed = performance.now() - goPhaseStartRef.current;
+          alpha = Math.max(0, 1 - goElapsed / 600);
         }
 
         // Draw the current word
@@ -234,8 +240,18 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         }
       }
 
-      // Continue animation until GO fades out completely
-      if (state.phase === "countdown" || (state.phase === "go" && state.timeInPhase < 600)) {
+      // Continue animation until GO fades out completely (use local timer to ensure fade works even if external state stops updating)
+      let continueAnim = false;
+      if (state.phase === "countdown") {
+        continueAnim = true;
+      } else if (state.phase === "go") {
+        if (goPhaseStartRef.current == null) {
+          goPhaseStartRef.current = performance.now() - state.timeInPhase;
+        }
+        const goElapsed = performance.now() - goPhaseStartRef.current;
+        continueAnim = goElapsed < 600;
+      }
+      if (continueAnim) {
         rafId = requestAnimationFrame(render);
       } else {
         // Final cleanup - clear entire canvas buffer and reset all state
@@ -244,6 +260,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
+        // Reset local GO phase timer
+        goPhaseStartRef.current = null;
       }
     };
 
@@ -257,6 +275,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       ctx.shadowBlur = 0;
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
+      goPhaseStartRef.current = null;
     };
   }, [state, lowGraphics, photosensitive, shipPosition]);
 
