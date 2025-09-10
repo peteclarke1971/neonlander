@@ -65,6 +65,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
   
+  // Screen-space ship position for countdown overlay (CSS pixels)
+  const [shipScreenPos, setShipScreenPos] = useState<{ x: number; y: number } | null>(null);
+  
   // Countdown intro state
   const introRef = useRef<IntroHandle | null>(null);
   const [introState, setIntroState] = useState<any>({ phase: "inactive" });
@@ -139,11 +142,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       c.height = Math.floor(h * dpr);
       c.style.width = `${w}px`;
       c.style.height = `${h}px`;
+
+      // Also compute initial on-screen ship position for the countdown overlay (CSS pixels)
+      const yCss = (mode === "caverns") ? h / 2 : h * 0.45;
+      setShipScreenPos({ x: w / 2, y: yCss });
     };
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
@@ -643,6 +650,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       });
       setWorldPaused(true); worldPausedRef.current = true;
       setPlayerLocked(true); playerLockedRef.current = true;
+
+      // Ensure overlay knows ship screen position from the very start of countdown
+      const parent = containerRef.current!;
+      if (parent) {
+        const wCss = parent.clientWidth;
+        const hCss = parent.clientHeight;
+        const yCss = (mode === "caverns") ? hCss / 2 : hCss * 0.45;
+        setShipScreenPos({ x: wCss / 2, y: yCss });
+      }
     }
 
     const loop = () => {
@@ -2087,6 +2103,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         state={introState} 
         canvasRef={canvasRef}
         lowGraphics={lowGraphics}
+        shipPosition={shipScreenPos ?? undefined}
       />
       
       {/* Invulnerability indicator */}

@@ -179,7 +179,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           // Keep circle fully visible during countdown, then fade with GO
           const circleAlpha = state.phase === "countdown" ? 1 : alpha;
           const circleRadius = 25; // Fixed radius around the lander
-          const circleYOffset = 4; // Slight downward adjustment to better center on lander
+          const circleYOffset = 8; // Downward adjustment to center on lander
           
           ctx.save();
           ctx.globalAlpha = circleAlpha;
