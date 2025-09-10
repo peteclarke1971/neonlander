@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { AudioManager } from "./AudioManager";
 import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
+import { createCountdownIntro, IntroHandle } from "./intro/CountdownIntro";
+import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { CursorManager } from "@/lib/cursorManager";
 import { DEFAULT_CURSOR_CONFIG } from "@/lib/cursorConfig";
 import { RemixStarfield } from "./RemixStarfield";
@@ -101,6 +103,12 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
   const fpsRef = useRef(0);
   const [isTouch, setIsTouch] = useState(false);
+  
+  // Countdown intro state
+  const introRef = useRef<IntroHandle | null>(null);
+  const [introState, setIntroState] = useState<any>({ phase: "inactive" });
+  const [worldPaused, setWorldPaused] = useState(false);
+  const invulnerabilityTimer = useRef(0);
 
   // Touch controls state
   const touchInputRef = useRef({ left: false, right: false, up: false, down: false, fire: false });
@@ -119,6 +127,26 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   // Initialize game state
   const initGameState = useCallback((): RemixGameState => {
     gameSeed = Date.now() % 2147483647;
+    
+    // Initialize countdown intro for Remix with "warp" variant
+    if (!introRef.current) {
+      introRef.current = createCountdownIntro();
+      introRef.current.onDone(() => {
+        setWorldPaused(false);
+        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+      });
+      
+      // Start countdown with "warp" variant for remix
+      const introSeed = mix(gameSeed, "INTRO");
+      introRef.current.start({
+        variant: "warp", 
+        seed: introSeed,
+        onTick: () => { try { audioRef.current?.playIntroTick(); } catch {} },
+        onGo: () => { try { audioRef.current?.playIntroGo(); } catch {} },
+        onWarp: () => { try { audioRef.current?.playIntroWarp(); } catch {} }
+      });
+      setWorldPaused(true);
+    }
     
     return {
       player: {
@@ -316,11 +344,36 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     input.down = input.down || touchInputRef.current.down;
     input.fire = input.fire || touchInputRef.current.fire;
 
-    // Update scroll
-    state.scrollY += state.scrollSpeed * dt / 1000;
+    // Update countdown intro
+    if (introRef.current?.isActive()) {
+      setIntroState(introRef.current.getCurrentState());
+    }
+    
+    // Update invulnerability timer
+    if (invulnerabilityTimer.current > 0) {
+      invulnerabilityTimer.current -= dt;
+    }
+    
+    // Skip countdown on input
+    if (introRef.current?.isActive()) {
+      const skipInput = input.fire || input.up || input.down || input.left || input.right;
+      if (skipInput && introRef.current.getCurrentState().canSkip) {
+        introRef.current.skip();
+      }
+    }
 
-    // Update stage director
-    updateStageDirector(state, dt);
+    // Update scroll - pause during countdown
+    if (!worldPaused) {
+      state.scrollY += state.scrollSpeed * dt / 1000;
+    } else {
+      // Keep scroll speed at 0 during countdown  
+      state.scrollSpeed = 0;
+    }
+
+    // Update stage director - only when not paused
+    if (!worldPaused) {
+      updateStageDirector(state, dt);
+    }
 
     // Update player
     const player = state.player;
@@ -1103,6 +1156,22 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
             }}
           >
             <span className="text-sm text-red-400 font-mono font-bold">FIRE</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Countdown Overlay */}
+      <CountdownOverlay 
+        state={introState} 
+        canvasRef={canvasRef}
+        shipPosition={{ x: 960, y: 900 }} // Remix ship position
+      />
+      
+      {/* Invulnerability indicator */}
+      {invulnerabilityTimer.current > 0 && (
+        <div className="absolute inset-0 pointer-events-none z-40">
+          <div className="absolute" style={{ left: '50%', top: '85%', transform: 'translate(-50%, -50%)' }}>
+            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
           </div>
         </div>
       )}

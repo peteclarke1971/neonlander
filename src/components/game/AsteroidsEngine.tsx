@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AsteroidsHUD } from "./AsteroidsHUD";
 import { AudioManager } from "@/components/game/AudioManager";
+import { createCountdownIntro, IntroHandle, mix } from "./intro/CountdownIntro";
+import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { AsteroidsGameOverData, AsteroidsHUDSnapshot, AsteroidsGameState, Projectile } from "./types/asteroids";
 import {
   generateAsteroidField,
@@ -74,6 +76,12 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  
+  // Countdown intro state
+  const introRef = useRef<IntroHandle | null>(null);
+  const [introState, setIntroState] = useState<any>({ phase: "inactive" });
+  const [worldPaused, setWorldPaused] = useState(false);
+  const invulnerabilityTimer = useRef(0);
   
   // Cursor management
   const cursorManager = useRef<CursorManager | null>(null);
@@ -309,6 +317,26 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
     const ufoConfig = difficulty === "Easy" ? UFO_DIFFICULTY_PRESETS.easy : UFO_DIFFICULTY_PRESETS.normal;
     const ufoState = createUFOState(ufoConfig, baseSeed, "asteroids");
     
+    // Initialize countdown intro
+    if (!introRef.current) {
+      introRef.current = createCountdownIntro();
+      introRef.current.onDone(() => {
+        setWorldPaused(false);
+        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+        try { audio.current.playIntroGo(); } catch {}
+      });
+      
+      // Start countdown with "freeze" variant for classic asteroids
+      const introSeed = mix(baseSeed, "INTRO");
+      introRef.current.start({
+        variant: "freeze", 
+        seed: introSeed,
+        onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+        onGo: () => { try { audio.current.playIntroGo(); } catch {} }
+      });
+      setWorldPaused(true);
+    }
+    
     // UFO events
     const ufoEvents: UFOEvents = {
       onSpawn: (ufo) => {
@@ -349,6 +377,24 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
       }
 
       gameState.elapsed += dt;
+      
+      // Update countdown intro
+      if (introRef.current?.isActive()) {
+        setIntroState(introRef.current.getCurrentState());
+      }
+      
+      // Update invulnerability timer
+      if (invulnerabilityTimer.current > 0) {
+        invulnerabilityTimer.current -= dt * 1000;
+      }
+      
+      // Skip countdown on input
+      if (introRef.current?.isActive()) {
+        const skipInput = keys.current.fire || keys.current.thrust || keys.current.left || keys.current.right;
+        if (skipInput && introRef.current.getCurrentState().canSkip) {
+          introRef.current.skip();
+        }
+      }
 
       // Handle gamepad input
       const gp = anyGamepad();
@@ -1018,6 +1064,22 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
             onTouchEnd={() => { keys.current.right = false; }}
           >
             <span className="text-sm text-accent select-none">→</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Countdown Overlay */}
+      <CountdownOverlay 
+        state={introState} 
+        canvasRef={canvasRef}
+        shipPosition={{ x: 400, y: 300 }} // Will be updated with actual position
+      />
+      
+      {/* Invulnerability indicator */}
+      {invulnerabilityTimer.current > 0 && (
+        <div className="absolute inset-0 pointer-events-none z-40">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
           </div>
         </div>
       )}

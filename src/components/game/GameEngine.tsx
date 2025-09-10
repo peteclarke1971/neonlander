@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { HUD } from "./HUD";
 import { AudioManager } from "./AudioManager";
 import { CavernFXRenderer } from "./CavernFXRenderer";
+import { createCountdownIntro, IntroHandle, mix } from "./intro/CountdownIntro";
+import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
@@ -62,6 +64,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
+  
+  // Countdown intro state
+  const introRef = useRef<IntroHandle | null>(null);
+  const [introState, setIntroState] = useState<any>({ phase: "inactive" });
+  const [worldPaused, setWorldPaused] = useState(false);
+  const [playerLocked, setPlayerLocked] = useState(false);
+  const invulnerabilityTimer = useRef(0);
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -604,6 +613,29 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Rumble state for gamepad thrust
     let thrustHold = 0; // seconds held
     let rumbleNext = 0; // next time to send a rumble pulse (ms timestamp)
+    
+    // Initialize countdown intro
+    if (!introRef.current) {
+      introRef.current = createCountdownIntro();
+      introRef.current.onDone(() => {
+        setWorldPaused(false);
+        setPlayerLocked(false);
+        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+        try { audio.current.playIntroGo(); } catch {}
+      });
+      
+      // Start countdown with "freeze" variant for lander
+      const introSeed = mix(levelSeed, "INTRO");
+      introRef.current.start({
+        variant: "freeze",
+        seed: introSeed,
+        onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+        onGo: () => { try { audio.current.playIntroGo(); } catch {} },
+        onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
+      });
+      setWorldPaused(true);
+      setPlayerLocked(true);
+    }
 
     const loop = () => {
       raf = requestAnimationFrame(loop);
@@ -622,8 +654,27 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         render();
         return;
       }
+      
+      // Update countdown intro
+      if (introRef.current?.isActive()) {
+        setIntroState(introRef.current.getCurrentState());
+      }
+      
+      // Update invulnerability timer
+      if (invulnerabilityTimer.current > 0) {
+        invulnerabilityTimer.current -= dt * 1000;
+      }
+      
+      // Skip countdown on input
+      if (introRef.current?.isActive()) {
+        const skipInput = keys.current.thrust || keys.current.left || keys.current.right || keys.current.abort;
+        if (skipInput && introRef.current.getCurrentState().canSkip) {
+          introRef.current.skip();
+        }
+      }
+      
       elapsed += dt;
-      if (elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
+      if (!worldPaused && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
         nextBgSat = elapsed + (5 + Math.random() * 7);
         // ensure periodic spawn
@@ -818,13 +869,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       angle += av * dt;
 
-      // Physics integration - only if not resting on start pad
-      const onStartPad = isCavernLevel &&
-        Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15 && 
-        Math.abs(y - (terrain as CavernData).startPad.y + 14) < 2 &&
-        x >= (terrain as CavernData).startPad.xStart && 
-        x <= (terrain as CavernData).startPad.xEnd &&
-        !(keys.current.thrust || thrustAnalog.current > 0.05);
+      // Skip all physics during countdown intro
+      if (worldPaused || playerLocked) {
+        // Keep lander stationary during countdown
+        vx = 0;
+        vy = 0;
+        av = 0;
+      } else {
+        // Physics integration - only if not resting on start pad
+        const onStartPad = isCavernLevel &&
+          Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15 && 
+          Math.abs(y - (terrain as CavernData).startPad.y + 14) < 2 &&
+          x >= (terrain as CavernData).startPad.xStart && 
+          x <= (terrain as CavernData).startPad.xEnd &&
+          !(keys.current.thrust || thrustAnalog.current > 0.05);
 
       if (!onStartPad) {
         // Apply gravity only when not resting on start pad
@@ -846,9 +904,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         x = wrapX(x + vx * dt * 60);
         y += vy * dt * 60;
       } else {
-        // Keep lander perfectly still on start pad
-        vx = 0;
-        vy = 0;
+          // Keep lander perfectly still on start pad
+          vx = 0;
+          vy = 0;
+        }
       }
 
       // Update moving hazards in non-cavern levels with performance optimization
@@ -2007,6 +2066,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         <Button variant="hero" className="select-none" onClick={() => setPaused((p) => !p)}><span className="select-none">{paused ? "Resume" : "Pause"}</span></Button>
         <Button variant="outline" className="select-none" onClick={onExit}><span className="select-none">Exit</span></Button>
       </div>
+      
+      {/* Countdown Overlay */}
+      <CountdownOverlay 
+        state={introState} 
+        canvasRef={canvasRef}
+        lowGraphics={lowGraphics}
+        shipPosition={{ x: 400, y: 300 }} // Will be updated with actual position
+      />
+      
+      {/* Invulnerability indicator */}
+      {invulnerabilityTimer.current > 0 && (
+        <div className="absolute inset-0 pointer-events-none z-40">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
+          </div>
+        </div>
+      )}
     </section>
   );
 };

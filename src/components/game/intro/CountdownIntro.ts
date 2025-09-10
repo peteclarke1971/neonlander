@@ -7,6 +7,9 @@ export interface CountdownOptions {
   allowSkipAfterMs?: number; // default 800
   words?: string[]; // default ["3","2","1","GO"]
   seed?: number; // mix(levelSeed,"INTRO")
+  onTick?: () => void; // called on each digit
+  onGo?: () => void; // called on GO
+  onWarp?: () => void; // called on warp effect
 }
 
 export interface IntroHandle {
@@ -72,7 +75,10 @@ export function createCountdownIntro(): IntroHandle {
     invulnMs: 1200,
     allowSkipAfterMs: 800,
     words: ["3", "2", "1", "GO"],
-    seed: 0
+    seed: 0,
+    onTick: () => {},
+    onGo: () => {},
+    onWarp: () => {}
   };
 
   const updateState = (currentTime: number) => {
@@ -98,11 +104,21 @@ export function createCountdownIntro(): IntroHandle {
         state.wordIndex = targetWordIndex;
         state.currentWord = options.words[state.wordIndex];
         state.timeInPhase = 0;
+        
+        // Play tick sound for digits
+        if (state.currentWord !== "GO") {
+          options.onTick();
+        }
       }
 
       if (targetWordIndex >= options.words.length) {
         state.phase = "go";
         state.timeInPhase = 0;
+        options.onGo();
+        if (options.variant === "warp") {
+          options.onWarp();
+        }
+        
         // Brief pause for GO display
         setTimeout(() => {
           state.phase = "done";
