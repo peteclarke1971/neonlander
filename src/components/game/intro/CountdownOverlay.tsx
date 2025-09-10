@@ -192,63 +192,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.restore();
         }
 
-        // Warp-in effect for GO phase
-        if (state.phase === "go" && state.variant === "warp" && shipPosition) {
-          const warpProgress = Math.min(state.timeInPhase / 200, 1);
-          
-          // Concentric wire rings from ship position
-          for (let i = 0; i < (lowGraphics ? 1 : 4); i++) {
-            const ringRadius = (50 + i * 30) * warpProgress;
-            const ringAlpha = Math.max(0, 1 - warpProgress) * (1 - i * 0.2);
-            
-            ctx.save();
-            ctx.globalAlpha = ringAlpha;
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(shipPosition.x, shipPosition.y, ringRadius, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-          }
-
-          // Ship materialization effect
-          if (warpProgress > 0.3) {
-            const shipAlpha = (warpProgress - 0.3) / 0.7;
-            
-            ctx.save();
-            ctx.globalAlpha = shipAlpha;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            
-            // Simple ship outline (triangle) - no dashed outline needed since dotted circle handles it
-            ctx.beginPath();
-            ctx.moveTo(shipPosition.x, shipPosition.y - 10);
-            ctx.lineTo(shipPosition.x - 8, shipPosition.y + 8);
-            ctx.lineTo(shipPosition.x + 8, shipPosition.y + 8);
-            ctx.closePath();
-            ctx.stroke();
-            
-            ctx.fillStyle = '#333333';
-            ctx.fill();
-            
-            // Vertical noise shimmer effect
-            if (!lowGraphics && shipAlpha > 0.8) {
-              const shimmerRng = mulberry32(mix(0, "SHIMMER", Math.floor(state.timeInPhase * 10)));
-              for (let i = 0; i < 5; i++) {
-                const offsetY = (shimmerRng() - 0.5) * 4;
-                ctx.globalAlpha = 0.3;
-                ctx.strokeStyle = '#00ffff';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(shipPosition.x - 10, shipPosition.y + offsetY);
-                ctx.lineTo(shipPosition.x + 10, shipPosition.y + offsetY);
-                ctx.stroke();
-              }
-            }
-            
-            ctx.restore();
-          }
-        }
+        // Warp-in effect disabled - dotted circle around lander handles visual feedback
       }
 
       // Continue animation until GO fades out completely (use local timer to ensure fade works even if external state stops updating)
