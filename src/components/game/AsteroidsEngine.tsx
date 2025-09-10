@@ -388,15 +388,7 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         invulnerabilityTimer.current -= dt * 1000;
       }
       
-      // Skip countdown on input
-      if (introRef.current?.isActive()) {
-        const skipInput = keys.current.fire || keys.current.thrust || keys.current.left || keys.current.right;
-        if (skipInput && introRef.current.getCurrentState().canSkip) {
-          introRef.current.skip();
-        }
-      }
-
-      // Handle gamepad input
+      // Handle gamepad input first to include it in skip logic
       const gp = anyGamepad();
       let rotInput = 0;
       let thrustInput = 0;
@@ -418,10 +410,23 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         // Also check d-pad for rotation
         if (input.ui.left) rotInput -= 1;
         if (input.ui.right) rotInput += 1;
-        
+      }
+
+      // Handle gamepad pause input
+      if (gp) {
+        const input = readGamepad(gp, gpProfileRef.current);
         const pauseDown = input.buttons.pause;
         if (pauseDown && !lastPauseDown.current) setPaused(!paused);
         lastPauseDown.current = pauseDown;
+      }
+
+      // Skip countdown on input (keyboard OR gamepad)
+      if (introRef.current?.isActive()) {
+        const keyboardSkipInput = keys.current.fire || keys.current.thrust || keys.current.left || keys.current.right;
+        const gamepadSkipInput = fireInput || thrustInput > 0 || Math.abs(rotInput) > 0;
+        if ((keyboardSkipInput || gamepadSkipInput) && introRef.current.getCurrentState().canSkip) {
+          introRef.current.skip();
+        }
       }
 
       // Keyboard input

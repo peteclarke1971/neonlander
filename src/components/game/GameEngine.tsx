@@ -673,14 +673,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         invulnerabilityTimer.current -= dt * 1000;
       }
       
-      // Skip countdown on input
-      if (introRef.current?.isActive()) {
-        const skipInput = keys.current.thrust || keys.current.left || keys.current.right || keys.current.abort;
-        if (skipInput && introRef.current.getCurrentState().canSkip) {
-          introRef.current.skip();
-        }
-      }
-      
       elapsed += dt;
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
@@ -691,7 +683,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       // Controls
       // Gamepad hot-swap + read UI/analog
-      let gpLeft = false, gpRight = false, gpThrust = 0, gpRotateBoost = false;
+      let gpLeft = false, gpRight = false, gpThrust = 0, gpRotateBoost = false, gpAbort = false;
       {
         const gp = anyGamepad?.();
         if (gp && gp.connected) {
@@ -707,6 +699,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           // Apply analog rotation only when no digital rotation pressed
           gpLeft = input.buttons.rotateLeft;
           gpRight = input.buttons.rotateRight;
+          gpAbort = input.buttons.abort;
+          
           if (!gpLeft && !gpRight) {
             if (Math.abs(input.rotation) > 0.0001) {
               av += input.rotation * rotAccel * dt;
@@ -729,6 +723,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
       
+      // Skip countdown on input (keyboard OR gamepad)
+      if (introRef.current?.isActive()) {
+        const keyboardSkipInput = keys.current.thrust || keys.current.left || keys.current.right || keys.current.abort;
+        const gamepadSkipInput = gpThrust > 0 || gpLeft || gpRight || gpAbort;
+        if ((keyboardSkipInput || gamepadSkipInput) && introRef.current.getCurrentState().canSkip) {
+          introRef.current.skip();
+        }
+      }
+       
       // Update rotation modifier
       const rotBoostHeld = keys.current.rotateBoost || gpRotateBoost;
       rotBoostActive.current = updateRotationModifier(
