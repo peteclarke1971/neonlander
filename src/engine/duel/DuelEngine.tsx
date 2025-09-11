@@ -9,7 +9,6 @@ import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
 import { AudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
-import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
 
 interface DuelEngineProps {
   options: DuelOptions;
@@ -23,6 +22,13 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
   const countdownRef = useRef(createCountdownIntro());
   const lastTimeRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
+  
+  // Starfield state
+  type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
+  type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
+  const starsRef = useRef<Star[]>([]);
+  const shootingRef = useRef<Shooting[]>([]);
+  const nextShootingRef = useRef(0.6 + Math.random() * 1.6);
   
   const [gameState, setGameState] = useState<DuelGameState | null>(null);
 
@@ -212,6 +218,26 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       }
     }
 
+    // Update starfield
+    const canvas = canvasRef.current;
+    if (canvas) {
+      // Update shooting stars
+      const shooting = shootingRef.current;
+      for (let i = shooting.length - 1; i >= 0; i--) {
+        const s = shooting[i];
+        s.life += deltaTime;
+        s.x += s.vx * deltaTime;
+        s.y += s.vy * deltaTime;
+        if (s.life > s.max) shooting.splice(i, 1);
+      }
+
+      // Spawn shooting stars periodically
+      if (state.roundTimer >= nextShootingRef.current) {
+        nextShootingRef.current = state.roundTimer + 0.6 + Math.random() * 1.6;
+        spawnShooting();
+      }
+    }
+
     setGameState({ ...state });
   }, [updateInput, onMatchEnd]);
 
@@ -263,9 +289,9 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
         }
       }
 
-      // Apply space drag (slight friction)
-      player.vx *= Math.pow(DRAG, deltaTime * 60);
-      player.vy *= Math.pow(DRAG, deltaTime * 60);
+      // Apply space drag (Asteroids-style light friction)
+      player.vx *= 0.995;
+      player.vy *= 0.995;
 
       // Position update
       player.x += player.vx * deltaTime;
@@ -407,8 +433,12 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
     const state = gameStateRef.current;
     
-    // Clear canvas (transparent to reveal backdrop)
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas and draw starfield
+    ctx.fillStyle = "hsl(var(--background))";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw starfield in screen space
+    drawStars(ctx, state.roundTimer);
 
     // Render terrain (simple for now)
     ctx.strokeStyle = "hsl(var(--primary))";
@@ -473,7 +503,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       ctx.stroke();
 
       // Thrust effect
-      if (player.thrust && player.fuel > 0) {
+      if (player.thrust) {
         ctx.strokeStyle = "hsl(30 100% 60%)";
         ctx.beginPath();
         ctx.moveTo(-6, -3);
@@ -485,6 +515,114 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       ctx.restore();
     }
   };
+
+  // Initialize starfield
+  const initStarfield = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const stars = starsRef.current;
+    stars.length = 0; // Clear existing stars
+    
+    const dprInit = Math.min(2, window.devicePixelRatio || 1);
+    const pxW = canvas.width / dprInit;
+    const pxH = canvas.height / dprInit;
+    
+    // Screen-space static stars covering full screen
+    for (let i = 0; i < 320; i++) {
+      const sx = Math.random() * pxW;
+      const sy = Math.random() * pxH;
+      const bright = Math.random() < 0.15;
+      stars.push({ 
+        x: sx, 
+        y: sy,
+        size: bright ? 2.4 : 1.4, 
+        baseA: bright ? 0.95 : 0.6, 
+        tw: 0.5 + Math.random() * 1.5, 
+        ph: Math.random() * Math.PI * 2, 
+        bright 
+      });
+    }
+  }, []);
+
+  const spawnShooting = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const shooting = shootingRef.current;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const viewWpx = canvas.width / dpr;
+    const viewHpx = canvas.height / dpr;
+    const margin = 80;
+    const side = Math.floor(Math.random() * 3); // 0:left, 1:right, 2:top
+    let sx = 0, sy = 0, vx = 0, vy = 0;
+    
+    if (side === 0) {
+      sx = -margin; 
+      sy = Math.random() * (viewHpx * 0.7);
+      vx = 180 + Math.random() * 260; 
+      vy = (Math.random() - 0.5) * 140;
+    } else if (side === 1) {
+      sx = viewWpx + margin; 
+      sy = Math.random() * (viewHpx * 0.7);
+      vx = -180 - Math.random() * 260; 
+      vy = (Math.random() - 0.5) * 140;
+    } else {
+      sx = Math.random() * viewWpx; 
+      sy = -margin;
+      vx = (Math.random() - 0.5) * 280; 
+      vy = 160 + Math.random() * 220;
+    }
+    
+    const life = 0;
+    const max = 0.6 + Math.random() * 1.0;
+    shooting.push({ x: sx, y: sy, vx, vy, life, max });
+  }, []);
+
+  const drawStars = useCallback((ctx: CanvasRenderingContext2D, elapsed: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const stars = starsRef.current;
+    const shooting = shootingRef.current;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const wpx = canvas.width / dpr;
+    const hpx = canvas.height / dpr;
+    
+    // Use primary color as star color (matches duel theme)
+    const starColor = "hsl(var(--primary))";
+    
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for screen space
+    ctx.shadowColor = starColor;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = starColor;
+    ctx.scale(dpr, dpr);
+    
+    // Static twinkling stars in screen space
+    for (const s of stars) {
+      const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
+      ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+      const x = (s.x % wpx + wpx) % wpx;
+      const y = Math.max(0, Math.min(hpx, s.y));
+      ctx.fillRect(x, y, s.size, s.size);
+    }
+    ctx.globalAlpha = 1;
+    
+    // Shooting stars
+    for (const sh of shooting) {
+      const t = 1 - Math.min(1, sh.life / sh.max);
+      ctx.globalAlpha = t;
+      ctx.beginPath();
+      ctx.moveTo(sh.x, sh.y);
+      ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = starColor;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }, []);
 
   // Game loop
   const gameLoop = useCallback((currentTime: number) => {
@@ -503,6 +641,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
   // Initialize on mount
   useEffect(() => {
+    initStarfield();
     initializeGame();
     animationFrameRef.current = requestAnimationFrame(gameLoop);
 
@@ -511,7 +650,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [initializeGame, gameLoop]);
+  }, [initStarfield, initializeGame, gameLoop]);
 
   // Keyboard input handling (always active)
   useEffect(() => {
@@ -562,11 +701,6 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
-      {/* Starfield Background */}
-      <div className="absolute inset-0">
-        <AsteroidStarfield />
-      </div>
-      
       <canvas
         ref={canvasRef}
         width={1920}
