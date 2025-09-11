@@ -9,6 +9,7 @@ import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
 import { AudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
+import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 
 interface DuelEngineProps {
   options: DuelOptions;
@@ -21,8 +22,11 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
   const audioRef = useRef(new AudioManager());
   const countdownRef = useRef(createCountdownIntro());
   const lastTimeRef = useRef(0);
-  const animationFrameRef = useRef<number | null>(null);
-  
+const animationFrameRef = useRef<number | null>(null);
+
+// Keyboard fire-hold state for continuous firing like Asteroids
+const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
+
   // Starfield state
   type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
   type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
@@ -103,6 +107,10 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     const gamepads = navigator.getGamepads();
     const [p1, p2] = gameStateRef.current.players;
     
+    // Apply keyboard-held fire every frame (for auto-fire)
+    p1.fire = p1.fire || fireHeldRef.current[1];
+    p2.fire = p2.fire || fireHeldRef.current[2];
+
     // Player 1 input (Gamepad 0 or keyboard)
     const gp1 = gamepads[0];
     if (gp1?.connected) {
@@ -112,8 +120,11 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       p1.rotateLeft = input1.rotation < -0.5;
       p1.rotateRight = input1.rotation > 0.5;
       p1.thrust = input1.thrust > 0.5;
-      // Allow gamepad A (ui.select) or Y (abort) to fire; OR with existing key state so keyboard still works when a gamepad is connected
-      p1.fire = p1.fire || input1.ui.select || input1.buttons.abort;
+      // Accept A(0), X(2), or Y(3 abort) as fire, plus keyboard hold
+      const a1 = !!gp1.buttons?.[0]?.pressed;
+      const x1 = !!gp1.buttons?.[2]?.pressed;
+      const y1 = !!gp1.buttons?.[3]?.pressed || input1.buttons.abort;
+      p1.fire = p1.fire || a1 || x1 || y1;
       p1.rotateBoost = input1.rotateBoost;
     }
 
@@ -126,8 +137,11 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       p2.rotateLeft = input2.rotation < -0.5;
       p2.rotateRight = input2.rotation > 0.5;
       p2.thrust = input2.thrust > 0.5;
-      // Same mapping for P2: A or Y to fire; combine with existing key state
-      p2.fire = p2.fire || input2.ui.select || input2.buttons.abort;
+      // Accept A(0), X(2), or Y(3 abort) as fire, plus keyboard hold
+      const a2 = !!gp2.buttons?.[0]?.pressed;
+      const x2 = !!gp2.buttons?.[2]?.pressed;
+      const y2 = !!gp2.buttons?.[3]?.pressed || input2.buttons.abort;
+      p2.fire = p2.fire || a2 || x2 || y2;
       p2.rotateBoost = input2.rotateBoost;
     }
   }, []);
@@ -330,6 +344,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
             player.activePowerup
           );
           state.projectiles.push(...newProjectiles);
+          console.log("[DUEL] Fire", { playerId: player.id, count: newProjectiles.length });
           lastFireTimeRef.current[player.id] = currentTime;
         }
         player.fire = false; // Consume fire input
@@ -437,8 +452,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     ctx.fillStyle = "hsl(var(--background))";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw starfield in screen space
-    drawStars(ctx, state.roundTimer);
+    // Starfield drawn by separate HyperspaceStarfield background
 
     // Render terrain (simple for now)
     ctx.strokeStyle = "hsl(var(--primary))";
@@ -662,14 +676,14 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       if (e.code === "ArrowLeft") p1.rotateLeft = true;
       if (e.code === "ArrowRight") p1.rotateRight = true;  
       if (e.code === "ArrowUp") p1.thrust = true;
-      if (e.code === "Space") { e.preventDefault(); p1.fire = true; }
+      if (e.code === "Space") { e.preventDefault(); p1.fire = true; fireHeldRef.current[1] = true; }
       if (e.code === "ShiftRight") p1.rotateBoost = true;
 
       // P2 controls (WASD + F + left shift)
       if (e.code === "KeyA") p2.rotateLeft = true;
       if (e.code === "KeyD") p2.rotateRight = true;
       if (e.code === "KeyW") p2.thrust = true;
-      if (e.code === "KeyF") p2.fire = true;
+      if (e.code === "KeyF") { p2.fire = true; fireHeldRef.current[2] = true; }
       if (e.code === "ShiftLeft") p2.rotateBoost = true;
     };
 
@@ -681,12 +695,14 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       if (e.code === "ArrowLeft") p1.rotateLeft = false;
       if (e.code === "ArrowRight") p1.rotateRight = false;
       if (e.code === "ArrowUp") p1.thrust = false;
+      if (e.code === "Space") { fireHeldRef.current[1] = false; }
       if (e.code === "ShiftRight") p1.rotateBoost = false;
 
       // P2 controls  
       if (e.code === "KeyA") p2.rotateLeft = false;
       if (e.code === "KeyD") p2.rotateRight = false;
       if (e.code === "KeyW") p2.thrust = false;
+      if (e.code === "KeyF") { fireHeldRef.current[2] = false; }
       if (e.code === "ShiftLeft") p2.rotateBoost = false;
     };
 
@@ -701,6 +717,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
+      <HyperspaceStarfield allowBoost={false} speed={0.12} density={1200} className="absolute inset-0 z-0 pointer-events-none" />
       <canvas
         ref={canvasRef}
         width={1920}
