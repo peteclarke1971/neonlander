@@ -9,7 +9,7 @@ import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
 import { AudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
-import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
+
 
 interface DuelEngineProps {
   options: DuelOptions;
@@ -734,7 +734,6 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
-      <HyperspaceStarfield allowBoost={false} speed={0.12} density={1200} className="absolute inset-0 z-0 pointer-events-none" />
       <canvas
         ref={canvasRef}
         width={1920}
