@@ -104,14 +104,20 @@ export function handleShieldHit(player: DuelPlayer): boolean {
 export function renderPowerupPads(
   ctx: CanvasRenderingContext2D,
   pads: PowerupPad[],
-  neonColor: string = "hsl(var(--neon))"
+  neonColor: string = "#00ff88" // Default bright green - was "hsl(var(--neon))" which doesn't work in canvas
 ): void {
   ctx.save();
   
+  // Debug logging
+  const activePads = pads.filter(pad => pad.powerupType);
+  if (activePads.length > 0) {
+    console.log(`Rendering ${activePads.length} active powerup pads:`, activePads.map(p => `${p.powerupType} at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`));
+  }
+  
   for (const pad of pads) {
-    // Draw pad base
+    // Draw pad base with bright, visible color
     ctx.strokeStyle = neonColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3; // Increased visibility
     ctx.setLineDash([5, 5]);
     
     ctx.beginPath();
@@ -121,12 +127,24 @@ export function renderPowerupPads(
     ctx.setLineDash([]);
     
     if (pad.powerupType) {
-      // Draw powerup icon
+      // Draw powerup icon with enhanced visibility
       ctx.fillStyle = neonColor;
-      ctx.shadowBlur = pad.glowing ? 12 : 6;
+      ctx.strokeStyle = neonColor;
+      ctx.shadowBlur = pad.glowing ? 15 : 8; // Enhanced glow
       ctx.shadowColor = neonColor;
       
-      drawPowerupIcon(ctx, pad.x, pad.y, pad.powerupType, 20);
+      drawPowerupIcon(ctx, pad.x, pad.y, pad.powerupType, 22); // Slightly larger icons
+      
+      // Add pulsing ring effect for active powerups
+      if (pad.glowing) {
+        const time = Date.now() * 0.003;
+        const pulseRadius = pad.radius + Math.sin(time) * 5;
+        ctx.globalAlpha = 0.3 + Math.sin(time) * 0.2;
+        ctx.beginPath();
+        ctx.arc(pad.x, pad.y, pulseRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
     }
   }
   
