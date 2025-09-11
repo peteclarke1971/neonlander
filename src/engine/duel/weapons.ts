@@ -8,7 +8,7 @@ export function createProjectile(
   powerupType: PowerupType | null
 ): DuelProjectile[] {
   const projectiles: DuelProjectile[] = [];
-  const speed = 700; // px/s
+  const speed = 180; // px/s (slowed for visibility)
   const lifetime = 1.6; // seconds
   const damage = 1;
   
@@ -166,7 +166,7 @@ export function checkProjectileTerrainCollision(
 export function renderProjectiles(
   ctx: CanvasRenderingContext2D,
   projectiles: DuelProjectile[],
-  neonColor: string = "hsl(var(--neon))"
+  neonColor: string = "hsl(210, 100%, 70%)"
 ) {
   ctx.save();
   
@@ -177,16 +177,16 @@ export function renderProjectiles(
     
     // Render as small glowing circle
     ctx.beginPath();
-    ctx.arc(projectile.x, projectile.y, 3, 0, Math.PI * 2);
+    ctx.arc(projectile.x, projectile.y, 4, 0, Math.PI * 2);
     ctx.fill();
     
     // Add trail effect
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
     ctx.arc(
-      projectile.x - projectile.vx * 0.01,
-      projectile.y - projectile.vy * 0.01,
-      2,
+      projectile.x - projectile.vx * 0.02,
+      projectile.y - projectile.vy * 0.02,
+      3,
       0,
       Math.PI * 2
     );

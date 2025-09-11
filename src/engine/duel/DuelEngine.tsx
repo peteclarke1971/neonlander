@@ -452,7 +452,7 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     const state = gameStateRef.current;
     
     // Clear canvas
-    ctx.fillStyle = "hsl(var(--background))";
+    ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Gameplay starfield (same as Asteroids)
@@ -478,7 +478,7 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     }
 
     // Render projectiles
-    renderProjectiles(ctx, state.projectiles);
+    renderProjectiles(ctx, state.projectiles, 'hsl(210, 100%, 70%)');
 
     // Render players
     renderPlayers(ctx, state.players);
@@ -608,7 +608,7 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     const hpx = canvas.height / dpr;
     
     // Use primary color as star color (matches duel theme)
-    const starColor = "hsl(var(--primary))";
+    const starColor = 'hsl(210, 100%, 70%)';
     
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for screen space
