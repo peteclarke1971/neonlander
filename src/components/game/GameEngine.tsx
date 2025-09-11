@@ -1531,6 +1531,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         anchor = smoothedAnchor;
       }
 
+      // Update ship screen position (CSS pixels) for overlay during intro
+      if (introRef.current?.isActive()) {
+        const wCss = w / dpr;
+        const hCss = h / dpr;
+        const shipXCss = (wCss / 2) + (x - cameraX) * zoom;
+        const shipYCss = (hCss / 2) + (y + anchor) * zoom;
+        setShipScreenPos(prev => {
+          if (!prev || Math.abs(prev.x - shipXCss) > 0.5 || Math.abs(prev.y - shipYCss) > 0.5) {
+            return { x: shipXCss, y: shipYCss };
+          }
+          return prev;
+        });
+      }
+
       // Background stars: only for non-cavern levels
       if (!isCavernLevel) {
         ctx.save();

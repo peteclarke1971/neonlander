@@ -28,7 +28,11 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
 }) => {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const goPhaseStartRef = useRef<number | null>(null);
-
+  const shipPosRef = useRef<{ x: number; y: number } | undefined>(undefined);
+  // Keep latest ship position without restarting the render effect
+  React.useEffect(() => {
+    shipPosRef.current = shipPosition;
+  }, [shipPosition]);
   useEffect(() => {
     const canvas = overlayCanvasRef.current;
     const gameCanvas = canvasRef.current;
@@ -170,6 +174,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         if (shipPosition && !photosensitive && state.phase === "countdown") {
           const circleRadius = 25; // Fixed radius around the lander
           const circleYOffset = 8; // Downward adjustment to center on lander
+          const sp = shipPosRef.current ?? shipPosition;
           
           ctx.save();
           ctx.globalAlpha = 1;
@@ -177,8 +182,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]); // Dotted line pattern
           ctx.beginPath();
-          // Ship position is in CSS pixels, but canvas is scaled by dpr, so we need to account for that
-          ctx.arc(shipPosition.x / dpr, (shipPosition.y + circleYOffset) / dpr, circleRadius, 0, Math.PI * 2);
+          // Ship position is provided in CSS pixels; context is already scaled by dpr
+          ctx.arc(sp.x, sp.y + circleYOffset, circleRadius, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
@@ -223,7 +228,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       ctx.globalAlpha = 1;
       goPhaseStartRef.current = null;
     };
-  }, [state, lowGraphics, photosensitive, shipPosition]);
+  }, [state, lowGraphics, photosensitive]);
 
   if (state.phase === "inactive") {
     return null;
