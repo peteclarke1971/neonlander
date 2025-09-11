@@ -132,7 +132,7 @@ export const DuelHUD: React.FC<DuelHUDProps> = ({ gameState, showFuel = false })
   };
 
   return (
-    <div className="absolute inset-0 pointer-events-none text-foreground">
+    <div className="absolute inset-0 z-20 pointer-events-none text-foreground">
       {/* Top Center - Round Score */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
         {renderRoundScore()}

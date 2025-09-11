@@ -106,7 +106,8 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       p1.rotateLeft = input1.rotation < -0.5;
       p1.rotateRight = input1.rotation > 0.5;
       p1.thrust = input1.thrust > 0.5;
-      p1.fire = false; // Will handle via buttons
+      // Allow gamepad A (ui.select) or Y (abort) to fire; OR with existing key state so keyboard still works when a gamepad is connected
+      p1.fire = p1.fire || input1.ui.select || input1.buttons.abort;
       p1.rotateBoost = input1.rotateBoost;
     }
 
@@ -119,7 +120,8 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       p2.rotateLeft = input2.rotation < -0.5;
       p2.rotateRight = input2.rotation > 0.5;
       p2.thrust = input2.thrust > 0.5;
-      p2.fire = false; // Will handle via buttons
+      // Same mapping for P2: A or Y to fire; combine with existing key state
+      p2.fire = p2.fire || input2.ui.select || input2.buttons.abort;
       p2.rotateBoost = input2.rotateBoost;
     }
   }, []);
@@ -248,12 +250,17 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       player.angle += player.angularVel * deltaTime;
 
       // Thrust (Asteroids-style)
-      if (player.thrust && player.fuel > 0) {
-        const thrustX = Math.cos(player.angle) * THRUST_FORCE * deltaTime;
-        const thrustY = Math.sin(player.angle) * THRUST_FORCE * deltaTime;
-        player.vx += thrustX;
-        player.vy += thrustY;
-        player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
+      if (player.thrust) {
+        // If fuel gauge is hidden, make fuel infinite (no drain)
+        if (!options.showFuel || player.fuel > 0) {
+          const thrustX = Math.cos(player.angle) * THRUST_FORCE * deltaTime;
+          const thrustY = Math.sin(player.angle) * THRUST_FORCE * deltaTime;
+          player.vx += thrustX;
+          player.vy += thrustY;
+          if (options.showFuel) {
+            player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
+          }
+        }
       }
 
       // Apply space drag (slight friction)
@@ -400,9 +407,8 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
     const state = gameStateRef.current;
     
-    // Clear canvas
-    ctx.fillStyle = "hsl(var(--background))";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas (transparent to reveal backdrop)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Render terrain (simple for now)
     ctx.strokeStyle = "hsl(var(--primary))";
