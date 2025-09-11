@@ -119,12 +119,12 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       
       p1.rotateLeft = input1.rotation < -0.5;
       p1.rotateRight = input1.rotation > 0.5;
-      p1.thrust = input1.thrust > 0.5;
-      // Fire buttons only (A, X, Y) - separate from thrust button (B)
-      const a1 = !!gp1.buttons?.[0]?.pressed;
-      const x1 = !!gp1.buttons?.[2]?.pressed;
-      const y1 = !!gp1.buttons?.[3]?.pressed || input1.buttons.abort;
-      p1.fire = p1.fire || a1 || x1 || y1;
+      // Thrust: hard-coded to B button (1) only - separate from fire
+      const thrustBtn1 = !!gp1.buttons?.[1]?.pressed;
+      p1.thrust = thrustBtn1;
+      // Fire: hard-coded to A button (0) only - separate from thrust
+      const fireBtn1 = !!gp1.buttons?.[0]?.pressed;
+      p1.fire = p1.fire || fireBtn1;
       p1.rotateBoost = input1.rotateBoost;
     }
 
@@ -136,12 +136,12 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       
       p2.rotateLeft = input2.rotation < -0.5;
       p2.rotateRight = input2.rotation > 0.5;
-      p2.thrust = input2.thrust > 0.5;
-      // Fire buttons only (A, X, Y) - separate from thrust button (B) 
-      const a2 = !!gp2.buttons?.[0]?.pressed;
-      const x2 = !!gp2.buttons?.[2]?.pressed;
-      const y2 = !!gp2.buttons?.[3]?.pressed || input2.buttons.abort;
-      p2.fire = p2.fire || a2 || x2 || y2;
+      // Thrust: hard-coded to B button (1) only - separate from fire
+      const thrustBtn2 = !!gp2.buttons?.[1]?.pressed;
+      p2.thrust = thrustBtn2;
+      // Fire: hard-coded to A button (0) only - separate from thrust
+      const fireBtn2 = !!gp2.buttons?.[0]?.pressed;
+      p2.fire = p2.fire || fireBtn2;
       p2.rotateBoost = input2.rotateBoost;
     }
   }, []);
@@ -289,12 +289,14 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
       player.angle += player.angularVel * deltaTime;
 
-      // Thrust (Asteroids-style)
+      // Thrust (Asteroids-style) - from between landing legs (bottom of ship)
       if (player.thrust) {
         // If fuel gauge is hidden, make fuel infinite (no drain)
         if (!options.showFuel || player.fuel > 0) {
-          const thrustX = Math.cos(player.angle) * THRUST_FORCE * deltaTime;
-          const thrustY = Math.sin(player.angle) * THRUST_FORCE * deltaTime;
+          // Ship nose points up, so thrust comes from bottom (angle - PI/2)
+          const forwardAngle = player.angle - Math.PI / 2;
+          const thrustX = Math.cos(forwardAngle) * THRUST_FORCE * deltaTime;
+          const thrustY = Math.sin(forwardAngle) * THRUST_FORCE * deltaTime;
           player.vx += thrustX;
           player.vy += thrustY;
           if (options.showFuel) {
@@ -336,15 +338,17 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       if (player.fire) {
         const lastFireTime = lastFireTimeRef.current[player.id] || 0;
         if (currentTime - lastFireTime >= FIRE_DELAY) {
-          // Spawn from ship nose and inherit ship velocity (Asteroids-style)
+          // Spawn from ship nose (top point) and inherit ship velocity (Asteroids-style)
           const noseOffset = 12;
-          const sx = player.x + Math.cos(player.angle) * noseOffset;
-          const sy = player.y + Math.sin(player.angle) * noseOffset;
+          // Ship nose points up (angle - PI/2 for forward direction)
+          const forwardAngle = player.angle - Math.PI / 2;
+          const sx = player.x + Math.cos(forwardAngle) * noseOffset;
+          const sy = player.y + Math.sin(forwardAngle) * noseOffset;
           const newProjectiles = createProjectile(
             player.id,
             sx,
             sy,
-            player.angle,
+            forwardAngle,
             player.activePowerup
           ).map(p => ({ ...p, vx: p.vx + player.vx, vy: p.vy + player.vy }));
           state.projectiles.push(...newProjectiles);
