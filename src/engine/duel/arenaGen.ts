@@ -41,7 +41,8 @@ export function generateArena(seed: number, hazards: boolean): Arena {
   
   switch (layout) {
     case "twin-isles":
-      terrain = generateTwinIsles(worldWidth, worldHeight);
+      // No terrain for duel mode - just powerup pads and spawn points
+      terrain = [];
       spawnPoints = [
         { x: worldWidth * 0.2, y: worldHeight * 0.3 },
         { x: worldWidth * 0.8, y: worldHeight * 0.3 }
@@ -60,7 +61,8 @@ export function generateArena(seed: number, hazards: boolean): Arena {
       break;
       
     case "keyhole":
-      terrain = generateKeyhole(worldWidth, worldHeight);
+      // No terrain for duel mode - just powerup pads and spawn points
+      terrain = [];
       spawnPoints = [
         { x: worldWidth * 0.15, y: worldHeight * 0.25 },
         { x: worldWidth * 0.85, y: worldHeight * 0.25 }
@@ -80,7 +82,8 @@ export function generateArena(seed: number, hazards: boolean): Arena {
       break;
       
     case "bridges":
-      terrain = generateBridges(worldWidth, worldHeight);
+      // No terrain for duel mode - just powerup pads and spawn points
+      terrain = [];
       spawnPoints = [
         { x: worldWidth * 0.1, y: worldHeight * 0.2 },
         { x: worldWidth * 0.9, y: worldHeight * 0.2 }

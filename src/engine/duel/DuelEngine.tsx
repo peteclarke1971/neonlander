@@ -376,7 +376,7 @@ const cameraShakeRef = useRef(0);
   const lastFireTimeRef = useRef<{ [key: number]: number }>({});
 
   const handleWeaponFire = (state: DuelGameState) => {
-    const FIRE_DELAY = 170; // ms
+    const FIRE_DELAY = 0; // Disabled for testing - was 170ms
     const currentTime = Date.now();
     
     for (const player of state.players) {
@@ -448,13 +448,14 @@ const cameraShakeRef = useRef(0);
       }
     }
 
-    // Projectile vs terrain collisions
-    for (let i = state.projectiles.length - 1; i >= 0; i--) {
-      const projectile = state.projectiles[i];
-      if (checkProjectileTerrainCollision(projectile, state.arena.terrain)) {
-        state.projectiles.splice(i, 1);
-      }
-    }
+    // No terrain collision in duel mode - terrain array is empty
+    // Projectile vs terrain collisions - DISABLED for duel mode
+    // for (let i = state.projectiles.length - 1; i >= 0; i--) {
+    //   const projectile = state.projectiles[i];
+    //   if (checkProjectileTerrainCollision(projectile, state.arena.terrain)) {
+    //     state.projectiles.splice(i, 1);
+    //   }
+    // }
 
     // Powerup collisions
     for (const player of state.players) {
@@ -561,22 +562,23 @@ const cameraShakeRef = useRef(0);
     // Gameplay starfield (same as Asteroids)
     drawStars(ctx, state.roundTimer);
 
-    // Render terrain
-    ctx.save();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = "hsl(var(--primary))";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    for (let i = 0; i < state.arena.terrain.length; i++) {
-      const point = state.arena.terrain[i];
-      if (i === 0) ctx.moveTo(Math.round(point.x), Math.round(point.y));
-      else ctx.lineTo(Math.round(point.x), Math.round(point.y));
-    }
-    ctx.stroke();
-    ctx.restore();
+    // No terrain rendering in duel mode - terrain array is empty
+    // Terrain rendering - DISABLED for duel mode
+    // ctx.save();
+    // ctx.setLineDash([]);
+    // ctx.globalAlpha = 1;
+    // ctx.strokeStyle = "hsl(var(--primary))";
+    // ctx.lineWidth = 2;
+    // ctx.lineCap = "round";
+    // ctx.lineJoin = "round";
+    // ctx.beginPath();
+    // for (let i = 0; i < state.arena.terrain.length; i++) {
+    //   const point = state.arena.terrain[i];
+    //   if (i === 0) ctx.moveTo(Math.round(point.x), Math.round(point.y));
+    //   else ctx.lineTo(Math.round(point.x), Math.round(point.y));
+    // }
+    // ctx.stroke();
+    // ctx.restore();
 
     // Render powerup pads
     ctx.save();
