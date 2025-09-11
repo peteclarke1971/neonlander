@@ -283,8 +283,8 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
         player.angularVel += direction * accel * deltaTime;
         player.angularVel = Math.max(-MAX_ANGULAR_VEL, Math.min(MAX_ANGULAR_VEL, player.angularVel));
       } else {
-        // Angular friction
-        player.angularVel *= Math.pow(0.9, deltaTime * 60);
+        // Angular friction - smooth and responsive
+        player.angularVel *= 0.95;
       }
 
       player.angle += player.angularVel * deltaTime;
@@ -512,12 +512,21 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
         ctx.stroke();
       }
 
-      // Ship body (triangle)
+      // Ship body (lander-style with landing legs)
       ctx.beginPath();
-      ctx.moveTo(12, 0);
-      ctx.lineTo(-6, -6);
-      ctx.lineTo(-6, 6);
+      // Main triangle body
+      ctx.moveTo(0, -10);
+      ctx.lineTo(8, 10);
+      ctx.lineTo(-8, 10);
       ctx.closePath();
+      ctx.stroke();
+      
+      // Landing legs extending from bottom corners
+      ctx.beginPath();
+      ctx.moveTo(-6, 8);
+      ctx.lineTo(-12, 12);
+      ctx.moveTo(6, 8);
+      ctx.lineTo(12, 12);
       ctx.stroke();
 
       // Thrust effect

@@ -8,8 +8,8 @@ export function createProjectile(
   powerupType: PowerupType | null
 ): DuelProjectile[] {
   const projectiles: DuelProjectile[] = [];
-  const speed = 180; // px/s (slowed for visibility)
-  const lifetime = 1.6; // seconds
+  const speed = 360; // px/s (doubled speed)
+  const lifetime = 3.2; // seconds (doubled distance)
   const damage = 1;
   
   switch (powerupType) {
@@ -175,18 +175,18 @@ export function renderProjectiles(
     ctx.shadowBlur = 8;
     ctx.shadowColor = neonColor;
     
-    // Render as small glowing circle
+    // Render as small glowing circle (smaller like Asteroids)
     ctx.beginPath();
-    ctx.arc(projectile.x, projectile.y, 4, 0, Math.PI * 2);
+    ctx.arc(projectile.x, projectile.y, 2, 0, Math.PI * 2);
     ctx.fill();
     
     // Add trail effect
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
     ctx.arc(
-      projectile.x - projectile.vx * 0.02,
-      projectile.y - projectile.vy * 0.02,
-      3,
+      projectile.x - projectile.vx * 0.01,
+      projectile.y - projectile.vy * 0.01,
+      1.5,
       0,
       Math.PI * 2
     );
