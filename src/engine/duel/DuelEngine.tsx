@@ -333,18 +333,21 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     const currentTime = Date.now();
     
     for (const player of state.players) {
-      if (player.fire && player.activePowerup !== "shield") {
+      if (player.fire) {
         const lastFireTime = lastFireTimeRef.current[player.id] || 0;
         if (currentTime - lastFireTime >= FIRE_DELAY) {
+          // Spawn from ship nose and inherit ship velocity (Asteroids-style)
+          const noseOffset = 12;
+          const sx = player.x + Math.cos(player.angle) * noseOffset;
+          const sy = player.y + Math.sin(player.angle) * noseOffset;
           const newProjectiles = createProjectile(
             player.id,
-            player.x,
-            player.y,
+            sx,
+            sy,
             player.angle,
             player.activePowerup
-          );
+          ).map(p => ({ ...p, vx: p.vx + player.vx, vy: p.vy + player.vy }));
           state.projectiles.push(...newProjectiles);
-          console.log("[DUEL] Fire", { playerId: player.id, count: newProjectiles.length });
           lastFireTimeRef.current[player.id] = currentTime;
         }
         player.fire = false; // Consume fire input
@@ -448,11 +451,12 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
     const state = gameStateRef.current;
     
-    // Clear canvas and draw starfield
+    // Clear canvas
     ctx.fillStyle = "hsl(var(--background))";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Starfield drawn by separate HyperspaceStarfield background
+    // Gameplay starfield (same as Asteroids)
+    drawStars(ctx, state.roundTimer)
 
     // Render terrain (simple for now)
     ctx.strokeStyle = "hsl(var(--primary))";
