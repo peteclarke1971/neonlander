@@ -24,6 +24,10 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
   const lastTimeRef = useRef(0);
 const animationFrameRef = useRef<number | null>(null);
 
+// FPS tracking
+const fpsRef = useRef<number[]>([]);
+const currentFpsRef = useRef(0);
+
 // Keyboard fire-hold state for continuous firing like Asteroids
 const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
@@ -309,9 +313,9 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       player.vx *= 0.995;
       player.vy *= 0.995;
 
-      // Position update
-      player.x += player.vx * deltaTime;
-      player.y += player.vy * deltaTime;
+      // Position update - round to prevent sub-pixel flickering
+      player.x = Math.round((player.x + player.vx * deltaTime) * 100) / 100;
+      player.y = Math.round((player.y + player.vy * deltaTime) * 100) / 100;
 
       // World boundary handling
       if (gameStateRef.current?.wrap) {
@@ -494,7 +498,8 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       if (player.armor <= 0) continue;
 
       ctx.save();
-      ctx.translate(player.x, player.y);
+      // Round positions to prevent sub-pixel rendering issues
+      ctx.translate(Math.round(player.x), Math.round(player.y));
       ctx.rotate(player.angle);
 
       // Player tint
@@ -664,6 +669,14 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     const deltaTime = (currentTime - lastTimeRef.current) / 1000;
     lastTimeRef.current = currentTime;
 
+    // Calculate FPS
+    const fps = deltaTime > 0 ? 1 / deltaTime : 0;
+    fpsRef.current.push(fps);
+    if (fpsRef.current.length > 60) { // Keep last 60 frames for averaging
+      fpsRef.current.shift();
+    }
+    currentFpsRef.current = fpsRef.current.reduce((a, b) => a + b, 0) / fpsRef.current.length;
+
     updateGame(deltaTime);
     render();
 
@@ -743,6 +756,12 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       />
       
       {gameState && <DuelHUD gameState={gameState} showFuel={options.showFuel} />}
+      
+      {/* FPS and SEED display */}
+      <div className="absolute bottom-4 right-4 z-20 text-primary font-mono text-sm bg-black/50 px-2 py-1 rounded">
+        <div>FPS: {Math.round(currentFpsRef.current)}</div>
+        <div>SEED: {options.seed}</div>
+      </div>
       
       {gameState?.phase === "countdown" && (
         <CountdownOverlay 
