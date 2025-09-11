@@ -31,6 +31,14 @@ const currentFpsRef = useRef(0);
 // Keyboard fire-hold state for continuous firing like Asteroids
 const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
+// Particle system for explosions
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+type Shockwave = { x: number; y: number; life: number; max: number };
+const particlesRef = useRef<Particle[]>([]);
+const shockwavesRef = useRef<Shockwave[]>([]);
+const flashRef = useRef(0);
+const cameraShakeRef = useRef(0);
+
   // Starfield state
   type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
   type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
@@ -236,6 +244,30 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       }
     }
 
+    // Update particles and effects
+    const particles = particlesRef.current;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life += deltaTime;
+      p.x += p.vx * deltaTime;
+      p.y += p.vy * deltaTime;
+      p.vx *= 0.98; // Air resistance
+      p.vy *= 0.98;
+      if (p.life > p.max) particles.splice(i, 1);
+    }
+
+    // Update shockwaves
+    const shockwaves = shockwavesRef.current;
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const s = shockwaves[i];
+      s.life += deltaTime;
+      if (s.life > s.max) shockwaves.splice(i, 1);
+    }
+
+    // Update screen flash and camera shake
+    if (flashRef.current > 0) flashRef.current -= deltaTime;
+    if (cameraShakeRef.current > 0) cameraShakeRef.current -= deltaTime * 60;
+
     // Update starfield
     const canvas = canvasRef.current;
     if (canvas) {
@@ -363,6 +395,27 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     }
   };
 
+  const spawnExplosion = useCallback((x: number, y: number) => {
+    // Massive particle burst like in asteroids
+    for (let i = 0; i < 220; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 120 + Math.random() * 260;
+      particlesRef.current.push({ 
+        x, 
+        y, 
+        vx: Math.cos(angle) * speed, 
+        vy: Math.sin(angle) * speed, 
+        life: 0, 
+        max: 0.8 + Math.random() * 0.7, 
+        color: `hsla(${180 + Math.random() * 20},100%,60%,1)` // Cyan/blue theme
+      });
+    }
+    // Add shockwave ring and screen flash
+    shockwavesRef.current.push({ x, y, life: 0, max: 0.7 });
+    flashRef.current = Math.max(flashRef.current, 0.28);
+    cameraShakeRef.current = Math.max(cameraShakeRef.current, 36);
+  }, []);
+
   const checkCollisions = (state: DuelGameState) => {
     // Projectile vs player collisions
     for (let i = state.projectiles.length - 1; i >= 0; i--) {
@@ -372,7 +425,13 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
         if (checkProjectileCollision(projectile, player)) {
           // Check if shield blocks the hit
           if (!handleShieldHit(player)) {
+            const previousArmor = player.armor;
             player.armor = Math.max(0, player.armor - projectile.damage);
+            
+            // Spawn explosion when player is destroyed
+            if (previousArmor > 0 && player.armor <= 0) {
+              spawnExplosion(player.x, player.y);
+            }
           }
           state.projectiles.splice(i, 1);
           break;
@@ -402,6 +461,9 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
     if (state.hazards) {
       for (const player of state.players) {
         if (checkVolcanoCollision(player, state.arena.volcanoVents)) {
+          if (player.armor > 0) {
+            spawnExplosion(player.x, player.y);
+          }
           player.armor = 0; // Lava = instant KO
         }
       }
@@ -459,48 +521,124 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
     const state = gameStateRef.current;
     
+    // Clear canvas and reset transform to prevent context issues
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false; // Crisp pixel rendering
+    
+    // Camera shake effect
+    const shakeX = cameraShakeRef.current > 0 ? (Math.random() - 0.5) * cameraShakeRef.current : 0;
+    const shakeY = cameraShakeRef.current > 0 ? (Math.random() - 0.5) * cameraShakeRef.current : 0;
+    ctx.translate(shakeX, shakeY);
+    
     // Clear canvas
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // Screen flash effect
+    if (flashRef.current > 0) {
+      ctx.save();
+      ctx.globalAlpha = flashRef.current;
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    
     // Gameplay starfield (same as Asteroids)
-    drawStars(ctx, state.roundTimer)
+    drawStars(ctx, state.roundTimer);
 
-    // Render terrain (simple for now)
+    // Render terrain
+    ctx.save();
     ctx.strokeStyle = "hsl(var(--primary))";
     ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
     for (let i = 0; i < state.arena.terrain.length; i++) {
       const point = state.arena.terrain[i];
-      if (i === 0) ctx.moveTo(point.x, point.y);
-      else ctx.lineTo(point.x, point.y);
+      if (i === 0) ctx.moveTo(Math.round(point.x), Math.round(point.y));
+      else ctx.lineTo(Math.round(point.x), Math.round(point.y));
     }
     ctx.stroke();
+    ctx.restore();
 
     // Render powerup pads
+    ctx.save();
     renderPowerupPads(ctx, state.arena.powerupPads);
+    ctx.restore();
 
     // Render hazards
     if (state.hazards) {
+      ctx.save();
       renderVolcanoVents(ctx, state.arena.volcanoVents);
+      ctx.restore();
     }
 
-    // Render projectiles
-    renderProjectiles(ctx, state.projectiles, 'hsl(210, 100%, 70%)');
-
-    // Render players
+    // Render players FIRST so bullets appear on top
+    ctx.save();
     renderPlayers(ctx, state.players);
+    ctx.restore();
 
+    // Render projectiles AFTER players so they're visible
+    ctx.save();
+    renderProjectiles(ctx, state.projectiles, 'hsl(210, 100%, 70%)');
+    ctx.restore();
+
+    // Render particle effects
+    renderParticles(ctx);
+
+    ctx.restore(); // Restore initial transform
   }, []);
+
+  const renderParticles = (ctx: CanvasRenderingContext2D) => {
+    const particles = particlesRef.current;
+    const shockwaves = shockwavesRef.current;
+    
+    // Render shockwaves
+    for (const s of shockwaves) {
+      const t = 1 - s.life / s.max;
+      const radius = (1 - t) * 60;
+      ctx.save();
+      ctx.globalAlpha = t * 0.8;
+      ctx.strokeStyle = "hsl(180, 100%, 60%)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(Math.round(s.x), Math.round(s.y), radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    
+    // Render particles
+    for (const p of particles) {
+      const t = 1 - p.life / p.max;
+      if (t <= 0) continue;
+      
+      ctx.save();
+      ctx.globalAlpha = t;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 4;
+      const size = t * 2;
+      ctx.fillRect(Math.round(p.x - size/2), Math.round(p.y - size/2), size, size);
+      ctx.restore();
+    }
+  };
 
   const renderPlayers = (ctx: CanvasRenderingContext2D, players: DuelPlayer[]) => {
     for (const player of players) {
       if (player.armor <= 0) continue;
 
       ctx.save();
-      // Round positions to prevent sub-pixel rendering issues
+      
+      // Round positions to prevent sub-pixel rendering issues  
       ctx.translate(Math.round(player.x), Math.round(player.y));
       ctx.rotate(player.angle);
+
+      // Reset line settings to prevent context issues
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([]); // Clear any dash pattern
+      ctx.globalAlpha = 1; // Reset alpha
 
       // Player tint
       const color = player.id === 1 ? "hsl(165 92% 60%)" : "hsl(120 100% 60%)"; // Green-cyan vs lime
@@ -515,10 +653,16 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
       // Shield effect
       if (player.activePowerup === "shield" && player.shieldHitsLeft > 0) {
+        ctx.save();
         ctx.strokeStyle = "hsl(200 100% 60%)";
+        ctx.setLineDash([]); // No dash for shield
         ctx.beginPath();
         ctx.arc(0, 0, 18, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+        
+        // Restore player color for ship
+        ctx.strokeStyle = color;
       }
 
       // Ship body (lander-style with landing legs)
@@ -540,15 +684,18 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
 
       // Thrust effect (from between landing legs at bottom)
       if (player.thrust) {
+        ctx.save();
         ctx.strokeStyle = "hsl(30 100% 60%)";
+        ctx.setLineDash([]); // No dash for thrust
         ctx.beginPath();
         ctx.moveTo(-3, 10);
         ctx.lineTo(0, 18);
         ctx.lineTo(3, 10);
         ctx.stroke();
+        ctx.restore();
       }
 
-      ctx.restore();
+      ctx.restore(); // This will reset all context state including lineDash and globalAlpha
     }
   };
 
