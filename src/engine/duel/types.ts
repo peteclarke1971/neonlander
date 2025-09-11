@@ -117,4 +117,5 @@ export interface DuelOptions {
   seed: number;
   wrap: boolean;
   hazards: boolean;
+  showFuel: boolean;
 }

@@ -6,13 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { DuelEngine } from "@/engine/duel/DuelEngine";
+import { DuelOptions } from "@/engine/duel/types";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
-
-export interface DuelOptions {
-  seed: number;
-  wrap: boolean;
-  hazards: boolean;
-}
 
 export default function Duel() {
   const navigate = useNavigate();
@@ -21,6 +16,7 @@ export default function Duel() {
     seed: Math.floor(Math.random() * 1000000),
     wrap: false,
     hazards: true,
+    showFuel: false,
   });
 
   const seedInputRef = useRef<HTMLInputElement>(null);
@@ -176,13 +172,22 @@ export default function Duel() {
               />
               <Label htmlFor="hazards">Volcano Hazards</Label>
             </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="showFuel"
+                checked={options.showFuel}
+                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, showFuel: checked }))}
+              />
+              <Label htmlFor="showFuel">Show Fuel Gauge</Label>
+            </div>
           </div>
 
           {/* Controls Info */}
           <div className="text-xs text-muted-foreground space-y-1">
             <p><strong>Controls:</strong></p>
-            <p>P1: Gamepad or Arrow Keys + Space (fire) + Shift (rotate boost)</p>
-            <p>P2: Second Gamepad or WASD + F (fire) + Left Shift (rotate boost)</p>
+            <p>P1: Gamepad or Arrow Keys (rotate) + Up Arrow (thrust) + Space (fire) + Shift (rotate boost)</p>
+            <p>P2: Second Gamepad or A/D (rotate) + W (thrust) + F (fire) + Left Shift (rotate boost)</p>
           </div>
 
           {/* Action Buttons */}

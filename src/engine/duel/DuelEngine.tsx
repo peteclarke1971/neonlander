@@ -9,6 +9,7 @@ import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
 import { AudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
+import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
 
 interface DuelEngineProps {
   options: DuelOptions;
@@ -515,8 +516,8 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       // P1 controls (arrows + space + shift)
       if (e.code === "ArrowLeft") p1.rotateLeft = true;
       if (e.code === "ArrowRight") p1.rotateRight = true;  
-      if (e.code === "Space") { e.preventDefault(); p1.thrust = true; }
-      if (e.code === "KeyX") p1.fire = true;
+      if (e.code === "ArrowUp") p1.thrust = true;
+      if (e.code === "Space") { e.preventDefault(); p1.fire = true; }
       if (e.code === "ShiftRight") p1.rotateBoost = true;
 
       // P2 controls (WASD + F + left shift)
@@ -534,7 +535,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
       // P1 controls
       if (e.code === "ArrowLeft") p1.rotateLeft = false;
       if (e.code === "ArrowRight") p1.rotateRight = false;
-      if (e.code === "Space") p1.thrust = false;
+      if (e.code === "ArrowUp") p1.thrust = false;
       if (e.code === "ShiftRight") p1.rotateBoost = false;
 
       // P2 controls  
@@ -555,15 +556,20 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
+      {/* Starfield Background */}
+      <div className="absolute inset-0">
+        <AsteroidStarfield />
+      </div>
+      
       <canvas
         ref={canvasRef}
         width={1920}
         height={1080}
-        className="w-full h-full object-contain"
+        className="relative z-10 w-full h-full object-contain"
         style={{ imageRendering: "pixelated" }}
       />
       
-      {gameState && <DuelHUD gameState={gameState} />}
+      {gameState && <DuelHUD gameState={gameState} showFuel={options.showFuel} />}
       
       {gameState?.phase === "countdown" && (
         <CountdownOverlay 

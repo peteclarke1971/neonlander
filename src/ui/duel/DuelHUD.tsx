@@ -3,9 +3,10 @@ import { DuelGameState } from "@/engine/duel/types";
 
 interface DuelHUDProps {
   gameState: DuelGameState;
+  showFuel?: boolean;
 }
 
-export const DuelHUD: React.FC<DuelHUDProps> = ({ gameState }) => {
+export const DuelHUD: React.FC<DuelHUDProps> = ({ gameState, showFuel = false }) => {
   const { players, phase, currentRound, roundTimer, suddenDeath } = gameState;
   const [p1, p2] = players;
 
@@ -143,10 +144,12 @@ export const DuelHUD: React.FC<DuelHUDProps> = ({ gameState }) => {
           <span className="text-sm text-muted-foreground">P1</span>
           {renderArmorPips(p1.armor)}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">FUEL</span>
-          {renderFuelBar(p1.fuel, p1.maxFuel)}
-        </div>
+        {showFuel && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">FUEL</span>
+            {renderFuelBar(p1.fuel, p1.maxFuel)}
+          </div>
+        )}
       </div>
 
       {/* Top Right - P2 Stats */}
@@ -155,10 +158,12 @@ export const DuelHUD: React.FC<DuelHUDProps> = ({ gameState }) => {
           {renderArmorPips(p2.armor)}
           <span className="text-sm text-muted-foreground">P2</span>
         </div>
-        <div className="flex items-center gap-2 justify-end">
-          {renderFuelBar(p2.fuel, p2.maxFuel)}
-          <span className="text-xs text-muted-foreground">FUEL</span>
-        </div>
+        {showFuel && (
+          <div className="flex items-center gap-2 justify-end">
+            {renderFuelBar(p2.fuel, p2.maxFuel)}
+            <span className="text-xs text-muted-foreground">FUEL</span>
+          </div>
+        )}
       </div>
 
       {/* Bottom Left - P1 Powerup */}
