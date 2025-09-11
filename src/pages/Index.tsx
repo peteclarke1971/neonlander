@@ -255,8 +255,8 @@ const retryGame = () => {
         contRef.current?.focus();
       } else {
         if (!needsInitials) {
-          setGoIndex(0);
-          homeRef.current?.focus();
+          setGoIndex(1);
+          retryCurrRef.current?.focus();
         } else {
           setGoIndex(1);
           retryCurrRef.current?.focus();
