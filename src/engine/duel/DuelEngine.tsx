@@ -130,8 +130,10 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     const state = gameStateRef.current;
     updateInput();
 
-    // Update countdown
+    // Update countdown state during countdown phase
     if (state.phase === "countdown") {
+      // Force update to trigger re-render with latest countdown state
+      setGameState({ ...state });
       return; // Countdown handles phase transition
     }
 
@@ -210,14 +212,14 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     setGameState({ ...state });
   }, [updateInput, onMatchEnd]);
 
-  // Player physics update
+  // Player physics update (Asteroids-style)
   const updatePlayers = (players: DuelPlayer[], deltaTime: number) => {
-    const GRAVITY = 400; // px/s²
     const THRUST_FORCE = 600; // px/s²
     const ANGULAR_ACCEL = 8; // rad/s²
     const MAX_ANGULAR_VEL = 4; // rad/s
     const FUEL_DRAIN_RATE = 100; // fuel/s when thrusting
     const ROTATION_BOOST = 2.0; // multiplier when boost held
+    const DRAG = 0.98; // Space drag (slight friction per frame)
 
     for (const player of players) {
       // Update invulnerability
@@ -244,7 +246,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
 
       player.angle += player.angularVel * deltaTime;
 
-      // Thrust
+      // Thrust (Asteroids-style)
       if (player.thrust && player.fuel > 0) {
         const thrustX = Math.cos(player.angle) * THRUST_FORCE * deltaTime;
         const thrustY = Math.sin(player.angle) * THRUST_FORCE * deltaTime;
@@ -253,42 +255,49 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
         player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
       }
 
-      // Gravity
-      player.vy += GRAVITY * deltaTime;
+      // Apply space drag (slight friction)
+      player.vx *= Math.pow(DRAG, deltaTime * 60);
+      player.vy *= Math.pow(DRAG, deltaTime * 60);
 
       // Position update
       player.x += player.vx * deltaTime;
       player.y += player.vy * deltaTime;
 
-      // World wrapping
+      // World boundary handling
       if (gameStateRef.current?.wrap) {
         if (player.x < 0) player.x += gameStateRef.current.arena.worldWidth;
         if (player.x > gameStateRef.current.arena.worldWidth) player.x -= gameStateRef.current.arena.worldWidth;
         if (player.y < 0) player.y += gameStateRef.current.arena.worldHeight;
         if (player.y > gameStateRef.current.arena.worldHeight) player.y -= gameStateRef.current.arena.worldHeight;
-      }
-
-      // Simple terrain collision (crash detection)
-      if (player.y > gameStateRef.current?.arena.worldHeight! - 20) {
-        player.armor = 0; // Crash = instant KO
+      } else {
+        // Clamp to screen bounds without KO
+        player.x = Math.max(20, Math.min(gameStateRef.current?.arena.worldWidth! - 20, player.x));
+        player.y = Math.max(20, Math.min(gameStateRef.current?.arena.worldHeight! - 20, player.y));
       }
     }
   };
 
+  // Add fire rate limiting per player
+  const lastFireTimeRef = useRef<{ [key: number]: number }>({});
+
   const handleWeaponFire = (state: DuelGameState) => {
     const FIRE_DELAY = 170; // ms
+    const currentTime = Date.now();
     
     for (const player of state.players) {
       if (player.fire && player.activePowerup !== "shield") {
-        // TODO: Add fire rate limiting
-        const newProjectiles = createProjectile(
-          player.id,
-          player.x,
-          player.y,
-          player.angle,
-          player.activePowerup
-        );
-        state.projectiles.push(...newProjectiles);
+        const lastFireTime = lastFireTimeRef.current[player.id] || 0;
+        if (currentTime - lastFireTime >= FIRE_DELAY) {
+          const newProjectiles = createProjectile(
+            player.id,
+            player.x,
+            player.y,
+            player.angle,
+            player.activePowerup
+          );
+          state.projectiles.push(...newProjectiles);
+          lastFireTimeRef.current[player.id] = currentTime;
+        }
         player.fire = false; // Consume fire input
       }
     }
@@ -497,12 +506,10 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     };
   }, [initializeGame, gameLoop]);
 
-  // Keyboard input handling
+  // Keyboard input handling (always active)
   useEffect(() => {
-    if (!gameStateRef.current || gameStateRef.current.phase !== "active") return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!gameStateRef.current) return;
+      if (!gameStateRef.current || gameStateRef.current.phase !== "active") return;
       const [p1, p2] = gameStateRef.current.players;
 
       // P1 controls (arrows + space + shift)
@@ -521,7 +528,7 @@ export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) =
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (!gameStateRef.current) return;
+      if (!gameStateRef.current || gameStateRef.current.phase !== "active") return;
       const [p1, p2] = gameStateRef.current.players;
 
       // P1 controls
