@@ -120,7 +120,7 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       p1.rotateLeft = input1.rotation < -0.5;
       p1.rotateRight = input1.rotation > 0.5;
       p1.thrust = input1.thrust > 0.5;
-      // Accept A(0), X(2), or Y(3 abort) as fire, plus keyboard hold
+      // Fire buttons only (A, X, Y) - separate from thrust button (B)
       const a1 = !!gp1.buttons?.[0]?.pressed;
       const x1 = !!gp1.buttons?.[2]?.pressed;
       const y1 = !!gp1.buttons?.[3]?.pressed || input1.buttons.abort;
@@ -137,7 +137,7 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       p2.rotateLeft = input2.rotation < -0.5;
       p2.rotateRight = input2.rotation > 0.5;
       p2.thrust = input2.thrust > 0.5;
-      // Accept A(0), X(2), or Y(3 abort) as fire, plus keyboard hold
+      // Fire buttons only (A, X, Y) - separate from thrust button (B) 
       const a2 = !!gp2.buttons?.[0]?.pressed;
       const x2 = !!gp2.buttons?.[2]?.pressed;
       const y2 = !!gp2.buttons?.[3]?.pressed || input2.buttons.abort;
@@ -529,13 +529,13 @@ const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
       ctx.lineTo(12, 12);
       ctx.stroke();
 
-      // Thrust effect
+      // Thrust effect (from between landing legs at bottom)
       if (player.thrust) {
         ctx.strokeStyle = "hsl(30 100% 60%)";
         ctx.beginPath();
-        ctx.moveTo(-6, -3);
-        ctx.lineTo(-12, 0);
-        ctx.lineTo(-6, 3);
+        ctx.moveTo(-3, 10);
+        ctx.lineTo(0, 18);
+        ctx.lineTo(3, 10);
         ctx.stroke();
       }
 
