@@ -216,7 +216,16 @@ const cameraShakeRef = useRef(0);
           winner.roundsWon++;
         }
         
-        // Check for match end
+        // Add explosion delay phase for 1.5 seconds to show explosion effects
+        state.phase = "explosion-delay";
+        state.phaseTimer = 0;
+      }
+    }
+
+    if (state.phase === "explosion-delay") {
+      state.phaseTimer += deltaTime;
+      if (state.phaseTimer > 1.5) {
+        // Check for match end after explosion delay
         const matchWinner = state.players.find(p => p.roundsWon >= 2);
         if (matchWinner) {
           state.phase = "match-end";
@@ -516,15 +525,20 @@ const cameraShakeRef = useRef(0);
   // Render
   const render = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
+    const ctx = canvas?.getContext("2d", { willReadFrequently: false });
     if (!canvas || !ctx || !gameStateRef.current) return;
 
     const state = gameStateRef.current;
     
-    // Clear canvas and reset transform to prevent context issues
+    // Clear canvas and reset ALL context state to prevent rendering issues
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false; // Crisp pixel rendering
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
     
     // Camera shake effect
     const shakeX = cameraShakeRef.current > 0 ? (Math.random() - 0.5) * cameraShakeRef.current : 0;
@@ -549,6 +563,8 @@ const cameraShakeRef = useRef(0);
 
     // Render terrain
     ctx.save();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = "hsl(var(--primary))";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
@@ -564,23 +580,31 @@ const cameraShakeRef = useRef(0);
 
     // Render powerup pads
     ctx.save();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
     renderPowerupPads(ctx, state.arena.powerupPads);
     ctx.restore();
 
     // Render hazards
     if (state.hazards) {
       ctx.save();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
       renderVolcanoVents(ctx, state.arena.volcanoVents);
       ctx.restore();
     }
 
     // Render players FIRST so bullets appear on top
     ctx.save();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
     renderPlayers(ctx, state.players);
     ctx.restore();
 
-    // Render projectiles AFTER players so they're visible
+    // Render projectiles AFTER players so they're visible on top
     ctx.save();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
     renderProjectiles(ctx, state.projectiles, 'hsl(210, 100%, 70%)');
     ctx.restore();
 
@@ -899,7 +923,9 @@ const cameraShakeRef = useRef(0);
         width={1920}
         height={1080}
         className="relative z-10 w-full h-full object-contain"
-        style={{ imageRendering: "pixelated" }}
+        style={{ 
+          imageRendering: "pixelated",
+        }}
       />
       
       {gameState && <DuelHUD gameState={gameState} showFuel={options.showFuel} />}
@@ -910,7 +936,7 @@ const cameraShakeRef = useRef(0);
         <div>SEED: {options.seed}</div>
       </div>
       
-      {gameState?.phase === "countdown" && (
+      {(gameState?.phase === "countdown" || countdownRef.current.getCurrentState().phase === "go") && (
         <CountdownOverlay 
           state={countdownRef.current.getCurrentState()}
           canvasRef={canvasRef}

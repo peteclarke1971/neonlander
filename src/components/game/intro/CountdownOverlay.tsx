@@ -230,7 +230,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
     };
   }, [state, lowGraphics, photosensitive]);
 
-  if (state.phase === "inactive") {
+  // Only render canvas during countdown and go phases - completely remove from DOM during active gameplay
+  if (state.phase === "inactive" || state.phase === "done") {
     return null;
   }
 

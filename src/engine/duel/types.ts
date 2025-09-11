@@ -88,7 +88,7 @@ export interface Arena {
 
 export type PowerupType = "twin" | "tri" | "shield";
 
-export type DuelPhase = "countdown" | "active" | "round-end" | "match-end";
+export type DuelPhase = "countdown" | "active" | "explosion-delay" | "round-end" | "match-end";
 
 export interface DuelGameState {
   phase: DuelPhase;
