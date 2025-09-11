@@ -13,6 +13,7 @@ import LightCycles from "./pages/LightCycles";
 import CavernFXDemo from "./pages/CavernFXDemo";
 import NeonRacing from "./pages/NeonRacing";
 import NeonDocking from "./pages/NeonDocking";
+import Duel from "./pages/Duel";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/asteroids" element={<Asteroids />} />
           <Route path="/asteroids-color" element={<AsteroidsColor />} />
           <Route path="/asteroids-remix" element={<AsteroidsRemix />} />
+          <Route path="/duel" element={<Duel />} />
           <Route path="/lightcycles" element={<LightCycles />} />
           <Route path="/neon-racing" element={<NeonRacing />} />
           <Route path="/neon-docking" element={<NeonDocking />} />

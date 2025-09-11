@@ -412,6 +412,9 @@ useEffect(() => {
           >
             {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
           </Button>
+          <a href="/duel" className="inline-block">
+            <Button variant="neon">⚔️ LANDER DUEL</Button>
+          </a>
           <a href="/asteroids" className="inline-block">
             <Button ref={asteroidsBtnRef} variant="neon">🚀 NEON ASTEROIDS</Button>
           </a>
