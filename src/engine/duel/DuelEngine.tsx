@@ -106,6 +106,9 @@ const cameraShakeRef = useRef(0);
             player.invulnerable = true;
             player.invulnTime = 1200; // 1.2s
           });
+          
+          // Start background music
+          audioRef.current.playLevelTrackByIndex(Math.floor(Math.random() * 8));
         }
       }
     });
@@ -249,6 +252,9 @@ const cameraShakeRef = useRef(0);
     if (state.phase === "match-end") {
       state.phaseTimer += deltaTime;
       if (state.phaseTimer > 5) {
+        // Stop music when match ends
+        audioRef.current.stopLevelMusic();
+        audioRef.current.stopAllAudio();
         onMatchEnd();
       }
     }
@@ -347,7 +353,13 @@ const cameraShakeRef = useRef(0);
           if (options.showFuel) {
             player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
           }
+          
+          // Play thruster sound
+          audioRef.current.setThruster(1.0);
         }
+      } else {
+        // Stop thruster sound when not thrusting
+        audioRef.current.setThruster(0);
       }
 
       // Apply space drag (Asteroids-style light friction)
@@ -397,6 +409,10 @@ const cameraShakeRef = useRef(0);
             player.activePowerup
           ).map(p => ({ ...p, vx: p.vx + player.vx, vy: p.vy + player.vy }));
           state.projectiles.push(...newProjectiles);
+          
+          // Play shooting sound
+          audioRef.current.click();
+          
           lastFireTimeRef.current[player.id] = currentTime;
         }
         player.fire = false; // Consume fire input
@@ -423,6 +439,9 @@ const cameraShakeRef = useRef(0);
     shockwavesRef.current.push({ x, y, life: 0, max: 0.7 });
     flashRef.current = Math.max(flashRef.current, 0.28);
     cameraShakeRef.current = Math.max(cameraShakeRef.current, 36);
+    
+    // Play explosion sound
+    audioRef.current.explosion();
   }, []);
 
   const checkCollisions = (state: DuelGameState) => {
@@ -860,9 +879,16 @@ const cameraShakeRef = useRef(0);
   useEffect(() => {
     initStarfield();
     initializeGame();
+    
+    // Preload audio for smooth playback
+    audioRef.current.preloadSFX();
+    audioRef.current.resume();
+    
     animationFrameRef.current = requestAnimationFrame(gameLoop);
 
     return () => {
+      // Stop all audio when component unmounts
+      audioRef.current.stopAllAudio();
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
