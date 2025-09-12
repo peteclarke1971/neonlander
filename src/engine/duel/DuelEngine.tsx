@@ -9,6 +9,7 @@ import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
 import { AudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 interface DuelEngineProps {
@@ -30,6 +31,9 @@ const currentFpsRef = useRef(0);
 
 // Keyboard fire-hold state for continuous firing like Asteroids
 const fireHeldRef = useRef<{ 1: boolean; 2: boolean }>({ 1: false, 2: false });
+
+// Mobile detection for performance optimization
+const isMobile = useIsMobile();
 
 // Particle system for explosions
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
@@ -353,6 +357,57 @@ const cameraShakeRef = useRef(0);
           if (options.showFuel) {
             player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
           }
+
+          // Spectacular multi-nozzle thruster effect - matching main game
+          const lowGraphics = localStorage.getItem('lowGraphics') === 'true';
+          const shouldOptimizePerformance = isMobile || lowGraphics;
+          const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25;
+          
+          // Get neonColor from CSS custom property
+          const neonColor = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim();
+          const neonColorHsl = neonColor ? `hsl(${neonColor})` : 'hsl(165, 92%, 60%)';
+          
+          const nozzlePositions = shouldOptimizePerformance ? [
+            { x: player.x - Math.sin(player.angle) * 10, y: player.y + Math.cos(player.angle) * 10 }
+          ] : [
+            // Center nozzle
+            { x: player.x - Math.sin(player.angle) * 10, y: player.y + Math.cos(player.angle) * 10 },
+            // Left nozzle 
+            { x: player.x - Math.sin(player.angle) * 10 - Math.cos(player.angle) * 3, y: player.y + Math.cos(player.angle) * 10 + Math.sin(player.angle) * 3 },
+            // Right nozzle
+            { x: player.x - Math.sin(player.angle) * 10 + Math.cos(player.angle) * 3, y: player.y + Math.cos(player.angle) * 10 - Math.sin(player.angle) * 3 }
+          ];
+          
+          for (const nozzle of nozzlePositions) {
+            const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
+            for (let i = 0; i < particlesPerNozzle; i++) {
+              // Much wider angle spread for dramatic effect
+              const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
+              const pa = player.angle + (Math.random() - 0.5) * angleSpread + Math.PI;
+              
+              // Enhanced speed range with more variation
+              const sp = shouldOptimizePerformance ? 
+                (60 + Math.random() * 120) : 
+                (100 + Math.random() * 200); // Dramatically enhanced speed range
+              
+              // Double the lifespan as requested
+              const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
+              
+              // Add slight color variation for high graphics
+              const particleColor = shouldOptimizePerformance ? neonColorHsl : 
+                (Math.random() > 0.7 ? neonColorHsl.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColorHsl);
+              
+              particlesRef.current.push({ 
+                x: nozzle.x, 
+                y: nozzle.y, 
+                vx: Math.sin(pa) * sp, 
+                vy: -Math.cos(pa) * sp, 
+                life: 0, 
+                max: lifespan, 
+                color: particleColor 
+              });
+            }
+          }
         }
       }
       
@@ -637,6 +692,12 @@ const cameraShakeRef = useRef(0);
     const particles = particlesRef.current;
     const shockwaves = shockwavesRef.current;
     
+    // Performance optimization - check for low graphics mode
+    const lowGraphics = localStorage.getItem('lowGraphics') === 'true';
+    const shouldOptimizePerformance = isMobile || lowGraphics;
+    const neonColor = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim();
+    const neonColorHsl = neonColor ? `hsl(${neonColor})` : 'hsl(165, 92%, 60%)';
+    
     // Render shockwaves
     for (const s of shockwaves) {
       const t = 1 - s.life / s.max;
@@ -651,18 +712,34 @@ const cameraShakeRef = useRef(0);
       ctx.restore();
     }
     
-    // Render particles
-    for (const p of particles) {
-      const t = 1 - p.life / p.max;
-      if (t <= 0) continue;
-      
+    // Spectacular particle rendering with dramatically enhanced thruster effects (matching main game)
+    if (particles.length > 0) {
       ctx.save();
-      ctx.globalAlpha = t;
-      ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 4;
-      const size = t * 2;
-      ctx.fillRect(Math.round(p.x - size/2), Math.round(p.y - size/2), size, size);
+      
+      for (const p of particles) {
+        // Determine if this is a thruster particle
+        const isThruster = p.color === neonColorHsl || p.color.includes('hsla');
+        
+        // Age-based fade and size variation for thruster particles
+        const ageRatio = p.life / p.max;
+        const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
+        
+        // Dramatic shadow blur for thruster particles
+        ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+        ctx.shadowColor = isThruster ? neonColorHsl : p.color;
+        
+        ctx.beginPath();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = p.color;
+        
+        // Variable line width for thruster particles - thicker when young
+        const lineWidth = shouldOptimizePerformance ? 1.8 : 
+          (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8); // 1.5-2.5px for thrusters
+        ctx.lineWidth = lineWidth;
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   };
