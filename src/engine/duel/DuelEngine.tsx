@@ -450,7 +450,7 @@ const cameraShakeRef = useRef(0);
       const projectile = state.projectiles[i];
       
       for (const player of state.players) {
-        if (checkProjectileCollision(projectile, player)) {
+        if (checkProjectileCollision(projectile, player, 24)) { // Increased collision radius for better gameplay
           // Check if shield blocks the hit
           if (!handleShieldHit(player)) {
             const previousArmor = player.armor;
