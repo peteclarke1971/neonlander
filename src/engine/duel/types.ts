@@ -118,4 +118,5 @@ export interface DuelOptions {
   wrap: boolean;
   hazards: boolean;
   showFuel: boolean;
+  lowGFX: boolean;
 }

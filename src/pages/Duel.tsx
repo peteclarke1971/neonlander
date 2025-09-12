@@ -12,11 +12,31 @@ import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
 export default function Duel() {
   const navigate = useNavigate();
   const [gameStarted, setGameStarted] = useState(false);
-  const [options, setOptions] = useState<DuelOptions>({
-    seed: Math.floor(Math.random() * 1000000),
-    wrap: false,
-    hazards: true,
-    showFuel: false,
+  const [options, setOptions] = useState<DuelOptions>(() => {
+    // Read graphics setting from localStorage
+    let lowGFX = true; // Default to low-gfx
+    try {
+      // Try new format first
+      const graphicsSettings = localStorage.getItem('ll-graphics-settings');
+      if (graphicsSettings) {
+        const parsed = JSON.parse(graphicsSettings);
+        lowGFX = parsed.lowGraphics;
+      } else {
+        // Fallback to old format
+        const savedLowGfx = localStorage.getItem('ll-low-graphics');
+        lowGFX = savedLowGfx !== 'false';
+      }
+    } catch {
+      lowGFX = true;
+    }
+    
+    return {
+      seed: Math.floor(Math.random() * 1000000),
+      wrap: false,
+      hazards: true,
+      showFuel: false,
+      lowGFX,
+    };
   });
 
   const seedInputRef = useRef<HTMLInputElement>(null);
@@ -180,6 +200,15 @@ export default function Duel() {
                 onCheckedChange={(checked) => setOptions(prev => ({ ...prev, showFuel: checked }))}
               />
               <Label htmlFor="showFuel">Show Fuel Gauge</Label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="lowGFX"
+                checked={options.lowGFX}
+                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, lowGFX: checked }))}
+              />
+              <Label htmlFor="lowGFX">Low Graphics Mode</Label>
             </div>
           </div>
 

@@ -274,6 +274,13 @@ const cameraShakeRef = useRef(0);
       p.vy *= 0.98;
       if (p.life > p.max) particles.splice(i, 1);
     }
+    
+    // Limit total particles - optimized for dual ships
+    const shouldOptimizePerformance = isMobile || options.lowGFX;
+    const MAX_PARTICLES = shouldOptimizePerformance ? 30 : 150;
+    while (particles.length > MAX_PARTICLES) {
+      particles.splice(0, 1); // Remove oldest particles first
+    }
 
     // Update shockwaves
     const shockwaves = shockwavesRef.current;
@@ -359,9 +366,9 @@ const cameraShakeRef = useRef(0);
           }
 
           // Spectacular multi-nozzle thruster effect - matching main game
-          const lowGraphics = localStorage.getItem('lowGraphics') === 'true';
-          const shouldOptimizePerformance = isMobile || lowGraphics;
-          const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25;
+          const shouldOptimizePerformance = isMobile || options.lowGFX;
+          // Optimized settings for dual ships - halved high GFX values
+          const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 12;
           
           // Get neonColor from CSS custom property
           const neonColor = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim();
@@ -388,10 +395,10 @@ const cameraShakeRef = useRef(0);
               // Enhanced speed range with more variation
               const sp = shouldOptimizePerformance ? 
                 (60 + Math.random() * 120) : 
-                (100 + Math.random() * 200); // Dramatically enhanced speed range
+                (100 + Math.random() * 150); // Optimized for dual ships
               
-              // Double the lifespan as requested
-              const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
+              // Optimized lifespan for dual ships
+              const lifespan = shouldOptimizePerformance ? 0.5 : 1.2;
               
               // Add slight color variation for high graphics
               const particleColor = shouldOptimizePerformance ? neonColorHsl : 
@@ -692,9 +699,8 @@ const cameraShakeRef = useRef(0);
     const particles = particlesRef.current;
     const shockwaves = shockwavesRef.current;
     
-    // Performance optimization - check for low graphics mode
-    const lowGraphics = localStorage.getItem('lowGraphics') === 'true';
-    const shouldOptimizePerformance = isMobile || lowGraphics;
+    // Performance optimization using passed option
+    const shouldOptimizePerformance = isMobile || options.lowGFX;
     const neonColor = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim();
     const neonColorHsl = neonColor ? `hsl(${neonColor})` : 'hsl(165, 92%, 60%)';
     
@@ -724,8 +730,8 @@ const cameraShakeRef = useRef(0);
         const ageRatio = p.life / p.max;
         const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
         
-        // Dramatic shadow blur for thruster particles
-        ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+        // Dramatic shadow blur for thruster particles - optimized for dual ships
+        ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 12 : 2);
         ctx.shadowColor = isThruster ? neonColorHsl : p.color;
         
         ctx.beginPath();
