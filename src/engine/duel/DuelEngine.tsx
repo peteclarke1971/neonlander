@@ -353,14 +353,12 @@ const cameraShakeRef = useRef(0);
           if (options.showFuel) {
             player.fuel = Math.max(0, player.fuel - FUEL_DRAIN_RATE * deltaTime);
           }
-          
-          // Play thruster sound
-          audioRef.current.setThruster(1.0);
         }
-      } else {
-        // Stop thruster sound when not thrusting
-        audioRef.current.setThruster(0);
       }
+      
+      // Handle thruster sound properly - matches main lander game behavior
+      const thrustLevel = player.thrust ? (!options.showFuel || player.fuel > 0 ? 1.0 : 0) : 0;
+      audioRef.current.setThruster(thrustLevel);
 
       // Apply space drag (Asteroids-style light friction)
       player.vx *= 0.995;
