@@ -77,6 +77,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const playerLockedRef = useRef(false);
   const invulnerabilityTimer = useRef(0);
   
+  // Timer state for speed bonus calculation
+  const [timerActive, setTimerActive] = useState(false);
+  const timerActiveRef = useRef(false);
+  const timerStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
@@ -205,6 +210,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   // Keep refs in sync with state for game loop
   useEffect(() => { worldPausedRef.current = worldPaused; }, [worldPaused]);
   useEffect(() => { playerLockedRef.current = playerLocked; }, [playerLocked]);
+  useEffect(() => { timerActiveRef.current = timerActive; }, [timerActive]);
 
   // Detect touch-capable devices (enable touch-to-thrust overlay)
   useEffect(() => {
@@ -644,6 +650,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           setWorldPaused(false); worldPausedRef.current = false;
           setPlayerLocked(false); playerLockedRef.current = false;
           invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+          // Start timer fallback - if no movement within 2 seconds after GO, start timer anyway
+          timerStartTimeoutRef.current = setTimeout(() => {
+            setTimerActive(true);
+            timerActiveRef.current = true;
+          }, 2000);
           try { audio.current.playIntroGo(); } catch {} 
         },
         onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
@@ -689,7 +700,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         invulnerabilityTimer.current -= dt * 1000;
       }
       
-      elapsed += dt;
+      // Only increment elapsed time when timer is active (after first movement or 2s after GO)
+      if (timerActiveRef.current) {
+        elapsed += dt;
+      }
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
         nextBgSat = elapsed + (5 + Math.random() * 7);
@@ -779,6 +793,22 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           keys.current.thrust ? 1 : 0
         );
       }
+      // Start timer on first significant movement after GO (timer not yet active)
+      if (!timerActiveRef.current && !worldPausedRef.current) {
+        const hasMovement = Math.abs(vx) > 0.15 || Math.abs(vy) > 0.15;
+        const thrustStarted = thrust > 0.05;
+        
+        if (hasMovement || thrustStarted) {
+          // Clear any pending timeout since player started moving
+          if (timerStartTimeoutRef.current) {
+            clearTimeout(timerStartTimeoutRef.current);
+            timerStartTimeoutRef.current = null;
+          }
+          setTimerActive(true);
+          timerActiveRef.current = true;
+        }
+      }
+
       if (thrust > 0) {
         if (fuel > 0) {
           // Lift-off assist: when first thrusting from a static start-pad rest in caverns
