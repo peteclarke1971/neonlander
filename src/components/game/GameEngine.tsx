@@ -1398,24 +1398,84 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       clearanceEMA += (rawClr - clearanceEMA) * alphaC;
       const effClr = clearanceEMA;
 
-      // For cavern levels, use fixed zoom; for normal levels, use dynamic zoom
+      // Helper function to find nearest landing pad distance
+      const getNearestPadDistance = (): number => {
+        let minDistance = Infinity;
+        
+        // Check static pads
+        for (const pad of terrain.pads) {
+          const padCenterX = (pad.xStart + pad.xEnd) / 2;
+          let dx = Math.abs(x - padCenterX);
+          
+          // Handle world wrapping for normal levels
+          if (!isCavernLevel) {
+            dx = Math.min(dx, Math.abs(x - (padCenterX + terrain.worldWidth)), Math.abs(x - (padCenterX - terrain.worldWidth)));
+          }
+          
+          const dy = Math.abs(y - pad.y);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          minDistance = Math.min(minDistance, distance);
+        }
+        
+        // Check moving pads if available
+        const terrainData = terrain as TerrainData;
+        if (terrainData.movingPads) {
+          for (const movingPad of terrainData.movingPads) {
+            const dx = Math.abs(x - movingPad.currentPos.x);
+            const dy = Math.abs(y - movingPad.currentPos.y);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            minDistance = Math.min(minDistance, distance);
+          }
+        }
+        
+        return minDistance;
+      };
+
+      // Calculate enhanced zoom based on terrain clearance AND landing pad proximity
+      let targetZoom = 1.0;
+      
       if (isCavernLevel) {
-        zoom = 1.2; // Fixed zoom for caverns
+        // For cavern levels, use base zoom but allow enhancement near pads
+        targetZoom = 1.2;
+        
+        // Check for pad proximity enhancement in caverns too
+        const nearestPadDist = getNearestPadDistance();
+        const padDetectionRange = 250;
+        
+        if (nearestPadDist < padDetectionRange) {
+          // Enhanced zoom for landing approach (1.2x to 3.0x)
+          const padProximityRatio = 1 - (nearestPadDist / padDetectionRange);
+          const enhancedZoom = 1.2 + (1.8 * padProximityRatio * padProximityRatio); // Exponential curve
+          targetZoom = Math.max(targetZoom, enhancedZoom);
+        }
       } else {
-        // Map clearance to zoom with hysteresis and capped rate of change
+        // Normal levels: dynamic terrain-based zoom with pad enhancement
         const near = 0, far = 420;
         const tRaw = Math.min(1, Math.max(0, (effClr - near) / (far - near)));
         const s = tRaw * tRaw * (3 - 2 * tRaw);
-        let targetZoom = 1.4 * (1 - s) + 1.0 * s;
-        if (Math.abs(targetZoom - prevTargetZoom) < 0.015) targetZoom = prevTargetZoom;
-        prevTargetZoom = targetZoom;
-
-        const zoomAlpha = 1 - Math.exp(-dt / 1.6);
-        const desiredDelta = (targetZoom - zoom) * zoomAlpha;
-        const maxRate = 0.28; // units per second
-        const maxStep = maxRate * dt;
-        zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
+        targetZoom = 1.4 * (1 - s) + 1.0 * s; // Base terrain zoom (1.0x to 1.4x)
+        
+        // Check for landing pad proximity enhancement
+        const nearestPadDist = getNearestPadDistance();
+        const padDetectionRange = 250;
+        
+        if (nearestPadDist < padDetectionRange) {
+          // Enhanced zoom for landing approach (1.4x to 3.0x)
+          const padProximityRatio = 1 - (nearestPadDist / padDetectionRange);
+          const enhancedZoom = 1.4 + (1.6 * padProximityRatio * padProximityRatio); // Exponential curve
+          targetZoom = Math.max(targetZoom, enhancedZoom);
+        }
       }
+      
+      // Apply hysteresis and smooth transitions
+      if (Math.abs(targetZoom - prevTargetZoom) < 0.015) targetZoom = prevTargetZoom;
+      prevTargetZoom = targetZoom;
+
+      const zoomAlpha = 1 - Math.exp(-dt / 1.6);
+      const desiredDelta = (targetZoom - zoom) * zoomAlpha;
+      const maxRate = 0.28; // units per second
+      const maxStep = maxRate * dt;
+      zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
       if (cameraShake > 0) cameraShake -= 60 * dt;
 
       // Enhanced particles update with thruster-friendly limits
