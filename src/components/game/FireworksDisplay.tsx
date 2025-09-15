@@ -141,17 +141,20 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           const pattern = patterns[Math.floor(Math.random() * patterns.length)];
           setParticles(prev => [...prev, ...createBurst(x, targetY, colors, pattern)]);
           
-          // Screen flash effect
-          const flash = document.createElement('div');
-          flash.className = 'absolute inset-0 bg-white pointer-events-none';
-          flash.style.opacity = '0.3';
-          flash.style.zIndex = '100';
-          document.body.appendChild(flash);
-          setTimeout(() => {
-            flash.style.opacity = '0';
-            flash.style.transition = 'opacity 0.2s';
-            setTimeout(() => document.body.removeChild(flash), 200);
-          }, 50);
+          // Screen flash effect (only on mobile devices)
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 'ontouchstart' in window;
+          if (isMobile) {
+            const flash = document.createElement('div');
+            flash.className = 'absolute inset-0 bg-white pointer-events-none';
+            flash.style.opacity = '0.3';
+            flash.style.zIndex = '100';
+            document.body.appendChild(flash);
+            setTimeout(() => {
+              flash.style.opacity = '0';
+              flash.style.transition = 'opacity 0.2s';
+              setTimeout(() => document.body.removeChild(flash), 200);
+            }, 50);
+          }
         }, 1000);
       }, i * 200);
     }
@@ -159,19 +162,26 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Animation loop
   useEffect(() => {
-    const animate = () => {
+    let lastTime = 0;
+    
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      const normalizedDelta = Math.min(deltaTime / 16.67, 2); // Cap at 2x normal speed for stability
+      
       setParticles(prev => {
         return prev
           .map(particle => ({
             ...particle,
-            x: particle.x + particle.vx,
-            y: particle.y + particle.vy,
-            vy: particle.gravity ? particle.vy + 0.1 : particle.vy, // gravity
-            life: particle.life - 1
+            x: particle.x + (particle.vx * normalizedDelta),
+            y: particle.y + (particle.vy * normalizedDelta),
+            vy: particle.gravity ? particle.vy + (0.05 * normalizedDelta) : particle.vy, // Reduced gravity for smoother movement
+            vx: particle.vx * 0.999, // Slight air resistance for more natural movement
+            life: particle.life - normalizedDelta
           }))
           .filter(particle => particle.life > 0);
       });
       
+      lastTime = currentTime;
       animationRef.current = requestAnimationFrame(animate);
     };
     
