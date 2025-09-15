@@ -71,7 +71,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   // Create firework burst
   const createBurst = useCallback((x: number, y: number, colors: string[], pattern: string = 'starburst') => {
     const newParticles: FireworkParticle[] = [];
-    const particleCount = landingType === '2x' ? 40 : landingType === 'moving' ? 35 : 25;
+    const particleCount = landingType === '2x' ? 80 : landingType === 'moving' ? 70 : 50;
     
     for (let i = 0; i < particleCount; i++) {
       let vx, vy;
@@ -120,7 +120,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     const canvas = canvasRef.current;
     const colors = getColors();
-    const launchCount = landingType === '2x' ? 5 : landingType === 'moving' ? 4 : 3;
+    const launchCount = landingType === '2x' ? 10 : landingType === 'moving' ? 8 : 6;
     
     // Stagger launches
     for (let i = 0; i < launchCount; i++) {
