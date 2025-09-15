@@ -98,110 +98,152 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return newParticles;
   }, []);
 
-  // Create spectacular burst patterns
+  // Create spectacular burst patterns with distinct visual signatures
   const createBurst = useCallback((x: number, y: number, colors: any, pattern: string = 'starburst') => {
     const newParticles: FireworkParticle[] = [];
-    const baseCount = landingType === '2x' ? 120 : landingType === 'moving' ? 100 : 80;
+    const baseCount = landingType === '2x' ? 150 : landingType === 'moving' ? 120 : 100;
+    
+    // Debug pattern selection
+    console.log(`🎆 Creating ${pattern} firework at (${Math.round(x)}, ${Math.round(y)}) for ${landingType} landing`);
     
     const createParticle = (vx: number, vy: number, customProps: Partial<FireworkParticle> = {}) => {
-      const shapes: FireworkParticle['shape'][] = ['circle', 'star', 'diamond', 'heart', 'cross'];
-      const colorArray = Math.random() > 0.3 ? colors.primary : colors.secondary;
-      
-      return {
+      // Pattern-specific defaults that can be overridden
+      const baseParticle = {
         x,
         y,
-        vx: vx * (0.8 + Math.random() * 0.4), // Speed variation
+        vx: vx * (0.8 + Math.random() * 0.4),
         vy: vy * (0.8 + Math.random() * 0.4),
-        life: 80 + Math.random() * 80,
-        max: 80 + Math.random() * 80,
-        color: colorArray[Math.floor(Math.random() * colorArray.length)],
+        life: 120 + Math.random() * 60, // Longer life for visibility
+        max: 120 + Math.random() * 60,
+        color: colors.primary[Math.floor(Math.random() * colors.primary.length)],
         secondaryColor: colors.glitter[Math.floor(Math.random() * colors.glitter.length)],
         type: 'burst' as const,
-        shape: shapes[Math.floor(Math.random() * shapes.length)],
-        size: 1.5 + Math.random() * 3,
+        shape: 'circle' as FireworkParticle['shape'],
+        size: 2 + Math.random() * 4, // Larger base size
         gravity: true,
         rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.2,
-        glowSize: 2 + Math.random() * 4,
+        rotationSpeed: (Math.random() - 0.5) * 0.3,
+        glowSize: 4 + Math.random() * 6, // More glow
         trail: [],
-        colorTransition: Math.random() > 0.7,
-        parentId: `burst_${particleIdCounter.current++}`,
+        colorTransition: false,
+        parentId: `${pattern}_${particleIdCounter.current++}`,
         ...customProps
       };
+      return baseParticle;
     };
 
     switch (pattern) {
       case 'spiral':
+        console.log('🌪️ Creating SPIRAL pattern with green/blue theme');
         for (let i = 0; i < baseCount; i++) {
-          const angle = (i / baseCount) * Math.PI * 8; // Multiple spirals
-          const radius = (i / baseCount) * 6;
+          const angle = (i / baseCount) * Math.PI * 12; // More spirals
+          const radius = (i / baseCount) * 8;
           const vx = Math.cos(angle) * radius;
           const vy = Math.sin(angle) * radius;
-          newParticles.push(createParticle(vx, vy));
+          newParticles.push(createParticle(vx, vy, { 
+            shape: 'diamond',
+            color: i % 2 === 0 ? '#00FF88' : '#0088FF',
+            size: 3 + (i / baseCount) * 4,
+            rotationSpeed: 0.4,
+            glowSize: 8
+          }));
         }
         break;
         
       case 'heart':
+        console.log('💖 Creating HEART pattern with pink/red theme');
         for (let i = 0; i < baseCount; i++) {
           const t = (i / baseCount) * Math.PI * 2;
           const heartX = 16 * Math.pow(Math.sin(t), 3);
           const heartY = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-          newParticles.push(createParticle(heartX * 0.3, heartY * 0.3, { shape: 'heart', color: '#FF69B4' }));
+          newParticles.push(createParticle(heartX * 0.4, heartY * 0.4, { 
+            shape: 'heart', 
+            color: i % 3 === 0 ? '#FF1493' : i % 3 === 1 ? '#FF69B4' : '#FFB6C1',
+            size: 4 + Math.random() * 3,
+            glowSize: 10,
+            colorTransition: true
+          }));
         }
         break;
         
       case 'star':
+        console.log('⭐ Creating STAR pattern with gold/yellow theme');
         for (let i = 0; i < baseCount; i++) {
           const angle = (i / baseCount) * Math.PI * 2;
           const isPoint = i % (baseCount / 10) < (baseCount / 20);
-          const radius = isPoint ? 6 : 3;
+          const radius = isPoint ? 8 : 4;
           const vx = Math.cos(angle) * radius;
           const vy = Math.sin(angle) * radius;
-          newParticles.push(createParticle(vx, vy, { shape: 'star' }));
+          newParticles.push(createParticle(vx, vy, { 
+            shape: 'star',
+            color: isPoint ? '#FFD700' : '#FFA500',
+            size: isPoint ? 6 : 3,
+            glowSize: isPoint ? 12 : 6,
+            rotationSpeed: isPoint ? 0.3 : 0.1
+          }));
         }
         break;
         
       case 'willow':
+        console.log('🌿 Creating WILLOW pattern with green cascading theme');
         for (let i = 0; i < baseCount; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 2 + Math.random() * 3;
+          const angle = (Math.PI / 6) + Math.random() * (5 * Math.PI / 6); // Upward spread
+          const speed = 3 + Math.random() * 4;
           const vx = Math.cos(angle) * speed;
-          const vy = Math.sin(angle) * speed - 2; // Droop effect
-          newParticles.push(createParticle(vx, vy, { gravity: true }));
+          const vy = -Math.abs(Math.sin(angle) * speed); // Always upward initially
+          newParticles.push(createParticle(vx, vy, { 
+            color: i % 3 === 0 ? '#32CD32' : i % 3 === 1 ? '#90EE90' : '#ADFF2F',
+            gravity: true,
+            size: 2 + Math.random() * 3,
+            shape: 'streak',
+            glowSize: 5
+          }));
         }
         break;
         
       case 'chrysanthemum':
-        const layers = 3;
+        console.log('🌸 Creating CHRYSANTHEMUM pattern with layered bursts');
+        const layers = 4;
         for (let layer = 0; layer < layers; layer++) {
           const layerCount = Math.floor(baseCount / layers);
+          const layerColor = layer === 0 ? '#FF4444' : layer === 1 ? '#FF8844' : layer === 2 ? '#FFAA44' : '#FFDD44';
           for (let i = 0; i < layerCount; i++) {
             const angle = (i / layerCount) * Math.PI * 2;
-            const speed = 2 + layer * 1.5;
+            const speed = 1.5 + layer * 2;
             const vx = Math.cos(angle) * speed;
             const vy = Math.sin(angle) * speed;
             newParticles.push(createParticle(vx, vy, { 
-              size: 2 + layer,
-              life: 100 + layer * 20
+              size: 3 + layer * 1.5,
+              life: 150 + layer * 30,
+              max: 150 + layer * 30,
+              color: layerColor,
+              shape: layer % 2 === 0 ? 'circle' : 'diamond',
+              glowSize: 6 + layer * 2
             }));
           }
         }
         break;
         
       case 'crossette':
-        // Initial burst
-        for (let i = 0; i < baseCount * 0.6; i++) {
+        console.log('✨ Creating CROSSETTE pattern with secondary explosions');
+        // Initial burst with bright white/silver
+        for (let i = 0; i < baseCount * 0.7; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 3 + Math.random() * 2;
+          const speed = 4 + Math.random() * 3;
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
-          const particle = createParticle(vx, vy);
+          const particle = createParticle(vx, vy, {
+            color: '#FFFFFF',
+            size: 4 + Math.random() * 2,
+            shape: 'cross',
+            glowSize: 8
+          });
           
           // Mark for secondary explosion
-          if (Math.random() > 0.8) {
+          if (Math.random() > 0.6) {
             setTimeout(() => {
               setParticles(prev => [...prev, ...createSecondaryBurst(particle.x, particle.y, colors)]);
-            }, 500 + Math.random() * 1000);
+            }, 600 + Math.random() * 800);
           }
           
           newParticles.push(particle);
@@ -209,36 +251,51 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         break;
         
       case 'double-burst':
-        // First ring
-        for (let i = 0; i < baseCount * 0.5; i++) {
-          const angle = (i / (baseCount * 0.5)) * Math.PI * 2;
-          const speed = 2 + Math.random();
+        console.log('💥 Creating DOUBLE-BURST pattern with delayed rings');
+        // First ring - inner burst
+        for (let i = 0; i < baseCount * 0.6; i++) {
+          const angle = (i / (baseCount * 0.6)) * Math.PI * 2;
+          const speed = 2.5 + Math.random() * 1.5;
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
-          newParticles.push(createParticle(vx, vy));
+          newParticles.push(createParticle(vx, vy, {
+            color: '#FF6600',
+            size: 3,
+            glowSize: 6
+          }));
         }
         
-        // Second ring (delayed)
+        // Second ring (delayed) - outer burst
         setTimeout(() => {
           const secondRing: FireworkParticle[] = [];
-          for (let i = 0; i < baseCount * 0.5; i++) {
-            const angle = (i / (baseCount * 0.5)) * Math.PI * 2;
-            const speed = 4 + Math.random() * 2;
+          for (let i = 0; i < baseCount * 0.8; i++) {
+            const angle = (i / (baseCount * 0.8)) * Math.PI * 2;
+            const speed = 5 + Math.random() * 2;
             const vx = Math.cos(angle) * speed;
             const vy = Math.sin(angle) * speed;
-            secondRing.push(createParticle(vx, vy, { color: colors.secondary[0] }));
+            secondRing.push(createParticle(vx, vy, { 
+              color: '#00CCFF',
+              size: 5,
+              shape: 'star',
+              glowSize: 10
+            }));
           }
           setParticles(prev => [...prev, ...secondRing]);
-        }, 300);
+        }, 400);
         break;
         
       default: // Enhanced starburst
+        console.log('💫 Creating STARBURST pattern - classic burst');
         for (let i = 0; i < baseCount; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 2 + Math.random() * 4;
+          const speed = 3 + Math.random() * 4;
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
-          newParticles.push(createParticle(vx, vy));
+          newParticles.push(createParticle(vx, vy, {
+            size: 3 + Math.random() * 2,
+            shape: Math.random() > 0.5 ? 'circle' : 'star',
+            glowSize: 5 + Math.random() * 3
+          }));
         }
     }
     
