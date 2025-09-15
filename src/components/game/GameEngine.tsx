@@ -13,6 +13,7 @@ import { checkJunkPickup, checkWormholeEntry, collectJunk, generateWormholeDoor 
 import { renderSpaceJunk, renderWormholeDoor, generateSparkles, updateSparkles, SPACE_JUNK_ASSETS } from "./systems/spaceJunkAssets";
 import { generateTerrain } from "./terrain";
 import { movingPadSystem } from "./systems/movingPads";
+import FireworksDisplay from './FireworksDisplay';
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -65,6 +66,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showBlackScreen, setShowBlackScreen] = useState(false);
+  
+  // Fireworks system state
+  const [fireworksActive, setFireworksActive] = useState(false);
+  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | null>(null);
+  const [fireworkStartTime, setFireworkStartTime] = useState(0);
+  const [neonColor, setNeonColor] = useState('#00FFFF');
+  const [currentLandings, setCurrentLandings] = useState(0);
   
   // Screen-space ship position for countdown overlay (CSS pixels)
   const [shipScreenPos, setShipScreenPos] = useState<{ x: number; y: number } | null>(null);
@@ -1250,6 +1258,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             if (speedBonus) { earned += 500; }
             score += earned;
             landings += 1;
+            setCurrentLandings(landings);
             cameraShake = 6;
             audio.current.success();
             audio.current.stopThruster();
@@ -1257,6 +1266,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
             running = false;
             setTimeout(() => {
+              const padType = applied2x ? '2x' : 'regular';
+              setLandingType(padType);
               setShowBlackScreen(true);
             }, 500);
           } else {
@@ -1298,6 +1309,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           
           score += earned;
           landings += 1;
+          setCurrentLandings(landings);
           cameraShake = 8; // Extra camera shake for MEGA landing
           audio.current.success();
           audio.current.stopThruster();
@@ -1305,19 +1317,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
           running = false;
           setTimeout(() => {
-            onGameOver({ 
-              score, 
-              landings, 
-              cause: "success", 
-              difficulty, 
-              elapsed, 
-              lastEarned: earned, 
-              padBonus2x: false, 
-              bullseye, 
-              speedBonus, 
-              levelSeed,
-              level
-            });
+            setLandingType('moving');
+            setShowBlackScreen(true);
           }, 500);
         } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
           // successful landing - end run (non-cavern levels)
@@ -1339,6 +1340,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (speedBonus) { earned += 500; }
           score += earned;
           landings += 1;
+          setCurrentLandings(landings);
           cameraShake = 6;
           audio.current.success();
           audio.current.stopThruster();
@@ -1346,6 +1348,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
+            const padType = applied2x ? '2x' : 'regular';
+            setLandingType(padType);
             setShowBlackScreen(true);
           }, 500);
         } else {
@@ -2213,7 +2217,32 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       
       {/* Black screen overlay for successful landing */}
       {showBlackScreen && (
-        <div className="absolute inset-0 bg-black z-50" />
+        <FireworksDisplay 
+          landingType={landingType}
+          neonColor={neonColor}
+          onComplete={() => {
+            onGameOver({ 
+              score: hud.score, 
+              landings: currentLandings, 
+              cause: "success", 
+              difficulty, 
+              elapsed: hud.time, 
+              levelSeed: hud.levelSeed,
+              level 
+            });
+          }}
+          onSkip={() => {
+            onGameOver({ 
+              score: hud.score, 
+              landings: currentLandings, 
+              cause: "success", 
+              difficulty, 
+              elapsed: hud.time, 
+              levelSeed: hud.levelSeed,
+              level 
+            });
+          }}
+        />
       )}
       
     </section>
