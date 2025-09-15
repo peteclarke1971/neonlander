@@ -65,7 +65,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
-  const [showBlackScreen, setShowBlackScreen] = useState(false);
+  const [showFireworks, setShowFireworks] = useState(false);
   
   // Fireworks system state
   const [fireworksActive, setFireworksActive] = useState(false);
@@ -1268,7 +1268,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             setTimeout(() => {
               const padType = applied2x ? '2x' : 'regular';
               setLandingType(padType);
-              setShowBlackScreen(true);
+              setShowFireworks(true);
             }, 500);
           } else {
             // crash on cavern walls/floor or invalid landing
@@ -1318,7 +1318,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           running = false;
           setTimeout(() => {
             setLandingType('moving');
-            setShowBlackScreen(true);
+            setShowFireworks(true);
           }, 500);
         } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
           // successful landing - end run (non-cavern levels)
@@ -1350,7 +1350,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           setTimeout(() => {
             const padType = applied2x ? '2x' : 'regular';
             setLandingType(padType);
-            setShowBlackScreen(true);
+            setShowFireworks(true);
           }, 500);
         } else {
           // crash
@@ -2215,8 +2215,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         shipPosition={shipScreenPos ?? undefined}
       />
       
-      {/* Black screen overlay for successful landing */}
-      {showBlackScreen && (
+      {/* Fireworks overlay for successful landing */}
+      {showFireworks && (
         <FireworksDisplay 
           landingType={landingType}
           neonColor={neonColor}
@@ -2226,7 +2226,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               landings: currentLandings, 
               cause: "success", 
               difficulty, 
-              elapsed: hud.time, 
+              elapsed: hud.time,
               levelSeed: hud.levelSeed,
               level 
             });

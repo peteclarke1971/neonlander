@@ -229,8 +229,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     particles.forEach(particle => {
       const alpha = particle.life / particle.max;
@@ -258,13 +257,13 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   }, [particles]);
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ background: 'black' }}
+        style={{ background: 'transparent' }}
       />
-      <div className="absolute bottom-8 text-center text-white/60 text-sm">
+      <div className="absolute bottom-8 text-center text-white/80 text-sm drop-shadow-lg pointer-events-none">
         Press THRUST to continue
       </div>
     </div>
