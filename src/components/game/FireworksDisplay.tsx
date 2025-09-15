@@ -60,7 +60,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       max: 60,
       color: colors[0],
       type: 'launch',
-      size: 3,
+      size: 2 + Math.random() * 2, // Vary launch particle size from 2 to 4
       gravity: false
     };
     
@@ -103,7 +103,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         max: 120 + Math.random() * 60,
         color: colors[Math.floor(Math.random() * colors.length)],
         type: 'burst',
-        size: 2 + Math.random(),
+        size: 1.5 + Math.random() * 2.5, // Vary size from 1.5 to 4
         gravity: true
       };
       
@@ -125,9 +125,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     // Stagger launches
     for (let i = 0; i < launchCount; i++) {
       setTimeout(() => {
-        const x = (canvas.width / (launchCount + 1)) * (i + 1);
+        // Add horizontal variation while keeping on screen
+        const baseX = (canvas.width / (launchCount + 1)) * (i + 1);
+        const x = Math.max(50, Math.min(canvas.width - 50, baseX + (Math.random() - 0.5) * 100));
         const y = canvas.height;
-        const targetY = canvas.height * (0.2 + Math.random() * 0.3);
+        // Vary height from 15% to 70% of screen height
+        const targetY = canvas.height * (0.15 + Math.random() * 0.55);
         
         // Launch
         setParticles(prev => [...prev, ...createLaunch(x, y, targetY, colors)]);
