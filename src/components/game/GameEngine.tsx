@@ -64,6 +64,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
+  const [showBlackScreen, setShowBlackScreen] = useState(false);
   
   // Screen-space ship position for countdown overlay (CSS pixels)
   const [shipScreenPos, setShipScreenPos] = useState<{ x: number; y: number } | null>(null);
@@ -1256,7 +1257,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
             running = false;
             setTimeout(() => {
-              onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus, levelSeed, level });
+              setShowBlackScreen(true);
             }, 500);
           } else {
             // crash on cavern walls/floor or invalid landing
@@ -1345,7 +1346,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
-            onGameOver({ score, landings, cause: "success", difficulty, elapsed, lastEarned: earned, padBonus2x: applied2x, bullseye, speedBonus, levelSeed, level });
+            setShowBlackScreen(true);
           }, 500);
         } else {
           // crash
@@ -2209,6 +2210,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         lowGraphics={lowGraphics}
         shipPosition={shipScreenPos ?? undefined}
       />
+      
+      {/* Black screen overlay for successful landing */}
+      {showBlackScreen && (
+        <div className="absolute inset-0 bg-black z-50" />
+      )}
       
     </section>
   );
