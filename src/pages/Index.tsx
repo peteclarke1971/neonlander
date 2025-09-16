@@ -144,13 +144,14 @@ const Index = () => {
 
   const [showGhost, setShowGhost] = useState(false);
   
-  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, enableGhost?: boolean) => {
+  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel });
     setDifficulty(d);
     setMode(mode);
     const finalLowGfx = lowGfx ?? lowGraphics; // Use current setting if not explicitly provided
     setLowGraphics(finalLowGfx);
     setSeedOverride(seedOverrideParam ?? null);
+    setShowGhost(gameSettings?.showGhost ?? false);
     // Force GameEngine remount to ensure fresh state
     setGameKey(prev => prev + 1);
     // Save graphics preference
@@ -461,6 +462,8 @@ const retryGame = () => {
           mode={mode}
           lowGraphics={lowGraphics}
           seedOverride={seedOverride ?? undefined}
+          showGhost={showGhost}
+          ghostLevel={carry?.level ?? successCount}
         />
       )}
       {view === "gameover" && lastResult && (

@@ -19,6 +19,7 @@ interface GameSettings {
   skipCountdowns: "never" | "first" | "always";
   photosensitive: boolean;
   lowGraphics: boolean;
+  showGhost?: boolean;
 }
 
 interface Props {
@@ -483,7 +484,8 @@ useEffect(() => {
                 introVariant,
                 skipCountdowns,
                 photosensitive,
-                lowGraphics
+                lowGraphics,
+                showGhost: false
               });
             }}
           >
@@ -515,7 +517,8 @@ useEffect(() => {
                         introVariant,
                         skipCountdowns,
                         photosensitive,
-                        lowGraphics
+                        lowGraphics,
+                        showGhost: false
                       })}
                     >
                       {L}
@@ -549,7 +552,8 @@ useEffect(() => {
                       introVariant,
                       skipCountdowns,
                       photosensitive,
-                      lowGraphics
+                      lowGraphics,
+                      showGhost: false
                     })}
                   >
                     {L}
