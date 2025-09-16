@@ -72,7 +72,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   
   // Fireworks system state
   const [fireworksActive, setFireworksActive] = useState(false);
-  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | null>(null);
+  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'ghost-beaten' | null>(null);
   const [fireworkStartTime, setFireworkStartTime] = useState(0);
   const [neonColor, setNeonColor] = useState('#00FFFF');
   const [currentLandings, setCurrentLandings] = useState(0);
@@ -1352,11 +1352,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             try { audio.current.stopFuelAlarm(); } catch {}
             if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
             running = false;
-            setTimeout(() => {
-              const padType = applied2x ? '2x' : 'regular';
-              setLandingType(padType);
-              setShowFireworks(true);
-            }, 500);
+             setTimeout(() => {
+               // For cavern mode, don't check ghost beating (ghosts are only in fixed mode)
+               const padType = applied2x ? '2x' : 'regular';
+               setLandingType(padType);
+               setShowFireworks(true);
+             }, 500);
           } else {
             // crash on cavern walls/floor or invalid landing
             running = false;
@@ -1435,7 +1436,16 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
-            const padType = applied2x ? '2x' : 'regular';
+            // Check if this is a new best time by beating a ghost
+            let isGhostBeaten = false;
+            if (mode === "fixed" && ghostRecording.length > 0) {
+              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+              if (existingBestTime && elapsed < existingBestTime) {
+                isGhostBeaten = true;
+              }
+            }
+            
+            const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
             setLandingType(padType);
             setShowFireworks(true);
           }, 500);

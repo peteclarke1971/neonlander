@@ -24,7 +24,7 @@ interface FireworkParticle {
 }
 
 interface FireworksDisplayProps {
-  landingType: 'regular' | 'moving' | '2x' | null;
+  landingType: 'regular' | 'moving' | '2x' | 'ghost-beaten' | null;
   neonColor: string;
   onComplete: () => void;
   onSkip: () => void;
@@ -397,6 +397,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     let launchCount: number, patterns: string[], timing: number;
     
     switch (landingType) {
+      case 'ghost-beaten':
+        // Spectacular display for beating a ghost time
+        launchCount = 15;
+        patterns = ['ghost', 'heart', 'ghost', 'heart', 'starburst', 'ghost', 'heart'];
+        timing = 120;
+        break;
       case '2x':
         launchCount = 12;
         patterns = ['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'];
@@ -551,7 +557,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Auto-complete after extended time for spectacular show
   useEffect(() => {
-    const duration = landingType === '2x' ? 8000 : landingType === 'moving' ? 7000 : 6000;
+    const duration = landingType === 'ghost-beaten' ? 10000 : landingType === '2x' ? 8000 : landingType === 'moving' ? 7000 : 6000;
     const timer = setTimeout(onComplete, duration);
     return () => clearTimeout(timer);
   }, [onComplete, landingType]);
