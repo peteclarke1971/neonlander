@@ -72,12 +72,15 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
   const [mode, setMode] = useState<Mode>(() => {
     try {
       const saved = localStorage.getItem("ll-game-mode");
-      return (saved === "fixed" ? "fixed" : "classic") as Mode;
+      return (saved as Mode) || "fixed";
     } catch {
-      return "classic";
+      return "fixed";
     }
   });
-  const [showGhost, setShowGhost] = useState(false);
+  const [showGhost, setShowGhost] = useState(() => {
+    // Ghost mode on by default for fixed mode
+    return mode === "fixed";
+  });
   const [leaderboardView, setLeaderboardView] = useState<
     | "local-classic"
     | "local-fixed"
@@ -97,6 +100,13 @@ const navigate = useNavigate();
       setSeedInput(lastPlayedSeed.toString());
     }
   }, [lastPlayedSeed]);
+
+  // Auto-enable ghost mode when switching to fixed mode
+  useEffect(() => {
+    if (mode === "fixed") {
+      setShowGhost(true);
+    }
+  }, [mode]);
 
   // Save settings to localStorage
   useEffect(() => {
