@@ -462,8 +462,8 @@ useEffect(() => {
     }}
     aria-label="Select game mode"
   >
-    <ToggleGroupItem ref={modeClassicRef} value="classic" variant="outline" aria-label="Classic mode" onFocus={() => { lastModeFocus.current = "classic"; }}>Classic</ToggleGroupItem>
     <ToggleGroupItem ref={modeFixedRef} value="fixed" variant="outline" aria-label="Campaign mode" onFocus={() => { lastModeFocus.current = "fixed"; }}>Campaign</ToggleGroupItem>
+    <ToggleGroupItem ref={modeClassicRef} value="classic" variant="outline" aria-label="Classic mode" onFocus={() => { lastModeFocus.current = "classic"; }}>Classic</ToggleGroupItem>
   </ToggleGroup>
         </div>
 
