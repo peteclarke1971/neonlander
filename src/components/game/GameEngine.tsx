@@ -496,6 +496,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     let prevTargetZoom = 1;
     let loggedMovingPadStart = false;
     
+    // Ghost state
+    let ghostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
+    if (isGhostMode && ghostLevel !== undefined) {
+      ghostShip = { x: 0, y: 0, angle: 0, visible: false };
+    }
+    
     // Particles
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
@@ -559,7 +565,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       } else {
         altitude = Math.max(0, terrain.getHeightAt(x) - y);
       }
-      setHud({ altitude, vx, vy, fuel, fuelCap, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1 });
+      
+      // Calculate ghost time difference
+      let ghostTimeDiff: number | undefined;
+      if (isGhostMode && ghostLevel !== undefined && bestTime !== null) {
+        ghostTimeDiff = elapsed - bestTime;
+      }
+      
+      setHud({ altitude, vx, vy, fuel, fuelCap, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1, ghostTimeDiff });
     };
 
     const spawnExplosion = () => {
@@ -751,6 +764,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       if (timerActiveRef.current) {
         elapsed += dt;
         gameTime += dt;
+      }
+      
+      // Ghost state update
+      if (ghostShip && isGhostMode && ghostLevel !== undefined) {
+        const ghostState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        if (ghostState) {
+          ghostShip.x = ghostState.x;
+          ghostShip.y = ghostState.y;
+          ghostShip.angle = ghostState.angle;
+          ghostShip.visible = true;
+        } else {
+          ghostShip.visible = false;
+        }
       }
       
       // Ghost recording (sample every 50ms when recording)
@@ -1966,6 +1992,31 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
 
+      // Ghost ship (render before player)
+      if (ghostShip && ghostShip.visible) {
+        for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+          ctx.save();
+          ctx.translate(ghostShip.x + offset, ghostShip.y);
+          ctx.rotate(ghostShip.angle);
+          ctx.globalAlpha = 0.5; // Translucent
+          ctx.beginPath();
+          ctx.moveTo(0, -10);
+          ctx.lineTo(8, 10);
+          ctx.lineTo(-8, 10);
+          ctx.closePath();
+          ctx.strokeStyle = '#00ff80'; // Ghost green
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Ghost legs
+          ctx.beginPath();
+          ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+          ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
       // Lander
       if (!crashed) {
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
@@ -2190,7 +2241,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         />
       )}
 
-      <HUD {...hud} collectibles={collectiblesRef.current || undefined} />
+      <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} />
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
         <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">

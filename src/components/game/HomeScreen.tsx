@@ -77,6 +77,7 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
       return "classic";
     }
   });
+  const [showGhost, setShowGhost] = useState(false);
   const [leaderboardView, setLeaderboardView] = useState<
     | "local-classic"
     | "local-fixed"
@@ -456,6 +457,23 @@ useEffect(() => {
   </ToggleGroup>
         </div>
 
+        {/* Ghost mode toggle (only visible in fixed mode) */}
+        {mode === "fixed" && (
+          <div className="mt-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Ghost Mode</div>
+            <button
+              className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                showGhost
+                  ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                  : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+              }`}
+              onClick={() => setShowGhost(!showGhost)}
+            >
+              👻 Ghost Mode {showGhost ? "ON" : "OFF"}
+            </button>
+          </div>
+        )}
+
         {/* Play by Seed */}
         <div className="mt-4 flex items-center justify-center gap-2">
           <Input
@@ -501,7 +519,13 @@ useEffect(() => {
                 <div className="text-xs text-muted-foreground mt-1">{d.desc}</div>
                 <Button
                   ref={d.key === "easy" ? easyStartRef : hardStartRef}
-                  variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart(d.key, undefined, mode, lowGraphics)}>
+                  variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart(d.key, undefined, mode, lowGraphics, undefined, {
+                    introVariant,
+                    skipCountdowns,
+                    photosensitive,
+                    lowGraphics,
+                    showGhost
+                  })}>
                   Start
                 </Button>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mt-3">Start at level</div>
@@ -518,7 +542,7 @@ useEffect(() => {
                         skipCountdowns,
                         photosensitive,
                         lowGraphics,
-                        showGhost: false
+                        showGhost
                       })}
                     >
                       {L}
