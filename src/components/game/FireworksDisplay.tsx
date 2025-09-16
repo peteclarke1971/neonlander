@@ -587,13 +587,28 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         });
       }
       
-      // Main particle with glow
+      // Main particle with optimized glow
       ctx.globalAlpha = alpha;
       
-      // Glow effect
-      if (particle.glowSize > 0) {
-        ctx.shadowBlur = particle.glowSize;
+      // Optimized glow effect with smart thresholds
+      const effectiveSize = particle.size * alpha;
+      
+      if (particle.glowSize > 0 && effectiveSize >= 4) {
+        // Use expensive shadowBlur only for larger particles
+        const scaledGlow = Math.min(8, particle.glowSize * (effectiveSize >= 8 ? 1 : 0.5));
+        ctx.shadowBlur = scaledGlow;
         ctx.shadowColor = particle.color;
+      } else if (particle.glowSize > 0 && effectiveSize < 4) {
+        // Alternative glow for small particles - draw background circle
+        ctx.shadowBlur = 0;
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, effectiveSize * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = alpha;
       } else {
         ctx.shadowBlur = 0;
       }
