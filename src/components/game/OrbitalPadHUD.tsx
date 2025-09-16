@@ -122,7 +122,7 @@ export const OrbitalPadHUD: React.FC<Props> = ({ hud, paused }) => {
             <div className="text-xs text-muted-foreground mt-1 space-y-1">
               <div>Land velocity: R ≤2.0, T ≤3.0</div>
               <div>Ship orientation: Nose down</div>
-              <div>Position: On glowing pad</div>
+              <div>Position: On illuminated pad</div>
             </div>
           </div>
         </div>
