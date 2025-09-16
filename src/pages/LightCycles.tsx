@@ -270,7 +270,7 @@ const LightCycles: React.FC = () => {
             NEON LIGHT CYCLES
           </h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Enter the digital grid and outrun your opponents in classic TRON style. Leave illuminated trails as you race for survival.
+            Enter the digital grid and outrun your opponents in classic TRON style. Leave glowing trails as you race for survival.
           </p>
 
           {/* Navigation buttons */}
