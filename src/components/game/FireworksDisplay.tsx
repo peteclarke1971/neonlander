@@ -11,7 +11,7 @@ interface FireworkParticle {
   color: string;
   secondaryColor?: string;
   type: 'launch' | 'burst' | 'glitter' | 'crackle' | 'comet' | 'secondary';
-  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak';
+  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak' | 'ghost';
   size: number;
   gravity: boolean;
   rotation: number;
@@ -241,9 +241,9 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           
           // Mark for secondary explosion
           if (Math.random() > 0.6) {
-            setTimeout(() => {
-              setParticles(prev => [...prev, ...createSecondaryBurst(particle.x, particle.y, colors)]);
-            }, 600 + Math.random() * 800);
+        setTimeout(() => {
+          setParticles(prev => [...prev, ...createSecondaryBurst(particle.x, particle.y, colors)]);
+        }, 600 + Math.random() * 800);
           }
           
           newParticles.push(particle);
@@ -282,6 +282,28 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           }
           setParticles(prev => [...prev, ...secondRing]);
         }, 400);
+        break;
+        
+      case 'ghost':
+        console.log('👻 Creating GHOST pattern with spooky floating theme');
+        for (let i = 0; i < baseCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 1.5 + Math.random() * 2; // Slower, floaty movement
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed - 0.5; // Slight upward bias
+          newParticles.push(createParticle(vx, vy, { 
+            shape: 'ghost',
+            color: i % 4 === 0 ? '#FFFFFF' : i % 4 === 1 ? '#E6F3FF' : i % 4 === 2 ? '#CCE7FF' : '#B3DBFF',
+            size: 4 + Math.random() * 3,
+            gravity: false, // Ghosts float!
+            life: 180 + Math.random() * 80, // Longer life for ethereal effect
+            max: 180 + Math.random() * 80,
+            glowSize: 8 + Math.random() * 4,
+            rotationSpeed: (Math.random() - 0.5) * 0.1, // Slow gentle rotation
+            colorTransition: true,
+            secondaryColor: 'rgba(255, 255, 255, 0.3)'
+          }));
+        }
         break;
         
       default: // Enhanced starburst
@@ -636,6 +658,9 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         case 'streak':
           drawStreak(ctx, 0, 0, particle.size * alpha, particle.vx, particle.vy);
           break;
+        case 'ghost':
+          drawGhost(ctx, 0, 0, particle.size * alpha);
+          break;
         default: // circle
           ctx.beginPath();
           ctx.arc(0, 0, particle.size * alpha, 0, Math.PI * 2);
@@ -698,6 +723,40 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     ctx.rotate(angle);
     ctx.fillRect(-length, -size/2, length, size);
     ctx.restore();
+  };
+
+  const drawGhost = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
+    const scale = size / 8;
+    ctx.beginPath();
+    
+    // Ghost body - rounded top
+    ctx.arc(0, -2 * scale, 6 * scale, Math.PI, 0, false);
+    
+    // Ghost body sides
+    ctx.lineTo(6 * scale, 6 * scale);
+    
+    // Wavy bottom hem (classic ghost shape)
+    ctx.lineTo(4 * scale, 4 * scale);
+    ctx.lineTo(2 * scale, 6 * scale);
+    ctx.lineTo(0, 4 * scale);
+    ctx.lineTo(-2 * scale, 6 * scale);
+    ctx.lineTo(-4 * scale, 4 * scale);
+    ctx.lineTo(-6 * scale, 6 * scale);
+    
+    // Close back to start
+    ctx.lineTo(-6 * scale, -2 * scale);
+    
+    ctx.closePath();
+    ctx.fill();
+    
+    // Add ghost eyes (small dark circles)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.beginPath();
+    ctx.arc(-2 * scale, -1 * scale, 0.8 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(2 * scale, -1 * scale, 0.8 * scale, 0, Math.PI * 2);
+    ctx.fill();
   };
 
   return (
