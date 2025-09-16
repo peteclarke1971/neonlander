@@ -387,7 +387,7 @@ useEffect(() => {
           NEON LUNAR LANDER
         </h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Retro-inspired precision landings with a modern neon vector glow.. Conserve fuel, master thrust, and touch down on glowing pads.
+          Retro-inspired precision landings with a modern neon vector glow.. Conserve fuel, master thrust, and touch down on illuminated pads.
         </p>
 
         {/* Music control visible near the title for clarity */}
