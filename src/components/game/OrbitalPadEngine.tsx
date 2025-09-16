@@ -10,11 +10,13 @@ import { anyGamepad, readGamepad, loadProfile, getLastDeviceId, setUiMode } from
 import { Button } from "@/components/ui/button";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
+import { GhostManager, GhostFrame, GhostState } from "./GhostManager";
 
 interface Props {
   level: number;
+  showGhost?: boolean;
   onExit: () => void;
-  onGameOver: (data: OrbitalDockingGameOverData) => void;
+  onGameOver: (data: OrbitalDockingGameOverData & { isNewBestTime?: boolean }) => void;
 }
 
 // Seeded random number generator
@@ -68,10 +70,13 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
   };
 };
 
-export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver }) => {
+export const OrbitalPadEngine: React.FC<Props> = ({ level, showGhost = false, onExit, onGameOver }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audio = useRef(new AudioManager());
+  
+  // Ghost management
+  const ghostManager = useRef(new GhostManager());
   
   // Cursor management
   const cursorManager = useRef<CursorManager | null>(null);
@@ -102,6 +107,12 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
   // Game timers
   const [gameTime, setGameTime] = useState(0);
   const [attemptCount, setAttemptCount] = useState(1);
+  
+  // Ghost recording and playback
+  const [ghostRecording, setGhostRecording] = useState<GhostFrame[]>([]);
+  const [ghostState, setGhostState] = useState<GhostState | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const lastRecordTime = useRef(0);
   
   // Input state
   const keys = useRef<Record<string, boolean>>({});
@@ -161,6 +172,12 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
     setGameEnded(false);
     setPaused(false);
     setAttemptCount(1);
+    
+    // Initialize ghost recording/playback
+    setGhostRecording([]);
+    setGhostState(null);
+    setIsRecording(!showGhost); // Only record when not showing ghost
+    lastRecordTime.current = 0;
     
     // Setup audio
     audio.current.stopAllAudio();
@@ -357,7 +374,33 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       lastTime = currentTime;
       
       if (!paused && !gameEnded) {
-        setGameTime(prev => prev + deltaTime);
+        setGameTime(prev => {
+          const newTime = prev + deltaTime;
+          
+          // Record ghost data every 50ms (20fps)
+          if (isRecording && newTime - lastRecordTime.current >= 0.05) {
+            const shipAngle = ship.theta; // Ship points radially outward
+            setGhostRecording(prevRecording => [
+              ...prevRecording,
+              {
+                timestamp: newTime,
+                r: ship.r,
+                theta: ship.theta,
+                angle: shipAngle,
+                thrust: ship.thrust > 0
+              }
+            ]);
+            lastRecordTime.current = newTime;
+          }
+          
+          // Update ghost state for playback
+          if (showGhost && !isRecording) {
+            const newGhostState = ghostManager.current.getGhostState(level, newTime);
+            setGhostState(newGhostState);
+          }
+          
+          return newTime;
+        });
         updatePhysics(deltaTime);
         
         // Update particles
@@ -417,6 +460,16 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
                 totalScore += config.scoring.cleanBonus;
               }
               
+              // Check if this is a new best time and save ghost
+              let isNewBestTime = false;
+              if (isRecording) {
+                const existingBestTime = ghostManager.current.getBestTime(level);
+                if (!existingBestTime || gameTime < existingBestTime) {
+                  isNewBestTime = true;
+                  ghostManager.current.saveGhost(level, ghostRecording, gameTime);
+                }
+              }
+              
               // audio.current.playLanding();
               onGameOver({
                 score: totalScore,
@@ -424,7 +477,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
                 fuelRemaining: ship.fuel,
                 cause: "success",
                 cleanCapture: attemptCount === 1,
-                seed
+                seed,
+                isNewBestTime
               });
               setGameEnded(true);
               return;
@@ -583,6 +637,35 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, onExit, onGameOver })
       ctx.fillStyle = '#ff6600';
       ctx.fill();
     });
+    
+    // Draw ghost ship (if available and visible)
+    if (ghostState && ghostState.visible) {
+      const ghostX = ghostState.r * Math.cos(ghostState.theta);
+      const ghostY = ghostState.r * Math.sin(ghostState.theta);
+      
+      ctx.save();
+      ctx.translate(ghostX, ghostY);
+      
+      // Ghost ship rotated 90 degrees right so thruster points toward planet
+      const ghostShipAngle = ghostState.theta + Math.PI / 2;
+      ctx.rotate(ghostShipAngle);
+      
+      // Draw semi-transparent ghost ship triangle
+      ctx.globalAlpha = 0.4;
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(0, -7.5); // Point away from planet - half size
+      ctx.lineTo(-5, 5);
+      ctx.lineTo(5, 5);
+      ctx.closePath();
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
     
     // Draw ship (same triangle design as main game)
     const shipX = ship.r * Math.cos(ship.theta);

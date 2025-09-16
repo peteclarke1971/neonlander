@@ -5,6 +5,7 @@ import { OrbitalDockingGameOverData } from "@/components/game/types/orbitaldocki
 import { Button } from "@/components/ui/button";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, setUiMode } from "@/hooks/use-gamepad";
+import { GhostManager } from "@/components/game/GhostManager";
 
 type View = "home" | "game" | "gameover";
 
@@ -18,7 +19,9 @@ interface HighScore {
 const NeonDocking: React.FC = () => {
   const [view, setView] = useState<View>("home");
   const [startLevel, setStartLevel] = useState<number>(1);
+  const [showGhost, setShowGhost] = useState<boolean>(false);
   const [lastResult, setLastResult] = useState<OrbitalDockingGameOverData | null>(null);
+  const ghostManager = useRef(new GhostManager());
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -51,7 +54,7 @@ const NeonDocking: React.FC = () => {
     setView("game");
   };
 
-  const handleGameOver = (data: OrbitalDockingGameOverData) => {
+  const handleGameOver = (data: OrbitalDockingGameOverData & { isNewBestTime?: boolean }) => {
     setLastResult(data);
     setView("gameover");
     // Avoid auto-focusing default actions on crash screen
@@ -279,25 +282,58 @@ const NeonDocking: React.FC = () => {
             </p>
             
             <div className="border border-border/60 rounded-lg p-6 bg-card/50 max-w-2xl mx-auto">
-              <div className="grid grid-cols-5 gap-3">
-                {levels.map((level) => (
-                  <Button
-                    key={level}
-                    ref={(el) => { levelButtonRefs.current[level] = el; }}
-                    variant={level === 1 ? "neon" : "outline"}
-                    size="lg"
-                    className="aspect-square font-mono text-lg"
-                    onClick={() => startGame(level)}
-                  >
-                    {level}
-                  </Button>
-                ))}
+              {/* Ghost Mode Toggle */}
+              <div className="mb-4 flex items-center justify-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showGhost}
+                    onChange={(e) => setShowGhost(e.target.checked)}
+                    className="w-4 h-4 rounded border-border bg-background text-accent"
+                  />
+                  <span className="text-muted-foreground">Ghost Mode</span>
+                </label>
+                <div className="text-xs text-muted-foreground/80">
+                  Race against your best time
+                </div>
               </div>
               
-              <div className="mt-4 text-xs text-muted-foreground space-y-1">
+              <div className="grid grid-cols-5 gap-3">
+                {levels.map((level) => {
+                  const hasGhost = ghostManager.current.hasGhost(level);
+                  const bestTime = ghostManager.current.getBestTime(level);
+                  return (
+                    <div key={level} className="relative">
+                      <Button
+                        ref={(el) => { levelButtonRefs.current[level] = el; }}
+                        variant={level === 1 ? "neon" : "outline"}
+                        size="lg"
+                        className="w-full aspect-square font-mono text-lg"
+                        onClick={() => startGame(level)}
+                        disabled={showGhost && !hasGhost}
+                      >
+                        {level}
+                      </Button>
+                      {hasGhost && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full" title="Ghost available" />
+                      )}
+                      {bestTime && (
+                        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
+                          {bestTime.toFixed(1)}s
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-6 text-xs text-muted-foreground space-y-1">
                 <div>• Levels 1-3: Large pads, slow rotation (Beginner)</div>
                 <div>• Levels 4-6: Medium pads, moderate rotation (Intermediate)</div>
                 <div>• Levels 7-10: Small pads, fast rotation (Expert)</div>
+                {showGhost && (
+                  <div className="text-accent mt-2">• Ghost mode: Race against your best time!</div>
+                )}
               </div>
             </div>
           </div>
@@ -335,6 +371,7 @@ const NeonDocking: React.FC = () => {
     return (
       <OrbitalPadEngine
         level={startLevel}
+        showGhost={showGhost}
         onExit={backToHome}
         onGameOver={handleGameOver}
       />
@@ -366,6 +403,9 @@ const NeonDocking: React.FC = () => {
               <div className="text-lg">Fuel Left: {Math.round(lastResult.fuelRemaining)}%</div>
               {lastResult.cleanCapture && (
                 <div className="text-lg text-green-400 font-semibold">Clean Capture Bonus!</div>
+              )}
+              {lastResult.isNewBestTime && (
+                <div className="text-lg text-accent font-semibold animate-pulse">NEW BEST TIME!</div>
               )}
             </div>
           )}

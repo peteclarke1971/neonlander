@@ -45,6 +45,7 @@ export interface OrbitalDockingGameOverData {
   cause: "crash" | "fuel" | "timeout" | "success";
   cleanCapture: boolean;  // landed on first try within thresholds
   seed: number;
+  isNewBestTime?: boolean;  // whether this was a new best time for ghost recording
 }
 
 export interface OrbitalDockingHUDSnapshot {
