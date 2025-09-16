@@ -455,7 +455,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Ghost recording and playback initialization
     let gameTime = 0;
     const isGhostMode = showGhost && mode === "fixed" && !isCavernLevel;
-    const shouldRecord = mode === "fixed" && !showGhost && !isCavernLevel;
+    const shouldRecord = mode === "fixed" && !isCavernLevel;
     
     // Initialize ghost system
     if (isGhostMode && ghostLevel !== undefined) {
@@ -779,8 +779,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
       
-      // Ghost recording (sample every 50ms when recording)
-      if (shouldRecord && isRecording && gameTime - lastRecordTime.current >= 0.05) {
+          // Ghost recording (sample every 50ms when recording)
+      if (shouldRecord && gameTime - lastRecordTime.current >= 0.05) {
         const newFrame: LunarLanderGhostFrame = {
           timestamp: gameTime,
           x,
@@ -2336,7 +2336,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           // Check if this is a new best time and save ghost
           let isNewBestTime = false;
           let ghostTimeDiff: number | undefined;
-          if (isRecording && mode === "fixed") {
+          if (mode === "fixed" && ghostRecording.length > 0) {
             const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
             if (!existingBestTime || hud.time < existingBestTime) {
               isNewBestTime = true;
@@ -2363,7 +2363,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             // Check if this is a new best time and save ghost
             let isNewBestTime = false;
             let ghostTimeDiff: number | undefined;
-            if (isRecording && mode === "fixed") {
+            if (mode === "fixed" && ghostRecording.length > 0) {
               const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
               if (!existingBestTime || hud.time < existingBestTime) {
                 isNewBestTime = true;
