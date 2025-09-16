@@ -38,6 +38,7 @@ import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import { PerformanceManager } from "./utils/performanceManager";
 import { particlePool, debrisPool } from "./utils/objectPool";
+import { GhostManager, LunarLanderGhostFrame, LunarLanderGhostState } from "./GhostManager";
 
 interface Props {
   difficulty: Difficulty;
@@ -51,13 +52,15 @@ interface Props {
   showCavernFX?: boolean;
   cavernFXParams?: CavernFXParams;
   seedOverride?: number;
+  showGhost?: boolean;
+  ghostLevel?: number;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride }) => {
+export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
@@ -133,6 +136,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   
   // Cursor management
   const cursorManager = useRef<CursorManager | null>(null);
+  
+  // Ghost recording and playback system
+  const ghostManager = useRef(new GhostManager());
+  const [ghostRecording, setGhostRecording] = useState<LunarLanderGhostFrame[]>([]);
+  const [ghostState, setGhostState] = useState<LunarLanderGhostState | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const lastRecordTime = useRef(0);
+  const [bestTime, setBestTime] = useState<number | null>(null);
   
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
@@ -441,6 +452,33 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     let running = true;
     let crashed = false;
 
+    // Ghost recording and playback initialization
+    let gameTime = 0;
+    const isGhostMode = showGhost && mode === "fixed" && !isCavernLevel;
+    const shouldRecord = mode === "fixed" && !showGhost && !isCavernLevel;
+    
+    // Initialize ghost system
+    if (isGhostMode && ghostLevel !== undefined) {
+      const difficultyStr = difficulty;
+      const recording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
+      if (recording) {
+        console.log("👻 Ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (recording.completionTime).toFixed(2) + "s");
+      }
+    }
+    
+    if (shouldRecord) {
+      setGhostRecording([]);
+      setIsRecording(true);
+      lastRecordTime.current = 0;
+      console.log("🔴 Ghost recording started for", difficulty, "level", level);
+    }
+    
+    // Load best time for HUD display
+    if (mode === "fixed" && !isCavernLevel) {
+      const currentBest = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+      setBestTime(currentBest);
+    }
+
     let cameraX = x;
     let cameraShake = 0;
     let zoom = 1;
@@ -712,6 +750,29 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Only increment elapsed time when timer is active (after first movement or 2s after GO)
       if (timerActiveRef.current) {
         elapsed += dt;
+        gameTime += dt;
+      }
+      
+      // Ghost recording (sample every 50ms when recording)
+      if (shouldRecord && isRecording && gameTime - lastRecordTime.current >= 0.05) {
+        const newFrame: LunarLanderGhostFrame = {
+          timestamp: gameTime,
+          x,
+          y,
+          vx,
+          vy,
+          angle,
+          thrust: keys.current.thrust,
+          fuel
+        };
+        setGhostRecording(prev => [...prev, newFrame]);
+        lastRecordTime.current = gameTime;
+      }
+      
+      // Ghost playback - update ghost state
+      if (isGhostMode && ghostLevel !== undefined) {
+        const ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        setGhostState(ghostStateUpdate);
       }
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
@@ -2220,17 +2281,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         <FireworksDisplay 
           landingType={landingType}
           neonColor={neonColor}
-          onComplete={() => {
-            onGameOver({ 
-              score: hud.score, 
-              landings: currentLandings, 
-              cause: "success", 
-              difficulty, 
-              elapsed: hud.time,
-              levelSeed: hud.levelSeed,
-              level 
-            });
-          }}
+        onComplete={() => {
+          onGameOver({ 
+            score: hud.score, 
+            landings: currentLandings, 
+            cause: "success", 
+            difficulty, 
+            elapsed: hud.time,
+            levelSeed: hud.levelSeed,
+            level
+          });
+        }}
           onSkip={() => {
             onGameOver({ 
               score: hud.score, 

@@ -85,6 +85,9 @@ export interface GameOverData {
   speedBonus?: boolean;
   levelSeed?: number;
   level?: number;
+  // Ghost-related data
+  isNewBestTime?: boolean;
+  ghostTimeDiff?: number;
 }
 
 export interface HighScore {

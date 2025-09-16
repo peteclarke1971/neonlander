@@ -10,7 +10,7 @@ import { anyGamepad, readGamepad, loadProfile, getLastDeviceId, setUiMode } from
 import { Button } from "@/components/ui/button";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
-import { GhostManager, GhostFrame, GhostState } from "./GhostManager";
+import { GhostManager, NeonDockingGhostFrame, NeonDockingGhostState } from "./GhostManager";
 
 interface Props {
   level: number;
@@ -109,8 +109,8 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, showGhost = false, on
   const [attemptCount, setAttemptCount] = useState(1);
   
   // Ghost recording and playback
-  const [ghostRecording, setGhostRecording] = useState<GhostFrame[]>([]);
-  const [ghostState, setGhostState] = useState<GhostState | null>(null);
+  const [ghostRecording, setGhostRecording] = useState<NeonDockingGhostFrame[]>([]);
+  const [ghostState, setGhostState] = useState<NeonDockingGhostState | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const lastRecordTime = useRef(0);
   
@@ -640,14 +640,14 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, showGhost = false, on
     
     // Draw ghost ship (if available and visible)
     if (ghostState && ghostState.visible) {
-      const ghostX = ghostState.r * Math.cos(ghostState.theta);
-      const ghostY = ghostState.r * Math.sin(ghostState.theta);
+      const ghostX = (ghostState as NeonDockingGhostState).r * Math.cos((ghostState as NeonDockingGhostState).theta);
+      const ghostY = (ghostState as NeonDockingGhostState).r * Math.sin((ghostState as NeonDockingGhostState).theta);
       
       ctx.save();
       ctx.translate(ghostX, ghostY);
       
       // Ghost ship rotated 90 degrees right so thruster points toward planet
-      const ghostShipAngle = ghostState.theta + Math.PI / 2;
+      const ghostShipAngle = (ghostState as NeonDockingGhostState).theta + Math.PI / 2;
       ctx.rotate(ghostShipAngle);
       
       // Draw semi-transparent ghost ship triangle

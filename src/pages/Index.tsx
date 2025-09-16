@@ -142,7 +142,9 @@ const Index = () => {
     return () => { mgr.detach(); pageCursorMgr.current = null; };
   }, []);
 
-  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number) => {
+  const [showGhost, setShowGhost] = useState(false);
+  
+  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, enableGhost?: boolean) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel });
     setDifficulty(d);
     setMode(mode);
