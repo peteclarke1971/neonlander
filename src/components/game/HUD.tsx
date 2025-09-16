@@ -20,11 +20,6 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
           <div className="text-accent">TIME</div>
           <div className="flex flex-col">
             <span>{time.toFixed(1)} s</span>
-            {bestTime && (
-              <span className="text-xs text-muted-foreground">
-                Best: {bestTime.toFixed(1)}s
-              </span>
-            )}
             {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.1 && (
               <span className={`text-xs ${ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}`}>
                 Ghost: {ghostTimeDiff > 0 ? '+' : ''}{ghostTimeDiff.toFixed(1)}s
@@ -46,6 +41,11 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
             </span>
           )}
         </div>
+        {bestTime && (
+          <div className="text-xs text-muted-foreground mt-1">
+            Best: {bestTime.toFixed(1)}s
+          </div>
+        )}
         
         {collectibles && (
           <div className="mt-3">
