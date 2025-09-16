@@ -551,6 +551,13 @@ const retryGame = () => {
           <section className="relative text-center animate-enter" onKeyDown={handleGameOverKeys} tabIndex={0}>
             <h1 ref={successTitleRef} className="text-4xl font-display font-bold mb-3">{lastResult.cause === "success" ? "Mission Successful" : lastResult.cause === "crash" ? "Mission Failed" : "Mission Ended"}</h1>
             <p className="text-muted-foreground">Score: <span className="text-accent font-semibold">{lastResult.score}</span> · Landings: {lastResult.landings} · Time: {lastResult.elapsed.toFixed(1)}s</p>
+            {lastResult.isNewBestTime && (
+              <div className="mt-3 animate-enter">
+                <span className="px-4 py-2 rounded-md border border-accent/70 shadow-neon-strong font-display text-accent text-lg font-bold animate-pulse">
+                  🏆 NEW BEST TIME! 🏆
+                </span>
+              </div>
+            )}
             {lastResult.cause === "success" && (lastResult.padBonus2x || lastResult.bullseye || lastResult.speedBonus) && (
               <div className="mt-3 flex items-center justify-center gap-3 animate-enter">
                 {lastResult.padBonus2x && (

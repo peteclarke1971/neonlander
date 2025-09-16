@@ -300,13 +300,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
     }
     
-    // Initialize collectibles
-    collectiblesRef.current = terrain.collectibles || null;
-    if (collectiblesRef.current) {
-      collectiblesRef.current.spaceJunk.forEach(junk => {
-        sparklesRef.current.set(junk.id, generateSparkles(junk.seed));
-      });
-    }
+  // Initialize collectibles
+  collectiblesRef.current = terrain.collectibles || null;
+  if (collectiblesRef.current) {
+    collectiblesRef.current.spaceJunk.forEach(junk => {
+      sparklesRef.current.set(junk.id, generateSparkles(junk.seed));
+    });
+  }
     
     // Debug moving pads presence
     if (!isCavernLevel) {
@@ -2333,6 +2333,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           landingType={landingType}
           neonColor={neonColor}
         onComplete={() => {
+          // Check if this is a new best time and save ghost
+          let isNewBestTime = false;
+          let ghostTimeDiff: number | undefined;
+          if (isRecording && mode === "fixed") {
+            const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+            if (!existingBestTime || hud.time < existingBestTime) {
+              isNewBestTime = true;
+              ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+            }
+            if (existingBestTime) {
+              ghostTimeDiff = hud.time - existingBestTime;
+            }
+          }
+          
           onGameOver({ 
             score: hud.score, 
             landings: currentLandings, 
@@ -2340,10 +2354,26 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             difficulty, 
             elapsed: hud.time,
             levelSeed: hud.levelSeed,
-            level
+            level,
+            isNewBestTime,
+            ghostTimeDiff
           });
         }}
           onSkip={() => {
+            // Check if this is a new best time and save ghost
+            let isNewBestTime = false;
+            let ghostTimeDiff: number | undefined;
+            if (isRecording && mode === "fixed") {
+              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+              if (!existingBestTime || hud.time < existingBestTime) {
+                isNewBestTime = true;
+                ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+              }
+              if (existingBestTime) {
+                ghostTimeDiff = hud.time - existingBestTime;
+              }
+            }
+            
             onGameOver({ 
               score: hud.score, 
               landings: currentLandings, 
@@ -2351,7 +2381,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               difficulty, 
               elapsed: hud.time, 
               levelSeed: hud.levelSeed,
-              level 
+              level,
+              isNewBestTime,
+              ghostTimeDiff 
             });
           }}
         />
