@@ -1436,15 +1436,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
-            // Check if this is a new best time by beating a ghost
-            let isGhostBeaten = false;
-            if (mode === "fixed" && ghostRecording.length > 0) {
-              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
-              if (existingBestTime && elapsed < existingBestTime) {
-                isGhostBeaten = true;
-              }
-            }
-            
+            // Simple ghost-beating check: are we in ghost mode and did we beat the ghost time?
+            const isGhostBeaten = isGhostMode && elapsed < bestTime;
             const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
             setLandingType(padType);
             setShowFireworks(true);
