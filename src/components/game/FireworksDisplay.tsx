@@ -46,6 +46,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   // Enhanced color schemes with gradients and transitions
   const getColors = useCallback(() => {
     switch (landingType) {
+      case 'ghost-beaten':
+        return {
+          primary: ['#FFFFFF', '#E6F3FF', '#CCE7FF', '#B3DBFF', '#9AC9FF', '#FF69B4', '#FF1493', '#FFB6C1'],
+          secondary: ['#FFFFFF', '#E0E0FF', '#C0C0FF', '#A0A0FF', '#FF4DFF', '#FF8DFF'],
+          glitter: ['#FFFFFF', '#FFDDFF', '#E6F3FF', '#FFE6FF']
+        };
       case 'moving':
         return {
           primary: ['#FFD700', '#FFA500', '#FF8C00', '#FFFF00', '#FFB347'],
@@ -398,10 +404,10 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     
     switch (landingType) {
       case 'ghost-beaten':
-        // Spectacular display for beating a ghost time
-        launchCount = 15;
-        patterns = ['ghost', 'heart', 'ghost', 'heart', 'starburst', 'ghost', 'heart'];
-        timing = 120;
+        // SPECTACULAR ghost-beating display - intense and magical!
+        launchCount = 20;
+        patterns = ['ghost', 'heart', 'ghost', 'heart', 'ghost', 'heart', 'ghost', 'heart'];
+        timing = 80;
         break;
       case '2x':
         launchCount = 12;
@@ -451,6 +457,36 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           }
         }, 800 + Math.random() * 400);
       }, i * timing);
+    }
+    
+    // Grand finale for ghost-beaten - MAGICAL GHOST ARMY!
+    if (landingType === 'ghost-beaten') {
+      setTimeout(() => {
+        // First wave: massive ghost parade across the sky
+        for (let i = 0; i < 8; i++) {
+          const x = canvas.width * (0.1 + i * 0.1);
+          const targetY = canvas.height * 0.2;
+          setTimeout(() => {
+            setParticles(prev => [...prev, ...createBurst(x, targetY, colors, 'ghost')]);
+          }, i * 80);
+        }
+        
+        // Second wave: heart explosion in center
+        setTimeout(() => {
+          const centerX = canvas.width * 0.5;
+          const centerY = canvas.height * 0.3;
+          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'heart')]);
+          
+          // Triple ghost finale around the heart
+          setTimeout(() => {
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI * 2 / 3) {
+              const x = centerX + Math.cos(angle) * 150;
+              const y = centerY + Math.sin(angle) * 100;
+              setParticles(prev => [...prev, ...createBurst(x, y, colors, 'ghost')]);
+            }
+          }, 300);
+        }, 800);
+      }, launchCount * timing + 500);
     }
     
     // Grand finale for 2x bonus
