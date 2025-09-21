@@ -94,13 +94,14 @@ export function updateDemoAI(
       } else {
         controls.left = true;
       }
-    } else {
-      // Rotation complete, now start thrust if not already active
-      if (!ai.thrustActive) {
-        ai.thrustActive = true;
-        ai.thrustStartTime = now;
-        console.log("🔥 Rotation complete, starting 0.5s thrust");
-      }
+    }
+    
+    // Start thrust after small initial rotation (when we've rotated at least 10 degrees)
+    const rotatedAmount = Math.abs(targetAngle - angleDiff);
+    if (rotatedAmount > (10 * Math.PI / 180) && !ai.thrustActive) {
+      ai.thrustActive = true;
+      ai.thrustStartTime = now;
+      console.log("🔥 Started thrust after initial rotation");
     }
   } else {
     // Keep somewhat upright when not avoiding
