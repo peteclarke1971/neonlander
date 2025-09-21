@@ -48,9 +48,9 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     switch (landingType) {
       case 'ghost-beaten':
         return {
-          primary: ['#FFFFFF', '#E6F3FF', '#CCE7FF', '#B3DBFF', '#9AC9FF', '#FF69B4', '#FF1493', '#FFB6C1'],
-          secondary: ['#FFFFFF', '#E0E0FF', '#C0C0FF', '#A0A0FF', '#FF4DFF', '#FF8DFF'],
-          glitter: ['#FFFFFF', '#FFDDFF', '#E6F3FF', '#FFE6FF']
+          primary: ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500', '#FFFFFF'], // Classic Pac-Man ghost colors
+          secondary: ['#FF4444', '#FF8888', '#44FFFF', '#FFAA44', '#EEEEEE'],
+          glitter: ['#FFFFFF', '#FFDDDD', '#DDFFFF', '#FFFFDD']
         };
       case 'moving':
         return {
@@ -291,7 +291,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         break;
         
       case 'ghost':
-        console.log('👻 Creating GHOST pattern with spooky floating theme');
+        console.log('👻 Creating GHOST pattern with Pac-Man style ghosts');
+        const ghostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500']; // Classic Pac-Man colors
         for (let i = 0; i < baseCount; i++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 1.5 + Math.random() * 2; // Slower, floaty movement
@@ -299,15 +300,53 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           const vy = Math.sin(angle) * speed - 0.5; // Slight upward bias
           newParticles.push(createParticle(vx, vy, { 
             shape: 'ghost',
-            color: i % 4 === 0 ? '#FFFFFF' : i % 4 === 1 ? '#E6F3FF' : i % 4 === 2 ? '#CCE7FF' : '#B3DBFF',
-            size: 4 + Math.random() * 3,
+            color: ghostColors[i % ghostColors.length],
+            size: 6 + Math.random() * 4, // Larger for better visibility
             gravity: false, // Ghosts float!
-            life: 180 + Math.random() * 80, // Longer life for ethereal effect
-            max: 180 + Math.random() * 80,
-            glowSize: 8 + Math.random() * 4,
-            rotationSpeed: (Math.random() - 0.5) * 0.1, // Slow gentle rotation
+            life: 200 + Math.random() * 100, // Longer life for ethereal effect
+            max: 200 + Math.random() * 100,
+            glowSize: 12 + Math.random() * 6, // More dramatic glow
+            rotationSpeed: (Math.random() - 0.5) * 0.05, // Very slow gentle rotation
             colorTransition: true,
-            secondaryColor: 'rgba(255, 255, 255, 0.3)'
+            secondaryColor: 'rgba(255, 255, 255, 0.4)'
+          }));
+        }
+        break;
+        
+      case 'giant-ghost':
+        console.log('👻👑 Creating GIANT GHOST pattern - massive Pac-Man ghost finale!');
+        const giantGhostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500'];
+        // Create one massive central ghost
+        newParticles.push(createParticle(0, 0, {
+          shape: 'ghost',
+          color: giantGhostColors[0], // Red ghost (Blinky)
+          size: 40, // Massive size
+          gravity: false,
+          life: 300,
+          max: 300,
+          glowSize: 30,
+          rotationSpeed: 0.02,
+          vx: 0, // Stationary
+          vy: 0
+        }));
+        
+        // Floating particles around the giant ghost
+        for (let i = 0; i < 60; i++) {
+          const angle = (i / 60) * Math.PI * 2;
+          const radius = 80 + Math.sin(i * 0.5) * 20; // Wavy circle
+          const vx = Math.cos(angle) * 0.5;
+          const vy = Math.sin(angle) * 0.5;
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'circle',
+            color: giantGhostColors[i % giantGhostColors.length],
+            size: 3 + Math.random() * 2,
+            gravity: false,
+            life: 250,
+            max: 250,
+            glowSize: 8,
+            x: x + Math.cos(angle) * radius,
+            y: y + Math.sin(angle) * radius,
+            rotationSpeed: (Math.random() - 0.5) * 0.1
           }));
         }
         break;
@@ -459,17 +498,24 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       }, i * timing);
     }
     
-    // Grand finale for ghost-beaten - MAGICAL GHOST ARMY!
+    // Grand finale for ghost-beaten - MAGICAL GHOST ARMY WITH GIANT GHOST!
     if (landingType === 'ghost-beaten') {
       setTimeout(() => {
-        // First wave: massive ghost parade across the sky
-        for (let i = 0; i < 8; i++) {
-          const x = canvas.width * (0.1 + i * 0.1);
-          const targetY = canvas.height * 0.2;
+        // First wave: ghost parade across the sky
+        for (let i = 0; i < 6; i++) {
+          const x = canvas.width * (0.15 + i * 0.14);
+          const targetY = canvas.height * 0.25;
           setTimeout(() => {
             setParticles(prev => [...prev, ...createBurst(x, targetY, colors, 'ghost')]);
-          }, i * 80);
+          }, i * 100);
         }
+        
+        // GIANT GHOST FINALE - dramatic pause then massive ghost appears in center
+        setTimeout(() => {
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height * 0.4;
+          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'giant-ghost')]);
+        }, 800); // Pause for dramatic effect
         
         // Second wave: heart explosion in center
         setTimeout(() => {
@@ -768,36 +814,61 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   };
 
   const drawGhost = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
-    const scale = size / 8;
+    const scale = size / 10;
+    
     ctx.beginPath();
     
-    // Ghost body - rounded top
-    ctx.arc(0, -2 * scale, 6 * scale, Math.PI, 0, false);
+    // Pac-Man style ghost body - rounded dome top
+    ctx.arc(0, -1 * scale, 7 * scale, Math.PI, 0, false);
     
-    // Ghost body sides
-    ctx.lineTo(6 * scale, 6 * scale);
+    // Ghost body sides down to scalloped bottom
+    ctx.lineTo(7 * scale, 7 * scale);
     
-    // Wavy bottom hem (classic ghost shape)
-    ctx.lineTo(4 * scale, 4 * scale);
-    ctx.lineTo(2 * scale, 6 * scale);
-    ctx.lineTo(0, 4 * scale);
-    ctx.lineTo(-2 * scale, 6 * scale);
-    ctx.lineTo(-4 * scale, 4 * scale);
-    ctx.lineTo(-6 * scale, 6 * scale);
+    // Classic Pac-Man scalloped bottom edge (5 scallops)
+    ctx.lineTo(5.6 * scale, 5 * scale);   // First scallop peak
+    ctx.lineTo(4.2 * scale, 7 * scale);   // First valley
+    ctx.lineTo(2.8 * scale, 5 * scale);   // Second scallop peak  
+    ctx.lineTo(1.4 * scale, 7 * scale);   // Second valley
+    ctx.lineTo(0, 5 * scale);             // Center scallop peak
+    ctx.lineTo(-1.4 * scale, 7 * scale);  // Third valley
+    ctx.lineTo(-2.8 * scale, 5 * scale);  // Third scallop peak
+    ctx.lineTo(-4.2 * scale, 7 * scale);  // Fourth valley
+    ctx.lineTo(-5.6 * scale, 5 * scale);  // Fourth scallop peak
+    ctx.lineTo(-7 * scale, 7 * scale);    // Final valley
     
     // Close back to start
-    ctx.lineTo(-6 * scale, -2 * scale);
+    ctx.lineTo(-7 * scale, -1 * scale);
     
     ctx.closePath();
     ctx.fill();
     
-    // Add ghost eyes (small dark circles)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    // Pac-Man style eyes - larger white ovals with dark pupils
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
     ctx.beginPath();
-    ctx.arc(-2 * scale, -1 * scale, 0.8 * scale, 0, Math.PI * 2);
+    // Left eye (larger oval)
+    ctx.ellipse(-2.5 * scale, 0, 1.5 * scale, 2 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(2 * scale, -1 * scale, 0.8 * scale, 0, Math.PI * 2);
+    // Right eye
+    ctx.ellipse(2.5 * scale, 0, 1.5 * scale, 2 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Eye pupils (dark centers)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.beginPath();
+    ctx.ellipse(-2.5 * scale, 0.3 * scale, 0.8 * scale, 1.2 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(2.5 * scale, 0.3 * scale, 0.8 * scale, 1.2 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Eye highlights for cartoon look
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(-2.2 * scale, -0.3 * scale, 0.4 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(2.8 * scale, -0.3 * scale, 0.4 * scale, 0, Math.PI * 2);
     ctx.fill();
   };
 
