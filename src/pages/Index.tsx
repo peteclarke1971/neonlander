@@ -444,9 +444,14 @@ const retryGame = () => {
     return () => clearInterval(interval);
   }, [view, lastInteractionTime, demoSequenceIndex]);
 
-  // User interaction detection - reset demo timer
+  // User interaction detection - reset demo timer (ignore AI inputs during demo)
   useEffect(() => {
-    const resetTimer = () => {
+    const resetTimer = (event: Event) => {
+      // During demo mode, ignore synthetic events that come from the AI
+      if (view === "demo" && event.isTrusted === false) {
+        return; // This is an AI-generated input, ignore it
+      }
+      
       setLastInteractionTime(Date.now());
       if (view === "demo") {
         exitDemo();

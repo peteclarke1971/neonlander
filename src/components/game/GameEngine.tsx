@@ -853,9 +853,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
 
       // Controls
-      // Gamepad hot-swap + read UI/analog
+      // Gamepad hot-swap + read UI/analog (skip in demo mode)
       let gpLeft = false, gpRight = false, gpThrust = 0, gpRotateBoost = false, gpAbort = false;
-      {
+      if (!isDemo) {
         const gp = anyGamepad?.();
         if (gp && gp.connected) {
           if (gpDeviceIdRef.current !== gp.id) {
@@ -894,8 +894,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
       
-      // Skip countdown on input (keyboard OR gamepad)
-      if (introRef.current?.isActive()) {
+      // Skip countdown on input (keyboard OR gamepad) - not in demo mode
+      if (introRef.current?.isActive() && !isDemo) {
         const keyboardSkipInput = keys.current.thrust || keys.current.left || keys.current.right || keys.current.abort;
         const gamepadSkipInput = gpThrust > 0 || gpLeft || gpRight || gpAbort;
         if ((keyboardSkipInput || gamepadSkipInput) && introRef.current.getCurrentState().canSkip) {
