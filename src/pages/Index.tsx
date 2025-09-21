@@ -30,6 +30,7 @@ const Index = () => {
   const [demoTimer, setDemoTimer] = useState(0);
   const [demoLevel, setDemoLevel] = useState(1);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
+  const [demoStartTime, setDemoStartTime] = useState<number | null>(null);
   const demoSequence = [1, 5, 20, 50]; // Demo levels to cycle through
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [mode, setMode] = useState<Mode>("classic");
@@ -201,12 +202,14 @@ const Index = () => {
     setMode("fixed"); // Use fixed mode for consistent demos
     setLowGraphics(true); // Force low graphics for demos
     setSeedOverride(level * 1000); // Consistent seed for each demo level
+    setDemoStartTime(Date.now()); // Track when demo actually starts
     setView("demo");
   };
 
   const exitDemo = () => {
     console.log("🏠 Exiting demo, returning to home");
     setView("home");
+    setDemoStartTime(null); // Clear demo start time
     setLastInteractionTime(Date.now());
   };
 
@@ -431,9 +434,9 @@ const retryGame = () => {
         if (now - lastInteractionTime > 15000) {
           startDemo(demoSequenceIndex);
         }
-      } else if (view === "demo") {
+      } else if (view === "demo" && demoStartTime) {
         // Demo has been running for 15 seconds, return to home
-        if (now - lastInteractionTime > 15000) {
+        if (now - demoStartTime > 15000) {
           exitDemo();
           // Advance to next demo in sequence
           setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
@@ -442,30 +445,44 @@ const retryGame = () => {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [view, lastInteractionTime, demoSequenceIndex]);
+  }, [view, lastInteractionTime, demoSequenceIndex, demoStartTime]);
 
-  // User interaction detection - reset demo timer (ignore AI inputs during demo)
+  // User interaction detection for home screen (demo timer reset)
   useEffect(() => {
-    const resetTimer = (event: Event) => {
-      // During demo mode, ignore synthetic events that come from the AI
-      if (view === "demo" && event.isTrusted === false) {
-        return; // This is an AI-generated input, ignore it
-      }
-      
+    if (view !== "home") return; // Only track interactions on home screen
+    
+    const resetHomeTimer = () => {
       setLastInteractionTime(Date.now());
-      if (view === "demo") {
-        exitDemo();
-      }
     };
 
     const events = ["keydown", "mousedown", "touchstart", "gamepadconnected"];
     events.forEach(event => {
-      window.addEventListener(event, resetTimer);
+      window.addEventListener(event, resetHomeTimer);
     });
 
     return () => {
       events.forEach(event => {
-        window.removeEventListener(event, resetTimer);
+        window.removeEventListener(event, resetHomeTimer);
+      });
+    };
+  }, [view]);
+
+  // Demo exit detection (separate from home timer)
+  useEffect(() => {
+    if (view !== "demo") return;
+    
+    const exitOnUserInput = () => {
+      exitDemo();
+    };
+
+    const events = ["keydown", "mousedown", "touchstart"];
+    events.forEach(event => {
+      window.addEventListener(event, exitOnUserInput);
+    });
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, exitOnUserInput);
       });
     };
   }, [view]);
