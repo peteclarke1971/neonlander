@@ -29,7 +29,7 @@ export function createDemoAI(level: number): DemoAIState {
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 250, // 0.25 seconds in milliseconds
+    thrustDuration: 100, // 0.1 seconds in milliseconds - tiny burst
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3, // 30% chance to make a mistake
     avoidanceRotation: 0,
@@ -61,10 +61,10 @@ export function updateDemoAI(
   // Check if thrust is currently active
   if (ai.thrustActive) {
     if (now - ai.thrustStartTime >= ai.thrustDuration) {
-      // 0.5 seconds have passed, turn off thrust and stop avoidance
+      // 0.1 seconds have passed, turn off thrust and stop avoidance
       ai.thrustActive = false;
       ai.isAvoiding = false;
-      console.log("🔥 Thrust off after 0.5s");
+      console.log("🔥 Thrust off after 0.1s");
     } else {
       // Still within 0.5 second window, keep thrusting
       controls.thrust = true;
