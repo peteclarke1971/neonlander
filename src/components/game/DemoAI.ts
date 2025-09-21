@@ -2,10 +2,9 @@
 export interface DemoAIState {
   level: number;
   startTime: number;
-  phase: 'descending' | 'landing' | 'hovering' | 'crashed';
-  lastThrust: number;
-  thrustCooldown: number;
-  targetPadIndex: number;
+  thrustActive: boolean;
+  thrustStartTime: number;
+  thrustDuration: number; // 0.5 seconds
   mistakeTimer: number;
   shouldMakeMistake: boolean;
 }
@@ -26,10 +25,9 @@ export function createDemoAI(level: number): DemoAIState {
   return {
     level,
     startTime: performance.now(),
-    phase: 'descending',
-    lastThrust: 0,
-    thrustCooldown: 0,
-    targetPadIndex: 0,
+    thrustActive: false,
+    thrustStartTime: 0,
+    thrustDuration: 500, // 0.5 seconds in milliseconds
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3 // 30% chance to make a mistake
   };
@@ -44,9 +42,6 @@ export function updateDemoAI(
   const now = performance.now();
   const elapsed = now - ai.startTime;
   
-  // Update timers
-  ai.thrustCooldown = Math.max(0, ai.thrustCooldown - deltaTime);
-  
   // Initialize controls
   const controls: DemoControls = { left: false, right: false, thrust: false };
   
@@ -59,20 +54,26 @@ export function updateDemoAI(
   const groundHeight = terrain.getHeightAt ? terrain.getHeightAt(ship.x) : 400;
   const altitude = ship.y - groundHeight; // Distance above ground (negative = above ground)
   
-  console.log("🤖 AI Debug:", {
-    shipY: ship.y.toFixed(1),
-    groundHeight: groundHeight.toFixed(1), 
-    altitude: altitude.toFixed(1),
-    vy: ship.vy.toFixed(1),
-    thrustCooldown: ai.thrustCooldown.toFixed(0)
-  });
+  // Check if thrust is currently active
+  if (ai.thrustActive) {
+    if (now - ai.thrustStartTime >= ai.thrustDuration) {
+      // 0.5 seconds have passed, turn off thrust
+      ai.thrustActive = false;
+      console.log("🔥 Thrust off after 0.5s");
+    } else {
+      // Still within 0.5 second window, keep thrusting
+      controls.thrust = true;
+    }
+  }
   
-  // Emergency crash prevention - only thrust if really falling fast and close to ground
-  if (altitude > -100 && ship.vy > 25 && ai.thrustCooldown === 0) {
-    console.log("🚨 Emergency thrust - falling too fast!");
+  // Check if too close to landscape and not already thrusting
+  const dangerAltitude = -50; // 50 units above ground
+  if (altitude > dangerAltitude && !ai.thrustActive) {
+    // Start 0.5 second thrust burst
+    ai.thrustActive = true;
+    ai.thrustStartTime = now;
     controls.thrust = true;
-    ai.thrustCooldown = 800; // 800ms cooldown
-    return controls;
+    console.log("🚨 Too close to ground! Starting 0.5s thrust burst");
   }
   
   // Keep somewhat upright
@@ -85,20 +86,12 @@ export function updateDemoAI(
     }
   }
   
-  // Gentle drift around occasionally
-  if (elapsed % 6000 < 100) { // Every 6 seconds for 100ms
-    // Drift left or right randomly
+  // Gentle horizontal drift occasionally  
+  if (elapsed % 8000 < 100) { // Every 8 seconds for 100ms
     if (Math.random() < 0.5) {
       controls.left = true;
     } else {
       controls.right = true;
-    }
-    
-    // Light thrust to move horizontally
-    if (Math.abs(ship.vx) < 30 && ai.thrustCooldown === 0) {
-      controls.thrust = true;
-      ai.thrustCooldown = 400;
-      console.log("💨 Gentle drift");
     }
   }
   
@@ -107,7 +100,6 @@ export function updateDemoAI(
     if (Math.random() < 0.1) {
       controls.left = !controls.left;
       controls.right = !controls.right;
-      console.log("😅 Small mistake");
     }
   }
   
