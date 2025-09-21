@@ -443,10 +443,10 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     
     switch (landingType) {
       case 'ghost-beaten':
-        // SPECTACULAR ghost-beating display - intense and magical!
-        launchCount = 20;
-        patterns = ['ghost', 'heart', 'ghost', 'heart', 'ghost', 'heart', 'ghost', 'heart'];
-        timing = 80;
+        // Four giant ghost fireworks display
+        launchCount = 4;
+        patterns = ['giant-ghost', 'giant-ghost', 'giant-ghost', 'giant-ghost'];
+        timing = 500;
         break;
       case '2x':
         launchCount = 12;
