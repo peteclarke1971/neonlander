@@ -36,6 +36,7 @@ const Index = () => {
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
   const audioRef = useRef(new AudioManager());
+  const [demoCrashed, setDemoCrashed] = useState(false);
   const [classicScores, setClassicScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -462,7 +463,20 @@ const retryGame = () => {
           startDemo(demoSequenceIndex);
         }
       } else if (view === "demo" && demoStartTime) {
-        // Demo has been running - check for early exit on crash
+        // Check for crash first
+        if (demoCrashed) {
+          console.log("💥 Demo crash detected, exiting in 1 second");
+          setTimeout(() => {
+            console.log("🏠 Exiting demo after crash");
+            exitDemo();
+            setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
+            setDemoCrashed(false); // Reset crash flag
+          }, 1000);
+          setDemoCrashed(false); // Reset immediately to prevent repeat triggers
+          return; // Exit this check to prevent normal timeout
+        }
+        
+        // Normal 15 second timeout
         if (now - demoStartTime > 15000) {
           exitDemo();
           // Advance to next demo in sequence
@@ -626,7 +640,7 @@ const retryGame = () => {
                 key={`demo-${demoLevel}`}
                 difficulty="easy"
                 onExit={exitDemo}
-                onGameOver={() => {}} // No game over handling in demo
+                onGameOver={() => setDemoCrashed(true)} // Set crash flag for demo
                 level={demoLevel}
                 mode="fixed"
                 lowGraphics={true}
