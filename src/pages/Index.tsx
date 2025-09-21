@@ -203,6 +203,21 @@ const Index = () => {
     setLowGraphics(true); // Force low graphics for demos
     setSeedOverride(level * 1000); // Consistent seed for each demo level
     setDemoStartTime(Date.now()); // Track when demo actually starts
+    
+    // Apply color variety to demo levels (same as game colors)
+    const colors = [
+      "330 100% 60%", // pink
+      "50 100% 60%",  // yellow
+      "140 100% 55%", // green
+      "270 100% 70%", // purple
+      "25 100% 60%",  // orange
+      "0 100% 60%",   // red
+    ];
+    const colorIndex = levelIndex % colors.length;
+    const root = document.documentElement;
+    root.style.setProperty("--neon", colors[colorIndex]);
+    root.style.setProperty("--neon-2", colors[colorIndex]);
+    
     setView("demo");
   };
 
@@ -217,6 +232,18 @@ const Index = () => {
     setLastResult(data);
     setLastPlayedSeed(data.levelSeed ?? null);
     setLastPlayedLevel(data.level ?? 0);
+    
+    // Handle demo crashes - exit after 1 second instead of 15
+    if (view === "demo" && (data.cause === "crash" || data.cause === "fuel")) {
+      console.log("💥 Demo crashed, exiting in 1 second");
+      setTimeout(() => {
+        exitDemo();
+        // Advance to next demo in sequence
+        setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
+      }, 1000);
+      return;
+    }
+    
     // Generate a fresh starfield/effect config for this screen
     setSfConfig(genSfConfig());
     if (data.cause === "success") {
@@ -435,7 +462,7 @@ const retryGame = () => {
           startDemo(demoSequenceIndex);
         }
       } else if (view === "demo" && demoStartTime) {
-        // Demo has been running for 15 seconds, return to home
+        // Demo has been running - check for early exit on crash
         if (now - demoStartTime > 15000) {
           exitDemo();
           // Advance to next demo in sequence

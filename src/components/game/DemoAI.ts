@@ -29,7 +29,7 @@ export function createDemoAI(level: number): DemoAIState {
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 100, // 0.1 seconds in milliseconds - tiny burst
+    thrustDuration: 50, // 0.05 seconds in milliseconds - half the previous burst
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3, // 30% chance to make a mistake
     avoidanceRotation: 0,
@@ -64,7 +64,7 @@ export function updateDemoAI(
       // 0.1 seconds have passed, turn off thrust and stop avoidance
       ai.thrustActive = false;
       ai.isAvoiding = false;
-      console.log("🔥 Thrust off after 0.1s");
+      console.log("🔥 Thrust off after 0.05s");
     } else {
       // Still within 0.5 second window, keep thrusting
       controls.thrust = true;
@@ -74,9 +74,10 @@ export function updateDemoAI(
   // Check if too close to landscape and not already avoiding
   const dangerAltitude = -300; // 300 units above ground (trigger very early)
   if (altitude > dangerAltitude && !ai.thrustActive && !ai.isAvoiding) {
-    // Start avoidance maneuver: random 30-degree rotation
+    // Start avoidance maneuver: random direction and angle between 30-60 degrees
     const rotationDirection = Math.random() < 0.5 ? -1 : 1;
-    ai.avoidanceRotation = rotationDirection * (30 * Math.PI / 180); // 30 degrees in radians
+    const randomAngle = 30 + Math.random() * 30; // Random angle between 30-60 degrees
+    ai.avoidanceRotation = rotationDirection * (randomAngle * Math.PI / 180);
     ai.isAvoiding = true;
     console.log(`🚨 Too close to ground! Starting avoidance: ${rotationDirection > 0 ? 'right' : 'left'} rotation then thrust`);
   }

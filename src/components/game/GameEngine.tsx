@@ -1218,9 +1218,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          if (!isDemo) {
-            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
-          }
+          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
         }, 700);
       }
       
@@ -1236,9 +1234,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          if (!isDemo) {
-            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
-          }
+          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
         }, 700);
       }
       
@@ -1419,9 +1415,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             setTimeout(() => {
-              if (!isDemo) {
-                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
-              }
+              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
             }, 700);
           }
         } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
@@ -1508,9 +1502,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           cameraShake = 24;
           if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
           setTimeout(() => {
-            if (!isDemo) {
-              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
-            }
+            onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
           }, 700);
         }
       }
