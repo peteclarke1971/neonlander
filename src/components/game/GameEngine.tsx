@@ -1436,22 +1436,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
           running = false;
           setTimeout(() => {
-            // DEBUG: Comprehensive logging for ghost fireworks investigation
-            console.log('🎆 FIREWORKS DEBUG - Landing successful!');
-            console.log('  showGhost:', showGhost);
-            console.log('  mode:', mode);
-            console.log('  isCavernLevel:', isCavernLevel);
-            console.log('  isGhostMode:', isGhostMode);
-            console.log('  bestTime:', bestTime);
-            console.log('  elapsed:', elapsed);
-            console.log('  applied2x:', applied2x);
-            
-            // Simple ghost-beating check: are we in ghost mode and did we beat the ghost time?
-            const isGhostBeaten = isGhostMode && elapsed < bestTime;
-            console.log('  isGhostBeaten:', isGhostBeaten);
+            // Ghost-beating check: get the current best time and compare
+            const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
+            const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
             
             const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
-            console.log('  Final padType:', padType);
             
             setLandingType(padType);
             setShowFireworks(true);
