@@ -50,170 +50,66 @@ export function updateDemoAI(
   // Initialize controls
   const controls: DemoControls = { left: false, right: false, thrust: false };
   
-  // Debug logging
-  console.log("🤖 Demo AI State:", {
-    ship: { x: ship.x.toFixed(1), y: ship.y.toFixed(1), vx: ship.vx.toFixed(1), vy: ship.vy.toFixed(1), angle: ship.angle.toFixed(2) },
-    phase: ai.phase,
-    elapsed: elapsed.toFixed(0),
-    pads: terrain.pads.length
-  });
+  // Skip if too early - let intro/countdown finish
+  if (elapsed < 3000) {
+    return controls;
+  }
   
-  // EMERGENCY CRASH PREVENTION - First priority!
-  const groundHeight = terrain.getHeightAt ? terrain.getHeightAt(ship.x) : 400; // Fallback if no terrain
-  const altitude = groundHeight - ship.y; // Altitude = ground height - ship Y (Y increases downward)
+  // Calculate altitude correctly (Y increases downward)
+  const groundHeight = terrain.getHeightAt ? terrain.getHeightAt(ship.x) : 400;
+  const altitude = ship.y - groundHeight; // Distance above ground (negative = above ground)
   
-  console.log("🤖 Emergency Check:", {
-    groundHeight: groundHeight.toFixed(1),
+  console.log("🤖 AI Debug:", {
     shipY: ship.y.toFixed(1),
+    groundHeight: groundHeight.toFixed(1), 
     altitude: altitude.toFixed(1),
-    vy: ship.vy.toFixed(1)
+    vy: ship.vy.toFixed(1),
+    thrustCooldown: ai.thrustCooldown.toFixed(0)
   });
   
-  // Emergency thrust if falling too fast or too close to ground
-  if (altitude < 150 && ship.vy > 30) {
-    console.log("🚨 EMERGENCY THRUST - Too fast, too low!");
+  // Emergency crash prevention - only thrust if really falling fast and close to ground
+  if (altitude > -100 && ship.vy > 25 && ai.thrustCooldown === 0) {
+    console.log("🚨 Emergency thrust - falling too fast!");
     controls.thrust = true;
-    return controls; // Override everything else
+    ai.thrustCooldown = 800; // 800ms cooldown
+    return controls;
   }
   
-  // General "don't fall too fast" control
-  if (ship.vy > 60) {
-    console.log("🚨 SPEED CONTROL - Falling too fast!");
-    controls.thrust = true;
-  }
-  
-  // Basic rotation control - keep upright
-  const targetAngle = 0;
-  const angleDiff = ((ship.angle - targetAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
-  
-  if (Math.abs(angleDiff) > 0.2) {
+  // Keep somewhat upright
+  const angleDiff = ((ship.angle + Math.PI) % (2 * Math.PI)) - Math.PI;
+  if (Math.abs(angleDiff) > 0.3) {
     if (angleDiff > 0) {
       controls.left = true;
     } else {
       controls.right = true;
     }
-    console.log("🔄 Rotating to upright, angle:", ship.angle.toFixed(2));
   }
   
-  // Skip complex logic if too early or no terrain data
-  if (elapsed < 2000 || terrain.pads.length === 0) {
-    console.log("⏳ Too early or no pads, basic controls only");
-    return controls;
-  }
-  
-  // Get target landing pad
-  const targetPad = terrain.pads[ai.targetPadIndex % terrain.pads.length];
-  const padCenterX = (targetPad.xStart + targetPad.xEnd) / 2;
-  const padY = targetPad.y;
-  
-  // Calculate distances
-  const distanceX = padCenterX - ship.x;
-  const padAltitude = groundHeight - padY; // How high the pad is
-  
-  console.log("🎯 Target:", {
-    padCenter: padCenterX.toFixed(1),
-    padY: padY.toFixed(1),
-    distanceX: distanceX.toFixed(1),
-    padAltitude: padAltitude.toFixed(1)
-  });
-  
-  // Different behavior based on level (simpler)
-  let maxSpeed = 40; // Conservative falling speed
-  let landingSpeed = 25; // Even slower for landing
-  
-  switch (ai.level) {
-    case 1:
-      maxSpeed = 35;
-      landingSpeed = 20;
-      break;
-    case 5:
-      maxSpeed = 45;
-      landingSpeed = 25;
-      break;
-    case 20:
-      maxSpeed = 50;
-      landingSpeed = 30;
-      break;
-    case 50:
-      maxSpeed = 55;
-      landingSpeed = 35;
-      break;
-  }
-  
-  // Phase management
-  if (ai.phase === 'descending') {
-    // Check if we're getting close to landing area
-    if (altitude < 200 && Math.abs(distanceX) < 300) {
-      ai.phase = 'landing';
-      console.log("🛬 Switching to landing phase");
+  // Gentle drift around occasionally
+  if (elapsed % 6000 < 100) { // Every 6 seconds for 100ms
+    // Drift left or right randomly
+    if (Math.random() < 0.5) {
+      controls.left = true;
+    } else {
+      controls.right = true;
     }
     
-    // Descent speed control
-    if (ship.vy > maxSpeed) {
+    // Light thrust to move horizontally
+    if (Math.abs(ship.vx) < 30 && ai.thrustCooldown === 0) {
       controls.thrust = true;
-      console.log("⬇️ Controlling descent speed");
-    }
-    
-    // Rough horizontal positioning (only if not too close to ground)
-    if (altitude > 150 && Math.abs(distanceX) > 200) {
-      if (Math.abs(ship.vx) < 60) {
-        // Tilt slightly toward target and thrust
-        const desiredTilt = distanceX > 0 ? Math.PI / 8 : -Math.PI / 8;
-        if (Math.abs(ship.angle - desiredTilt) < Math.PI / 4) {
-          controls.thrust = true;
-          console.log("➡️ Moving toward pad");
-        }
-      }
-    }
-  } else if (ai.phase === 'landing') {
-    // Precision landing phase
-    if (ship.vy > landingSpeed) {
-      controls.thrust = true;
-      console.log("🛬 Landing speed control");
-    }
-    
-    // Fine horizontal adjustment
-    if (altitude > 50 && Math.abs(distanceX) > 50 && Math.abs(ship.vx) < 40) {
-      const desiredTilt = distanceX > 0 ? Math.PI / 12 : -Math.PI / 12;
-      if (Math.abs(ship.angle - desiredTilt) < Math.PI / 6) {
-        controls.thrust = true;
-        console.log("↔️ Fine positioning");
-      }
-    }
-    
-    // Check if we've landed successfully
-    if (altitude < 20) {
-      const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-      if (speed < 40 && Math.abs(ship.angle) < Math.PI / 3) {
-        ai.phase = 'hovering';
-        ai.lastThrust = now + 1500; // Hover longer
-        console.log("🎉 Successful landing!");
-      } else if (speed > 80) {
-        ai.phase = 'crashed';
-        console.log("💥 Crash detected");
-      }
-    }
-  } else if (ai.phase === 'hovering') {
-    // Gentle hover after landing
-    if (now < ai.lastThrust && ship.vy > 15) {
-      controls.thrust = true;
-      console.log("🚁 Hovering");
+      ai.thrustCooldown = 400;
+      console.log("💨 Gentle drift");
     }
   }
   
-  // Mistakes (reduce frequency and impact)
-  if (ai.shouldMakeMistake && elapsed > ai.mistakeTimer && ai.phase === 'descending' && altitude > 100) {
-    if (Math.random() < 0.3) { // Reduced from constant mistakes
-      controls.thrust = !controls.thrust; // Simple mistake
-      console.log("😅 Making a small mistake");
-    }
-    
-    // Stop making mistakes after a short time
-    if (elapsed > ai.mistakeTimer + 1500) {
-      ai.shouldMakeMistake = false;
+  // Small mistakes occasionally
+  if (ai.shouldMakeMistake && elapsed > ai.mistakeTimer && elapsed < ai.mistakeTimer + 200) {
+    if (Math.random() < 0.1) {
+      controls.left = !controls.left;
+      controls.right = !controls.right;
+      console.log("😅 Small mistake");
     }
   }
   
-  console.log("🎮 Final controls:", controls);
   return controls;
 }
