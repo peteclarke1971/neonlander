@@ -29,7 +29,7 @@ export function createDemoAI(level: number): DemoAIState {
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 500, // 0.5 seconds in milliseconds
+    thrustDuration: 250, // 0.25 seconds in milliseconds
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3, // 30% chance to make a mistake
     avoidanceRotation: 0,
