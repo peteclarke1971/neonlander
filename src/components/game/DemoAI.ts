@@ -4,7 +4,7 @@ export interface DemoAIState {
   startTime: number;
   thrustActive: boolean;
   thrustStartTime: number;
-  thrustDuration: number; // 0.5 seconds
+  thrustDuration: number; // 0.75 seconds
   mistakeTimer: number;
   shouldMakeMistake: boolean;
 }
@@ -27,7 +27,7 @@ export function createDemoAI(level: number): DemoAIState {
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 500, // 0.5 seconds in milliseconds
+    thrustDuration: 750, // 0.75 seconds in milliseconds
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3 // 30% chance to make a mistake
   };
@@ -57,23 +57,23 @@ export function updateDemoAI(
   // Check if thrust is currently active
   if (ai.thrustActive) {
     if (now - ai.thrustStartTime >= ai.thrustDuration) {
-      // 0.5 seconds have passed, turn off thrust
+      // 0.75 seconds have passed, turn off thrust
       ai.thrustActive = false;
-      console.log("🔥 Thrust off after 0.5s");
+      console.log("🔥 Thrust off after 0.75s");
     } else {
-      // Still within 0.5 second window, keep thrusting
+      // Still within 0.75 second window, keep thrusting
       controls.thrust = true;
     }
   }
   
   // Check if too close to landscape and not already thrusting
-  const dangerAltitude = -50; // 50 units above ground
+  const dangerAltitude = -80; // 80 units above ground (trigger earlier)
   if (altitude > dangerAltitude && !ai.thrustActive) {
-    // Start 0.5 second thrust burst
+    // Start 0.75 second thrust burst
     ai.thrustActive = true;
     ai.thrustStartTime = now;
     controls.thrust = true;
-    console.log("🚨 Too close to ground! Starting 0.5s thrust burst");
+    console.log("🚨 Too close to ground! Starting 0.75s thrust burst");
   }
   
   // Keep somewhat upright
