@@ -31,7 +31,7 @@ const Index = () => {
   const [demoLevel, setDemoLevel] = useState(1);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
   const [demoStartTime, setDemoStartTime] = useState<number | null>(null);
-  const demoSequence = [1, 5, 10, 19, 30, 50]; // Demo levels to cycle through
+  const demoSequence = [1, 5, 10, 19, 31, 50]; // Demo levels to cycle through
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
