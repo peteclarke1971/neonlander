@@ -72,7 +72,7 @@ export function updateDemoAI(
   }
   
   // Check if too close to landscape and not already avoiding
-  const dangerAltitude = -80; // 80 units above ground (trigger earlier)
+  const dangerAltitude = -150; // 150 units above ground (trigger much earlier)
   if (altitude > dangerAltitude && !ai.thrustActive && !ai.isAvoiding) {
     // Start avoidance maneuver: random 30-degree rotation
     const rotationDirection = Math.random() < 0.5 ? -1 : 1;
