@@ -4,9 +4,11 @@ export interface DemoAIState {
   startTime: number;
   thrustActive: boolean;
   thrustStartTime: number;
-  thrustDuration: number; // 0.75 seconds
+  thrustDuration: number; // 0.5 seconds
   mistakeTimer: number;
   shouldMakeMistake: boolean;
+  avoidanceRotation: number; // target rotation when avoiding terrain
+  isAvoiding: boolean; // currently in avoidance maneuver
 }
 
 export interface DemoControls {
@@ -27,9 +29,11 @@ export function createDemoAI(level: number): DemoAIState {
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 750, // 0.75 seconds in milliseconds
+    thrustDuration: 500, // 0.5 seconds in milliseconds
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
-    shouldMakeMistake: Math.random() < 0.3 // 30% chance to make a mistake
+    shouldMakeMistake: Math.random() < 0.3, // 30% chance to make a mistake
+    avoidanceRotation: 0,
+    isAvoiding: false
   };
 }
 
@@ -57,32 +61,54 @@ export function updateDemoAI(
   // Check if thrust is currently active
   if (ai.thrustActive) {
     if (now - ai.thrustStartTime >= ai.thrustDuration) {
-      // 0.75 seconds have passed, turn off thrust
+      // 0.5 seconds have passed, turn off thrust and stop avoidance
       ai.thrustActive = false;
-      console.log("🔥 Thrust off after 0.75s");
+      ai.isAvoiding = false;
+      console.log("🔥 Thrust off after 0.5s");
     } else {
-      // Still within 0.75 second window, keep thrusting
+      // Still within 0.5 second window, keep thrusting
       controls.thrust = true;
     }
   }
   
   // Check if too close to landscape and not already thrusting
   const dangerAltitude = -80; // 80 units above ground (trigger earlier)
-  if (altitude > dangerAltitude && !ai.thrustActive) {
-    // Start 0.75 second thrust burst
+  if (altitude > dangerAltitude && !ai.thrustActive && !ai.isAvoiding) {
+    // Start avoidance maneuver: random 30-degree rotation
+    const rotationDirection = Math.random() < 0.5 ? -1 : 1;
+    ai.avoidanceRotation = rotationDirection * (30 * Math.PI / 180); // 30 degrees in radians
+    ai.isAvoiding = true;
+    
+    // Start 0.5 second thrust burst after rotation begins
     ai.thrustActive = true;
     ai.thrustStartTime = now;
     controls.thrust = true;
-    console.log("🚨 Too close to ground! Starting 0.75s thrust burst");
+    console.log(`🚨 Too close to ground! Starting avoidance: ${rotationDirection > 0 ? 'right' : 'left'} rotation + 0.5s thrust`);
   }
   
-  // Keep somewhat upright
-  const angleDiff = ((ship.angle + Math.PI) % (2 * Math.PI)) - Math.PI;
-  if (Math.abs(angleDiff) > 0.3) {
-    if (angleDiff > 0) {
-      controls.left = true;
-    } else {
-      controls.right = true;
+  // Handle avoidance rotation when avoiding terrain
+  if (ai.isAvoiding && ai.avoidanceRotation !== 0) {
+    const currentAngle = ((ship.angle + Math.PI) % (2 * Math.PI)) - Math.PI;
+    const targetAngle = ai.avoidanceRotation;
+    const angleDiff = targetAngle - currentAngle;
+    
+    // Apply rotation towards target
+    if (Math.abs(angleDiff) > 0.1) {
+      if (angleDiff > 0) {
+        controls.right = true;
+      } else {
+        controls.left = true;
+      }
+    }
+  } else {
+    // Keep somewhat upright when not avoiding
+    const angleDiff = ((ship.angle + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (Math.abs(angleDiff) > 0.3) {
+      if (angleDiff > 0) {
+        controls.left = true;
+      } else {
+        controls.right = true;
+      }
     }
   }
   
