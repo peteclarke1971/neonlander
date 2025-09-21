@@ -39,6 +39,7 @@ import { loadCursorConfig } from "@/lib/cursorConfig";
 import { PerformanceManager } from "./utils/performanceManager";
 import { particlePool, debrisPool } from "./utils/objectPool";
 import { GhostManager, LunarLanderGhostFrame, LunarLanderGhostState } from "./GhostManager";
+import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 
 interface Props {
   difficulty: Difficulty;
@@ -54,13 +55,14 @@ interface Props {
   seedOverride?: number;
   showGhost?: boolean;
   ghostLevel?: number;
+  isDemo?: boolean;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel }) => {
+export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
@@ -145,6 +147,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const lastRecordTime = useRef(0);
   const [bestTime, setBestTime] = useState<number | null>(null);
   
+  // Demo AI system
+  const demoAI = useRef<DemoAIState | null>(null);
+  const [demoStartTime, setDemoStartTime] = useState<number>(0);
+  
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
     const hintShown = localStorage.getItem('ll-rotation-boost-hint-shown');
@@ -179,6 +185,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
+      // Skip keyboard input in demo mode
+      if (isDemo) return;
+      
       const k = e.key.toLowerCase();
       if (["a", "arrowleft"].includes(k)) keys.current.left = down;
       if (["d", "arrowright"].includes(k)) keys.current.right = down;
@@ -192,7 +201,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     window.addEventListener("keydown", kd);
     window.addEventListener("keyup", ku);
     return () => { window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); };
-  }, []);
+  }, [isDemo]);
 
   // Ensure UI mode is off during gameplay
   useEffect(() => { try { setUiMode(false); } catch {} }, []);
@@ -243,7 +252,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   }, []);
 
   useEffect(() => {
-    console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride });
+    console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     let raf = 0;
     const c = canvasRef.current!;
     const ctx = c.getContext("2d")!;
@@ -252,6 +261,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
     // Clear volcano particles at start of each level
     setVolcanoParticles([]);
+    
+    // Initialize demo AI if in demo mode
+    if (isDemo) {
+      demoAI.current = createDemoAI(level);
+      setDemoStartTime(performance.now());
+      console.log("🤖 Demo AI initialized for level", level);
+    }
     
     // Physics state
     const baseSeed = 873421;
@@ -572,7 +588,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         ghostTimeDiff = elapsed - bestTime;
       }
       
-      setHud({ altitude, vx, vy, fuel, fuelCap, score, time: elapsed, difficulty, levelSeed, rotateBoostActive: rotBoostActive.current > 1.1, ghostTimeDiff });
+      setHud({ 
+        altitude, 
+        vx, 
+        vy, 
+        fuel, 
+        fuelCap, 
+        score: isDemo ? 0 : score, 
+        time: elapsed, 
+        difficulty, 
+        levelSeed, 
+        rotateBoostActive: rotBoostActive.current > 1.1, 
+        ghostTimeDiff 
+      });
     };
 
     const spawnExplosion = () => {
@@ -805,6 +833,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         nextBgSat = elapsed + (5 + Math.random() * 7);
         // ensure periodic spawn
         spawnBgSat(false);
+      }
+
+      // Demo AI controls override
+      if (isDemo && demoAI.current) {
+        const demoControls = updateDemoAI(
+          demoAI.current,
+          { x, y, vx, vy, angle, fuel },
+          terrain,
+          dt * 1000 // Convert to milliseconds
+        );
+        
+        // Override keys with demo AI input
+        keys.current.left = demoControls.left;
+        keys.current.right = demoControls.right;
+        keys.current.thrust = demoControls.thrust;
+        keys.current.abort = false; // Demo doesn't use abort
+        keys.current.rotateBoost = false; // Demo doesn't use rotation boost
       }
 
       // Controls
@@ -1173,7 +1218,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
+          if (!isDemo) {
+            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
+          }
         }, 700);
       }
       
@@ -1189,7 +1236,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
         setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
+          if (!isDemo) {
+            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
+          }
         }, 700);
       }
       
@@ -1370,7 +1419,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             setTimeout(() => {
-              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+              if (!isDemo) {
+                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+              }
             }, 700);
           }
         } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
@@ -1457,7 +1508,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           cameraShake = 24;
           if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
           setTimeout(() => {
-            onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+            if (!isDemo) {
+              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+            }
           }, 700);
         }
       }

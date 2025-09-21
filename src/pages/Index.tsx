@@ -18,11 +18,19 @@ import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave"
 import { AudioManager } from "@/components/game/AudioManager";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
+import { DemoTransition } from "@/components/game/DemoTransition";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
 const Index = () => {
-  const [view, setView] = useState<"home" | "game" | "gameover">("home");
+  const [view, setView] = useState<"home" | "game" | "gameover" | "demo">("home");
+  
+  // Demo/attract mode state
+  const [demoSequenceIndex, setDemoSequenceIndex] = useState(0);
+  const [demoTimer, setDemoTimer] = useState(0);
+  const [demoLevel, setDemoLevel] = useState(1);
+  const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
+  const demoSequence = [1, 5, 20, 50]; // Demo levels to cycle through
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
@@ -183,6 +191,23 @@ const Index = () => {
       root.style.removeProperty("--neon-2");
     }
     setView("game");
+  };
+
+  const startDemo = (levelIndex: number) => {
+    const level = demoSequence[levelIndex];
+    console.log("🎮 Starting demo for level:", level);
+    setDemoLevel(level);
+    setDifficulty("easy"); // Always use easy for demos
+    setMode("fixed"); // Use fixed mode for consistent demos
+    setLowGraphics(true); // Force low graphics for demos
+    setSeedOverride(level * 1000); // Consistent seed for each demo level
+    setView("demo");
+  };
+
+  const exitDemo = () => {
+    console.log("🏠 Exiting demo, returning to home");
+    setView("home");
+    setLastInteractionTime(Date.now());
   };
 
   const handleGameOver = (data: GameOverData) => {
@@ -396,9 +421,53 @@ const retryGame = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [view, needsInitials, lastResult, goIndex]);
 
+  // Demo timer system - 15 seconds on menu, 15 seconds per demo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      
+      if (view === "home") {
+        // Check if 15 seconds have passed since last interaction
+        if (now - lastInteractionTime > 15000) {
+          startDemo(demoSequenceIndex);
+        }
+      } else if (view === "demo") {
+        // Demo has been running for 15 seconds, return to home
+        if (now - lastInteractionTime > 15000) {
+          exitDemo();
+          // Advance to next demo in sequence
+          setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
+        }
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [view, lastInteractionTime, demoSequenceIndex]);
+
+  // User interaction detection - reset demo timer
+  useEffect(() => {
+    const resetTimer = () => {
+      setLastInteractionTime(Date.now());
+      if (view === "demo") {
+        exitDemo();
+      }
+    };
+
+    const events = ["keydown", "mousedown", "touchstart", "gamepadconnected"];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [view]);
+
   // Toggle UI mode for gamepad based on view
   useEffect(() => {
-    try { setUiMode(view !== "game"); } catch {}
+    try { setUiMode(view !== "game" && view !== "demo"); } catch {}
   }, [view]);
 
   // Apply effect on gameover mount
@@ -442,13 +511,16 @@ const retryGame = () => {
   return (
     <div ref={pageContainerRef} className="min-h-screen bg-background text-foreground">
       {view === "home" && (
-        <HomeScreen 
-          onStart={startGame} 
-          highScoresClassic={classicScores} 
-          highScoresFixed={fixedScores} 
-          lastPlayedSeed={lastPlayedSeed ?? undefined}
-          lastPlayedLevel={lastPlayedLevel}
-        />
+        <DemoTransition isVisible={view === "home"}>
+          <HomeScreen 
+            onStart={startGame} 
+            highScoresClassic={classicScores} 
+            highScoresFixed={fixedScores} 
+            lastPlayedSeed={lastPlayedSeed ?? undefined}
+            lastPlayedLevel={lastPlayedLevel}
+            onInteraction={() => setLastInteractionTime(Date.now())}
+          />
+        </DemoTransition>
       )}
       {view === "game" && (
         <GameEngine
@@ -465,6 +537,57 @@ const retryGame = () => {
           showGhost={showGhost}
           ghostLevel={carry?.level ?? successCount}
         />
+      )}
+      {view === "demo" && (
+        <DemoTransition isVisible={view === "demo"}>
+          <div className="relative min-h-screen bg-background">
+            {/* Demo overlay */}
+            <div className="absolute top-4 left-4 z-50 opacity-70">
+              <div className="bg-background/80 backdrop-blur-sm border border-accent/50 rounded-lg px-4 py-2">
+                <p className="text-accent font-display text-lg">DEMO</p>
+                <p className="text-muted-foreground text-sm">Level {demoLevel}</p>
+              </div>
+            </div>
+            
+            {/* "Press any key" hint */}
+            <div className="absolute bottom-4 right-4 z-50 opacity-70 animate-pulse">
+              <div className="bg-background/80 backdrop-blur-sm border border-accent/30 rounded-lg px-4 py-2">
+                <p className="text-muted-foreground text-sm">Press any key to play</p>
+              </div>
+            </div>
+            
+            {/* Demo indicators */}
+            <div className="absolute top-4 right-4 z-50 opacity-70">
+              <div className="flex gap-2">
+                {demoSequence.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-3 h-3 rounded-full border ${
+                      idx === demoSequenceIndex
+                        ? 'bg-accent border-accent'
+                        : 'bg-transparent border-accent/30'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            <div className="opacity-80">
+              <GameEngine
+                key={`demo-${demoLevel}`}
+                difficulty="easy"
+                onExit={exitDemo}
+                onGameOver={() => {}} // No game over handling in demo
+                level={demoLevel}
+                mode="fixed"
+                lowGraphics={true}
+                seedOverride={demoLevel * 1000}
+                showGhost={false}
+                isDemo={true}
+              />
+            </div>
+          </div>
+        </DemoTransition>
       )}
       {view === "gameover" && lastResult && (
         <main className="min-h-screen relative flex items-center justify-center">

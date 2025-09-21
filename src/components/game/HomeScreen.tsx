@@ -28,9 +28,10 @@ interface Props {
   highScoresFixed: HighScore[];
   lastPlayedSeed?: number;
   lastPlayedLevel?: number;
+  onInteraction?: () => void;
 }
 
-export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel }) => {
+export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel, onInteraction }) => {
   const audioRef = useRef(new AudioManager());
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
