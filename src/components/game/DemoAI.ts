@@ -71,33 +71,35 @@ export function updateDemoAI(
     }
   }
   
-  // Check if too close to landscape and not already thrusting
+  // Check if too close to landscape and not already avoiding
   const dangerAltitude = -80; // 80 units above ground (trigger earlier)
   if (altitude > dangerAltitude && !ai.thrustActive && !ai.isAvoiding) {
     // Start avoidance maneuver: random 30-degree rotation
     const rotationDirection = Math.random() < 0.5 ? -1 : 1;
     ai.avoidanceRotation = rotationDirection * (30 * Math.PI / 180); // 30 degrees in radians
     ai.isAvoiding = true;
-    
-    // Start 0.5 second thrust burst after rotation begins
-    ai.thrustActive = true;
-    ai.thrustStartTime = now;
-    controls.thrust = true;
-    console.log(`🚨 Too close to ground! Starting avoidance: ${rotationDirection > 0 ? 'right' : 'left'} rotation + 0.5s thrust`);
+    console.log(`🚨 Too close to ground! Starting avoidance: ${rotationDirection > 0 ? 'right' : 'left'} rotation then thrust`);
   }
   
   // Handle avoidance rotation when avoiding terrain
-  if (ai.isAvoiding && ai.avoidanceRotation !== 0) {
+  if (ai.isAvoiding) {
     const currentAngle = ((ship.angle + Math.PI) % (2 * Math.PI)) - Math.PI;
     const targetAngle = ai.avoidanceRotation;
     const angleDiff = targetAngle - currentAngle;
     
-    // Apply rotation towards target
+    // Apply rotation towards target - this makes the lander visibly rotate
     if (Math.abs(angleDiff) > 0.1) {
       if (angleDiff > 0) {
         controls.right = true;
       } else {
         controls.left = true;
+      }
+    } else {
+      // Rotation complete, now start thrust if not already active
+      if (!ai.thrustActive) {
+        ai.thrustActive = true;
+        ai.thrustStartTime = now;
+        console.log("🔥 Rotation complete, starting 0.5s thrust");
       }
     }
   } else {
