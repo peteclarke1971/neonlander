@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { anyGamepad } from '../../hooks/use-gamepad';
+import { PerformanceManager } from './utils/performanceManager';
+import { ObjectPool } from './utils/objectPool';
 
 interface FireworkParticle {
   x: number;
@@ -30,6 +32,26 @@ interface FireworksDisplayProps {
   onSkip: () => void;
 }
 
+// Object pool for particle reuse
+interface PooledFireworkParticle extends FireworkParticle {
+  reset(): void;
+}
+
+const createPooledParticle = (): PooledFireworkParticle => ({
+  x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 0, color: '', type: 'burst',
+  shape: 'circle', size: 0, gravity: false, rotation: 0, rotationSpeed: 0,
+  glowSize: 0, trail: [], colorTransition: false,
+  reset() {
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.life = 0; this.max = 0;
+    this.color = ''; this.trail = []; this.colorTransition = false;
+    delete this.secondaryColor; delete this.magneticTarget; delete this.parentId;
+  }
+});
+
+const resetPooledParticle = (p: PooledFireworkParticle) => p.reset();
+
+const particlePool = new ObjectPool(createPooledParticle, resetPooledParticle, 500);
+
 const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   landingType,
   neonColor,
@@ -42,6 +64,29 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   const animationRef = useRef<number>();
   const hasLaunched = useRef(false);
   const particleIdCounter = useRef(0);
+  const performanceManager = useRef(new PerformanceManager());
+  const [performanceStats, setPerformanceStats] = useState({ fps: 60, quality: 'high' });
+  const lastFrameTime = useRef(0);
+
+  // Performance-based quality settings
+  const qualitySettings = useMemo(() => {
+    const { settings } = performanceManager.current.update(0.016);
+    const quality = settings.particleCount >= 50 ? 'ultra' : 
+                   settings.particleCount >= 30 ? 'high' : 
+                   settings.particleCount >= 15 ? 'medium' : 'low';
+    
+    return {
+      quality,
+      particleMultiplier: settings.particleCount / 50, // Base multiplier from high performance
+      enableShadows: settings.shadowBlur > 4,
+      shadowBlur: settings.shadowBlur,
+      enableTrails: quality !== 'low',
+      maxTrailLength: quality === 'ultra' ? 8 : quality === 'high' ? 5 : 3,
+      enableGlow: quality !== 'low',
+      glowMultiplier: quality === 'ultra' ? 1.5 : quality === 'high' ? 1.0 : 0.5,
+      cullingEnabled: settings.viewportCulling
+    };
+  }, [performanceStats]);
 
   // Enhanced color schemes with gradients and transitions
   const getColors = useCallback(() => {
@@ -107,35 +152,45 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   // Create spectacular burst patterns with distinct visual signatures
   const createBurst = useCallback((x: number, y: number, colors: any, pattern: string = 'starburst') => {
     const newParticles: FireworkParticle[] = [];
-    const baseCount = landingType === '2x' ? 150 : landingType === 'moving' ? 120 : 100;
+    // Apply performance scaling to particle counts
+    const rawCount = landingType === '2x' ? 150 : landingType === 'moving' ? 120 : 100;
+    const baseCount = Math.floor(rawCount * qualitySettings.particleMultiplier);
     
     // Debug pattern selection
     console.log(`🎆 Creating ${pattern} firework at (${Math.round(x)}, ${Math.round(y)}) for ${landingType} landing`);
     
     const createParticle = (vx: number, vy: number, customProps: Partial<FireworkParticle> = {}) => {
-      // Pattern-specific defaults that can be overridden
-      const baseParticle = {
+      // Get from pool and configure
+      const particle = particlePool.get() as FireworkParticle;
+      
+      // Apply performance-based settings
+      const glowSize = (4 + Math.random() * 6) * qualitySettings.glowMultiplier;
+      const size = Math.max(1, (2 + Math.random() * 4) * Math.sqrt(qualitySettings.particleMultiplier));
+      
+      // Configure particle
+      Object.assign(particle, {
         x,
         y,
         vx: vx * (0.8 + Math.random() * 0.4),
         vy: vy * (0.8 + Math.random() * 0.4),
-        life: 120 + Math.random() * 60, // Longer life for visibility
+        life: 120 + Math.random() * 60,
         max: 120 + Math.random() * 60,
         color: colors.primary[Math.floor(Math.random() * colors.primary.length)],
-        secondaryColor: colors.glitter[Math.floor(Math.random() * colors.glitter.length)],
+        secondaryColor: qualitySettings.enableGlow ? colors.glitter[Math.floor(Math.random() * colors.glitter.length)] : undefined,
         type: 'burst' as const,
         shape: 'circle' as FireworkParticle['shape'],
-        size: 2 + Math.random() * 4, // Larger base size
+        size,
         gravity: true,
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 0.3,
-        glowSize: 4 + Math.random() * 6, // More glow
+        glowSize,
         trail: [],
         colorTransition: false,
         parentId: `${pattern}_${particleIdCounter.current++}`,
         ...customProps
-      };
-      return baseParticle;
+      });
+      
+      return particle;
     };
 
     switch (pattern) {
@@ -547,7 +602,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         }
       }, launchCount * timing + 1000);
     }
-  }, [landingType, getColors, createLaunch, createBurst]);
+  }, [landingType, getColors, createLaunch, createBurst, qualitySettings.particleMultiplier]);
 
   // Enhanced animation loop with trails and effects
   useEffect(() => {
@@ -557,18 +612,46 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       const deltaTime = currentTime - lastTime;
       const normalizedDelta = Math.min(deltaTime / 16.67, 2);
       
+      // Update performance stats
+      const perfStats = performanceManager.current.update(deltaTime / 1000);
+      if (currentTime - lastFrameTime.current > 1000) {
+        setPerformanceStats({ fps: perfStats.fps, quality: qualitySettings.quality });
+        lastFrameTime.current = currentTime;
+      }
+      
+      const canvas = canvasRef.current;
+      const viewWidth = canvas?.width || 800;
+      const viewHeight = canvas?.height || 600;
+      
       setParticles(prev => {
-        return prev
+        const activeParticles = prev.filter(particle => {
+          // Performance culling - skip particles outside view
+          if (qualitySettings.cullingEnabled) {
+            const margin = 100;
+            if (particle.x < -margin || particle.x > viewWidth + margin ||
+                particle.y < -margin || particle.y > viewHeight + margin) {
+              // Return to pool when culled
+              if ('reset' in particle) {
+                particlePool.release(particle as PooledFireworkParticle);
+              }
+              return false;
+            }
+          }
+          
+          return particle.life > 0;
+        });
+        
+        return activeParticles
           .map(particle => {
             // Update position
             const newX = particle.x + (particle.vx * normalizedDelta);
             const newY = particle.y + (particle.vy * normalizedDelta);
             
-            // Update trail
+            // Update trail with performance consideration
             const newTrail = [...particle.trail];
-            if (particle.type === 'comet' || particle.type === 'burst') {
+            if (qualitySettings.enableTrails && (particle.type === 'comet' || particle.type === 'burst')) {
               newTrail.unshift({ x: particle.x, y: particle.y, alpha: particle.life / particle.max });
-              if (newTrail.length > 5) newTrail.pop();
+              if (newTrail.length > qualitySettings.maxTrailLength) newTrail.pop();
             }
             
             // Color transition
@@ -615,7 +698,16 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
               color: newColor
             };
           })
-          .filter(particle => particle.life > 0);
+          .filter(particle => {
+            if (particle.life <= 0) {
+              // Return dead particles to pool
+              if ('reset' in particle) {
+                particlePool.release(particle as PooledFireworkParticle);
+              }
+              return false;
+            }
+            return true;
+          });
       });
       
       lastTime = currentTime;
@@ -669,7 +761,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return () => clearInterval(interval);
   }, [onSkip]);
 
-  // Enhanced rendering with shapes, glow, and trails
+  // Performance-optimized rendering with shapes, glow, and trails
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -682,77 +774,99 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    particles.forEach(particle => {
+    // Sort particles by size to optimize rendering order (back to front)
+    const sortedParticles = qualitySettings.quality === 'low' ? particles : 
+      [...particles].sort((a, b) => a.size - b.size);
+
+    sortedParticles.forEach(particle => {
       const alpha = Math.max(0, particle.life / particle.max);
+      const effectiveSize = particle.size * alpha;
       
-      // Draw trail for comet and burst particles
-      if (particle.trail.length > 0) {
+      // Skip very small or nearly invisible particles
+      if (effectiveSize < 0.5 || alpha < 0.05) return;
+      
+      // Level-of-detail: Use simple circles for small particles
+      const useSimpleShape = effectiveSize < 3 || qualitySettings.quality === 'low';
+      
+      // Draw trail for comet and burst particles (performance optimized)
+      if (qualitySettings.enableTrails && particle.trail.length > 0 && effectiveSize > 2) {
+        ctx.fillStyle = particle.color;
         particle.trail.forEach((point, index) => {
           const trailAlpha = point.alpha * 0.3 * (1 - index / particle.trail.length);
-          ctx.globalAlpha = trailAlpha;
-          ctx.fillStyle = particle.color;
-          ctx.beginPath();
-          ctx.arc(point.x, point.y, particle.size * 0.5, 0, Math.PI * 2);
-          ctx.fill();
+          if (trailAlpha > 0.1) { // Skip nearly invisible trail points
+            ctx.globalAlpha = trailAlpha;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, Math.max(1, particle.size * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+          }
         });
       }
       
       // Main particle with optimized glow
       ctx.globalAlpha = alpha;
       
-      // Optimized glow effect with smart thresholds
-      const effectiveSize = particle.size * alpha;
-      
-      if (particle.glowSize > 0 && effectiveSize >= 4) {
-        // Use expensive shadowBlur only for larger particles
-        const scaledGlow = Math.min(8, particle.glowSize * (effectiveSize >= 8 ? 1 : 0.5));
-        ctx.shadowBlur = scaledGlow;
-        ctx.shadowColor = particle.color;
-      } else if (particle.glowSize > 0 && effectiveSize < 4) {
-        // Alternative glow for small particles - draw background circle
-        ctx.shadowBlur = 0;
-        ctx.save();
-        ctx.globalAlpha = alpha * 0.3;
-        ctx.fillStyle = particle.color;
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, effectiveSize * 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        ctx.globalAlpha = alpha;
+      // Performance-based glow rendering
+      if (qualitySettings.enableGlow && particle.glowSize > 0 && effectiveSize >= 3) {
+        if (qualitySettings.enableShadows && effectiveSize >= 6) {
+          // Use expensive shadowBlur only for large particles on high quality
+          const scaledGlow = Math.min(qualitySettings.shadowBlur, particle.glowSize * qualitySettings.glowMultiplier);
+          ctx.shadowBlur = scaledGlow;
+          ctx.shadowColor = particle.color;
+        } else {
+          // Alternative glow for smaller particles - background circle
+          ctx.shadowBlur = 0;
+          ctx.save();
+          ctx.globalAlpha = alpha * 0.2;
+          ctx.fillStyle = particle.color;
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, effectiveSize * 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = alpha;
+        }
       } else {
         ctx.shadowBlur = 0;
       }
       
       ctx.fillStyle = particle.color;
       
-      // Draw different shapes
+      // Draw shapes with level-of-detail
       ctx.save();
       ctx.translate(particle.x, particle.y);
-      ctx.rotate(particle.rotation);
       
-      switch (particle.shape) {
-        case 'star':
-          drawStar(ctx, 0, 0, particle.size * alpha, 5);
-          break;
-        case 'diamond':
-          drawDiamond(ctx, 0, 0, particle.size * alpha);
-          break;
-        case 'heart':
-          drawHeart(ctx, 0, 0, particle.size * alpha);
-          break;
-        case 'cross':
-          drawCross(ctx, 0, 0, particle.size * alpha);
-          break;
-        case 'streak':
-          drawStreak(ctx, 0, 0, particle.size * alpha, particle.vx, particle.vy);
-          break;
-        case 'ghost':
-          drawGhost(ctx, 0, 0, particle.size * alpha);
-          break;
-        default: // circle
-          ctx.beginPath();
-          ctx.arc(0, 0, particle.size * alpha, 0, Math.PI * 2);
-          ctx.fill();
+      if (useSimpleShape) {
+        // Fast circle rendering for small/low-quality particles
+        ctx.beginPath();
+        ctx.arc(0, 0, effectiveSize, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Complex shape rendering for larger particles
+        ctx.rotate(particle.rotation);
+        
+        switch (particle.shape) {
+          case 'star':
+            drawStar(ctx, 0, 0, effectiveSize, 5);
+            break;
+          case 'diamond':
+            drawDiamond(ctx, 0, 0, effectiveSize);
+            break;
+          case 'heart':
+            drawHeart(ctx, 0, 0, effectiveSize);
+            break;
+          case 'cross':
+            drawCross(ctx, 0, 0, effectiveSize);
+            break;
+          case 'streak':
+            drawStreak(ctx, 0, 0, effectiveSize, particle.vx, particle.vy);
+            break;
+          case 'ghost':
+            drawGhost(ctx, 0, 0, effectiveSize);
+            break;
+          default: // circle
+            ctx.beginPath();
+            ctx.arc(0, 0, effectiveSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
       }
       
       ctx.restore();
