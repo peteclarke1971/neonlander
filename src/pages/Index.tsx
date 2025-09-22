@@ -36,7 +36,7 @@ const Index = () => {
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
   const audioRef = useRef(new AudioManager());
-  const [demoCrashed, setDemoCrashed] = useState(false);
+  // Removed demoCrashed state - was causing conflicts with timer logic
   const [classicScores, setClassicScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -222,11 +222,18 @@ const Index = () => {
     setView("demo");
   };
 
+  // Consolidated timer reset function
+  const resetTimers = () => {
+    console.log("⏰ Resetting attract mode timers");
+    setLastInteractionTime(Date.now());
+    setDemoStartTime(null);
+    setDemoTimer(0);
+  };
+
   const exitDemo = () => {
     console.log("🏠 Exiting demo, returning to home");
     setView("home");
-    setDemoStartTime(null); // Clear demo start time
-    setLastInteractionTime(Date.now());
+    resetTimers();
   };
 
   const handleGameOver = (data: GameOverData) => {
@@ -234,13 +241,16 @@ const Index = () => {
     setLastPlayedSeed(data.levelSeed ?? null);
     setLastPlayedLevel(data.level ?? 0);
     
-    // Handle demo crashes - exit after 1 second instead of 15
+    // Handle demo crashes - advance sequence and exit after 1 second
     if (view === "demo" && (data.cause === "crash" || data.cause === "fuel")) {
-      console.log("💥 Demo crashed, exiting in 1 second");
+      console.log("💥 Demo crashed, advancing sequence and exiting in 1 second");
       setTimeout(() => {
+        setDemoSequenceIndex((prev) => {
+          const nextIndex = (prev + 1) % demoSequence.length;
+          console.log(`🎮 Demo sequence advancing: ${prev} -> ${nextIndex}`);
+          return nextIndex;
+        });
         exitDemo();
-        // Advance to next demo in sequence
-        setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
       }, 1000);
       return;
     }
@@ -463,24 +473,15 @@ const retryGame = () => {
           startDemo(demoSequenceIndex);
         }
       } else if (view === "demo" && demoStartTime) {
-        // Check for crash first
-        if (demoCrashed) {
-          console.log("💥 Demo crash detected, exiting in 1 second");
-          setTimeout(() => {
-            console.log("🏠 Exiting demo after crash");
-            exitDemo();
-            setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
-            setDemoCrashed(false); // Reset crash flag
-          }, 1000);
-          setDemoCrashed(false); // Reset immediately to prevent repeat triggers
-          return; // Exit this check to prevent normal timeout
-        }
-        
-        // Normal 15 second timeout
+        // Normal 15 second timeout for demo
         if (now - demoStartTime > 15000) {
+          console.log("⏰ Demo timeout, advancing sequence and exiting");
+          setDemoSequenceIndex((prev) => {
+            const nextIndex = (prev + 1) % demoSequence.length;
+            console.log(`🎮 Demo sequence advancing: ${prev} -> ${nextIndex}`);
+            return nextIndex;
+          });
           exitDemo();
-          // Advance to next demo in sequence
-          setDemoSequenceIndex((prev) => (prev + 1) % demoSequence.length);
         }
       }
     }, 1000);
@@ -513,6 +514,7 @@ const retryGame = () => {
     if (view !== "demo") return;
     
     const exitOnUserInput = () => {
+      console.log("👆 User input detected in demo, exiting");
       exitDemo();
     };
 
@@ -589,7 +591,11 @@ const retryGame = () => {
         <GameEngine
           key={gameKey}
           difficulty={difficulty}
-          onExit={() => setView("home")}
+          onExit={() => {
+            console.log("🏠 Game exited, returning to home");
+            setView("home");
+            resetTimers();
+          }}
           onGameOver={handleGameOver}
           initialScore={carry?.score}
           initialLandings={carry?.landings}
@@ -640,7 +646,7 @@ const retryGame = () => {
                 key={`demo-${demoLevel}`}
                 difficulty="easy"
                 onExit={exitDemo}
-                onGameOver={() => setDemoCrashed(true)} // Set crash flag for demo
+                onGameOver={handleGameOver} // Use main game over handler for demo
                 level={demoLevel}
                 mode="fixed"
                 lowGraphics={true}
@@ -801,7 +807,11 @@ const retryGame = () => {
                 </Button>
               ) : (
                 <>
-                  <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => setView("home")} disabled={needsInitials}>Home</Button>
+                  <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
+                    console.log("🏠 Home button clicked from gameover");
+                    setView("home");
+                    resetTimers();
+                  }} disabled={needsInitials}>Home</Button>
                   <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials}>Retry Current Level</Button>
                   <Button ref={retryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryGame} disabled={needsInitials}>Retry From Start</Button>
                 </>
