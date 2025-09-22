@@ -809,7 +809,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           ghostShip.x = ghostState.x;
           ghostShip.y = ghostState.y;
           ghostShip.angle = ghostState.angle;
-          ghostShip.visible = true;
+          ghostShip.visible = ghostState.visible;
         } else {
           ghostShip.visible = false;
         }
