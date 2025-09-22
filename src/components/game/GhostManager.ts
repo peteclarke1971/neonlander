@@ -173,15 +173,14 @@ export class GhostManager {
       }
     }
     
-    // If we're past the last frame, use the last frame
+    // If we're past the last frame, hide the ghost
     if (gameTime >= frames[frames.length - 1].timestamp) {
-      const lastFrame = frames[frames.length - 1];
       return {
-        r: lastFrame.r,
-        theta: lastFrame.theta,
-        angle: lastFrame.angle,
-        thrust: lastFrame.thrust,
-        visible: true
+        r: 0,
+        theta: 0,
+        angle: 0,
+        thrust: false,
+        visible: false
       };
     }
     
@@ -243,15 +242,14 @@ export class GhostManager {
       }
     }
     
-    // If we're past the last frame, use the last frame
+    // If we're past the last frame, hide the ghost
     if (gameTime >= frames[frames.length - 1].timestamp) {
-      const lastFrame = frames[frames.length - 1];
       return {
-        x: lastFrame.x,
-        y: lastFrame.y,
-        angle: lastFrame.angle,
-        thrust: lastFrame.thrust,
-        visible: true
+        x: 0,
+        y: 0,
+        angle: 0,
+        thrust: false,
+        visible: false
       };
     }
     
