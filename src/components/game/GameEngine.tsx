@@ -96,6 +96,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const timerActiveRef = useRef(false);
   const timerStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Landing bonus tracking state
+  const [lastLandingBonuses, setLastLandingBonuses] = useState<{
+    bullseye: boolean;
+    speedBonus: boolean;
+    padBonus2x: boolean;
+    lastEarned: number;
+  }>({ bullseye: false, speedBonus: false, padBonus2x: false, lastEarned: 0 });
+  
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
@@ -1391,6 +1399,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             score += earned;
             landings += 1;
             setCurrentLandings(landings);
+            
+            // Save landing bonus information for cavern landing
+            setLastLandingBonuses({
+              bullseye,
+              speedBonus,
+              padBonus2x: applied2x,
+              lastEarned: earned
+            });
+            
             cameraShake = 6;
             audio.current.success();
             audio.current.stopThruster();
@@ -1443,6 +1460,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           score += earned;
           landings += 1;
           setCurrentLandings(landings);
+          
+          // Save landing bonus information for moving pad landing
+          setLastLandingBonuses({
+            bullseye,
+            speedBonus,
+            padBonus2x: false, // Moving pads don't have 2x bonus
+            lastEarned: earned
+          });
+          
           cameraShake = 8; // Extra camera shake for MEGA landing
           audio.current.success();
           audio.current.stopThruster();
@@ -1474,6 +1500,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           score += earned;
           landings += 1;
           setCurrentLandings(landings);
+          
+          // Save landing bonus information for game over screen
+          setLastLandingBonuses({
+            bullseye,
+            speedBonus,
+            padBonus2x: applied2x,
+            lastEarned: earned
+          });
+          
           cameraShake = 6;
           audio.current.success();
           audio.current.stopThruster();
@@ -2398,17 +2433,21 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             }
           }
           
-          onGameOver({ 
-            score: hud.score, 
-            landings: currentLandings, 
-            cause: "success", 
-            difficulty, 
-            elapsed: hud.time,
-            levelSeed: hud.levelSeed,
-            level,
-            isNewBestTime,
-            ghostTimeDiff
-          });
+            onGameOver({ 
+              score: hud.score, 
+              landings: currentLandings, 
+              cause: "success", 
+              difficulty, 
+              elapsed: hud.time,
+              levelSeed: hud.levelSeed,
+              level,
+              isNewBestTime,
+              ghostTimeDiff,
+              lastEarned: lastLandingBonuses.lastEarned,
+              padBonus2x: lastLandingBonuses.padBonus2x,
+              bullseye: lastLandingBonuses.bullseye,
+              speedBonus: lastLandingBonuses.speedBonus
+            });
         }}
           onSkip={() => {
             // Check if this is a new best time and save ghost
@@ -2434,7 +2473,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               levelSeed: hud.levelSeed,
               level,
               isNewBestTime,
-              ghostTimeDiff 
+              ghostTimeDiff,
+              lastEarned: lastLandingBonuses.lastEarned,
+              padBonus2x: lastLandingBonuses.padBonus2x,
+              bullseye: lastLandingBonuses.bullseye,
+              speedBonus: lastLandingBonuses.speedBonus
             });
           }}
         />
