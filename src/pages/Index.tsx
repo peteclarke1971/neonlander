@@ -28,6 +28,11 @@ const Index = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionRef = useRef<GameTransitionHandle>(null);
   
+  // Reset transition state on mount
+  useEffect(() => {
+    setIsTransitioning(false);
+  }, []);
+  
   // Demo/attract mode state
   const [demoSequenceIndex, setDemoSequenceIndex] = useState(0);
   const [demoTimer, setDemoTimer] = useState(0);
@@ -209,10 +214,26 @@ const Index = () => {
       setIsTransitioning(false);
     };
     
-    transitionRef.current?.startTransition(transitionType, () => {
+    // Try to start transition with fallback
+    try {
+      transitionRef.current?.startTransition(transitionType, () => {
+        executeTransition();
+        setTimeout(completeTransition, 200);
+      });
+    } catch (error) {
+      // If transition fails, reset state and start game directly
+      console.warn("Transition failed, starting game directly:", error);
+      setIsTransitioning(false);
       executeTransition();
-      setTimeout(completeTransition, 200);
-    });
+    }
+    
+    // Safety timeout to reset transition state if it gets stuck
+    setTimeout(() => {
+      if (isTransitioning) {
+        console.warn("Transition timeout reached, resetting state");
+        setIsTransitioning(false);
+      }
+    }, 2000);
   };
 
   const startDemo = (levelIndex: number) => {
