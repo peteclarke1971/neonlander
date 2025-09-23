@@ -31,6 +31,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
     const wormholeRef = useRef<VectorWormholeHandle>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const onCompleteRef = useRef<(() => void) | null>(null);
+    const animationRef = useRef<number | null>(null);
 
     // Signal component is ready
     useEffect(() => {
@@ -45,6 +46,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
           return; // Prevent overlapping transitions
         }
         
+        console.log("🎨 Setting transition:", type);
         setCurrentTransition(type);
         setPhase("fade-out");
         setProgress(0);
@@ -188,15 +190,32 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
 
     // Asteroid blast effect
     const drawAsteroidBlast = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+      // Particle explosion effect
+      const numParticles = 50;
+      const blastProgress = phase === "effect" ? progress : (phase === "fade-in" ? 1 : 0);
+      
+      for (let i = 0; i < numParticles; i++) {
+        const angle = (i / numParticles) * Math.PI * 2;
+        const distance = blastProgress * 300 * (0.5 + Math.random() * 0.5);
+        const x = canvas.width / 2 + Math.cos(angle) * distance;
+        const y = canvas.height / 2 + Math.sin(angle) * distance;
+        const size = (1 - blastProgress) * 8 * Math.random();
+        
+        ctx.fillStyle = `hsl(${30 + Math.random() * 60}, 100%, ${50 + Math.random() * 50}%)`;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // White flash effect
       if (phase === "effect" && progress > 0.7) {
-        // White flash effect
         const flashAlpha = Math.sin((progress - 0.7) * Math.PI / 0.3);
-        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.8})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.6})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     };
 
-    // Canvas effects rendering
+    // Canvas effects rendering with continuous animation
     useEffect(() => {
       if (!currentTransition || !canvasRef.current) return;
       if (currentTransition === "hyperspace-jump" || currentTransition === "wormhole-portal") return;
@@ -209,6 +228,8 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
       canvas.height = window.innerHeight;
 
       const draw = () => {
+        if (!currentTransition || phase === "complete") return;
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         switch (currentTransition) {
@@ -222,12 +243,23 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
             drawAsteroidBlast(ctx, canvas);
             break;
         }
+        
+        // Continue animation loop
+        animationRef.current = requestAnimationFrame(draw);
       };
 
       draw();
-    }, [currentTransition, phase, progress]);
 
-    if (!isActive || !currentTransition) return null;
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      };
+    }, [currentTransition, phase]);
+
+    // Show transition when active and transition is set
+    if (!isActive) return null;
 
     const getOpacity = () => {
       switch (phase) {
@@ -260,14 +292,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
           />
         )}
         
-        {/* Asteroid Blast */}
-        {currentTransition === "asteroid-blast" && (
-        <AsteroidField
-            ref={asteroidRef}
-            seed={12345}
-            className="w-full h-full"
-          />
-        )}
+        {/* Asteroid Blast - handled by canvas now */}
         
         {/* Wormhole Portal */}
         {currentTransition === "wormhole-portal" && (
@@ -282,7 +307,8 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
         
         {/* Canvas-based effects */}
         {(currentTransition === "vector-scanline" || 
-          currentTransition === "neon-grid-flip") && (
+          currentTransition === "neon-grid-flip" ||
+          currentTransition === "asteroid-blast") && (
           <canvas
             ref={canvasRef}
             className="w-full h-full"
