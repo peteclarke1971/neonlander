@@ -71,7 +71,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
       const durations = {
         "hyperspace-jump": { fadeOut: 200, effect: 400, fadeIn: 200 },
         "vector-scanline": { fadeOut: 150, effect: 700, fadeIn: 150 },
-        "wormhole-portal": { fadeOut: 250, effect: 700, fadeIn: 250 },
+        "wormhole-portal": { fadeOut: 500, effect: 2000, fadeIn: 500 },
         "neon-grid-flip": { fadeOut: 200, effect: 500, fadeIn: 200 },
         "asteroid-blast": { fadeOut: 150, effect: 500, fadeIn: 150 }
       };

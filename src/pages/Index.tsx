@@ -166,9 +166,8 @@ const Index = () => {
       return; // Prevent multiple transitions
     }
     
-    // Choose random transition type for variety
-    const transitions: TransitionType[] = ["hyperspace-jump", "vector-scanline", "wormhole-portal", "neon-grid-flip", "asteroid-blast"];
-    const transitionType = transitions[Math.floor(Math.random() * transitions.length)];
+    // Use wormhole portal transition
+    const transitionType = "wormhole-portal";
     
     setIsTransitioning(true);
     
