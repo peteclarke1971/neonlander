@@ -26,12 +26,8 @@ const HS_FIXED_KEY = "ll-highscores-fixed";
 const Index = () => {
   const [view, setView] = useState<"home" | "game" | "gameover" | "demo">("home");
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionReady, setTransitionReady] = useState(false);
   const transitionRef = useRef<GameTransitionHandle>(null);
-  
-  // Reset transition state on mount
-  useEffect(() => {
-    setIsTransitioning(false);
-  }, []);
   
   // Demo/attract mode state
   const [demoSequenceIndex, setDemoSequenceIndex] = useState(0);
@@ -163,9 +159,12 @@ const Index = () => {
   const [showGhost, setShowGhost] = useState(false);
   
   const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
-    console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel });
+    console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
-    if (isTransitioning) return; // Prevent multiple transitions
+    if (isTransitioning) {
+      console.log("⚠️ Already transitioning, ignoring start request");
+      return; // Prevent multiple transitions
+    }
     
     // Choose transition type based on mode or random
     const transitions: TransitionType[] = ["hyperspace-jump", "vector-scanline", "wormhole-portal", "neon-grid-flip", "asteroid-blast"];
@@ -214,26 +213,25 @@ const Index = () => {
       setIsTransitioning(false);
     };
     
-    // Try to start transition with fallback
+    // Check if transition is available and ready
+    if (!transitionRef.current) {
+      console.log("⚡ No transition ref, starting game directly");
+      executeTransition();
+      setIsTransitioning(false);
+      return;
+    }
+
     try {
-      transitionRef.current?.startTransition(transitionType, () => {
+      console.log("🌀 Starting transition:", transitionType);
+      transitionRef.current.startTransition(transitionType, () => {
         executeTransition();
         setTimeout(completeTransition, 200);
       });
     } catch (error) {
-      // If transition fails, reset state and start game directly
-      console.warn("Transition failed, starting game directly:", error);
+      console.warn("❌ Transition failed, starting game directly:", error);
       setIsTransitioning(false);
       executeTransition();
     }
-    
-    // Safety timeout to reset transition state if it gets stuck
-    setTimeout(() => {
-      if (isTransitioning) {
-        console.warn("Transition timeout reached, resetting state");
-        setIsTransitioning(false);
-      }
-    }, 2000);
   };
 
   const startDemo = (levelIndex: number) => {
@@ -843,7 +841,11 @@ const retryGame = () => {
               />
             )}
 
-            <GameTransition ref={transitionRef} isActive={isTransitioning} />
+            <GameTransition 
+              ref={transitionRef} 
+              isActive={isTransitioning}
+              onReady={() => console.log("🎮 GameTransition component ready")}
+            />
 
             <div className="mt-6 flex gap-3 justify-center">
               {lastResult.cause === "success" ? (

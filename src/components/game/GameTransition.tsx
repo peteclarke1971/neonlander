@@ -17,10 +17,11 @@ export interface GameTransitionHandle {
 interface GameTransitionProps {
   isActive: boolean;
   className?: string;
+  onReady?: () => void;
 }
 
 export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionProps>(
-  ({ isActive, className = "" }, ref) => {
+  ({ isActive, className = "", onReady }, ref) => {
     const [currentTransition, setCurrentTransition] = useState<TransitionType | null>(null);
     const [phase, setPhase] = useState<"fade-out" | "effect" | "fade-in" | "complete">("complete");
     const [progress, setProgress] = useState(0);
@@ -31,9 +32,18 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const onCompleteRef = useRef<(() => void) | null>(null);
 
+    // Signal component is ready
+    useEffect(() => {
+      onReady?.();
+    }, [onReady]);
+
     useImperativeHandle(ref, () => ({
       startTransition: (type: TransitionType, onComplete: () => void) => {
-        if (currentTransition) return; // Prevent overlapping transitions
+        console.log("🎬 GameTransition.startTransition called:", type, { currentTransition, phase });
+        if (currentTransition) {
+          console.log("⚠️ Transition already in progress, ignoring");
+          return; // Prevent overlapping transitions
+        }
         
         setCurrentTransition(type);
         setPhase("fade-out");
