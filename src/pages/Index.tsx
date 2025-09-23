@@ -620,6 +620,13 @@ const retryGame = () => {
 
   return (
     <div ref={pageContainerRef} className="min-h-screen bg-background text-foreground">
+      {/* GameTransition - always mounted so it's available for all transitions */}
+      <GameTransition 
+        ref={transitionRef} 
+        isActive={isTransitioning}
+        onReady={() => console.log("🎮 GameTransition component ready")}
+      />
+      
       {view === "home" && (
         <DemoTransition isVisible={view === "home"}>
           <HomeScreen 
@@ -841,11 +848,7 @@ const retryGame = () => {
               />
             )}
 
-            <GameTransition 
-              ref={transitionRef} 
-              isActive={isTransitioning}
-              onReady={() => console.log("🎮 GameTransition component ready")}
-            />
+            {/* GameTransition moved to root level for all views */}
 
             <div className="mt-6 flex gap-3 justify-center">
               {lastResult.cause === "success" ? (
