@@ -19,11 +19,14 @@ import { AudioManager } from "@/components/game/AudioManager";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import { DemoTransition } from "@/components/game/DemoTransition";
+import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
 const Index = () => {
   const [view, setView] = useState<"home" | "game" | "gameover" | "demo">("home");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitionRef = useRef<GameTransitionHandle>(null);
   
   // Demo/attract mode state
   const [demoSequenceIndex, setDemoSequenceIndex] = useState(0);
@@ -156,43 +159,60 @@ const Index = () => {
   
   const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel });
-    setDifficulty(d);
-    setMode(mode);
-    const finalLowGfx = lowGfx ?? lowGraphics; // Use current setting if not explicitly provided
-    setLowGraphics(finalLowGfx);
-    setSeedOverride(seedOverrideParam ?? null);
-    setShowGhost(gameSettings?.showGhost ?? false);
-    // Force GameEngine remount to ensure fresh state
-    setGameKey(prev => prev + 1);
-    // Save graphics preference
-    try {
-      localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
-    } catch {}
-    if (startLevel && startLevel > 1) {
-      const lvlIndex = Math.max(0, Math.floor(startLevel - 1));
-      setSuccessCount(lvlIndex);
-      setCarry({ score: 0, landings: 0, level: lvlIndex });
-      const colors = [
-        "330 100% 60%", // pink
-        "50 100% 60%",  // yellow
-        "140 100% 55%", // green
-        "270 100% 70%", // purple
-        "25 100% 60%",  // orange
-        "0 100% 60%",   // red
-      ];
-      const idx = Math.floor(lvlIndex / 2) % colors.length;
-      const root = document.documentElement;
-      root.style.setProperty("--neon", colors[idx]);
-      root.style.setProperty("--neon-2", colors[idx]);
-    } else {
-      // reset to base
-      setCarry(null);
-      setSuccessCount(0);
-      const root = document.documentElement;
-      root.style.removeProperty("--neon");
-      root.style.removeProperty("--neon-2");
-    }
-    setView("game");
+    
+    if (isTransitioning) return; // Prevent multiple transitions
+    
+    // Choose transition type based on mode or random
+    const transitions: TransitionType[] = ["hyperspace-jump", "vector-scanline", "wormhole-portal", "neon-grid-flip", "asteroid-blast"];
+    const transitionType = mode === "classic" ? "hyperspace-jump" : 
+                          mode === "fixed" ? "wormhole-portal" :
+                          transitions[Math.floor(Math.random() * transitions.length)];
+    
+    setIsTransitioning(true);
+    
+    const executeTransition = () => {
+      setDifficulty(d);
+      setMode(mode);
+      const finalLowGfx = lowGfx ?? lowGraphics;
+      setLowGraphics(finalLowGfx);
+      setSeedOverride(seedOverrideParam ?? null);
+      setShowGhost(gameSettings?.showGhost ?? false);
+      setGameKey(prev => prev + 1);
+      
+      try {
+        localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
+      } catch {}
+      
+      if (startLevel && startLevel > 1) {
+        const lvlIndex = Math.max(0, Math.floor(startLevel - 1));
+        setSuccessCount(lvlIndex);
+        setCarry({ score: 0, landings: 0, level: lvlIndex });
+        const colors = [
+          "330 100% 60%", "50 100% 60%", "140 100% 55%",
+          "270 100% 70%", "25 100% 60%", "0 100% 60%",
+        ];
+        const idx = Math.floor(lvlIndex / 2) % colors.length;
+        const root = document.documentElement;
+        root.style.setProperty("--neon", colors[idx]);
+        root.style.setProperty("--neon-2", colors[idx]);
+      } else {
+        setCarry(null);
+        setSuccessCount(0);
+        const root = document.documentElement;
+        root.style.removeProperty("--neon");
+        root.style.removeProperty("--neon-2");
+      }
+      setView("game");
+    };
+    
+    const completeTransition = () => {
+      setIsTransitioning(false);
+    };
+    
+    transitionRef.current?.startTransition(transitionType, () => {
+      executeTransition();
+      setTimeout(completeTransition, 200);
+    });
   };
 
   const startDemo = (levelIndex: number) => {
@@ -284,23 +304,29 @@ const Index = () => {
   };
 
   const continueGame = () => {
-    // Stop mission success music
+    if (isTransitioning) return;
+    
     try { audioRef.current.stopMissionSuccess(); } catch {}
     
-    const colors = [
-      "330 100% 60%",
-      "50 100% 60%",
-      "140 100% 55%",
-      "270 100% 70%",
-      "25 100% 60%",
-      "0 100% 60%",
-    ];
-    const lvl = (carry?.level ?? successCount);
-    const idx = Math.floor(lvl / 2) % colors.length;
-    const root = document.documentElement;
-    root.style.setProperty("--neon", colors[idx]);
-    root.style.setProperty("--neon-2", colors[idx]);
-    setView("game");
+    setIsTransitioning(true);
+    
+    const executeTransition = () => {
+      const colors = [
+        "330 100% 60%", "50 100% 60%", "140 100% 55%",
+        "270 100% 70%", "25 100% 60%", "0 100% 60%",
+      ];
+      const lvl = (carry?.level ?? successCount);
+      const idx = Math.floor(lvl / 2) % colors.length;
+      const root = document.documentElement;
+      root.style.setProperty("--neon", colors[idx]);
+      root.style.setProperty("--neon-2", colors[idx]);
+      setView("game");
+    };
+    
+    transitionRef.current?.startTransition("hyperspace-jump", () => {
+      executeTransition();
+      setTimeout(() => setIsTransitioning(false), 200);
+    });
   };
 const retryGame = () => {
   const root = document.documentElement;
@@ -795,6 +821,8 @@ const retryGame = () => {
                 }}
               />
             )}
+
+            <GameTransition ref={transitionRef} isActive={isTransitioning} />
 
             <div className="mt-6 flex gap-3 justify-center">
               {lastResult.cause === "success" ? (
