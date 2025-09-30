@@ -182,14 +182,19 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     type Shockwave = { x: number; y: number; life: number; max: number };
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; color: string };
+    type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number };
     const stars: Star[] = [];
     const shooting: Shooting[] = [];
     const particles: Particle[] = [];
     const shockwaves: Shockwave[] = [];
     const debris: Debris[] = [];
+    const thrusterParticles: ThrusterParticle[] = [];
     let flashT = 0;
     let cameraShake = 0;
     let nextShooting = 0.6 + Math.random() * 1.6;
+    
+    // Optimized thruster constants
+    const THRUSTER_PARTICLE_COUNT = 3;
 
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const pxW = c.width / dprInit;
@@ -452,6 +457,26 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         
         // Set thrust state for both keyboard and controller
         player.thrust = thrustInput;
+        
+        // Optimized thruster particles - single nozzle
+        for (let i = 0; i < THRUSTER_PARTICLE_COUNT; i++) {
+          const spreadAngle = (Math.random() - 0.5) * 0.6;
+          const thrustAngle = player.angle + Math.PI / 2 + spreadAngle;
+          const baseSpeed = 80 + Math.random() * 40;
+          
+          const px = player.x + Math.cos(player.angle - Math.PI / 2) * -12;
+          const py = player.y + Math.sin(player.angle - Math.PI / 2) * -12;
+          
+          thrusterParticles.push({
+            x: px,
+            y: py,
+            vx: Math.cos(thrustAngle) * baseSpeed + player.vx * 0.3,
+            vy: Math.sin(thrustAngle) * baseSpeed + player.vy * 0.3,
+            life: 0,
+            maxLife: 1.0
+          });
+        }
+        
         audio.current.setThruster(thrustInput);
       } else {
         player.thrust = 0;
@@ -515,6 +540,15 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         p.y += p.vy * dt;
         p.vy += 200 * dt; // gravity
         if (p.life > p.max) particles.splice(i, 1);
+      }
+      
+      // Update thruster particles
+      for (let i = thrusterParticles.length - 1; i >= 0; i--) {
+        const p = thrusterParticles[i];
+        p.life += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.life > p.maxLife) thrusterParticles.splice(i, 1);
       }
 
       // Update shockwaves
@@ -843,6 +877,22 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         ctx.fillStyle = p.color;
         ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
       }
+      
+      // Draw thruster particles
+      for (const p of thrusterParticles) {
+        const age = p.life / p.maxLife;
+        const alpha = 1 - age;
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.strokeStyle = `hsl(30, 100%, ${70 - age * 20}%)`;
+        ctx.shadowColor = `hsl(30, 100%, ${70 - age * 20}%)`;
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
+        ctx.stroke();
+      }
+      
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
 
@@ -958,22 +1008,16 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
       // Draw ship triangle
       ctx.beginPath();
       ctx.moveTo(0, -10);
-      ctx.lineTo(-7, 10);
-      ctx.lineTo(7, 10);
+      ctx.lineTo(-8, 10);
+      ctx.lineTo(8, 10);
       ctx.closePath();
       ctx.stroke();
 
-      // Draw thrust flame
-      if (thrusting) {
-        ctx.strokeStyle = "hsl(15, 100%, 70%)";
-        ctx.shadowColor = "hsl(15, 100%, 70%)";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-3, 10);
-        ctx.lineTo(0, 18 + Math.random() * 5);
-        ctx.lineTo(3, 10);
-        ctx.stroke();
-      }
+      // Landing legs (same as lunar lander)
+      ctx.beginPath();
+      ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);  // Left leg
+      ctx.moveTo(6, 8); ctx.lineTo(12, 12);    // Right leg
+      ctx.stroke();
 
       ctx.restore();
     };
