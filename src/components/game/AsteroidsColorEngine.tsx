@@ -242,7 +242,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
     // Performance optimization for thrust particles
     const shouldOptimizePerformance = lowGraphics || isTouch;
-    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25;
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 1 : 6;
 
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const pxW = c.width / dprInit;
