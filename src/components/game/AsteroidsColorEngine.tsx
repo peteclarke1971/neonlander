@@ -36,6 +36,7 @@ interface Props {
   onExit: () => void;
   onGameOver: (data: ColorOrderGameOverData) => void;
   swapButtons?: boolean;
+  lowGraphics?: boolean;
 }
 
 // Reference resolution for consistent gameplay
@@ -65,7 +66,7 @@ const getWorldDimensionsAndScale = (canvasWidth: number, canvasHeight: number) =
 const PLAYER_RADIUS = 8;
 const RESPAWN_INVULNERABILITY = 3; // seconds
 
-export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, swapButtons = false }) => {
+export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, swapButtons = false, lowGraphics = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<ColorOrderHUDSnapshot>({ 
@@ -238,6 +239,10 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     let flashT = 0;
     let cameraShake = 0;
     let nextShooting = 0.6 + Math.random() * 1.6;
+
+    // Performance optimization for thrust particles
+    const shouldOptimizePerformance = lowGraphics || isTouch;
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25;
 
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const pxW = c.width / dprInit;
@@ -472,7 +477,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         player.angle += 5 * dt;
       }
 
-      // Player thrust with analog support
+      // Player thrust with analog support and particle effects
       if (keys.current.thrust) {
         const thrustPower = thrustAnalog.current > 0 ? thrustAnalog.current : 1.0;
         const thrustInput = thrustPower * 1.2; // Slightly faster than main asteroids
@@ -485,6 +490,49 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         
         player.thrust = thrustInput;
         audio.current.setThruster(thrustInput);
+
+        // Spectacular multi-nozzle thruster particle effect
+        const nozzlePositions = shouldOptimizePerformance ? [
+          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 }
+        ] : [
+          // Center nozzle
+          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 },
+          // Left nozzle 
+          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10 - Math.sin(player.angle - Math.PI / 2) * 3, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 + Math.cos(player.angle - Math.PI / 2) * 3 },
+          // Right nozzle
+          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10 + Math.sin(player.angle - Math.PI / 2) * 3, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 - Math.cos(player.angle - Math.PI / 2) * 3 }
+        ];
+        
+        for (const nozzle of nozzlePositions) {
+          const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
+          for (let i = 0; i < particlesPerNozzle; i++) {
+            // Much wider angle spread for dramatic effect
+            const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
+            const pa = player.angle - Math.PI / 2 + (Math.random() - 0.5) * angleSpread + Math.PI;
+            
+            // Enhanced speed range with more variation
+            const sp = shouldOptimizePerformance ? 
+              (60 + Math.random() * 120 * thrustInput) : 
+              (100 + Math.random() * 200 * thrustInput);
+            
+            // Longer lifespan for high graphics
+            const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
+            
+            // Add slight color variation for high graphics
+            const particleColor = shouldOptimizePerformance ? neonColor : 
+              (Math.random() > 0.7 ? neonColor.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColor);
+            
+            particles.push({ 
+              x: nozzle.x, 
+              y: nozzle.y, 
+              vx: Math.cos(pa) * sp, 
+              vy: Math.sin(pa) * sp, 
+              life: 0, 
+              max: lifespan, 
+              color: particleColor 
+            });
+          }
+        }
       } else {
         player.thrust = 0;
         audio.current.setThruster(0);
@@ -690,20 +738,36 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       if (flashT > 0) flashT -= dt;
       if (cameraShake > 0) cameraShake -= 120 * dt;
 
-      // Draw particles in world space
-      ctx.save();
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = 8;
-      for (const p of particles) {
-        const t = p.life / p.max;
-        const alpha = Math.max(0, 1 - t);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        const size = 3 * (1 - t * 0.5);
-        ctx.fillRect(p.x - size/2, p.y - size/2, size, size);
+      // Spectacular particle rendering with dramatically enhanced thruster effects
+      if (particles.length > 0) {
+        ctx.save();
+        
+        for (const p of particles) {
+          // Determine if this is a thruster particle
+          const isThruster = p.color === neonColor || p.color.includes('hsla');
+          
+          // Age-based fade and size variation for thruster particles
+          const ageRatio = p.life / p.max;
+          const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
+          
+          // Dramatic shadow blur for thruster particles
+          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+          ctx.shadowColor = isThruster ? neonColor : p.color;
+          
+          ctx.beginPath();
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = p.color;
+          
+          // Variable line width for thruster particles - thicker when young
+          const lineWidth = shouldOptimizePerformance ? 1.8 : 
+            (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8); // 1.5-2.5px for thrusters
+          ctx.lineWidth = lineWidth;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
-      ctx.restore();
       ctx.globalAlpha = 1;
 
       // Draw debris
@@ -773,18 +837,6 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       ctx.lineTo(7, 10);
       ctx.closePath();
       ctx.stroke();
-
-      // Draw thrust flame
-      if (player.thrust > 0) {
-        ctx.strokeStyle = "hsl(15, 100%, 70%)";
-        ctx.shadowColor = "hsl(15, 100%, 70%)";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-3, 10);
-        ctx.lineTo(0, 18 + Math.random() * 5);
-        ctx.lineTo(3, 10);
-        ctx.stroke();
-      }
 
       ctx.restore();
       ctx.globalAlpha = 1;

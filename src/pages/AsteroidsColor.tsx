@@ -242,12 +242,14 @@ export default function AsteroidsColor() {
   }
 
   if (view === "game") {
+    const lowGraphics = localStorage.getItem("low_graphics_mode") === "true";
     return (
       <AsteroidsColorEngine
         difficulty={difficulty}
         onExit={backToHome}
         onGameOver={handleGameOver}
         swapButtons={swapButtons}
+        lowGraphics={lowGraphics}
       />
     );
   }
