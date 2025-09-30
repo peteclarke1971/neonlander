@@ -97,9 +97,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
   const lastPauseDown = useRef(false);
 
   // Touch controls state  
-  const touchInputRef = useRef({ left: false, right: false, up: false, down: false, fire: false });
-  const dpadTouchRef = useRef<{ id: number; startX: number; startY: number } | null>(null);
-  const fireTouchRef = useRef<number | null>(null);
+  const touchInputRef = useRef({ left: false, right: false, up: false, fire: false });
 
   // Resize canvas
   useEffect(() => {
@@ -381,15 +379,6 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       ctx.fillStyle = "black";
       ctx.fillRect(0, 0, w, h);
 
-      // Apply world scaling and centering with camera shake
-      ctx.save();
-      const offsetX = (w - WORLD_WIDTH * scale) / 2;
-      const offsetY = (h - WORLD_HEIGHT * scale) / 2;
-      const shakeX = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
-      const shakeY = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
-      ctx.translate(offsetX + shakeX, offsetY + shakeY);
-      ctx.scale(scale, scale);
-
       const neonColors = [
         "hsl(315, 100%, 70%)", // magenta
         "hsl(210, 100%, 70%)", // cyan  
@@ -401,6 +390,50 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       ];
       const colorIndex = (game.current.wave - 1) % neonColors.length;
       const neonColor = neonColors[colorIndex];
+
+      // Draw starfield in screen space BEFORE world transform
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const wpx = ctx.canvas.width / dpr;
+      const hpx = ctx.canvas.height / dpr;
+      
+      ctx.save();
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = neonColor;
+      ctx.scale(dpr, dpr);
+      
+      // Static twinkling stars in screen space
+      for (const s of stars) {
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + game.current.elapsed * s.tw));
+        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        const x = (s.x % wpx + wpx) % wpx;
+        const y = Math.max(0, Math.min(hpx, s.y));
+        ctx.fillRect(x, y, s.size, s.size);
+      }
+      ctx.globalAlpha = 1;
+      
+      // Shooting stars
+      for (const sh of shooting) {
+        const t = 1 - Math.min(1, sh.life / sh.max);
+        ctx.globalAlpha = t;
+        ctx.beginPath();
+        ctx.moveTo(sh.x, sh.y);
+        ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = neonColor;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // Apply world scaling and centering with camera shake
+      ctx.save();
+      const offsetX = (w - WORLD_WIDTH * scale) / 2;
+      const offsetY = (h - WORLD_HEIGHT * scale) / 2;
+      const shakeX = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
+      const shakeY = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
+      ctx.translate(offsetX + shakeX, offsetY + shakeY);
+      ctx.scale(scale, scale);
 
       // Handle input (combine keyboard, gamepad, and touch)
       const gp = anyGamepad();
@@ -660,42 +693,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       if (flashT > 0) flashT -= dt;
       if (cameraShake > 0) cameraShake -= 120 * dt;
 
-      // Draw enhanced starfield
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const wpx = ctx.canvas.width / dpr;
-      const hpx = ctx.canvas.height / dpr;
-      
-      ctx.save();
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = 6;
-      ctx.fillStyle = neonColor;
-      ctx.scale(dpr, dpr);
-      
-      // Static twinkling stars in screen space
-      for (const s of stars) {
-        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + game.current.elapsed * s.tw));
-        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
-        const x = (s.x % wpx + wpx) % wpx;
-        const y = Math.max(0, Math.min(hpx, s.y));
-        ctx.fillRect(x, y, s.size, s.size);
-      }
-      ctx.globalAlpha = 1;
-      
-      // Shooting stars
-      for (const sh of shooting) {
-        const t = 1 - Math.min(1, sh.life / sh.max);
-        ctx.globalAlpha = t;
-        ctx.beginPath();
-        ctx.moveTo(sh.x, sh.y);
-        ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = neonColor;
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // Draw particles
+      // Draw particles in world space
       ctx.save();
       ctx.shadowColor = neonColor;
       ctx.shadowBlur = 8;
@@ -794,9 +792,9 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       ctx.restore();
       ctx.globalAlpha = 1;
 
-      ctx.restore();
+      ctx.restore(); // Restore from world transform
 
-      // Flash effect overlay
+      // Flash effect overlay in screen space
       if (flashT > 0) {
         const intensity = flashT / 0.28;
         ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.4})`;
@@ -862,17 +860,6 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     };
   }, [difficulty, onExit, onGameOver, paused]);
 
-  // Touch control helpers
-  const updateDpadFromTouch = (localX: number, localY: number, startX: number, startY: number) => {
-    const deltaX = localX - startX;
-    const deltaY = localY - startY;
-    const deadzone = 20;
-
-    touchInputRef.current.left = deltaX < -deadzone;
-    touchInputRef.current.right = deltaX > deadzone;
-    touchInputRef.current.up = deltaY < -deadzone;
-    touchInputRef.current.down = deltaY > deadzone;
-  };
 
   return (
     <div ref={containerRef} className="relative w-full h-screen bg-background overflow-hidden select-none">
@@ -916,113 +903,78 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         </Button>
       </div>
 
-      {/* Touch controls overlay for mobile */}
+      {/* Touch controls overlay for mobile - 4 button layout matching main Asteroids */}
       {isTouch && (
         <div className="absolute inset-0 pointer-events-none z-10 select-none">
-          {/* D-pad (swappable with fire button) */}
+          {/* Right side button - Thrust or Fire based on swapButtons */}
           <div
-            className={`absolute bottom-8 ${swapButtons ? 'right-8' : 'left-8'} w-32 h-32 rounded-full border-2 pointer-events-auto select-none`}
-            style={{
-              background: `radial-gradient(circle, hsl(var(--accent) / 0.1) 0%, hsl(var(--accent) / 0.05) 70%, transparent 100%)`,
-              borderColor: 'hsl(var(--accent) / 0.5)'
+            className={`absolute bottom-8 right-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-red-600/20 border-red-600/50' : 'bg-blue-600/20 border-blue-600/50'}`}
+            onTouchStart={() => { 
+              audio.current.resume(); 
+              if (swapButtons) { 
+                touchInputRef.current.fire = true; 
+              } else { 
+                touchInputRef.current.up = true; 
+              } 
             }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              audio.current?.resume();
-              if (dpadTouchRef.current) return;
-              const touch = e.changedTouches[0];
-              if (!touch) return;
-              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-              const startX = rect.width / 2;
-              const startY = rect.height / 2;
-              dpadTouchRef.current = { id: touch.identifier, startX, startY };
-              const localX = touch.clientX - rect.left;
-              const localY = touch.clientY - rect.top;
-              updateDpadFromTouch(localX, localY, startX, startY);
-            }}
-            onTouchMove={(e) => {
-              e.preventDefault();
-              if (!dpadTouchRef.current) return;
-              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-              for (const t of Array.from(e.changedTouches)) {
-                if (t.identifier === dpadTouchRef.current.id) {
-                  const localX = t.clientX - rect.left;
-                  const localY = t.clientY - rect.top;
-                  updateDpadFromTouch(localX, localY, dpadTouchRef.current.startX, dpadTouchRef.current.startY);
-                }
-              }
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              for (const t of Array.from(e.changedTouches)) {
-                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
-                  dpadTouchRef.current = null;
-                  touchInputRef.current.left = false;
-                  touchInputRef.current.right = false;
-                  touchInputRef.current.up = false;
-                  touchInputRef.current.down = false;
-                }
-              }
-            }}
-            onTouchCancel={(e) => {
-              e.preventDefault();
-              for (const t of Array.from(e.changedTouches)) {
-                if (dpadTouchRef.current && t.identifier === dpadTouchRef.current.id) {
-                  dpadTouchRef.current = null;
-                  touchInputRef.current.left = false;
-                  touchInputRef.current.right = false;
-                  touchInputRef.current.up = false;
-                  touchInputRef.current.down = false;
-                }
-              }
+            onTouchEnd={() => { 
+              if (swapButtons) { 
+                touchInputRef.current.fire = false; 
+              } else { 
+                touchInputRef.current.up = false; 
+              } 
             }}
           >
-            {/* Directional indicators around the circle */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-full h-full">
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 text-xs text-accent opacity-70">↑</div>
-                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-accent opacity-70">↓</div>
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 text-xs text-accent opacity-70">←</div>
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-accent opacity-70">→</div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs text-accent font-mono font-bold">MOVE</span>
-                </div>
-              </div>
-            </div>
+            <span className="text-sm text-accent select-none">{swapButtons ? 'FIRE' : 'THRUST'}</span>
           </div>
-
-          {/* Fire button (swappable with movement) */}
+          
+          {/* Left side button - Fire or Thrust based on swapButtons */}
           <div
-            className={`absolute bottom-8 ${swapButtons ? 'left-8' : 'right-8'} w-28 h-28 rounded-full border-2 border-red-500/50 bg-red-600/20 flex items-center justify-center pointer-events-auto select-none`}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              audio.current?.resume();
-              if (fireTouchRef.current !== null) return;
-              const touch = e.changedTouches[0];
-              if (!touch) return;
-              fireTouchRef.current = touch.identifier;
-              touchInputRef.current.fire = true;
+            className={`absolute bottom-8 left-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-blue-600/20 border-blue-600/50' : 'bg-red-600/20 border-red-600/50'}`}
+            onTouchStart={() => { 
+              audio.current.resume(); 
+              if (swapButtons) { 
+                touchInputRef.current.up = true; 
+              } else { 
+                touchInputRef.current.fire = true; 
+              } 
             }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              for (const t of Array.from(e.changedTouches)) {
-                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
-                  fireTouchRef.current = null;
-                  touchInputRef.current.fire = false;
-                }
-              }
-            }}
-            onTouchCancel={(e) => {
-              e.preventDefault();
-              for (const t of Array.from(e.changedTouches)) {
-                if (fireTouchRef.current !== null && t.identifier === fireTouchRef.current) {
-                  fireTouchRef.current = null;
-                  touchInputRef.current.fire = false;
-                }
-              }
+            onTouchEnd={() => { 
+              if (swapButtons) { 
+                touchInputRef.current.up = false; 
+              } else { 
+                touchInputRef.current.fire = false; 
+              } 
             }}
           >
-            <span className="text-sm text-red-400 font-mono font-bold">FIRE</span>
+            <span className="text-sm text-accent select-none">{swapButtons ? 'THRUST' : 'FIRE'}</span>
+          </div>
+          
+          {/* Touch rotation areas - positioned higher to avoid collision */}
+          <div
+            className="absolute bottom-40 left-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
+            onTouchStart={() => { 
+              audio.current.resume(); 
+              touchInputRef.current.left = true; 
+            }}
+            onTouchEnd={() => { 
+              touchInputRef.current.left = false; 
+            }}
+          >
+            <span className="text-sm text-accent select-none">←</span>
+          </div>
+          
+          <div
+            className="absolute bottom-40 right-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
+            onTouchStart={() => { 
+              audio.current.resume(); 
+              touchInputRef.current.right = true; 
+            }}
+            onTouchEnd={() => { 
+              touchInputRef.current.right = false; 
+            }}
+          >
+            <span className="text-sm text-accent select-none">→</span>
           </div>
         </div>
       )}
