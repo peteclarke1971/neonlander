@@ -822,9 +822,15 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       // Draw ship triangle
       ctx.beginPath();
       ctx.moveTo(0, -10);
-      ctx.lineTo(-7, 10);
-      ctx.lineTo(7, 10);
+      ctx.lineTo(-8, 10);
+      ctx.lineTo(8, 10);
       ctx.closePath();
+      ctx.stroke();
+
+      // Landing legs (same as lunar lander)
+      ctx.beginPath();
+      ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);  // Left leg
+      ctx.moveTo(6, 8); ctx.lineTo(12, 12);    // Right leg
       ctx.stroke();
 
       ctx.restore();
