@@ -48,10 +48,10 @@ const getWorldDimensionsAndScale = (canvasWidth: number, canvasHeight: number) =
   const viewWidth = canvasWidth / dpr;
   const viewHeight = canvasHeight / dpr;
   
-  // Calculate scale to maintain consistent gameplay
+  // Calculate scale to fit the world in the viewport
   const scaleX = viewWidth / REFERENCE_WIDTH;
   const scaleY = viewHeight / REFERENCE_HEIGHT;
-  const scale = Math.max(1, Math.min(scaleX, scaleY));
+  const scale = Math.min(scaleX, scaleY); // No minimum - scale down to fit any screen
   
   return {
     width: REFERENCE_WIDTH,
@@ -95,9 +95,6 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
   const gpProfileRef = useRef(loadProfile(getLastDeviceId()));
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const lastPauseDown = useRef(false);
-
-  // Touch controls state  
-  const touchInputRef = useRef({ left: false, right: false, up: false, fire: false });
 
   // Resize canvas
   useEffect(() => {
@@ -458,11 +455,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         lastPauseDown.current = input.buttons.pause;
       }
 
-      // Combine touch input with other inputs
-      keys.current.left = keys.current.left || touchInputRef.current.left;
-      keys.current.right = keys.current.right || touchInputRef.current.right;
-      keys.current.thrust = keys.current.thrust || touchInputRef.current.up;
-      keys.current.fire = keys.current.fire || touchInputRef.current.fire;
+      // Touch input is now directly setting keys.current, no need to merge
 
       const player = game.current.player;
       const now = Date.now();
@@ -912,16 +905,23 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
             onTouchStart={() => { 
               audio.current.resume(); 
               if (swapButtons) { 
-                touchInputRef.current.fire = true; 
+                keys.current.fire = true; 
               } else { 
-                touchInputRef.current.up = true; 
+                keys.current.thrust = true; 
               } 
             }}
             onTouchEnd={() => { 
               if (swapButtons) { 
-                touchInputRef.current.fire = false; 
+                keys.current.fire = false; 
               } else { 
-                touchInputRef.current.up = false; 
+                keys.current.thrust = false; 
+              } 
+            }}
+            onTouchCancel={() => { 
+              if (swapButtons) { 
+                keys.current.fire = false; 
+              } else { 
+                keys.current.thrust = false; 
               } 
             }}
           >
@@ -934,16 +934,23 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
             onTouchStart={() => { 
               audio.current.resume(); 
               if (swapButtons) { 
-                touchInputRef.current.up = true; 
+                keys.current.thrust = true; 
               } else { 
-                touchInputRef.current.fire = true; 
+                keys.current.fire = true; 
               } 
             }}
             onTouchEnd={() => { 
               if (swapButtons) { 
-                touchInputRef.current.up = false; 
+                keys.current.thrust = false; 
               } else { 
-                touchInputRef.current.fire = false; 
+                keys.current.fire = false; 
+              } 
+            }}
+            onTouchCancel={() => { 
+              if (swapButtons) { 
+                keys.current.thrust = false; 
+              } else { 
+                keys.current.fire = false; 
               } 
             }}
           >
@@ -955,10 +962,13 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
             className="absolute bottom-40 left-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
             onTouchStart={() => { 
               audio.current.resume(); 
-              touchInputRef.current.left = true; 
+              keys.current.left = true; 
             }}
             onTouchEnd={() => { 
-              touchInputRef.current.left = false; 
+              keys.current.left = false; 
+            }}
+            onTouchCancel={() => { 
+              keys.current.left = false; 
             }}
           >
             <span className="text-sm text-accent select-none">←</span>
@@ -968,10 +978,13 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
             className="absolute bottom-40 right-8 w-24 h-24 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none"
             onTouchStart={() => { 
               audio.current.resume(); 
-              touchInputRef.current.right = true; 
+              keys.current.right = true; 
             }}
             onTouchEnd={() => { 
-              touchInputRef.current.right = false; 
+              keys.current.right = false; 
+            }}
+            onTouchCancel={() => { 
+              keys.current.right = false; 
             }}
           >
             <span className="text-sm text-accent select-none">→</span>
