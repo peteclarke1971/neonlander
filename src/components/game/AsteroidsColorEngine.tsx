@@ -369,12 +369,14 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
       if (!canvas) return;
 
       const { width: WORLD_WIDTH, height: WORLD_HEIGHT, scale, viewWidth, viewHeight } = getWorldDimensionsAndScale(canvas.width, canvas.height);
+
+      // Clear entire physical canvas (not just logical dimensions)
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Use logical dimensions for subsequent calculations
       const w = viewWidth;
       const h = viewHeight;
-
-      // Clear screen
-      ctx.fillStyle = "black";
-      ctx.fillRect(0, 0, w, h);
 
       const neonColors = [
         "hsl(315, 100%, 70%)", // magenta
