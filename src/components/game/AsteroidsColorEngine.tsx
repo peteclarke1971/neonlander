@@ -425,6 +425,8 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
       // Apply world scaling and centering with camera shake
       ctx.save();
+      ctx.scale(dpr, dpr); // Scale for device pixel ratio FIRST
+      
       const offsetX = (w - WORLD_WIDTH * scale) / 2;
       const offsetY = (h - WORLD_HEIGHT * scale) / 2;
       const shakeX = cameraShake > 0 ? (Math.random() - 0.5) * cameraShake : 0;
