@@ -242,7 +242,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
     // Performance optimization for thrust particles
     const shouldOptimizePerformance = lowGraphics || isTouch;
-    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 1 : 6;
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 1 : 3;
 
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const pxW = c.width / dprInit;
@@ -491,47 +491,38 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
         player.thrust = thrustInput;
         audio.current.setThruster(thrustInput);
 
-        // Spectacular multi-nozzle thruster particle effect
-        const nozzlePositions = shouldOptimizePerformance ? [
-          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 }
-        ] : [
-          // Center nozzle
-          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 },
-          // Left nozzle 
-          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10 - Math.sin(player.angle - Math.PI / 2) * 3, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 + Math.cos(player.angle - Math.PI / 2) * 3 },
-          // Right nozzle
-          { x: player.x - Math.cos(player.angle - Math.PI / 2) * 10 + Math.sin(player.angle - Math.PI / 2) * 3, y: player.y - Math.sin(player.angle - Math.PI / 2) * 10 - Math.cos(player.angle - Math.PI / 2) * 3 }
-        ];
+        // Single nozzle thruster particle effect for optimal performance
+        const nozzle = {
+          x: player.x - Math.cos(player.angle - Math.PI / 2) * 10,
+          y: player.y - Math.sin(player.angle - Math.PI / 2) * 10
+        };
         
-        for (const nozzle of nozzlePositions) {
-          const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
-          for (let i = 0; i < particlesPerNozzle; i++) {
-            // Much wider angle spread for dramatic effect
-            const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
-            const pa = player.angle - Math.PI / 2 + (Math.random() - 0.5) * angleSpread + Math.PI;
-            
-            // Enhanced speed range with more variation
-            const sp = shouldOptimizePerformance ? 
-              (60 + Math.random() * 120 * thrustInput) : 
-              (100 + Math.random() * 200 * thrustInput);
-            
-            // Longer lifespan for high graphics
-            const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
-            
-            // Add slight color variation for high graphics
-            const particleColor = shouldOptimizePerformance ? neonColor : 
-              (Math.random() > 0.7 ? neonColor.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColor);
-            
-            particles.push({ 
-              x: nozzle.x, 
-              y: nozzle.y, 
-              vx: Math.cos(pa) * sp, 
-              vy: Math.sin(pa) * sp, 
-              life: 0, 
-              max: lifespan, 
-              color: particleColor 
-            });
-          }
+        for (let i = 0; i < THRUSTER_PARTICLE_COUNT; i++) {
+          // Balanced angle spread
+          const angleSpread = shouldOptimizePerformance ? 0.6 : 1.2;
+          const pa = player.angle - Math.PI / 2 + (Math.random() - 0.5) * angleSpread + Math.PI;
+          
+          // Moderate speed range
+          const sp = shouldOptimizePerformance ? 
+            (60 + Math.random() * 120 * thrustInput) : 
+            (100 + Math.random() * 180 * thrustInput);
+          
+          // Shorter lifespan to reduce particle accumulation
+          const lifespan = shouldOptimizePerformance ? 0.4 : 1.0;
+          
+          // Slight color variation for high graphics
+          const particleColor = shouldOptimizePerformance ? neonColor : 
+            (Math.random() > 0.8 ? neonColor.replace(')', ', 0.85)').replace('hsl', 'hsla') : neonColor);
+          
+          particles.push({ 
+            x: nozzle.x, 
+            y: nozzle.y, 
+            vx: Math.cos(pa) * sp, 
+            vy: Math.sin(pa) * sp, 
+            life: 0, 
+            max: lifespan, 
+            color: particleColor
+          });
         }
       } else {
         player.thrust = 0;
@@ -746,24 +737,22 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
           // Determine if this is a thruster particle
           const isThruster = p.color === neonColor || p.color.includes('hsla');
           
-          // Age-based fade and size variation for thruster particles
+          // Age-based fade for thruster particles
           const ageRatio = p.life / p.max;
-          const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
+          const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.6); // Fade out over time
           
-          // Dramatic shadow blur for thruster particles
-          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+          // Optimized shadow blur for thruster particles (reduced from 25 to 12)
+          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 12 : 2);
           ctx.shadowColor = isThruster ? neonColor : p.color;
           
           ctx.beginPath();
           ctx.globalAlpha = alpha;
           ctx.strokeStyle = p.color;
           
-          // Variable line width for thruster particles - thicker when young
-          const lineWidth = shouldOptimizePerformance ? 1.8 : 
-            (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8); // 1.5-2.5px for thrusters
-          ctx.lineWidth = lineWidth;
+          // Fixed line width for better performance
+          ctx.lineWidth = shouldOptimizePerformance ? 1.8 : (isThruster ? 1.5 : 1.8);
           ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+          ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
           ctx.stroke();
         }
         ctx.restore();
