@@ -445,7 +445,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       
       {isTouch && (
         <div
-          className="absolute inset-0 z-10 touch-none select-none"
+          className="absolute inset-0 z-10 select-none"
           onTouchStart={(e) => { 
             e.preventDefault(); 
             if (e.touches.length > 0 && !paused) { 
