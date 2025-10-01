@@ -455,9 +455,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       setVy(shipVy);
       setFuel(fuelAmount);
       
-      // Camera follows ship horizontally with smooth motion, keeping ship slightly left of center
-      const targetCameraX = shipX - viewWidth * 0.4;
-      cameraX += (targetCameraX - cameraX) * dt * 4;
+      // Camera follows ship horizontally with predictive centering (matching main game)
+      const leadTime = 0.35; // Predictive camera lead
+      const targetCameraX = shipX + shipVx * leadTime;
+      const camAlpha = 1 - Math.exp(-dt / 0.28); // Smooth interpolation
+      cameraX += (targetCameraX - cameraX) * camAlpha;
       
       // Calculate dynamic zoom based on terrain clearance (matching main game)
       const alpha = 0.1;
