@@ -285,9 +285,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         shipY += shipVy * 60 * dt;
         shipAngle += shipAngularVel * dt;
         
-        // Angular damping
-        shipAngularVel *= 0.994;
-        if (Math.abs(shipAngularVel) < 0.006) shipAngularVel = 0;
+        // Angular friction (easy mode - only when no rotation input)
+        if (!keys.current.left && !keys.current.right) {
+          shipAngularVel *= 0.9;
+          if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
+        }
         
         // Update distance (only counts forward progress)
         const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);

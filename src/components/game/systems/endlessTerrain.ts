@@ -59,6 +59,14 @@ export class EndlessTerrainGenerator {
     
     for (let i = 0; i <= segments; i++) {
       const x = startX + i * step;
+      
+      // First point: exact match with lastEndY for seamless connection
+      if (i === 0 && this.lastEndY !== null) {
+        points.push({ x, y: this.lastEndY });
+        continue;
+      }
+      
+      // Subsequent points: apply blending and variation
       const drift = (rand() - 0.5) * variation;
       current = this.config.baseHeight * 0.9 + current * 0.1 + drift;
       
