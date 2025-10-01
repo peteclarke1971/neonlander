@@ -19,6 +19,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
+  const [isTouch, setIsTouch] = useState(false);
   
   // Game state
   const [distance, setDistance] = useState(0);
@@ -35,6 +36,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   
   const keys = useRef({ left: false, right: false, thrust: false });
   const audio = useRef(new AudioManager());
+  
+  // Detect touch-capable devices
+  useEffect(() => {
+    try {
+      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
+      setIsTouch(!!hasTouch);
+    } catch {
+      setIsTouch(false);
+    }
+  }, []);
   
   useEffect(() => {
     const resize = () => {
@@ -432,6 +443,27 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     <div ref={containerRef} className="relative w-full h-screen bg-background overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0" />
       
+      {isTouch && (
+        <div
+          className="absolute inset-0 z-10 touch-none select-none"
+          onTouchStart={(e) => { 
+            e.preventDefault(); 
+            if (e.touches.length > 0 && !paused) { 
+              keys.current.thrust = true; 
+              audio.current.resume(); 
+            } 
+          }}
+          onTouchEnd={(e) => { 
+            e.preventDefault(); 
+            keys.current.thrust = false; 
+          }}
+          onTouchCancel={(e) => { 
+            e.preventDefault(); 
+            keys.current.thrust = false; 
+          }}
+        />
+      )}
+      
       <SurvivalHUD
         altitude={altitude}
         vx={vx}
@@ -455,8 +487,37 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         </div>
       )}
       
-      <div className="absolute bottom-4 right-4 z-20 text-xs text-muted-foreground">
-        Arrow Keys: Rotate | Space/W: Thrust
+      {/* Touch Controls */}
+      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none">
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            className="select-none"
+            onMouseDown={() => (keys.current.left = true)} 
+            onMouseUp={() => (keys.current.left = false)} 
+            onMouseLeave={() => (keys.current.left = false)}
+            onTouchStart={(e) => { e.preventDefault(); keys.current.left = true; }} 
+            onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
+            onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
+          >
+            <span className="select-none">Rotate ◄</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            className="select-none"
+            onMouseDown={() => (keys.current.right = true)} 
+            onMouseUp={() => (keys.current.right = false)} 
+            onMouseLeave={() => (keys.current.right = false)}
+            onTouchStart={(e) => { e.preventDefault(); keys.current.right = true; }} 
+            onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
+            onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
+          >
+            <span className="select-none">Rotate ►</span>
+          </Button>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Tap screen: Thrust | Arrows/W: Keys
+        </div>
       </div>
     </div>
   );
