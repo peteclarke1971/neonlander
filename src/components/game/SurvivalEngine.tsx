@@ -119,6 +119,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     let isDead = false;
     let isLanded = false;
     let landedPad: any = null;
+    let padToClear: any = null; // Track pad to remove after clearing
+    
+    // Thruster particles
+    type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+    const thrusterParticles: ThrusterParticle[] = [];
     
     // Camera
     let cameraX = 0;
@@ -128,10 +133,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     audio.current.stopAllAudio();
     audio.current.playLevelTrackForLevel(0);
     
-    const GRAVITY = 120;
-    const ROTATION_SPEED = 3.5;
-    const THRUST_POWER = 180;
-    const FUEL_BURN = 8;
+    // Physics constants matching main game
+    const GRAVITY = 0.02 * 0.75; // 0.015
+    const ROTATION_ACCEL = 2.5 * 1.15; // ~2.875
+    const THRUST_ACCEL = 9.8 * 0.7; // 6.86
+    const FUEL_BURN = 25; // fuel units per second at full thrust
+    
+    // Performance optimization
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const shouldOptimize = isMobile;
+    const THRUSTER_PARTICLE_COUNT = shouldOptimize ? 2 : 25;
     
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const getViewWidth = () => c.width / dprInit;
@@ -212,37 +223,98 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
-      // Input handling
+      // Input handling and physics
       if (!isLanded) {
+        // Rotation controls
         if (keys.current.left) {
-          shipAngularVel -= ROTATION_SPEED * dt;
+          shipAngularVel -= ROTATION_ACCEL * dt;
         }
         if (keys.current.right) {
-          shipAngularVel += ROTATION_SPEED * dt;
+          shipAngularVel += ROTATION_ACCEL * dt;
         }
         
+        // Thrust controls
         if (keys.current.thrust && fuelAmount > 0) {
-          const thrustX = Math.sin(shipAngle) * THRUST_POWER;
-          const thrustY = -Math.cos(shipAngle) * THRUST_POWER;
+          const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
+          const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL;
           shipVx += thrustX * dt;
           shipVy += thrustY * dt;
           fuelAmount -= FUEL_BURN * dt;
           audio.current.setThruster(1);
+          
+          // Spawn thruster particles (matching main game)
+          const nozzlePositions = shouldOptimize ? [
+            { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
+          ] : [
+            // Center nozzle
+            { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 },
+            // Left nozzle
+            { x: shipX - Math.sin(shipAngle) * 10 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 + Math.sin(shipAngle) * 3 },
+            // Right nozzle
+            { x: shipX - Math.sin(shipAngle) * 10 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 - Math.sin(shipAngle) * 3 }
+          ];
+          
+          for (const nozzle of nozzlePositions) {
+            const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
+            for (let i = 0; i < particlesPerNozzle; i++) {
+              const angleSpread = shouldOptimize ? 0.6 : 1.6;
+              const pa = shipAngle + (Math.random() - 0.5) * angleSpread + Math.PI;
+              const sp = shouldOptimize ? 
+                (60 + Math.random() * 120) : 
+                (100 + Math.random() * 200);
+              const lifespan = shouldOptimize ? 0.5 : 1.6;
+              
+              thrusterParticles.push({
+                x: nozzle.x,
+                y: nozzle.y,
+                vx: Math.sin(pa) * sp,
+                vy: -Math.cos(pa) * sp,
+                life: 0,
+                max: lifespan,
+                color: neonColor
+              });
+            }
+          }
         } else {
           audio.current.setThruster(0);
         }
         
-        // Physics
-        shipVy += GRAVITY * dt;
-        shipX += shipVx * dt;
-        shipY += shipVy * dt;
+        // Physics integration (matching main game with 60fps scaling)
+        shipVy += GRAVITY * 60 * dt;
+        shipX += shipVx * 60 * dt;
+        shipY += shipVy * 60 * dt;
         shipAngle += shipAngularVel * dt;
-        shipAngularVel *= 0.98;
+        
+        // Angular damping
+        shipAngularVel *= 0.994;
+        if (Math.abs(shipAngularVel) < 0.006) shipAngularVel = 0;
         
         // Update distance (only counts forward progress)
         const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
         currentDistance = newDistance;
         setDistance(currentDistance);
+        
+        // Check if we've cleared a pad after takeoff
+        if (padToClear) {
+          const padY = padToClear.y || padToClear.currentPos?.y;
+          const clearanceGap = 20; // Gap needed to clear the pad
+          if (shipY < padY - clearanceGap) {
+            // Remove the pad from the chunk
+            for (const chunk of chunks) {
+              const padIndex = chunk.pads.indexOf(padToClear);
+              if (padIndex !== -1) {
+                chunk.pads.splice(padIndex, 1);
+                break;
+              }
+              const mpIndex = chunk.movingPads.indexOf(padToClear);
+              if (mpIndex !== -1) {
+                chunk.movingPads.splice(mpIndex, 1);
+                break;
+              }
+            }
+            padToClear = null;
+          }
+        }
         
         // Prevent going too far left
         if (shipX < CHUNK_WIDTH / 2) {
@@ -264,12 +336,14 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             const speed = Math.sqrt(shipVx * shipVx + shipVy * shipVy);
             const angleOk = Math.abs(Math.sin(shipAngle)) < 0.3;
             
-            if (speed < 45 && angleOk && Math.abs(shipVy) < 30) {
+            const safeSpeed = 60; // Matching main game safe landing speed
+            const safeVy = 40; // Matching main game safe vertical speed
+            if (speed < safeSpeed && angleOk && Math.abs(shipVy) < safeVy) {
               // Successful landing!
               isLanded = true;
               landedPad = landingPad;
-              shipY = landingPad.y - 12;
-              shipVy = 0;
+              shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 12;
+              shipVy = movingPad ? (movingPad as MovingPad).currentVelocity.y : 0;
               shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
               shipAngularVel = 0;
               
@@ -288,13 +362,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
               
               audio.current.success();
               
-              // Auto-takeoff after 0.5 seconds
-              setTimeout(() => {
-                if (!isDead) {
-                  isLanded = false;
-                  landedPad = null;
-                }
-              }, 500);
+              // No auto-takeoff - player must thrust to take off
             } else {
               // Crash!
               isDead = true;
@@ -342,7 +410,31 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       } else {
         // Landed - move with pad if it's a moving pad
         if (landedPad && (landedPad as MovingPad).currentVelocity) {
-          shipX += (landedPad as MovingPad).currentVelocity.x * dt;
+          shipX += (landedPad as MovingPad).currentVelocity.x * 60 * dt;
+          shipY = (landedPad as MovingPad).currentPos.y - 12;
+        }
+        
+        // Check for takeoff input
+        if (keys.current.thrust && fuelAmount > 0) {
+          isLanded = false;
+          padToClear = landedPad; // Mark this pad to be removed once cleared
+          landedPad = null;
+          
+          // Small upward impulse to help clear the pad
+          shipVy = -1.5;
+        }
+      }
+      
+      // Update thruster particles
+      for (let i = thrusterParticles.length - 1; i >= 0; i--) {
+        const p = thrusterParticles[i];
+        p.life += dt;
+        if (p.life >= p.max) {
+          thrusterParticles.splice(i, 1);
+        } else {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += GRAVITY * 30 * dt; // Particles affected by gravity
         }
       }
       
@@ -399,6 +491,17 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           ctx.strokeStyle = "#FFC864";
           ctx.strokeRect(mp.currentPos.x - w / 2, mp.currentPos.y - 2, w, 4);
         }
+      }
+      
+      // Draw thruster particles
+      for (const p of thrusterParticles) {
+        const t = p.life / p.max;
+        const alpha = 1 - t;
+        const size = shouldOptimize ? 2 : (3 - t * 2);
+        ctx.fillStyle = `hsla(${styles.getPropertyValue('--neon')}, ${alpha})`;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       }
       
       // Draw ship
