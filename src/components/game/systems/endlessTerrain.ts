@@ -29,6 +29,7 @@ export interface EndlessTerrainConfig {
 export class EndlessTerrainGenerator {
   private config: EndlessTerrainConfig;
   private chunkCounter: number = 0;
+  private lastEndY: number | null = null;
 
   constructor(config: EndlessTerrainConfig) {
     this.config = config;
@@ -51,7 +52,10 @@ export class EndlessTerrainGenerator {
     const amplitude = this.config.amplitude * (1 + difficulty * 0.5);
     const variation = amplitude * (0.3 + difficulty * 0.4);
     
-    let current = this.config.baseHeight + (rand() - 0.5) * amplitude;
+    // Start from the last chunk's end Y to ensure seamless connection
+    let current = this.lastEndY !== null 
+      ? this.lastEndY 
+      : this.config.baseHeight + (rand() - 0.5) * amplitude;
     
     for (let i = 0; i <= segments; i++) {
       const x = startX + i * step;
@@ -162,6 +166,9 @@ export class EndlessTerrainGenerator {
         seed: seed
       });
     }
+    
+    // Store the last Y coordinate for the next chunk
+    this.lastEndY = points[points.length - 1].y;
     
     return {
       startX,

@@ -31,8 +31,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const [altitude, setAltitude] = useState(0);
   const [vx, setVx] = useState(0);
   const [vy, setVy] = useState(0);
-  const [fuel, setFuel] = useState(100);
-  const fuelCap = 100;
+  const [fuel, setFuel] = useState(200);
+  const fuelCap = 200;
   
   const keys = useRef({ left: false, right: false, thrust: false });
   const audio = useRef(new AudioManager());
@@ -111,7 +111,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     let shipVy = 0;
     let shipAngle = 0;
     let shipAngularVel = 0;
-    let fuelAmount = 100;
+    let fuelAmount = 200;
     let currentScore = 0;
     let currentLandings = 0;
     let currentDistance = 0;
@@ -133,11 +133,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     audio.current.stopAllAudio();
     audio.current.playLevelTrackForLevel(0);
     
-    // Physics constants matching main game
+    // Physics constants matching main game (EASY MODE)
     const GRAVITY = 0.02 * 0.75; // 0.015
-    const ROTATION_ACCEL = 2.5 * 1.15; // ~2.875
+    const ROTATION_ACCEL = 2.2 * 1.15; // Easy mode rotation
     const THRUST_ACCEL = 9.8 * 0.7; // 6.86
-    const FUEL_BURN = 25; // fuel units per second at full thrust
+    const FUEL_BURN = 22; // Easy mode fuel consumption
     
     // Performance optimization
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -347,8 +347,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
               shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
               shipAngularVel = 0;
               
-              // Add fuel refill
-              const refillAmount = 30 - (currentDistance / 5000) * 15; // 30 to 15 fuel
+              // Add fuel refill (doubled)
+              const refillAmount = 60 - (currentDistance / 5000) * 30; // 60 to 30 fuel
               fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
               
               // Add score
