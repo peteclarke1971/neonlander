@@ -129,6 +129,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     let cameraX = 0;
     let cameraShake = 0;
     
+    // Camera and zoom system (matching main game)
+    let smoothedAnchor = 0;
+    let camAnchorInit = true;
+    let zoom = 1.0;
+    let clearanceEMA = 220;
+    let prevTargetZoom = 1.0;
+    
     // Start level audio
     audio.current.stopAllAudio();
     audio.current.playLevelTrackForLevel(0);
@@ -335,12 +342,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           const landingPad = pad || movingPad;
           
           if (landingPad) {
-            const speed = Math.sqrt(shipVx * shipVx + shipVy * shipVy);
-            const angleOk = Math.abs(Math.sin(shipAngle)) < 0.3;
+            // Easy mode landing requirements (matching main game)
+            const okAngle = Math.abs(shipAngle) < 0.18; // ~10 degrees
+            const okVy = Math.abs(shipVy) < 1.8;
+            const okVx = Math.abs(shipVx) < 1.5;
             
-            const safeSpeed = 60; // Matching main game safe landing speed
-            const safeVy = 40; // Matching main game safe vertical speed
-            if (speed < safeSpeed && angleOk && Math.abs(shipVy) < safeVy) {
+            if (okAngle && okVy && okVx) {
               // Successful landing!
               isLanded = true;
               landedPad = landingPad;
@@ -442,14 +449,79 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       
       // Update HUD (recalculate terrain height for altitude)
       const currentTerrainY = getHeightAt(shipX);
-      setAltitude(currentTerrainY - shipY);
+      const currentAltitude = currentTerrainY - shipY;
+      setAltitude(currentAltitude);
       setVx(shipVx);
       setVy(shipVy);
       setFuel(fuelAmount);
       
-      // Camera follows ship with smooth motion, keeping ship slightly left of center
+      // Camera follows ship horizontally with smooth motion, keeping ship slightly left of center
       const targetCameraX = shipX - viewWidth * 0.4;
       cameraX += (targetCameraX - cameraX) * dt * 4;
+      
+      // Calculate dynamic zoom based on terrain clearance (matching main game)
+      const alpha = 0.1;
+      clearanceEMA = alpha * currentAltitude + (1 - alpha) * clearanceEMA;
+      const effClr = clearanceEMA;
+      
+      // Zoom range: 1.4x (close to terrain) to 1.0x (far from terrain)
+      const near = 0, far = 420;
+      const tRaw = Math.min(1, Math.max(0, (effClr - near) / (far - near)));
+      const s = tRaw * tRaw * (3 - 2 * tRaw); // Smoothstep
+      let targetZoom = 1.4 * (1 - s) + 1.0 * s;
+      
+      // Check for landing pad proximity enhancement
+      let nearestPadDist = Infinity;
+      for (const chunk of chunks) {
+        for (const pad of chunk.pads) {
+          const padCenterX = (pad.xStart + pad.xEnd) / 2;
+          const dx = Math.abs(shipX - padCenterX);
+          const dy = Math.abs(shipY - pad.y);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          nearestPadDist = Math.min(nearestPadDist, distance);
+        }
+        for (const mp of chunk.movingPads) {
+          const dx = Math.abs(shipX - mp.currentPos.x);
+          const dy = Math.abs(shipY - mp.currentPos.y);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          nearestPadDist = Math.min(nearestPadDist, distance);
+        }
+      }
+      
+      const padDetectionRange = 250;
+      if (nearestPadDist < padDetectionRange) {
+        // Enhanced zoom for landing approach (1.4x to 3.0x)
+        const padProximityRatio = 1 - (nearestPadDist / padDetectionRange);
+        const enhancedZoom = 1.4 + (1.6 * padProximityRatio * padProximityRatio);
+        targetZoom = Math.max(targetZoom, enhancedZoom);
+      }
+      
+      // Apply hysteresis and smooth transitions
+      if (Math.abs(targetZoom - prevTargetZoom) < 0.015) targetZoom = prevTargetZoom;
+      prevTargetZoom = targetZoom;
+      
+      const zoomAlpha = 1 - Math.exp(-dt / 1.6);
+      const desiredDelta = (targetZoom - zoom) * zoomAlpha;
+      const maxRate = 0.28;
+      const maxStep = maxRate * dt;
+      zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
+      
+      // Vertical camera anchor (matching main game)
+      const viewH = c.height / (zoom * dprInit);
+      let groundAtCam = getHeightAt(cameraX);
+      const desiredGroundY = viewH * 0.82; // Target ground position from top in view units
+      const groundAnchor = -groundAtCam + (desiredGroundY - viewH / 2);
+      const desiredLanderY = viewH * 0.45; // Target lander position from top in view units
+      const landerAnchor = -shipY + (desiredLanderY - viewH / 2);
+      const anchorTarget = Math.max(groundAnchor, landerAnchor);
+      
+      if (camAnchorInit) {
+        smoothedAnchor = anchorTarget;
+        camAnchorInit = false;
+      }
+      const aAlpha = 1 - Math.exp(-dt / 0.35);
+      smoothedAnchor += (anchorTarget - smoothedAnchor) * aAlpha;
+      const anchor = smoothedAnchor;
       
       // Render
       ctx.clearRect(0, 0, c.width, c.height);
@@ -458,7 +530,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       
       const shake = cameraShake;
       cameraShake *= 0.9;
-      ctx.translate(-cameraX + shake, 0);
+      
+      // Apply zoom and camera transform (both horizontal and vertical)
+      ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+      ctx.scale(zoom, zoom);
+      ctx.translate(-cameraX + shake, anchor);
       
       // Draw terrain
       ctx.strokeStyle = neonColor;
