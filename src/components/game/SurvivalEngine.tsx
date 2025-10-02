@@ -39,7 +39,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const [fuel, setFuel] = useState(200);
   const fuelCap = 200;
   
-  const keys = useRef({ left: false, right: false, thrust: false });
+  const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
   // Gamepad state
@@ -82,6 +82,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       if (["a", "arrowleft"].includes(k)) keys.current.left = down;
       if (["d", "arrowright"].includes(k)) keys.current.right = down;
       if (["w", "arrowup", " "].includes(k)) keys.current.thrust = down;
+      if (["shift"].includes(k)) keys.current.rotateBoost = down;
       if (down) audio.current.resume();
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
@@ -232,33 +233,105 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     };
     
     // Background satellite spawner - use full canvas dimensions
-    // Explosion helper functions
+    // Spectacular explosion helper functions
     const spawnExplosion = (cx: number, cy: number) => {
-      for (let i = 0; i < 60; i++) {
+      // Primary explosion wave (120-180 fast particles)
+      const primaryCount = 120 + Math.floor(Math.random() * 60);
+      for (let i = 0; i < primaryCount; i++) {
         const a = Math.random() * Math.PI * 2;
-        const s = 120 + Math.random() * 260;
+        const s = 200 + Math.random() * 300; // Much faster
+        const size = 2 + Math.random() * 6;
+        // Mix of colors: cyan, electric blue, white-hot, orange-red
+        const colorChoice = Math.random();
+        let color;
+        if (colorChoice < 0.3) color = `hsla(${180 + Math.random() * 20},100%,${60 + Math.random() * 20}%,1)`; // Cyan/blue
+        else if (colorChoice < 0.5) color = `hsla(0,0%,${90 + Math.random() * 10}%,1)`; // White-hot
+        else if (colorChoice < 0.75) color = `hsla(${20 + Math.random() * 15},100%,${55 + Math.random() * 20}%,1)`; // Orange
+        else color = `hsla(${0 + Math.random() * 10},100%,${50 + Math.random() * 20}%,1)`; // Red
+        
         particles.push({
           x: cx,
           y: cy,
           vx: Math.cos(a) * s,
           vy: Math.sin(a) * s,
           life: 0,
-          max: 0.8 + Math.random() * 0.7,
-          color: `hsla(${180 + Math.random() * 20},100%,60%,1)`,
+          max: 0.5 + Math.random() * 0.7,
+          color,
         });
       }
-      shockwaves.push({ x: cx, y: cy, life: 0, max: 0.7 });
-      flashT = Math.max(flashT, 0.28);
-      cameraShake = Math.max(cameraShake, 30);
+      
+      // Secondary fire/smoke layer (80-120 slower particles) - delayed spawn
+      setTimeout(() => {
+        const secondaryCount = 80 + Math.floor(Math.random() * 40);
+        for (let i = 0; i < secondaryCount; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 60 + Math.random() * 90; // Slower
+          const colorChoice = Math.random();
+          let color;
+          if (colorChoice < 0.4) color = `hsla(${30 + Math.random() * 15},100%,${50 + Math.random() * 10}%,1)`; // Orange
+          else if (colorChoice < 0.7) color = `hsla(${0 + Math.random() * 10},100%,${45 + Math.random() * 15}%,1)`; // Red
+          else color = `hsla(${50 + Math.random() * 10},100%,${60 + Math.random() * 10}%,1)`; // Yellow
+          
+          particles.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(a) * s,
+            vy: Math.sin(a) * s,
+            life: 0,
+            max: 1.5 + Math.random() * 1.3, // Longer lifespan
+            color,
+          });
+        }
+      }, 100);
+      
+      // Spark system (40-60 tiny bright sparks)
+      const sparkCount = 40 + Math.floor(Math.random() * 20);
+      for (let i = 0; i < sparkCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 300 + Math.random() * 300; // Very fast
+        particles.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: 0,
+          max: 0.3 + Math.random() * 0.3, // Short lived
+          color: Math.random() < 0.5 ? `hsla(0,0%,100%,1)` : `hsla(${55},100%,80%,1)`, // White or yellow
+        });
+      }
+      
+      // Enhanced shockwaves (3-4 concentric rings)
+      const ringCount = 3 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < ringCount; i++) {
+        shockwaves.push({ 
+          x: cx, 
+          y: cy, 
+          life: i * 0.05, // Slight delay between rings
+          max: 0.7 + i * 0.15 
+        });
+      }
+      
+      // Enhanced screen effects
+      flashT = Math.max(flashT, 0.45 + Math.random() * 0.15); // 0.45-0.6s flash
+      cameraShake = Math.max(cameraShake, 42 + Math.random() * 14); // 42-56 units shake
     };
 
     const spawnDebris = (cx: number, cy: number, cvx: number, cvy: number) => {
-      const pieceCount = 42 + Math.floor(Math.random() * 28);
+      // Enhanced debris system (80-120 pieces)
+      const pieceCount = 80 + Math.floor(Math.random() * 40);
       for (let i = 0; i < pieceCount; i++) {
         const dir = Math.random() * Math.PI * 2;
         const speed = 220 + Math.random() * 320;
-        const kind: Debris["kind"] = Math.random() < 0.45 ? "plate" : Math.random() < 0.75 ? "rod" : "chip";
-        const size = kind === "rod" ? 2 + Math.random() * 3 : kind === "plate" ? 3 + Math.random() * 7 : 1.5 + Math.random() * 3;
+        // More debris types
+        const rand = Math.random();
+        let kind: Debris["kind"];
+        if (rand < 0.35) kind = "plate";
+        else if (rand < 0.65) kind = "rod";
+        else kind = "chip";
+        
+        const size = kind === "rod" ? 2 + Math.random() * 4 : 
+                     kind === "plate" ? 3 + Math.random() * 8 : 
+                     1.5 + Math.random() * 3.5;
         const upwardBoost = Math.random() < 0.5 ? -(120 + Math.random() * 260) : 0;
         debris.push({
           x: cx,
@@ -266,7 +339,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           vx: Math.cos(dir) * speed + cvx * 0.5,
           vy: Math.sin(dir) * speed + cvy * 0.5 + upwardBoost,
           angle: Math.random() * Math.PI * 2,
-          av: (-3 + Math.random() * 6) * (kind === "rod" ? 2.2 : 1.2),
+          av: (-3 + Math.random() * 6) * (kind === "rod" ? 2.5 : 1.4),
           life: 0,
           max: 3.2 + Math.random() * 5.5,
           size: size,
@@ -423,11 +496,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         gamepadRef.current = gp;
         const input = readGamepad(gp, profileRef.current);
         
-        // Update rotation boost (matches main game)
-        const isRotating = input.buttons.rotateLeft || input.buttons.rotateRight || Math.abs(input.rotation) > 0.05;
+        // Update rotation boost (matches main game) - only when boost button held
+        const gpRotateBoost = input.rotateBoost || false;
         rotBoostActive.current = updateRotationModifier(
           rotBoostActive.current,
-          isRotating,
+          gpRotateBoost,
           dt * 1000,
           rotModConfig
         );
@@ -467,12 +540,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
-      // Keyboard rotation boost (matches gamepad boost)
-      const isKeyRotating = keys.current.left || keys.current.right;
+      // Keyboard rotation boost (matches gamepad boost) - only when boost key held
+      const keyRotateBoost = keys.current.rotateBoost;
       if (!isLanded) {
         rotBoostActive.current = updateRotationModifier(
           rotBoostActive.current,
-          isKeyRotating,
+          keyRotateBoost,
           dt * 1000,
           rotModConfig
         );
@@ -609,7 +682,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             spawnExplosion(shipX, shipY);
             spawnDebris(shipX, shipY, shipVx, shipVy);
             audio.current.explosion();
-            if (anyGamepad()) vibrate(300, 1.0);
+            if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
             setTimeout(() => {
               onGameOver({
                 cause: "crash",
@@ -618,7 +691,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                 score: currentScore,
                 landings: currentLandings
               });
-            }, 1800);
+            }, 2500); // Longer delay to enjoy explosion
           }
         }
         
@@ -671,7 +744,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
               audio.current.explosion();
-              if (anyGamepad()) vibrate(300, 1.0);
+              if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
                   cause: "crash",
@@ -680,7 +753,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                   score: currentScore,
                   landings: currentLandings
                 });
-              }, 1800);
+              }, 2500); // Longer delay to enjoy explosion
             }
           } else {
             // Hit terrain - crash!
@@ -688,7 +761,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             spawnExplosion(shipX, shipY);
             spawnDebris(shipX, shipY, shipVx, shipVy);
             audio.current.explosion();
-            if (anyGamepad()) vibrate(300, 1.0);
+            if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
             setTimeout(() => {
               onGameOver({
                 cause: "crash",
@@ -697,7 +770,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                 score: currentScore,
                 landings: currentLandings
               });
-            }, 1800);
+            }, 2500); // Longer delay to enjoy explosion
           }
         }
         
@@ -1031,16 +1104,40 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       }
       
-      // Draw shockwaves
+      // Draw enhanced shockwaves (multiple concentric rings with gradient)
       for (const sw of shockwaves) {
         const progress = sw.life / sw.max;
-        const radius = progress * 150;
-        ctx.globalAlpha = 1 - progress;
-        ctx.strokeStyle = neonColor;
-        ctx.lineWidth = 4;
+        const maxRadius = 150 + (sw.life * 50); // Larger expanding radius (up to 200)
+        const radius = progress * maxRadius;
+        const alpha = (1 - progress) * 0.9;
+        
+        // Draw multiple rings with different colors
+        ctx.globalAlpha = alpha;
+        
+        // Outer ring (cyan)
+        ctx.strokeStyle = `hsla(180, 100%, 60%, ${alpha})`;
+        ctx.lineWidth = 3 + progress * 2;
         ctx.beginPath();
         ctx.arc(sw.x, sw.y, radius, 0, Math.PI * 2);
         ctx.stroke();
+        
+        // Inner ring (blue-white)
+        if (progress < 0.7) {
+          ctx.strokeStyle = `hsla(200, 100%, 80%, ${alpha * 1.2})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(sw.x, sw.y, radius * 0.7, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        
+        // Core flash
+        if (progress < 0.3) {
+          ctx.strokeStyle = `hsla(0, 0%, 100%, ${alpha * 1.5})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(sw.x, sw.y, radius * 0.4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
       ctx.globalAlpha = 1;
 
@@ -1075,18 +1172,32 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.restore();
       }
 
-      // Draw explosion particles
+      // Draw explosion particles with enhanced visuals
       for (const p of particles) {
         const alpha = 1 - p.life / p.max;
-        ctx.globalAlpha = alpha;
+        const size = 2 + (1 - alpha) * 2; // Particles shrink as they fade
+        
+        // Draw particle trail
+        ctx.globalAlpha = alpha * 0.7;
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = Math.max(1, size);
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+        ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04);
         ctx.stroke();
+        
+        // Draw particle core (brighter)
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
       
       // Draw ship
       ctx.save();
@@ -1116,6 +1227,34 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       ctx.restore();
       
       ctx.restore();
+      
+      // Draw screen flash effect (white → orange → red gradient fade)
+      if (flashT > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        const flashProgress = 1 - (flashT / 0.6); // Normalize to 0-1
+        let flashColor;
+        let flashAlpha;
+        
+        if (flashProgress < 0.15) {
+          // Initial bright white flash
+          flashColor = 'rgba(255, 255, 255, ';
+          flashAlpha = (1 - flashProgress / 0.15) * 0.9;
+        } else if (flashProgress < 0.4) {
+          // Orange transition
+          flashColor = 'rgba(255, 180, 100, ';
+          flashAlpha = (1 - (flashProgress - 0.15) / 0.25) * 0.6;
+        } else {
+          // Red fade out
+          flashColor = 'rgba(255, 100, 80, ';
+          flashAlpha = (1 - (flashProgress - 0.4) / 0.6) * 0.4;
+        }
+        
+        ctx.fillStyle = flashColor + flashAlpha + ')';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.restore();
+      }
     };
     
     raf = requestAnimationFrame(loop);
