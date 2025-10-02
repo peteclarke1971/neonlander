@@ -239,7 +239,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       const primaryCount = 120 + Math.floor(Math.random() * 60);
       for (let i = 0; i < primaryCount; i++) {
         const a = Math.random() * Math.PI * 2;
-        const s = 200 + Math.random() * 300; // Much faster
+        const s = 600 + Math.random() * 600; // 3x faster for dramatic expansion
         const size = 2 + Math.random() * 6;
         // Mix of colors: cyan, electric blue, white-hot, orange-red
         const colorChoice = Math.random();
@@ -255,7 +255,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           vx: Math.cos(a) * s,
           vy: Math.sin(a) * s,
           life: 0,
-          max: 0.5 + Math.random() * 0.7,
+          max: 1.5 + Math.random() * 1.0, // 2x longer lifetime
           color,
         });
       }
@@ -265,7 +265,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         const secondaryCount = 80 + Math.floor(Math.random() * 40);
         for (let i = 0; i < secondaryCount; i++) {
           const a = Math.random() * Math.PI * 2;
-          const s = 60 + Math.random() * 90; // Slower
+          const s = 180 + Math.random() * 220; // 2.5x faster
           const colorChoice = Math.random();
           let color;
           if (colorChoice < 0.4) color = `hsla(${30 + Math.random() * 15},100%,${50 + Math.random() * 10}%,1)`; // Orange
@@ -278,7 +278,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             vx: Math.cos(a) * s,
             vy: Math.sin(a) * s,
             life: 0,
-            max: 1.5 + Math.random() * 1.3, // Longer lifespan
+            max: 2.5 + Math.random() * 1.5, // Longer lifespan
             color,
           });
         }
@@ -288,14 +288,14 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       const sparkCount = 40 + Math.floor(Math.random() * 20);
       for (let i = 0; i < sparkCount; i++) {
         const a = Math.random() * Math.PI * 2;
-        const s = 300 + Math.random() * 300; // Very fast
+        const s = 800 + Math.random() * 600; // Much faster for dramatic streaks
         particles.push({
           x: cx,
           y: cy,
           vx: Math.cos(a) * s,
           vy: Math.sin(a) * s,
           life: 0,
-          max: 0.3 + Math.random() * 0.3, // Short lived
+          max: 0.8 + Math.random() * 0.4, // Longer trails
           color: Math.random() < 0.5 ? `hsla(0,0%,100%,1)` : `hsla(${55},100%,80%,1)`, // White or yellow
         });
       }
