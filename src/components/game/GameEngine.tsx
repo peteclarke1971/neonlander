@@ -781,7 +781,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         frameCount = 0;
         lastFpsUpdate = now;
       }
-      if (paused || !running) {
+      if (paused) {
         render();
         return;
       }
@@ -935,7 +935,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
       // Prevent thrust input during countdown intro
       let thrust = 0;
-      if (!worldPausedRef.current && !playerLockedRef.current) {
+      if (running && !worldPausedRef.current && !playerLockedRef.current) {
         thrust = Math.max(
           gpThrust,
           thrustAnalog.current,
@@ -943,7 +943,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         );
       }
       // Start timer on first significant movement after GO (timer not yet active)
-      if (!timerActiveRef.current && !worldPausedRef.current) {
+      if (running && !timerActiveRef.current && !worldPausedRef.current) {
         const hasMovement = Math.abs(vx) > 0.15 || Math.abs(vy) > 0.15;
         const thrustStarted = thrust > 0.05;
         
@@ -958,7 +958,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
 
-      if (thrust > 0) {
+      if (running && thrust > 0) {
         if (fuel > 0) {
           // Lift-off assist: when first thrusting from a static start-pad rest in caverns
           if (isCavernLevel) {
@@ -1039,25 +1039,27 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         rotModConfig
       );
       
-      if (keys.current.left || gpLeft) av -= modifiedRotAccel * dt;
-      if (keys.current.right || gpRight) av += modifiedRotAccel * dt;
-      
-      // Apply max angular velocity cap
-      av = Math.max(-maxAngularVel, Math.min(maxAngularVel, av));
-      if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight) {
-        if (rotFriction) {
-          // friction towards zero (easy)
-          av *= 0.9;
-          if (Math.abs(av) < 0.02) av = 0;
-        } else {
-          // slight damping in hard to aid recovery without removing free-spin feel
-          av *= 0.994; // nudged up from 0.992: slightly trickier than now, still easier than original
-          if (Math.abs(av) < 0.006) av = 0;
+      if (running) {
+        if (keys.current.left || gpLeft) av -= modifiedRotAccel * dt;
+        if (keys.current.right || gpRight) av += modifiedRotAccel * dt;
+        
+        // Apply max angular velocity cap
+        av = Math.max(-maxAngularVel, Math.min(maxAngularVel, av));
+        if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight) {
+          if (rotFriction) {
+            // friction towards zero (easy)
+            av *= 0.9;
+            if (Math.abs(av) < 0.02) av = 0;
+          } else {
+            // slight damping in hard to aid recovery without removing free-spin feel
+            av *= 0.994; // nudged up from 0.992: slightly trickier than now, still easier than original
+            if (Math.abs(av) < 0.006) av = 0;
+          }
         }
       }
 
       // Abort assist: latch until stabilized, then auto-disengage (but not during countdown)
-      if ((keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
+      if (running && (keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
         // Upright and hover assist
         angle = 0; av = 0; // recenter rotation
         const THRUST_ACCEL = 9.8;
@@ -1077,51 +1079,53 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         }
       }
 
-      angle += av * dt;
+      if (running) {
+        angle += av * dt;
 
-      // Skip all physics during countdown intro
-      if (worldPausedRef.current || playerLockedRef.current) {
-        // Keep lander stationary during countdown
-        vx = 0;
-        vy = 0;
-        av = 0;
-      } else {
-        // Physics integration - only if not resting on start pad
-        const onStartPad = isCavernLevel &&
-          Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15 && 
-          Math.abs(y - (terrain as CavernData).startPad.y + 14) < 2 &&
-          x >= (terrain as CavernData).startPad.xStart && 
-          x <= (terrain as CavernData).startPad.xEnd &&
-          !(keys.current.thrust || thrustAnalog.current > 0.05);
-
-      if (!onStartPad) {
-        // Apply gravity only when not resting on start pad
-        vy += gravity * 60 * dt;
-        
-        // Apply anomaly acceleration (gravity wells) if not disabled
-        if (!anomaliesDisabled && anomalies.length > 0) {
-          const { ax, ay } = anomalyAccelAt(anomalies, x, y, elapsed);
-          vx += ax * dt;
-          vy += ay * dt;
-        }
-        
-        // Air resistance
-        const drag = 0.998;
-        vx *= Math.pow(drag, dt * 60);
-        vy *= Math.pow(drag, dt * 60);
-
-        // Update position
-        x = wrapX(x + vx * dt * 60);
-        y += vy * dt * 60;
-      } else {
-          // Keep lander perfectly still on start pad
+        // Skip all physics during countdown intro
+        if (worldPausedRef.current || playerLockedRef.current) {
+          // Keep lander stationary during countdown
           vx = 0;
           vy = 0;
+          av = 0;
+        } else {
+          // Physics integration - only if not resting on start pad
+          const onStartPad = isCavernLevel &&
+            Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15 && 
+            Math.abs(y - (terrain as CavernData).startPad.y + 14) < 2 &&
+            x >= (terrain as CavernData).startPad.xStart && 
+            x <= (terrain as CavernData).startPad.xEnd &&
+            !(keys.current.thrust || thrustAnalog.current > 0.05);
+
+        if (!onStartPad) {
+          // Apply gravity only when not resting on start pad
+          vy += gravity * 60 * dt;
+          
+          // Apply anomaly acceleration (gravity wells) if not disabled
+          if (!anomaliesDisabled && anomalies.length > 0) {
+            const { ax, ay } = anomalyAccelAt(anomalies, x, y, elapsed);
+            vx += ax * dt;
+            vy += ay * dt;
+          }
+          
+          // Air resistance
+          const drag = 0.998;
+          vx *= Math.pow(drag, dt * 60);
+          vy *= Math.pow(drag, dt * 60);
+
+          // Update position
+          x = wrapX(x + vx * dt * 60);
+          y += vy * dt * 60;
+        } else {
+            // Keep lander perfectly still on start pad
+            vx = 0;
+            vy = 0;
+          }
         }
       }
 
       // Update moving hazards in non-cavern levels with performance optimization
-      if (!isCavernLevel) { 
+      if (running && !isCavernLevel) { 
         // Only update hazards that are near the camera
         const viewWidth = c.width / dprInit;
         const nearbyHazards = hazards.filter(h => {
@@ -1133,20 +1137,22 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Update moving pads
-      const terrainData = terrain as TerrainData;
-      if (terrainData.movingPads) {
-        for (const movingPad of terrainData.movingPads) {
-          movingPadSystem.updateMovingPad(movingPad, dt);
-        }
-        const mp = terrainData.movingPads[0];
-        if (mp && !loggedMovingPadStart && mp.phase === "moving" && (Math.abs(mp.currentVelocity.x) + Math.abs(mp.currentVelocity.y)) > 0.1) {
-          console.log("[MovingPad] Movement started", { pos: mp.currentPos, vel: mp.currentVelocity, speed: mp.speed });
-        loggedMovingPadStart = true;
+      if (running) {
+        const terrainData = terrain as TerrainData;
+        if (terrainData.movingPads) {
+          for (const movingPad of terrainData.movingPads) {
+            movingPadSystem.updateMovingPad(movingPad, dt);
+          }
+          const mp = terrainData.movingPads[0];
+          if (mp && !loggedMovingPadStart && mp.phase === "moving" && (Math.abs(mp.currentVelocity.x) + Math.abs(mp.currentVelocity.y)) > 0.1) {
+            console.log("[MovingPad] Movement started", { pos: mp.currentPos, vel: mp.currentVelocity, speed: mp.speed });
+          loggedMovingPadStart = true;
+          }
         }
       }
       
       // Update volcanoes with performance optimization
-      if (!isCavernLevel) {
+      if (running && !isCavernLevel) {
         const terrainData = terrain as TerrainData;
         if (terrainData.volcanoes && terrainData.volcanoes.length > 0) {
           const viewWidth = c.width / dprInit;
@@ -1165,7 +1171,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           // Update volcano particles state with new particles
           setVolcanoParticles([...volcanoParticles]);
         }
-      } else {
+      } else if (running) {
         const cavernData = terrain as CavernData;
         if (cavernData.volcanoes && cavernData.volcanoes.length > 0) {
           const cfg = getCavernVolcanoConfigForLevel(level);
@@ -1215,7 +1221,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Hazard collisions (airborne)
-      if (!crashed && checkHazardCollision(hazards, x, y, 10)) {
+      if (running && !crashed && checkHazardCollision(hazards, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1231,7 +1237,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Volcano particle collisions (airborne)
-      if (!crashed && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
+      if (running && !crashed && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1247,7 +1253,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Check collectible pickups
-      if (collectiblesRef.current && !crashed) {
+      if (running && collectiblesRef.current && !crashed) {
         for (const junk of collectiblesRef.current.spaceJunk) {
           if (checkJunkPickup({ x, y }, 16, junk)) {
             const result = collectJunk(collectiblesRef.current, junk.id);
@@ -1289,108 +1295,210 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
 
       // Collision check against terrain or cavern
-      let collisionDetected = false;
-      
-      if (isCavernLevel) {
-        // Cavern collision using custom collision detection
-        const cavernData = terrain as CavernData;
-        collisionDetected = cavernData.checkCollision(x, y, 8);
-      } else {
-        // Normal terrain collision
-        const ground = terrain.getHeightAt(x);
-        const foot = y + 8; // lander foot approximation
-        collisionDetected = foot >= ground;
-      }
-      
-      if (collisionDetected) {
-        const pad = terrain.getPadAt(x);
-        let nearPad: Pad | null = null;
+      if (running) {
+        let collisionDetected = false;
         
-        // Check for moving pad collision first
-        let movingPadLanding: MovingPad | null = null;
-        const terrainData = terrain as TerrainData;
-        if (terrainData.movingPads && terrainData.getMovingPadAt) {
-          movingPadLanding = terrainData.getMovingPadAt(x, y, level);
-        }
-        if (!isCavernLevel) {
-          const t = terrain as TerrainData;
-          const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
-          for (const p of t.pads) {
-            const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
-            const margin = Math.max(4, Math.min(10, w * 0.2));
-            let dist = 0;
-            if (p.xStart <= p.xEnd) {
-              if (xx < p.xStart) dist = p.xStart - xx;
-              else if (xx > p.xEnd) dist = xx - p.xEnd;
-              else dist = 0;
-            } else {
-              const inLeft = xx >= p.xStart;
-              const inRight = xx <= p.xEnd;
-              if (inLeft || inRight) dist = 0;
-              else {
-                const toStart = (p.xStart - xx + t.worldWidth) % t.worldWidth;
-                const toEnd = (xx - p.xEnd + t.worldWidth) % t.worldWidth;
-                dist = Math.min(toStart, toEnd);
-              }
-            }
-            if (dist <= margin) { nearPad = p; break; }
-          }
-        }
-        const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
-        
-        // For moving pads, use relative velocity with lenient horizontal thresholds
-        let okVy: boolean, okVx: boolean;
-        if (movingPadLanding) {
-          const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, movingPadLanding);
-          // Base vertical threshold
-          let vyThresh = (difficulty === "easy" ? 2.0 : 1.5);
-          
-          // Progressive level-based forgiveness after level 5
-          if (level > 5) {
-            const levelForgiveness = (level - 5) * 0.15;
-            vyThresh += levelForgiveness;
-          }
-          
-          // Enhanced forgiveness for fast moving pads
-          const pWidth = movingPadLanding.width ?? 32;
-          const centerDist = Math.abs(x - movingPadLanding.currentPos.x);
-          const nearCenter = centerDist <= pWidth * 0.5; // Expanded from 40% to 50%
-          const baseSpeed = movingPadLanding.baseSpeed ?? movingPadLanding.speed;
-          const isVeryFast = movingPadLanding.speed >= 2 * baseSpeed; // Lowered from 3x to 2x
-          if (isVeryFast && nearCenter && okAngle) {
-            vyThresh *= 1.6; // Increased from 1.35x to 1.6x forgiveness
-          }
-          
-          okVy = Math.abs(relativeVel.y) < vyThresh;
-          okVx = Math.abs(relativeVel.x) < 25.0; // Increased from 20.0 to 25.0 for moving pads
-        } else {
-          okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
-          okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
-        }
-
         if (isCavernLevel) {
-           const cav = terrain as CavernData;
-            // Allow settling on the start pad without completing the mission
-            if (pad === cav.startPad && okAngle && okVy && okVx) {
-              // Gentle landing on start pad - rest slightly higher for clean lift-off
-              if (vy > 0.05) { // Only stop if actually descending
-                y = pad.y - 14;
-                vy = 0; 
-                // Do not lock vx, av, or angle — allow immediate takeoff with light thrust
+          // Cavern collision using custom collision detection
+          const cavernData = terrain as CavernData;
+          collisionDetected = cavernData.checkCollision(x, y, 8);
+        } else {
+          // Normal terrain collision
+          const ground = terrain.getHeightAt(x);
+          const foot = y + 8; // lander foot approximation
+          collisionDetected = foot >= ground;
+        }
+        
+        if (collisionDetected) {
+          const pad = terrain.getPadAt(x);
+          let nearPad: Pad | null = null;
+          
+          // Check for moving pad collision first
+          let movingPadLanding: MovingPad | null = null;
+          const terrainData = terrain as TerrainData;
+          if (terrainData.movingPads && terrainData.getMovingPadAt) {
+            movingPadLanding = terrainData.getMovingPadAt(x, y, level);
+          }
+          if (!isCavernLevel) {
+            const t = terrain as TerrainData;
+            const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
+            for (const p of t.pads) {
+              const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
+              const margin = Math.max(4, Math.min(10, w * 0.2));
+              let dist = 0;
+              if (p.xStart <= p.xEnd) {
+                if (xx < p.xStart) dist = p.xStart - xx;
+                else if (xx > p.xEnd) dist = xx - p.xEnd;
+                else dist = 0;
+              } else {
+                const inLeft = xx >= p.xStart;
+                const inRight = xx <= p.xEnd;
+                if (inLeft || inRight) dist = 0;
+                else {
+                  const toStart = (p.xStart - xx + t.worldWidth) % t.worldWidth;
+                  const toEnd = (xx - p.xEnd + t.worldWidth) % t.worldWidth;
+                  dist = Math.min(toStart, toEnd);
+                }
               }
-              // Do NOT end the run here; simply rest on the start pad
-          } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
-            // successful landing ONLY on cavern end pad
-            y = pad.y - 10;
+              if (dist <= margin) { nearPad = p; break; }
+            }
+          }
+          const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
+          
+          // For moving pads, use relative velocity with lenient horizontal thresholds
+          let okVy: boolean, okVx: boolean;
+          if (movingPadLanding) {
+            const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, movingPadLanding);
+            // Base vertical threshold
+            let vyThresh = (difficulty === "easy" ? 2.0 : 1.5);
+            
+            // Progressive level-based forgiveness after level 5
+            if (level > 5) {
+              const levelForgiveness = (level - 5) * 0.15;
+              vyThresh += levelForgiveness;
+            }
+            
+            // Enhanced forgiveness for fast moving pads
+            const pWidth = movingPadLanding.width ?? 32;
+            const centerDist = Math.abs(x - movingPadLanding.currentPos.x);
+            const nearCenter = centerDist <= pWidth * 0.5; // Expanded from 40% to 50%
+            const baseSpeed = movingPadLanding.baseSpeed ?? movingPadLanding.speed;
+            const isVeryFast = movingPadLanding.speed >= 2 * baseSpeed; // Lowered from 3x to 2x
+            if (isVeryFast && nearCenter && okAngle) {
+              vyThresh *= 1.6; // Increased from 1.35x to 1.6x forgiveness
+            }
+            
+            okVy = Math.abs(relativeVel.y) < vyThresh;
+            okVx = Math.abs(relativeVel.x) < 25.0; // Increased from 20.0 to 25.0 for moving pads
+          } else {
+            okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
+            okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
+          }
+
+          if (isCavernLevel) {
+             const cav = terrain as CavernData;
+              // Allow settling on the start pad without completing the mission
+              if (pad === cav.startPad && okAngle && okVy && okVx) {
+                // Gentle landing on start pad - rest slightly higher for clean lift-off
+                if (vy > 0.05) { // Only stop if actually descending
+                  y = pad.y - 14;
+                  vy = 0; 
+                  // Do not lock vx, av, or angle — allow immediate takeoff with light thrust
+                }
+                // Do NOT end the run here; simply rest on the start pad
+            } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
+              // successful landing ONLY on cavern end pad
+              y = pad.y - 10;
+              vy = 0; vx = 0; av = 0; angle = 0;
+              const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
+              let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
+              const applied2x = !!pad.bonus2x;
+              if (applied2x) earned *= 2;
+              const pWidth = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+              const pCenter = (pad.xEnd >= pad.xStart)
+                ? (pad.xStart + pad.xEnd) / 2
+                : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
+              let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
+              const bullseye = Math.abs(dx) <= pWidth * 0.03;
+              if (bullseye) { earned += 500; bullseyeT = 0; }
+              const speedBonus = elapsed < 10;
+              if (speedBonus) { earned += 500; }
+              score += earned;
+              landings += 1;
+              setCurrentLandings(landings);
+              
+              // Save landing bonus information for cavern landing
+              setLastLandingBonuses({
+                bullseye,
+                speedBonus,
+                padBonus2x: applied2x,
+                lastEarned: earned
+              });
+              
+              cameraShake = 6;
+              audio.current.success();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+              if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
+              running = false;
+               setTimeout(() => {
+                 // For cavern mode, don't check ghost beating (ghosts are only in fixed mode)
+                 const padType = applied2x ? '2x' : 'regular';
+                 setLandingType(padType);
+                 setShowFireworks(true);
+               }, 500);
+            } else {
+              // crash on cavern walls/floor or invalid landing
+              running = false;
+              crashed = true;
+              spawnExplosion();
+              spawnDebris();
+              audio.current.explosion();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+              cameraShake = 24;
+              if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+              }, 700);
+            }
+          } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
+            // MEGA! Moving pad landing
+            const landedPad = movingPadLanding;
+            y = landedPad.currentPos.y - 8;
+            vy = landedPad.currentVelocity.y; 
+            vx = landedPad.currentVelocity.x; 
+            av = 0; angle = 0;
+            
+            // Calculate relative velocity for finesse bonus
+            const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, landedPad);
+            const finesse = Math.floor(200 * (1 - Math.max(Math.abs(relativeVel.x), Math.abs(relativeVel.y)) / 2));
+            let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
+            
+            // Apply MEGA multiplier!
+            earned = Math.floor(earned * landedPad.scoreMult);
+            
+            const pWidth = landedPad.width ?? 32;
+            const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
+            if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); bullseyeT = 0; }
+            const speedBonus = elapsed < 10;
+            if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
+            
+            score += earned;
+            landings += 1;
+            setCurrentLandings(landings);
+            
+            // Save landing bonus information for moving pad landing
+            setLastLandingBonuses({
+              bullseye,
+              speedBonus,
+              padBonus2x: false, // Moving pads don't have 2x bonus
+              lastEarned: earned
+            });
+            
+            cameraShake = 8; // Extra camera shake for MEGA landing
+            audio.current.success();
+            audio.current.stopThruster();
+            try { audio.current.stopFuelAlarm(); } catch {}
+            if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
+            running = false;
+            setTimeout(() => {
+              setLandingType('moving');
+              setShowFireworks(true);
+            }, 500);
+          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
+            // successful landing - end run (non-cavern levels)
+            const landedPad = (pad || nearPad)!;
+            y = landedPad.y - 8;
             vy = 0; vx = 0; av = 0; angle = 0;
             const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
-            let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
-            const applied2x = !!pad.bonus2x;
+            let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
+            const applied2x = !!landedPad.bonus2x;
             if (applied2x) earned *= 2;
-            const pWidth = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-            const pCenter = (pad.xEnd >= pad.xStart)
-              ? (pad.xStart + pad.xEnd) / 2
-              : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
+            const pWidth = landedPad.width ?? (landedPad.xEnd >= landedPad.xStart ? (landedPad.xEnd - landedPad.xStart) : (terrain.worldWidth - landedPad.xStart + landedPad.xEnd));
+            const pCenter = (landedPad.xEnd >= landedPad.xStart)
+              ? (landedPad.xStart + landedPad.xEnd) / 2
+              : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
             let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
             const bullseye = Math.abs(dx) <= pWidth * 0.03;
             if (bullseye) { earned += 500; bullseyeT = 0; }
@@ -1400,7 +1508,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             landings += 1;
             setCurrentLandings(landings);
             
-            // Save landing bonus information for cavern landing
+            // Save landing bonus information for game over screen
             setLastLandingBonuses({
               bullseye,
               speedBonus,
@@ -1414,14 +1522,18 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             try { audio.current.stopFuelAlarm(); } catch {}
             if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
             running = false;
-             setTimeout(() => {
-               // For cavern mode, don't check ghost beating (ghosts are only in fixed mode)
-               const padType = applied2x ? '2x' : 'regular';
-               setLandingType(padType);
-               setShowFireworks(true);
-             }, 500);
+            setTimeout(() => {
+              // Ghost-beating check: get the current best time and compare
+              const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
+              const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
+              
+              const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
+              
+              setLandingType(padType);
+              setShowFireworks(true);
+            }, 500);
           } else {
-            // crash on cavern walls/floor or invalid landing
+            // crash
             running = false;
             crashed = true;
             spawnExplosion();
@@ -1435,110 +1547,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
             }, 700);
           }
-        } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
-          // MEGA! Moving pad landing
-          const landedPad = movingPadLanding;
-          y = landedPad.currentPos.y - 8;
-          vy = landedPad.currentVelocity.y; 
-          vx = landedPad.currentVelocity.x; 
-          av = 0; angle = 0;
-          
-          // Calculate relative velocity for finesse bonus
-          const relativeVel = movingPadSystem.getRelativeVelocity(vx, vy, landedPad);
-          const finesse = Math.floor(200 * (1 - Math.max(Math.abs(relativeVel.x), Math.abs(relativeVel.y)) / 2));
-          let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
-          
-          // Apply MEGA multiplier!
-          earned = Math.floor(earned * landedPad.scoreMult);
-          
-          const pWidth = landedPad.width ?? 32;
-          const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
-          if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); bullseyeT = 0; }
-          const speedBonus = elapsed < 10;
-          if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
-          
-          score += earned;
-          landings += 1;
-          setCurrentLandings(landings);
-          
-          // Save landing bonus information for moving pad landing
-          setLastLandingBonuses({
-            bullseye,
-            speedBonus,
-            padBonus2x: false, // Moving pads don't have 2x bonus
-            lastEarned: earned
-          });
-          
-          cameraShake = 8; // Extra camera shake for MEGA landing
-          audio.current.success();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
-          if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
-          running = false;
-          setTimeout(() => {
-            setLandingType('moving');
-            setShowFireworks(true);
-          }, 500);
-        } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
-          // successful landing - end run (non-cavern levels)
-          const landedPad = (pad || nearPad)!;
-          y = landedPad.y - 8;
-          vy = 0; vx = 0; av = 0; angle = 0;
-          const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
-          let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
-          const applied2x = !!landedPad.bonus2x;
-          if (applied2x) earned *= 2;
-          const pWidth = landedPad.width ?? (landedPad.xEnd >= landedPad.xStart ? (landedPad.xEnd - landedPad.xStart) : (terrain.worldWidth - landedPad.xStart + landedPad.xEnd));
-          const pCenter = (landedPad.xEnd >= landedPad.xStart)
-            ? (landedPad.xStart + landedPad.xEnd) / 2
-            : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
-          let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
-          const bullseye = Math.abs(dx) <= pWidth * 0.03;
-          if (bullseye) { earned += 500; bullseyeT = 0; }
-          const speedBonus = elapsed < 10;
-          if (speedBonus) { earned += 500; }
-          score += earned;
-          landings += 1;
-          setCurrentLandings(landings);
-          
-          // Save landing bonus information for game over screen
-          setLastLandingBonuses({
-            bullseye,
-            speedBonus,
-            padBonus2x: applied2x,
-            lastEarned: earned
-          });
-          
-          cameraShake = 6;
-          audio.current.success();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
-          if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
-          running = false;
-          setTimeout(() => {
-            // Ghost-beating check: get the current best time and compare
-            const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
-            const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
-            
-            const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
-            
-            setLandingType(padType);
-            setShowFireworks(true);
-          }, 500);
-        } else {
-          // crash
-          running = false;
-          crashed = true;
-          spawnExplosion();
-          spawnDebris();
-          audio.current.explosion();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
-          cameraShake = 24;
-          if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-          setTimeout(() => {
-            onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
-          }, 700);
         }
       }
 
