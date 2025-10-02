@@ -807,18 +807,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
-      // Update explosion particles (no gravity - let them expand freely!)
+      // Update explosion particles (matching working Asteroids physics)
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        
-        // Time-based damping: lose 30% speed over the particle's lifetime
-        const dampenFactor = Math.pow(0.7, dt / p.max); // Exponential decay, frame-independent
-        p.vx *= dampenFactor;
-        p.vy *= dampenFactor;
-        
+        p.vy += 200 * dt; // Gravity (same as working Asteroids)
         if (p.life >= p.max) particles.splice(i, 1);
       }
 
