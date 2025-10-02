@@ -126,6 +126,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const thrusterParticles: ThrusterParticle[] = [];
     
+    // Starfield system (matching main game) - arrays declared here, initialized later
+    type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
+    type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
+    type BgSat = { x: number; y: number; vx: number; vy: number; life: number; max: number; scale: number; rot: number; rotV: number };
+    const stars: Star[] = [];
+    const shooting: Shooting[] = [];
+    const bgSats: BgSat[] = [];
+    let nextShooting = 0.6 + Math.random() * 1.6;
+    let nextBgSat = 5 + Math.random() * 7;
+    
     // Camera
     let cameraX = 0;
     let cameraShake = 0;
@@ -155,6 +165,67 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     const dprInit = Math.min(2, window.devicePixelRatio || 1);
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
+    
+    // Initialize starfield (screen-space stars)
+    const STAR_COUNT = shouldOptimize ? 150 : 320;
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const sx = Math.random() * getViewWidth();
+      const sy = Math.random() * getViewHeight();
+      const bright = Math.random() < 0.15;
+      stars.push({ 
+        x: sx, 
+        y: sy, 
+        size: bright ? 2.4 : 1.4, 
+        baseA: bright ? 0.95 : 0.6, 
+        tw: 0.5 + Math.random() * 1.5, 
+        ph: Math.random() * Math.PI * 2, 
+        bright 
+      });
+    }
+    
+    // Shooting star spawner
+    const spawnShooting = () => {
+      const margin = 80;
+      const viewWpx = getViewWidth();
+      const viewHpx = getViewHeight();
+      let sx = 0, sy = 0, vx = 0, vy = 0;
+      const side = Math.floor(Math.random() * 3);
+      if (side === 0) {
+        sx = -margin; sy = Math.random() * (viewHpx * 0.7);
+        vx = 180 + Math.random() * 260; vy = (Math.random() - 0.5) * 140;
+      } else if (side === 1) {
+        sx = viewWpx + margin; sy = Math.random() * (viewHpx * 0.7);
+        vx = -180 - Math.random() * 260; vy = (Math.random() - 0.5) * 140;
+      } else {
+        sx = Math.random() * viewWpx; sy = -margin;
+        vx = (Math.random() - 0.5) * 280; vy = 160 + Math.random() * 220;
+      }
+      shooting.push({ x: sx, y: sy, vx, vy, life: 0, max: 0.6 + Math.random() * 1.0 });
+    };
+    
+    // Background satellite spawner
+    const spawnBgSat = () => {
+      const viewWpx = getViewWidth();
+      const viewHpx = getViewHeight();
+      const scale = 0.25;
+      const speed = 40 + Math.random() * 60;
+      const fromLeft = Math.random() < 0.5;
+      const sx = fromLeft ? -120 : viewWpx + 120;
+      const vx = fromLeft ? speed : -speed;
+      const sy = viewHpx * 0.28 + Math.random() * (viewHpx * 0.34);
+      const vy = (Math.random() - 0.5) * speed * 0.25;
+      bgSats.push({ 
+        x: sx, 
+        y: sy, 
+        vx, 
+        vy, 
+        life: 0, 
+        max: 9 + Math.random() * 8, 
+        scale, 
+        rot: Math.random() * Math.PI * 2, 
+        rotV: -0.8 + Math.random() * 1.6 
+      });
+    };
     
     const getHeightAt = (x: number): number => {
       // Find the chunk this x belongs to
@@ -218,8 +289,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
         
-        // Remove old chunks that are far behind
-        if (chunks.length > 5) {
+        // Remove old chunks that are far behind (keep more chunks for smooth disappearing)
+        if (chunks.length > 8) {
           chunks.shift();
         }
       }
@@ -435,6 +506,41 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
+      // Update starfield (shooting stars and satellites)
+      if (currentTime >= nextShooting) {
+        spawnShooting();
+        nextShooting = currentTime + (0.6 + Math.random() * 1.6);
+      }
+      if (currentTime >= nextBgSat) {
+        spawnBgSat();
+        nextBgSat = currentTime + (5 + Math.random() * 7);
+      }
+      
+      // Update shooting stars
+      for (let i = shooting.length - 1; i >= 0; i--) {
+        const s = shooting[i];
+        s.life += dt;
+        if (s.life >= s.max) {
+          shooting.splice(i, 1);
+        } else {
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+        }
+      }
+      
+      // Update background satellites
+      for (let i = bgSats.length - 1; i >= 0; i--) {
+        const s = bgSats[i];
+        s.life += dt;
+        if (s.life >= s.max) {
+          bgSats.splice(i, 1);
+        } else {
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.rot += s.rotV * dt;
+        }
+      }
+      
       // Update HUD (recalculate terrain height for altitude)
       const currentTerrainY = getHeightAt(shipX);
       const currentAltitude = currentTerrainY - shipY;
@@ -521,6 +627,71 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       const shake = cameraShake;
       cameraShake *= 0.9;
       
+      // Draw starfield with terrain masking (before world transform)
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      
+      // Create terrain clipping path to mask stars behind terrain
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(c.width, 0);
+      const segs = 96;
+      for (let i = segs; i >= 0; i--) {
+        const sx = (i / segs) * c.width;
+        const worldX = cameraX + (sx - c.width / 2) / zoom;
+        const worldY = getHeightAt(worldX);
+        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit;
+        ctx.lineTo(sx, sy);
+      }
+      ctx.closePath();
+      ctx.clip();
+      
+      // Draw stars
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = shouldOptimize ? 2 : 4;
+      ctx.fillStyle = neonColor;
+      const starLimit = shouldOptimize ? Math.min(100, stars.length) : stars.length;
+      for (let i = 0; i < starLimit; i++) {
+        const s = stars[i];
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+      }
+      ctx.globalAlpha = 1;
+      
+      // Draw shooting stars
+      for (const sh of shooting) {
+        const t = 1 - Math.min(1, sh.life / sh.max);
+        ctx.globalAlpha = t;
+        ctx.beginPath();
+        ctx.moveTo(sh.x, sh.y);
+        ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = neonColor;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      
+      // Draw background satellites
+      for (const s of bgSats) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.rot);
+        ctx.scale(s.scale, s.scale);
+        ctx.strokeStyle = neonColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(-6, -2, 12, 4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(-16, -3, 8, 6);
+        ctx.rect(8, -3, 8, 6);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      
       // Apply zoom and camera transform (both horizontal and vertical)
       ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
       ctx.scale(zoom, zoom);
@@ -533,7 +704,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       ctx.lineWidth = 2;
       
       for (const chunk of chunks) {
-        if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX) continue;
+        // Improved culling: keep terrain visible for half a screen width after passing
+        if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
         
         ctx.beginPath();
         for (let i = 0; i < chunk.points.length; i++) {
