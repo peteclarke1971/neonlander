@@ -46,6 +46,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const gamepadRef = useRef<Gamepad | null>(null);
   const profileRef = useRef(loadProfile(getLastDeviceId()));
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
+  const rotBoostActive = useRef(0);
   
   // Detect touch-capable devices
   useEffect(() => {
@@ -185,7 +186,6 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     
     // Rotation modifier system (matching main game)
     const rotModConfig: RotationModConfig = DEFAULT_ROTATION_MOD_CONFIG;
-    const rotBoostActive = useRef(0);
     
     // Performance optimization
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
