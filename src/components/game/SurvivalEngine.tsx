@@ -423,7 +423,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         lastFpsUpdate = now;
       }
       
-      if (paused || isDead) return;
+      if (paused) return;
       
       // Frame rate limiting with clamped dt (matching main game)
       let dt = (now - lastTime) / 1000;
@@ -483,263 +483,206 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         allVolcanoParticles = volcanoUpdate.newParticles;
       }
       
-      // Gamepad input with hot-swap detection
-      const gp = anyGamepad();
-      if (gp) {
-        // Handle gamepad hot-swap
-        if (gpDeviceIdRef.current !== gp.id) {
-          gpDeviceIdRef.current = gp.id;
-          setLastDeviceId(gp.id);
-          profileRef.current = loadProfile(gp.id);
+      // Ship input and rotation (only when alive)
+      if (!isDead) {
+        // Gamepad input with hot-swap detection
+        const gp = anyGamepad();
+        if (gp) {
+          // Handle gamepad hot-swap
+          if (gpDeviceIdRef.current !== gp.id) {
+            gpDeviceIdRef.current = gp.id;
+            setLastDeviceId(gp.id);
+            profileRef.current = loadProfile(gp.id);
+          }
+          
+          gamepadRef.current = gp;
+          const input = readGamepad(gp, profileRef.current);
+          
+          // Update rotation boost (matches main game) - only when boost button held
+          const gpRotateBoost = input.rotateBoost || false;
+          rotBoostActive.current = updateRotationModifier(
+            rotBoostActive.current,
+            gpRotateBoost,
+            dt * 1000,
+            rotModConfig
+          );
+          
+          // Apply rotation modifier to get boosted rotation
+          const { angularAccel: modifiedRotAccel } = applyRotationModifier(
+            ROTATION_ACCEL,
+            8.0, // base max angular velocity
+            rotBoostActive.current,
+            rotModConfig
+          );
+          
+          // Analog rotation (left stick X-axis)
+          if (Math.abs(input.rotation) > 0.05) {
+            shipAngularVel += input.rotation * modifiedRotAccel * dt * 1.2;
+          }
+          
+          // Digital rotation (shoulder buttons)
+          if (input.buttons.rotateLeft) {
+            shipAngularVel -= modifiedRotAccel * dt;
+          }
+          if (input.buttons.rotateRight) {
+            shipAngularVel += modifiedRotAccel * dt;
+          }
+          
+          // Apply thrust from gamepad
+          if (input.thrust > 0.1 && fuelAmount > 0) {
+            keys.current.thrust = true;
+            vibrate(50, input.thrust * 0.15, input.thrust * 0.3);
+          } else {
+            keys.current.thrust = false;
+          }
+          
+          // Pause button
+          if (input.buttons.pause && !paused) {
+            setPaused(true);
+          }
         }
         
-        gamepadRef.current = gp;
-        const input = readGamepad(gp, profileRef.current);
-        
-        // Update rotation boost (matches main game) - only when boost button held
-        const gpRotateBoost = input.rotateBoost || false;
-        rotBoostActive.current = updateRotationModifier(
-          rotBoostActive.current,
-          gpRotateBoost,
-          dt * 1000,
-          rotModConfig
-        );
-        
-        // Apply rotation modifier to get boosted rotation
-        const { angularAccel: modifiedRotAccel } = applyRotationModifier(
-          ROTATION_ACCEL,
-          8.0, // base max angular velocity
-          rotBoostActive.current,
-          rotModConfig
-        );
-        
-        // Analog rotation (left stick X-axis)
-        if (Math.abs(input.rotation) > 0.05) {
-          shipAngularVel += input.rotation * modifiedRotAccel * dt * 1.2;
-        }
-        
-        // Digital rotation (shoulder buttons)
-        if (input.buttons.rotateLeft) {
-          shipAngularVel -= modifiedRotAccel * dt;
-        }
-        if (input.buttons.rotateRight) {
-          shipAngularVel += modifiedRotAccel * dt;
-        }
-        
-        // Apply thrust from gamepad
-        if (input.thrust > 0.1 && fuelAmount > 0) {
-          keys.current.thrust = true;
-          vibrate(50, input.thrust * 0.15, input.thrust * 0.3);
-        } else {
-          keys.current.thrust = false;
-        }
-        
-        // Pause button
-        if (input.buttons.pause && !paused) {
-          setPaused(true);
-        }
-      }
-      
-      // Keyboard rotation boost (matches gamepad boost) - only when boost key held
-      const keyRotateBoost = keys.current.rotateBoost;
-      if (!isLanded) {
-        rotBoostActive.current = updateRotationModifier(
-          rotBoostActive.current,
-          keyRotateBoost,
-          dt * 1000,
-          rotModConfig
-        );
-        
-        // Apply rotation modifier for keyboard
-        const { angularAccel: modifiedRotAccel } = applyRotationModifier(
-          ROTATION_ACCEL,
-          8.0,
-          rotBoostActive.current,
-          rotModConfig
-        );
-        
-        // Keyboard rotation controls
-        if (keys.current.left) {
-          shipAngularVel -= modifiedRotAccel * dt;
-        }
-        if (keys.current.right) {
-          shipAngularVel += modifiedRotAccel * dt;
-        }
-      }
-      
-      // Thrust controls (works both landed and in-flight to allow takeoff)
-      if (keys.current.thrust && fuelAmount > 0) {
-        // Only apply thrust physics when not landed
+        // Keyboard rotation boost (matches gamepad boost) - only when boost key held
+        const keyRotateBoost = keys.current.rotateBoost;
         if (!isLanded) {
-          const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
-          const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL;
-          shipVx += thrustX * dt;
-          shipVy += thrustY * dt;
-          fuelAmount -= FUEL_BURN * dt;
-          audio.current.setThruster(1);
+          rotBoostActive.current = updateRotationModifier(
+            rotBoostActive.current,
+            keyRotateBoost,
+            dt * 1000,
+            rotModConfig
+          );
           
-          // Spawn thruster particles (matching main game)
-          const nozzlePositions = shouldOptimize ? [
-            { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
-          ] : [
-            // Center nozzle
-            { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 },
-            // Left nozzle
-            { x: shipX - Math.sin(shipAngle) * 10 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 + Math.sin(shipAngle) * 3 },
-            // Right nozzle
-            { x: shipX - Math.sin(shipAngle) * 10 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 - Math.sin(shipAngle) * 3 }
-          ];
+          // Apply rotation modifier for keyboard
+          const { angularAccel: modifiedRotAccel } = applyRotationModifier(
+            ROTATION_ACCEL,
+            8.0,
+            rotBoostActive.current,
+            rotModConfig
+          );
           
-          for (const nozzle of nozzlePositions) {
-            const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
-            for (let i = 0; i < particlesPerNozzle; i++) {
-              const angleSpread = shouldOptimize ? 0.6 : 1.6;
-              const pa = shipAngle + (Math.random() - 0.5) * angleSpread + Math.PI;
-              const sp = shouldOptimize ? 
-                (60 + Math.random() * 120) : 
-                (100 + Math.random() * 200);
-              const lifespan = shouldOptimize ? 0.5 : 1.6;
-              
-              thrusterParticles.push({
-                x: nozzle.x,
-                y: nozzle.y,
-                vx: Math.sin(pa) * sp,
-                vy: -Math.cos(pa) * sp,
-                life: 0,
-                max: lifespan,
-                color: neonColor
-              });
-            }
+          // Keyboard rotation controls
+          if (keys.current.left) {
+            shipAngularVel -= modifiedRotAccel * dt;
+          }
+          if (keys.current.right) {
+            shipAngularVel += modifiedRotAccel * dt;
           }
         }
-        // Play thruster audio regardless of landed state
-        audio.current.setThruster(1);
-      } else {
-        audio.current.setThruster(0);
       }
       
-      // Physics (only when not landed)
-      if (!isLanded) {
-        // Apply anomaly forces
-        let anomalyAx = 0;
-        let anomalyAy = 0;
-        if (allAnomalies.length > 0) {
-          const anomalyForce = anomalyAccelAt(allAnomalies, shipX, shipY, currentTime);
-          anomalyAx = anomalyForce.ax;
-          anomalyAy = anomalyForce.ay;
-        }
-        
-        // Physics integration (matching main game with 60fps scaling)
-        shipVy += (GRAVITY + anomalyAy) * 60 * dt;
-        shipVx += anomalyAx * 60 * dt;
-        shipX += shipVx * 60 * dt;
-        shipY += shipVy * 60 * dt;
-        shipAngle += shipAngularVel * dt;
-        
-        // Angular friction (easy mode - only when no rotation input)
-        if (!keys.current.left && !keys.current.right) {
-          shipAngularVel *= 0.9;
-          if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
-        }
-        
-        // Update distance (only counts forward progress)
-        const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
-        currentDistance = newDistance;
-        setDistance(currentDistance);
-        
-        // Check if we've cleared a pad after takeoff
-        if (padToClear) {
-          const padY = padToClear.y || padToClear.currentPos?.y;
-          const clearanceGap = 20; // Gap needed to clear the pad
-          if (shipY < padY - clearanceGap) {
-            // Remove the pad from the chunk
-            for (const chunk of chunks) {
-              const padIndex = chunk.pads.indexOf(padToClear);
-              if (padIndex !== -1) {
-                chunk.pads.splice(padIndex, 1);
-                break;
-              }
-              const mpIndex = chunk.movingPads.indexOf(padToClear);
-              if (mpIndex !== -1) {
-                chunk.movingPads.splice(mpIndex, 1);
-                break;
+      // Thrust controls and physics (only when alive)
+      if (!isDead) {
+        // Thrust controls (works both landed and in-flight to allow takeoff)
+        if (keys.current.thrust && fuelAmount > 0) {
+          // Only apply thrust physics when not landed
+          if (!isLanded) {
+            const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
+            const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL;
+            shipVx += thrustX * dt;
+            shipVy += thrustY * dt;
+            fuelAmount -= FUEL_BURN * dt;
+            audio.current.setThruster(1);
+            
+            // Spawn thruster particles (matching main game)
+            const nozzlePositions = shouldOptimize ? [
+              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
+            ] : [
+              // Center nozzle
+              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 },
+              // Left nozzle
+              { x: shipX - Math.sin(shipAngle) * 10 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 + Math.sin(shipAngle) * 3 },
+              // Right nozzle
+              { x: shipX - Math.sin(shipAngle) * 10 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 - Math.sin(shipAngle) * 3 }
+            ];
+            
+            for (const nozzle of nozzlePositions) {
+              const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
+              for (let i = 0; i < particlesPerNozzle; i++) {
+                const angleSpread = shouldOptimize ? 0.6 : 1.6;
+                const pa = shipAngle + (Math.random() - 0.5) * angleSpread + Math.PI;
+                const sp = shouldOptimize ? 
+                  (60 + Math.random() * 120) : 
+                  (100 + Math.random() * 200);
+                const lifespan = shouldOptimize ? 0.5 : 1.6;
+                
+                thrusterParticles.push({
+                  x: nozzle.x,
+                  y: nozzle.y,
+                  vx: Math.sin(pa) * sp,
+                  vy: -Math.cos(pa) * sp,
+                  life: 0,
+                  max: lifespan,
+                  color: neonColor
+                });
               }
             }
-            padToClear = null;
           }
+          // Play thruster audio regardless of landed state
+          audio.current.setThruster(1);
+        } else {
+          audio.current.setThruster(0);
         }
         
-        // Prevent going too far left
-        if (shipX < CHUNK_WIDTH / 2) {
-          shipX = CHUNK_WIDTH / 2;
-          shipVx = Math.max(0, shipVx);
-        }
-        
-        // Check volcano particle collisions
-        if (allVolcanoParticles.length > 0) {
-          if (checkVolcanoParticleCollision(allVolcanoParticles, shipX, shipY, 8)) {
-            isDead = true;
-            spawnExplosion(shipX, shipY);
-            spawnDebris(shipX, shipY, shipVx, shipVy);
-            audio.current.explosion();
-            if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
-            setTimeout(() => {
-              onGameOver({
-                cause: "crash",
-                distance: currentDistance,
-                time: currentTime,
-                score: currentScore,
-                landings: currentLandings
-              });
-            }, 2500); // Longer delay to enjoy explosion
+        // Physics (only when not landed)
+        if (!isLanded) {
+          // Apply anomaly forces
+          let anomalyAx = 0;
+          let anomalyAy = 0;
+          if (allAnomalies.length > 0) {
+            const anomalyForce = anomalyAccelAt(allAnomalies, shipX, shipY, currentTime);
+            anomalyAx = anomalyForce.ax;
+            anomalyAy = anomalyForce.ay;
           }
-        }
-        
-        // Collision detection
-        let terrainY = getHeightAt(shipX);
-        const shipBottom = shipY + 12;
-        
-        if (shipBottom >= terrainY) {
-          // Check for pad landing
-          const pad = getPadAt(shipX, shipY);
-          const movingPad = getMovingPadAt(shipX, shipY);
-          const landingPad = pad || movingPad;
           
-          if (landingPad) {
-            // Easy mode landing requirements (matching main game)
-            const okAngle = Math.abs(shipAngle) < 0.18; // ~10 degrees
-            const okVy = Math.abs(shipVy) < 1.8;
-            const okVx = Math.abs(shipVx) < 1.5;
-            
-            if (okAngle && okVy && okVx) {
-              // Successful landing!
-              isLanded = true;
-              landedPad = landingPad;
-              shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 12;
-              shipVy = movingPad ? (movingPad as MovingPad).currentVelocity.y : 0;
-              shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
-              shipAngularVel = 0;
-              
-              // Add fuel refill (doubled)
-              const refillAmount = 60 - (currentDistance / 5000) * 30; // 60 to 30 fuel
-              fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
-              
-              // Add score only if player has moved from start
-              if (hasMovedFromStart) {
-                const landingScore = 1000 * (landingPad.multiplier || 1);
-                currentScore += landingScore;
-                currentLandings++;
-                
-                setScore(currentScore);
-                setLandings(currentLandings);
+          // Physics integration (matching main game with 60fps scaling)
+          shipVy += (GRAVITY + anomalyAy) * 60 * dt;
+          shipVx += anomalyAx * 60 * dt;
+          shipX += shipVx * 60 * dt;
+          shipY += shipVy * 60 * dt;
+          shipAngle += shipAngularVel * dt;
+          
+          // Angular friction (easy mode - only when no rotation input)
+          if (!keys.current.left && !keys.current.right) {
+            shipAngularVel *= 0.9;
+            if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
+          }
+          
+          // Update distance (only counts forward progress)
+          const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
+          currentDistance = newDistance;
+          setDistance(currentDistance);
+          
+          // Check if we've cleared a pad after takeoff
+          if (padToClear) {
+            const padY = padToClear.y || padToClear.currentPos?.y;
+            const clearanceGap = 20; // Gap needed to clear the pad
+            if (shipY < padY - clearanceGap) {
+              // Remove the pad from the chunk
+              for (const chunk of chunks) {
+                const padIndex = chunk.pads.indexOf(padToClear);
+                if (padIndex !== -1) {
+                  chunk.pads.splice(padIndex, 1);
+                  break;
+                }
+                const mpIndex = chunk.movingPads.indexOf(padToClear);
+                if (mpIndex !== -1) {
+                  chunk.movingPads.splice(mpIndex, 1);
+                  break;
+                }
               }
-              setFuel(fuelAmount);
-              
-              audio.current.success();
-              
-              // No auto-takeoff - player must thrust to take off
-            } else {
-              // Crash!
+              padToClear = null;
+            }
+          }
+          
+          // Prevent going too far left
+          if (shipX < CHUNK_WIDTH / 2) {
+            shipX = CHUNK_WIDTH / 2;
+            shipVx = Math.max(0, shipVx);
+          }
+          
+          // Check volcano particle collisions
+          if (allVolcanoParticles.length > 0) {
+            if (checkVolcanoParticleCollision(allVolcanoParticles, shipX, shipY, 8)) {
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
@@ -755,42 +698,105 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                 });
               }, 2500); // Longer delay to enjoy explosion
             }
-          } else {
-            // Hit terrain - crash!
-            isDead = true;
-            spawnExplosion(shipX, shipY);
-            spawnDebris(shipX, shipY, shipVx, shipVy);
-            audio.current.explosion();
-            if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
-            setTimeout(() => {
-              onGameOver({
-                cause: "crash",
-                distance: currentDistance,
-                time: currentTime,
-                score: currentScore,
-                landings: currentLandings
-              });
-            }, 2500); // Longer delay to enjoy explosion
           }
-        }
-        
-        // Fuel depletion - ship continues with trajectory until crash
-      } else {
-        // Landed - move with pad if it's a moving pad
-        if (landedPad && (landedPad as MovingPad).currentVelocity) {
-          shipX += (landedPad as MovingPad).currentVelocity.x * 60 * dt;
-          shipY = (landedPad as MovingPad).currentPos.y - 12;
-        }
-        
-        // Check for takeoff input
-        if (keys.current.thrust && fuelAmount > 0) {
-          isLanded = false;
-          hasMovedFromStart = true; // Mark that player has taken off
-          padToClear = landedPad; // Mark this pad to be removed once cleared
-          landedPad = null;
           
-          // Small upward impulse to help clear the pad
-          shipVy = -1.5;
+          // Collision detection
+          let terrainY = getHeightAt(shipX);
+          const shipBottom = shipY + 12;
+          
+          if (shipBottom >= terrainY) {
+            // Check for pad landing
+            const pad = getPadAt(shipX, shipY);
+            const movingPad = getMovingPadAt(shipX, shipY);
+            const landingPad = pad || movingPad;
+            
+            if (landingPad) {
+              // Easy mode landing requirements (matching main game)
+              const okAngle = Math.abs(shipAngle) < 0.18; // ~10 degrees
+              const okVy = Math.abs(shipVy) < 1.8;
+              const okVx = Math.abs(shipVx) < 1.5;
+              
+              if (okAngle && okVy && okVx) {
+                // Successful landing!
+                isLanded = true;
+                landedPad = landingPad;
+                shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 12;
+                shipVy = movingPad ? (movingPad as MovingPad).currentVelocity.y : 0;
+                shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
+                shipAngularVel = 0;
+                
+                // Add fuel refill (doubled)
+                const refillAmount = 60 - (currentDistance / 5000) * 30; // 60 to 30 fuel
+                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                
+                // Add score only if player has moved from start
+                if (hasMovedFromStart) {
+                  const landingScore = 1000 * (landingPad.multiplier || 1);
+                  currentScore += landingScore;
+                  currentLandings++;
+                  
+                  setScore(currentScore);
+                  setLandings(currentLandings);
+                }
+                setFuel(fuelAmount);
+                
+                audio.current.success();
+                
+                // No auto-takeoff - player must thrust to take off
+              } else {
+                // Crash!
+                isDead = true;
+                spawnExplosion(shipX, shipY);
+                spawnDebris(shipX, shipY, shipVx, shipVy);
+                audio.current.explosion();
+                if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
+                setTimeout(() => {
+                  onGameOver({
+                    cause: "crash",
+                    distance: currentDistance,
+                    time: currentTime,
+                    score: currentScore,
+                    landings: currentLandings
+                  });
+                }, 2500); // Longer delay to enjoy explosion
+              }
+            } else {
+              // Hit terrain - crash!
+              isDead = true;
+              spawnExplosion(shipX, shipY);
+              spawnDebris(shipX, shipY, shipVx, shipVy);
+              audio.current.explosion();
+              if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
+              setTimeout(() => {
+                onGameOver({
+                  cause: "crash",
+                  distance: currentDistance,
+                  time: currentTime,
+                  score: currentScore,
+                  landings: currentLandings
+                });
+              }, 2500); // Longer delay to enjoy explosion
+            }
+          }
+          
+          // Fuel depletion - ship continues with trajectory until crash
+        } else {
+          // Landed - move with pad if it's a moving pad
+          if (landedPad && (landedPad as MovingPad).currentVelocity) {
+            shipX += (landedPad as MovingPad).currentVelocity.x * 60 * dt;
+            shipY = (landedPad as MovingPad).currentPos.y - 12;
+          }
+          
+          // Check for takeoff input
+          if (keys.current.thrust && fuelAmount > 0) {
+            isLanded = false;
+            hasMovedFromStart = true; // Mark that player has taken off
+            padToClear = landedPad; // Mark this pad to be removed once cleared
+            landedPad = null;
+            
+            // Small upward impulse to help clear the pad
+            shipVy = -1.5;
+          }
         }
       }
       
