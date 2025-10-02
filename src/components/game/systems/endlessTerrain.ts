@@ -1,4 +1,5 @@
 import { Pad, MovingPad } from "../types";
+import { movingPadSystem } from "./movingPads";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -140,39 +141,38 @@ export class EndlessTerrainGenerator {
       pads[minIdx].bonus2x = true;
     }
     
-    // Generate moving pads at higher difficulty
+    // Generate moving pads at higher difficulty using advanced system
     const movingPads: MovingPad[] = [];
     
     if (difficulty > 0.3 && rand() > 0.6) {
-      const centerIdx = Math.floor(rand() * (segments - 10)) + 5;
-      const padX = startX + centerIdx * step;
-      const padY = points[centerIdx].y - 100;
+      // Helper to get height at x within this chunk
+      const getHeightAt = (x: number) => {
+        if (x < startX || x > endX) return this.config.baseHeight;
+        const localX = x - startX;
+        const idx = Math.floor(localX / step);
+        if (idx >= 0 && idx < points.length - 1) {
+          const t = (localX - idx * step) / step;
+          return points[idx].y * (1 - t) + points[idx + 1].y * t;
+        }
+        return points[Math.max(0, Math.min(idx, points.length - 1))].y;
+      };
       
-      const width = 35 - difficulty * 10; // 35 to 25
-      const speed = 60 + difficulty * 80; // 60 to 140
+      // Generate moving pad using advanced system
+      const level = Math.floor(difficulty * 10) + 1; // Convert difficulty to level (1-10)
+      const movingPad = movingPadSystem.generateMovingPad(
+        seed,
+        level,
+        "easy",
+        this.config.chunkWidth,
+        600, // worldHeight
+        getHeightAt,
+        pads,
+        false // isCavern
+      );
       
-      movingPads.push({
-        xStart: padX - width / 2,
-        xEnd: padX + width / 2,
-        y: padY,
-        multiplier: 3,
-        width,
-        bonus2x: false,
-        motion: "shuttle",
-        pos0: { x: padX - 60, y: padY },
-        pos1: { x: padX + 60, y: padY },
-        speed,
-        dwell: 0.5,
-        currentPos: { x: padX - 60, y: padY },
-        currentVelocity: { x: 0, y: 0 },
-        phase: "dwelling",
-        phaseTimer: 0,
-        direction: 1,
-        scoreMult: 2.0,
-        enabledInCaverns: false,
-        zIndex: 1,
-        seed: seed
-      });
+      if (movingPad) {
+        movingPads.push(movingPad);
+      }
     }
     
     // Store the last Y coordinate for the next chunk

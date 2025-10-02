@@ -104,9 +104,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       chunks.push(terrainGen.generateChunk(0));
     }
     
-    // Physics state
-    let shipX = CHUNK_WIDTH / 2;
-    let shipY = 200;
+    // Place ship on first landing pad
+    const firstPad = chunks[0].pads[0];
+    let shipX = firstPad ? (firstPad.xStart + firstPad.xEnd) / 2 : CHUNK_WIDTH / 2;
+    let shipY = firstPad ? firstPad.y - 16 : 200;
     let shipVx = 0;
     let shipVy = 0;
     let shipAngle = 0;
