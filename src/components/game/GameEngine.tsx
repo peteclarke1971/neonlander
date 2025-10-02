@@ -1664,11 +1664,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         
-        // Variable damping - less for newer particles (more realistic physics)
-        const ageRatio = p.life / p.max;
-        const dampening = shouldOptimizePerformance ? 0.98 : (0.96 + ageRatio * 0.04); // 0.96 to 1.0 based on age
-        p.vx *= dampening; 
-        p.vy *= dampening;
+        // Time-based damping: lose 30% speed over the particle's lifetime
+        const dampenFactor = Math.pow(0.7, dt / p.max); // Exponential decay, frame-independent
+        p.vx *= dampenFactor;
+        p.vy *= dampenFactor;
         
         if (p.life > p.max) {
           particlePool.release(p);
