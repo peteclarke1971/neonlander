@@ -40,7 +40,7 @@ export class EndlessTerrainGenerator {
     this.config = config;
   }
 
-  generateChunk(difficulty: number): TerrainChunk {
+  generateChunk(difficulty: number, isFirstChunk = false): TerrainChunk {
     const seed = this.config.seed + this.chunkCounter * 9973;
     const rand = mulberry32(seed);
     const startX = this.chunkCounter * this.config.chunkWidth;
@@ -137,7 +137,34 @@ export class EndlessTerrainGenerator {
     
     // Generate pads with varied sizes
     const pads: Pad[] = [];
-    const padCount = Math.max(2, Math.floor(3 - difficulty)); // 2-3 pads per chunk
+    
+    // Force a large, flat starting pad for the first chunk
+    if (isFirstChunk) {
+      const centerIdx = Math.floor(segments / 2);
+      const startPadWidth = 120; // Large starting pad
+      const startPadY = this.config.baseHeight - 50; // Safe starting height
+      
+      // Flatten a large area for the starting pad
+      const flattenRadius = Math.round((startPadWidth / step) * 1.5);
+      for (let j = -flattenRadius; j <= flattenRadius; j++) {
+        const idx = centerIdx + j;
+        if (idx >= 0 && idx <= segments) {
+          points[idx].y = startPadY;
+        }
+      }
+      
+      const padX = startX + centerIdx * step;
+      pads.push({
+        xStart: padX - startPadWidth / 2,
+        xEnd: padX + startPadWidth / 2,
+        y: startPadY,
+        multiplier: 1, // No bonus on starting pad
+        width: startPadWidth,
+        bonus2x: false
+      });
+    }
+    
+    const padCount = isFirstChunk ? 1 : Math.max(2, Math.floor(3 - difficulty)); // 2-3 pads per chunk
     
     // Define 3 distinct size categories
     const padSizes = [
@@ -146,7 +173,7 @@ export class EndlessTerrainGenerator {
       { min: 80, max: 170, multiplier: 2 }  // Large
     ];
     
-    for (let i = 0; i < padCount; i++) {
+    for (let i = (isFirstChunk ? 1 : 0); i < padCount; i++) {
       const centerIdx = Math.floor(rand() * (segments - 6)) + 3;
       const padX = startX + centerIdx * step;
       

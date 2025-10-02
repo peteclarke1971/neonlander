@@ -106,16 +106,17 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       seed
     });
     
-    // Generate initial chunks
+    // Generate initial chunks - first chunk is special starting chunk
     const chunks: TerrainChunk[] = [];
-    for (let i = 0; i < 3; i++) {
+    chunks.push(terrainGen.generateChunk(0, true)); // First chunk with guaranteed starting pad
+    for (let i = 1; i < 3; i++) {
       chunks.push(terrainGen.generateChunk(0));
     }
     
-    // Place ship on first landing pad
+    // Place ship on first landing pad (guaranteed to exist and be suitable)
     const firstPad = chunks[0].pads[0];
-    let shipX = firstPad ? (firstPad.xStart + firstPad.xEnd) / 2 : CHUNK_WIDTH / 2;
-    let shipY = firstPad ? firstPad.y - 16 : 200;
+    let shipX = (firstPad.xStart + firstPad.xEnd) / 2;
+    let shipY = firstPad.y - 12; // Position exactly on the pad
     let shipVx = 0;
     let shipVy = 0;
     let shipAngle = 0;
@@ -126,9 +127,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     let currentDistance = 0;
     let currentTime = 0;
     let isDead = false;
-    let isLanded = false;
-    let landedPad: any = null;
+    let isLanded = true; // Start landed on the pad
+    let landedPad: any = firstPad; // Track starting pad
     let padToClear: any = null; // Track pad to remove after clearing
+    let hasMovedFromStart = false; // Prevent scoring on starting pad
     
     // Thruster particles
     type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
@@ -535,13 +537,15 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
               const refillAmount = 60 - (currentDistance / 5000) * 30; // 60 to 30 fuel
               fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
               
-              // Add score
-              const landingScore = 1000 * (landingPad.multiplier || 1);
-              currentScore += landingScore;
-              currentLandings++;
-              
-              setScore(currentScore);
-              setLandings(currentLandings);
+              // Add score only if player has moved from start
+              if (hasMovedFromStart) {
+                const landingScore = 1000 * (landingPad.multiplier || 1);
+                currentScore += landingScore;
+                currentLandings++;
+                
+                setScore(currentScore);
+                setLandings(currentLandings);
+              }
               setFuel(fuelAmount);
               
               audio.current.success();
@@ -588,6 +592,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         // Check for takeoff input
         if (keys.current.thrust && fuelAmount > 0) {
           isLanded = false;
+          hasMovedFromStart = true; // Mark that player has taken off
           padToClear = landedPad; // Mark this pad to be removed once cleared
           landedPad = null;
           
@@ -738,12 +743,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(c.width, 0);
-      const segs = 96;
+      const segs = 220; // Increased resolution for accurate clipping
+      const terrainBuffer = 8 * dprInit; // Buffer below terrain line to prevent stars showing through
       for (let i = segs; i >= 0; i--) {
         const sx = (i / segs) * c.width;
         const worldX = cameraX + (sx - c.width / 2) / zoom;
         const worldY = getHeightAt(worldX);
-        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit;
+        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer;
         ctx.lineTo(sx, sy);
       }
       ctx.closePath();
