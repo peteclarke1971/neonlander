@@ -403,20 +403,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           }
         }
         
-        // Out of fuel check
-        terrainY = getHeightAt(shipX); // Recalculate for fuel check
-        if (fuelAmount <= 0 && shipBottom >= terrainY - 50) {
-          isDead = true;
-          setTimeout(() => {
-            onGameOver({
-              cause: "fuel",
-              distance: currentDistance,
-              time: currentTime,
-              score: currentScore,
-              landings: currentLandings
-            });
-          }, 1000);
-        }
+        // Fuel depletion - ship continues with trajectory until crash
       } else {
         // Landed - move with pad if it's a moving pad
         if (landedPad && (landedPad as MovingPad).currentVelocity) {
