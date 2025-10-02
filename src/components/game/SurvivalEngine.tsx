@@ -9,6 +9,7 @@ import { MovingPad, Volcano } from "./types";
 import { anyGamepad, readGamepad, loadProfile, vibrate, getLastDeviceId, setLastDeviceId } from "@/hooks/use-gamepad";
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
 import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
+import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -178,9 +179,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     
     // Physics constants matching main game (EASY MODE)
     const GRAVITY = 0.02 * 0.75; // 0.015
-    const ROTATION_ACCEL = 2.2 * 1.15; // Easy mode rotation
+    const ROTATION_ACCEL = 2.2 * 1.15; // Easy mode rotation (base value)
     const THRUST_ACCEL = 9.8 * 0.7; // 6.86
     const FUEL_BURN = 22; // Easy mode fuel consumption
+    
+    // Rotation modifier system (matching main game)
+    const rotModConfig: RotationModConfig = DEFAULT_ROTATION_MOD_CONFIG;
+    const rotBoostActive = useRef(0);
     
     // Performance optimization
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -418,17 +423,34 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         gamepadRef.current = gp;
         const input = readGamepad(gp, profileRef.current);
         
+        // Update rotation boost (matches main game)
+        const isRotating = input.buttons.rotateLeft || input.buttons.rotateRight || Math.abs(input.rotation) > 0.05;
+        rotBoostActive.current = updateRotationModifier(
+          rotBoostActive.current,
+          isRotating,
+          dt * 1000,
+          rotModConfig
+        );
+        
+        // Apply rotation modifier to get boosted rotation
+        const { angularAccel: modifiedRotAccel } = applyRotationModifier(
+          ROTATION_ACCEL,
+          8.0, // base max angular velocity
+          rotBoostActive.current,
+          rotModConfig
+        );
+        
         // Analog rotation (left stick X-axis)
         if (Math.abs(input.rotation) > 0.05) {
-          shipAngularVel += input.rotation * ROTATION_ACCEL * dt * 1.2;
+          shipAngularVel += input.rotation * modifiedRotAccel * dt * 1.2;
         }
         
         // Digital rotation (shoulder buttons)
         if (input.buttons.rotateLeft) {
-          shipAngularVel -= ROTATION_ACCEL * dt;
+          shipAngularVel -= modifiedRotAccel * dt;
         }
         if (input.buttons.rotateRight) {
-          shipAngularVel += ROTATION_ACCEL * dt;
+          shipAngularVel += modifiedRotAccel * dt;
         }
         
         // Apply thrust from gamepad
@@ -445,18 +467,37 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
-      // Input handling and physics
+      // Keyboard rotation boost (matches gamepad boost)
+      const isKeyRotating = keys.current.left || keys.current.right;
       if (!isLanded) {
+        rotBoostActive.current = updateRotationModifier(
+          rotBoostActive.current,
+          isKeyRotating,
+          dt * 1000,
+          rotModConfig
+        );
+        
+        // Apply rotation modifier for keyboard
+        const { angularAccel: modifiedRotAccel } = applyRotationModifier(
+          ROTATION_ACCEL,
+          8.0,
+          rotBoostActive.current,
+          rotModConfig
+        );
+        
         // Keyboard rotation controls
         if (keys.current.left) {
-          shipAngularVel -= ROTATION_ACCEL * dt;
+          shipAngularVel -= modifiedRotAccel * dt;
         }
         if (keys.current.right) {
-          shipAngularVel += ROTATION_ACCEL * dt;
+          shipAngularVel += modifiedRotAccel * dt;
         }
-        
-        // Thrust controls
-        if (keys.current.thrust && fuelAmount > 0) {
+      }
+      
+      // Thrust controls (works both landed and in-flight to allow takeoff)
+      if (keys.current.thrust && fuelAmount > 0) {
+        // Only apply thrust physics when not landed
+        if (!isLanded) {
           const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
           const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL;
           shipVx += thrustX * dt;
@@ -497,10 +538,15 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
               });
             }
           }
-        } else {
-          audio.current.setThruster(0);
         }
-        
+        // Play thruster audio regardless of landed state
+        audio.current.setThruster(1);
+      } else {
+        audio.current.setThruster(0);
+      }
+      
+      // Physics (only when not landed)
+      if (!isLanded) {
         // Apply anomaly forces
         let anomalyAx = 0;
         let anomalyAy = 0;
