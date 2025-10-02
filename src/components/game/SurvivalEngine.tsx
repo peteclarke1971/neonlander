@@ -6,7 +6,7 @@ import { SurvivalGameOverData } from "./types/survival";
 import { EndlessTerrainGenerator, TerrainChunk } from "./systems/endlessTerrain";
 import { movingPadSystem } from "./systems/movingPads";
 import { MovingPad, Volcano } from "./types";
-import { anyGamepad, readGamepad, loadProfile, vibrate } from "@/hooks/use-gamepad";
+import { anyGamepad, readGamepad, loadProfile, vibrate, getLastDeviceId, setLastDeviceId } from "@/hooks/use-gamepad";
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
 import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
 
@@ -43,7 +43,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   
   // Gamepad state
   const gamepadRef = useRef<Gamepad | null>(null);
-  const profileRef = useRef(loadProfile("default"));
+  const profileRef = useRef(loadProfile(getLastDeviceId()));
+  const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   
   // Detect touch-capable devices
   useEffect(() => {
@@ -75,6 +76,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
+      // Use same keyboard controls as main game
       if (["a", "arrowleft"].includes(k)) keys.current.left = down;
       if (["d", "arrowright"].includes(k)) keys.current.right = down;
       if (["w", "arrowup", " "].includes(k)) keys.current.thrust = down;
@@ -135,6 +137,19 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     // Thruster particles
     type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const thrusterParticles: ThrusterParticle[] = [];
+    
+    // Explosion particles
+    type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+    const particles: Particle[] = [];
+    
+    // Debris (lander shards on crash)
+    type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
+    const debris: Debris[] = [];
+    
+    // Shockwave rings and flash on big explosions
+    type Shockwave = { x: number; y: number; life: number; max: number };
+    const shockwaves: Shockwave[] = [];
+    let flashT = 0; // screen flash
     
     // Starfield system (matching main game) - arrays declared here, initialized later
     type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
@@ -212,6 +227,49 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     };
     
     // Background satellite spawner - use full canvas dimensions
+    // Explosion helper functions
+    const spawnExplosion = (cx: number, cy: number) => {
+      for (let i = 0; i < 60; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 120 + Math.random() * 260;
+        particles.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: 0,
+          max: 0.8 + Math.random() * 0.7,
+          color: `hsla(${180 + Math.random() * 20},100%,60%,1)`,
+        });
+      }
+      shockwaves.push({ x: cx, y: cy, life: 0, max: 0.7 });
+      flashT = Math.max(flashT, 0.28);
+      cameraShake = Math.max(cameraShake, 30);
+    };
+
+    const spawnDebris = (cx: number, cy: number, cvx: number, cvy: number) => {
+      const pieceCount = 42 + Math.floor(Math.random() * 28);
+      for (let i = 0; i < pieceCount; i++) {
+        const dir = Math.random() * Math.PI * 2;
+        const speed = 220 + Math.random() * 320;
+        const kind: Debris["kind"] = Math.random() < 0.45 ? "plate" : Math.random() < 0.75 ? "rod" : "chip";
+        const size = kind === "rod" ? 2 + Math.random() * 3 : kind === "plate" ? 3 + Math.random() * 7 : 1.5 + Math.random() * 3;
+        const upwardBoost = Math.random() < 0.5 ? -(120 + Math.random() * 260) : 0;
+        debris.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(dir) * speed + cvx * 0.5,
+          vy: Math.sin(dir) * speed + cvy * 0.5 + upwardBoost,
+          angle: Math.random() * Math.PI * 2,
+          av: (-3 + Math.random() * 6) * (kind === "rod" ? 2.2 : 1.2),
+          life: 0,
+          max: 3.2 + Math.random() * 5.5,
+          size: size,
+          kind,
+        });
+      }
+    };
+    
     const spawnBgSat = () => {
       const scale = 0.25 * dprInit;
       const speed = (40 + Math.random() * 60) * dprInit;
@@ -347,9 +405,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         allVolcanoParticles = volcanoUpdate.newParticles;
       }
       
-      // Gamepad input
+      // Gamepad input with hot-swap detection
       const gp = anyGamepad();
       if (gp) {
+        // Handle gamepad hot-swap
+        if (gpDeviceIdRef.current !== gp.id) {
+          gpDeviceIdRef.current = gp.id;
+          setLastDeviceId(gp.id);
+          profileRef.current = loadProfile(gp.id);
+        }
+        
         gamepadRef.current = gp;
         const input = readGamepad(gp, profileRef.current);
         
@@ -495,16 +560,19 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         if (allVolcanoParticles.length > 0) {
           if (checkVolcanoParticleCollision(allVolcanoParticles, shipX, shipY, 8)) {
             isDead = true;
+            spawnExplosion(shipX, shipY);
+            spawnDebris(shipX, shipY, shipVx, shipVy);
             audio.current.explosion();
             if (anyGamepad()) vibrate(300, 1.0);
-            cameraShake = 0.6;
-            onGameOver({
-              cause: "crash",
-              distance: currentDistance,
-              time: currentTime,
-              score: currentScore,
-              landings: currentLandings
-            });
+            setTimeout(() => {
+              onGameOver({
+                cause: "crash",
+                distance: currentDistance,
+                time: currentTime,
+                score: currentScore,
+                landings: currentLandings
+              });
+            }, 1800);
           }
         }
         
@@ -554,7 +622,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             } else {
               // Crash!
               isDead = true;
+              spawnExplosion(shipX, shipY);
+              spawnDebris(shipX, shipY, shipVx, shipVy);
               audio.current.explosion();
+              if (anyGamepad()) vibrate(300, 1.0);
               setTimeout(() => {
                 onGameOver({
                   cause: "crash",
@@ -563,12 +634,15 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                   score: currentScore,
                   landings: currentLandings
                 });
-              }, 1000);
+              }, 1800);
             }
           } else {
             // Hit terrain - crash!
             isDead = true;
+            spawnExplosion(shipX, shipY);
+            spawnDebris(shipX, shipY, shipVx, shipVy);
             audio.current.explosion();
+            if (anyGamepad()) vibrate(300, 1.0);
             setTimeout(() => {
               onGameOver({
                 cause: "crash",
@@ -577,7 +651,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                 score: currentScore,
                 landings: currentLandings
               });
-            }, 1000);
+            }, 1800);
           }
         }
         
@@ -613,6 +687,47 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           p.vy += GRAVITY * 30 * dt; // Particles affected by gravity
         }
       }
+      
+      // Update explosion particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 200 * dt; // Gravity on particles
+        p.life += dt;
+        if (p.life >= p.max) particles.splice(i, 1);
+      }
+
+      // Update debris
+      for (let i = debris.length - 1; i >= 0; i--) {
+        const d = debris[i];
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.vy += 450 * dt; // Gravity
+        d.angle += d.av * dt;
+        d.life += dt;
+        
+        // Bounce off terrain
+        const terrainY = getHeightAt(d.x);
+        if (d.y > terrainY) {
+          d.y = terrainY;
+          d.vy = -d.vy * 0.4; // Bounce with energy loss
+          d.vx *= 0.7; // Friction
+          d.av *= 0.8;
+        }
+        
+        if (d.life >= d.max) debris.splice(i, 1);
+      }
+
+      // Update shockwaves
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.life += dt;
+        if (sw.life >= sw.max) shockwaves.splice(i, 1);
+      }
+
+      // Update screen flash
+      if (flashT > 0) flashT = Math.max(0, flashT - dt * 2);
       
       // Update starfield (shooting stars and satellites)
       if (currentTime >= nextShooting) {
@@ -743,8 +858,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(c.width, 0);
-      const segs = 220; // Increased resolution for accurate clipping
-      const terrainBuffer = 8 * dprInit; // Buffer below terrain line to prevent stars showing through
+      const segs = 300; // Increased resolution for accurate clipping
+      const terrainBuffer = 15 * dprInit; // Buffer below terrain line to prevent stars showing through
       for (let i = segs; i >= 0; i--) {
         const sx = (i / segs) * c.width;
         const worldX = cameraX + (sx - c.width / 2) / zoom;
@@ -869,6 +984,63 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.shadowBlur = 6;
         ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       }
+      
+      // Draw shockwaves
+      for (const sw of shockwaves) {
+        const progress = sw.life / sw.max;
+        const radius = progress * 150;
+        ctx.globalAlpha = 1 - progress;
+        ctx.strokeStyle = neonColor;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // Draw debris shards
+      for (const d of debris) {
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        ctx.rotate(d.angle);
+        ctx.beginPath();
+        const s = d.size;
+        if (d.kind === "rod") {
+          ctx.moveTo(-s * 3, -s * 0.4);
+          ctx.lineTo(s * 3, -s * 0.4);
+          ctx.lineTo(s * 3, s * 0.4);
+          ctx.lineTo(-s * 3, s * 0.4);
+          ctx.closePath();
+        } else if (d.kind === "plate") {
+          ctx.moveTo(-s, -s * 0.8);
+          ctx.lineTo(s * 1.2, -s * 0.3);
+          ctx.lineTo(s * 0.3, s * 1.3);
+          ctx.lineTo(-s * 1.1, s * 0.4);
+          ctx.closePath();
+        } else {
+          ctx.moveTo(-s, -s * 0.6);
+          ctx.lineTo(s * 0.9, -s * 0.2);
+          ctx.lineTo(-s * 0.2, s);
+          ctx.closePath();
+        }
+        ctx.strokeStyle = neonColor;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Draw explosion particles
+      for (const p of particles) {
+        const alpha = 1 - p.life / p.max;
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
       
       // Draw ship
       ctx.save();
