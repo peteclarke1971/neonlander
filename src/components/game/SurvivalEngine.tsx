@@ -5,8 +5,10 @@ import { AudioManager } from "./AudioManager";
 import { SurvivalGameOverData } from "./types/survival";
 import { EndlessTerrainGenerator, TerrainChunk } from "./systems/endlessTerrain";
 import { movingPadSystem } from "./systems/movingPads";
-import { MovingPad } from "./types";
+import { MovingPad, Volcano } from "./types";
 import { anyGamepad, readGamepad, loadProfile, vibrate } from "@/hooks/use-gamepad";
+import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
+import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -303,7 +305,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       const rightmostChunk = chunks[chunks.length - 1];
       if (shipX > rightmostChunk.endX - CHUNK_WIDTH) {
         // Calculate difficulty based on distance traveled
-        const difficulty = Math.min(1, currentDistance / 5000);
+        const difficulty = Math.min(1, currentDistance / 500); // Accelerated for testing
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
         
@@ -318,6 +320,29 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         for (const mp of chunk.movingPads) {
           movingPadSystem.updateMovingPad(mp, dt);
         }
+      }
+      
+      // Get all volcanoes and anomalies from active chunks
+      const allVolcanoes: Volcano[] = [];
+      const allAnomalies: Anomaly[] = [];
+      for (const chunk of chunks) {
+        allVolcanoes.push(...chunk.volcanoes);
+        allAnomalies.push(...chunk.anomalies);
+      }
+      
+      // Update volcanoes
+      let allVolcanoParticles: VolcanoParticle[] = [];
+      if (allVolcanoes.length > 0) {
+        const level = Math.floor(currentDistance / 100) + 1; // Level based on distance
+        const volcanoUpdate = updateVolcanoes(
+          allVolcanoes,
+          allVolcanoParticles,
+          dt,
+          level,
+          cameraX - viewWidth / 2,
+          cameraX + viewWidth / 2
+        );
+        allVolcanoParticles = volcanoUpdate.newParticles;
       }
       
       // Gamepad input
@@ -409,8 +434,18 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           audio.current.setThruster(0);
         }
         
+        // Apply anomaly forces
+        let anomalyAx = 0;
+        let anomalyAy = 0;
+        if (allAnomalies.length > 0) {
+          const anomalyForce = anomalyAccelAt(allAnomalies, shipX, shipY, currentTime);
+          anomalyAx = anomalyForce.ax;
+          anomalyAy = anomalyForce.ay;
+        }
+        
         // Physics integration (matching main game with 60fps scaling)
-        shipVy += GRAVITY * 60 * dt;
+        shipVy += (GRAVITY + anomalyAy) * 60 * dt;
+        shipVx += anomalyAx * 60 * dt;
         shipX += shipVx * 60 * dt;
         shipY += shipVy * 60 * dt;
         shipAngle += shipAngularVel * dt;
@@ -452,6 +487,23 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         if (shipX < CHUNK_WIDTH / 2) {
           shipX = CHUNK_WIDTH / 2;
           shipVx = Math.max(0, shipVx);
+        }
+        
+        // Check volcano particle collisions
+        if (allVolcanoParticles.length > 0) {
+          if (checkVolcanoParticleCollision(allVolcanoParticles, shipX, shipY, 8)) {
+            isDead = true;
+            audio.current.explosion();
+            if (anyGamepad()) vibrate(300, 1.0);
+            cameraShake = 0.6;
+            onGameOver({
+              cause: "crash",
+              distance: currentDistance,
+              time: currentTime,
+              score: currentScore,
+              landings: currentLandings
+            });
+          }
         }
         
         // Collision detection
@@ -782,6 +834,23 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           ctx.strokeStyle = "#FFC864";
           ctx.strokeRect(mp.currentPos.x - w / 2, mp.currentPos.y - 2, w, 4);
         }
+      }
+      
+      // Draw anomalies (gravity wells)
+      if (allAnomalies.length > 0) {
+        drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor);
+      }
+      
+      // Draw volcanoes
+      if (allVolcanoes.length > 0) {
+        drawVolcanoes(
+          ctx,
+          allVolcanoes,
+          allVolcanoParticles,
+          neonColor,
+          cameraX - viewWidth / 2,
+          cameraX + viewWidth / 2
+        );
       }
       
       // Draw thruster particles

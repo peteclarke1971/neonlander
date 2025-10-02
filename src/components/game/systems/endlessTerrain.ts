@@ -1,5 +1,7 @@
-import { Pad, MovingPad } from "../types";
+import { Pad, MovingPad, Volcano } from "../types";
 import { movingPadSystem } from "./movingPads";
+import { generateVolcanoes, getVolcanoConfigForLevel } from "./volcano";
+import { generateAnomalies, Anomaly } from "./anomalies";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -17,6 +19,8 @@ export interface TerrainChunk {
   points: { x: number; y: number }[];
   pads: Pad[];
   movingPads: MovingPad[];
+  volcanoes: Volcano[];
+  anomalies: Anomaly[];
   difficulty: number; // 0-1 difficulty factor
 }
 
@@ -144,7 +148,7 @@ export class EndlessTerrainGenerator {
     // Generate moving pads at higher difficulty using advanced system
     const movingPads: MovingPad[] = [];
     
-    if (difficulty > 0.3 && rand() > 0.6) {
+    if (difficulty > 0.1 && rand() > 0.4) {
       // Helper to get height at x within this chunk
       const getHeightAt = (x: number) => {
         if (x < startX || x > endX) return this.config.baseHeight;
@@ -175,6 +179,54 @@ export class EndlessTerrainGenerator {
       }
     }
     
+    // Generate volcanoes at higher difficulty
+    const volcanoes: Volcano[] = [];
+    if (difficulty > 0.2 && rand() > 0.5) {
+      const level = Math.floor(difficulty * 10) + 1;
+      const config = getVolcanoConfigForLevel(level);
+      
+      // Find suitable volcano placement
+      const volcIdx = Math.floor(rand() * (segments - 10)) + 5;
+      const volcX = startX + volcIdx * step;
+      const volcY = points[volcIdx].y;
+      
+      const size = config.minSize + rand() * (config.maxSize - config.minSize);
+      
+      volcanoes.push({
+        x: volcX,
+        y: volcY,
+        size: size,
+        nextEruption: 2 + rand() * 3,
+        eruptionInterval: config.baseInterval,
+        isErupting: false,
+        eruptionTimer: 0,
+        eruptionDuration: config.eruptionDuration,
+        power: config.power,
+        emissionCarry: 0
+      });
+    }
+    
+    // Generate anomalies (gravity wells) at medium difficulty
+    const anomalies: Anomaly[] = [];
+    if (difficulty > 0.15) {
+      const anomCount = Math.floor(difficulty * 2); // 0-2 anomalies
+      for (let i = 0; i < anomCount; i++) {
+        const anomIdx = Math.floor(rand() * (segments - 8)) + 4;
+        const anomX = startX + anomIdx * step;
+        const anomY = points[anomIdx].y - 100 - rand() * 150;
+        
+        const kind = rand() > 0.5 ? "attract" : "repel";
+        anomalies.push({
+          x: anomX,
+          y: anomY,
+          radius: 60 + rand() * 40,
+          strength: (0.3 + rand() * 0.4) * (kind === "attract" ? 1 : -1),
+          falloff: 1.5 + rand() * 0.5,
+          kind
+        });
+      }
+    }
+    
     // Store the last Y coordinate for the next chunk
     this.lastEndY = points[points.length - 1].y;
     
@@ -184,6 +236,8 @@ export class EndlessTerrainGenerator {
       points,
       pads,
       movingPads,
+      volcanoes,
+      anomalies,
       difficulty
     };
   }
