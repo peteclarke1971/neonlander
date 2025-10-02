@@ -48,19 +48,25 @@ export class EndlessTerrainGenerator {
     
     this.chunkCounter++;
     
-    // Generate terrain points with increasing complexity
+    // Generate terrain points with more variety
     const points: { x: number; y: number }[] = [];
     const segments = 40;
     const step = this.config.chunkWidth / segments;
     
     // Increase amplitude and variation with difficulty
     const amplitude = this.config.amplitude * (1 + difficulty * 0.5);
-    const variation = amplitude * (0.3 + difficulty * 0.4);
+    const variation = amplitude * (0.5 + difficulty * 0.6); // More variation
     
     // Start from the last chunk's end Y to ensure seamless connection
     let current = this.lastEndY !== null 
       ? this.lastEndY 
       : this.config.baseHeight + (rand() - 0.5) * amplitude;
+    
+    // Choose terrain type for this chunk
+    const terrainType = rand();
+    const isPlateauChunk = terrainType > 0.7;
+    const isValleyChunk = terrainType < 0.15;
+    const isSteepChunk = terrainType > 0.5 && terrainType <= 0.7;
     
     for (let i = 0; i <= segments; i++) {
       const x = startX + i * step;
@@ -71,13 +77,46 @@ export class EndlessTerrainGenerator {
         continue;
       }
       
-      // Subsequent points: apply blending and variation
-      const drift = (rand() - 0.5) * variation;
-      current = this.config.baseHeight * 0.9 + current * 0.1 + drift;
+      // Apply terrain type shaping
+      let drift = (rand() - 0.5) * variation;
       
-      // Add some sine variation for natural look
-      const y = current + Math.sin((i / segments) * Math.PI * 4) * (amplitude * 0.15);
+      if (isPlateauChunk && i > 5 && i < segments - 5) {
+        // Plateau: flat elevated section
+        drift *= 0.2;
+        current = this.config.baseHeight * 0.85 + current * 0.15;
+      } else if (isValleyChunk && i > segments * 0.3 && i < segments * 0.7) {
+        // Valley: deeper section
+        drift *= 1.5;
+        current = this.config.baseHeight * 1.15 + current * -0.15;
+      } else if (isSteepChunk) {
+        // Steep terrain: sharp transitions
+        drift *= 1.8;
+        current = this.config.baseHeight * 0.85 + current * 0.15 + drift;
+      } else {
+        // Rolling hills: smooth transitions
+        current = this.config.baseHeight * 0.9 + current * 0.1 + drift;
+      }
+      
+      // Add multi-frequency sine waves for natural look
+      const y = current + 
+        Math.sin((i / segments) * Math.PI * 4) * (amplitude * 0.15) +
+        Math.sin((i / segments) * Math.PI * 2) * (amplitude * 0.08);
       points.push({ x, y });
+    }
+    
+    // Add occasional steep walls
+    if (rand() > 0.7 && !isPlateauChunk) {
+      const wallCenter = Math.floor(rand() * (segments - 12)) + 6;
+      const wallHeight = amplitude * (0.4 + rand() * 0.4);
+      const isCliff = rand() > 0.5;
+      
+      for (let j = 0; j < 6; j++) {
+        const idx = wallCenter + j;
+        if (idx > 0 && idx <= segments) {
+          const t = j / 6;
+          points[idx].y += isCliff ? -wallHeight * t : wallHeight * t;
+        }
+      }
     }
     
     // Add caverns based on difficulty
@@ -96,26 +135,36 @@ export class EndlessTerrainGenerator {
       }
     }
     
-    // Generate pads with decreasing size based on difficulty
+    // Generate pads with varied sizes
     const pads: Pad[] = [];
-    const padCount = Math.max(1, Math.floor(2 - difficulty)); // 1-2 pads per chunk
+    const padCount = Math.max(2, Math.floor(3 - difficulty)); // 2-3 pads per chunk
+    
+    // Define 3 distinct size categories
+    const padSizes = [
+      { min: 24, max: 32, multiplier: 5 },  // Small
+      { min: 40, max: 80, multiplier: 3 },  // Medium
+      { min: 80, max: 170, multiplier: 2 }  // Large
+    ];
     
     for (let i = 0; i < padCount; i++) {
       const centerIdx = Math.floor(rand() * (segments - 6)) + 3;
       const padX = startX + centerIdx * step;
       
-      // Pad size decreases with difficulty
-      const maxWidth = 80 - difficulty * 50; // 80 to 30
-      const minWidth = 40 - difficulty * 20; // 40 to 20
-      const width = minWidth + rand() * (maxWidth - minWidth);
+      // Pick size category
+      const sizeCategory = padSizes[Math.floor(rand() * padSizes.length)];
+      const width = sizeCategory.min + rand() * (sizeCategory.max - sizeCategory.min);
+      const multiplier = sizeCategory.multiplier;
       
-      const multiplier = width <= 30 ? 5 : width <= 50 ? 3 : 2;
+      // Check if this is on a steep incline (jutting pad)
+      const isJuttingPad = i === 0 && isSteepChunk && rand() > 0.5;
       
       // Flatten terrain for pad
       const targetY = points[centerIdx].y - 8;
-      const halfCount = Math.max(1, Math.round((width / step) * 1.2));
+      const flattenRadius = isJuttingPad 
+        ? Math.round(width / step / 2) // Minimal flattening for jutting pads
+        : Math.max(1, Math.round((width / step) * 1.2));
       
-      for (let j = -halfCount; j <= halfCount; j++) {
+      for (let j = -flattenRadius; j <= flattenRadius; j++) {
         const idx = centerIdx + j;
         if (idx >= 0 && idx <= segments) {
           points[idx].y = targetY;
@@ -145,10 +194,10 @@ export class EndlessTerrainGenerator {
       pads[minIdx].bonus2x = true;
     }
     
-    // Generate moving pads at higher difficulty using advanced system
+    // Generate moving pads at higher difficulty using advanced system with guaranteed MEGA pads
     const movingPads: MovingPad[] = [];
     
-    if (difficulty > 0.1 && rand() > 0.4) {
+    if (difficulty > 0.1) {
       // Helper to get height at x within this chunk
       const getHeightAt = (x: number) => {
         if (x < startX || x > endX) return this.config.baseHeight;
@@ -161,18 +210,52 @@ export class EndlessTerrainGenerator {
         return points[Math.max(0, Math.min(idx, points.length - 1))].y;
       };
       
-      // Generate moving pad using advanced system
-      const level = Math.floor(difficulty * 10) + 1; // Convert difficulty to level (1-10)
-      const movingPad = movingPadSystem.generateMovingPad(
-        seed,
-        level,
-        "easy",
-        this.config.chunkWidth,
-        600, // worldHeight
-        getHeightAt,
-        pads,
-        false // isCavern
-      );
+      // Convert difficulty to level (1-10)
+      const level = Math.floor(difficulty * 10) + 1;
+      
+      // Try multiple times to generate moving pad (guarantees MEGA pads)
+      let movingPad: MovingPad | null = null;
+      const maxAttempts = 3;
+      
+      for (let attempt = 0; attempt < maxAttempts && !movingPad; attempt++) {
+        const attemptSeed = seed + attempt * 1337;
+        movingPad = movingPadSystem.generateMovingPad(
+          attemptSeed,
+          level,
+          "easy",
+          this.config.chunkWidth,
+          600, // worldHeight
+          getHeightAt,
+          pads,
+          false // isCavern
+        );
+      }
+      
+      // Force generation if all attempts failed - create longer flat stretch for shuttle pad
+      if (!movingPad && difficulty > 0.2) {
+        // Create a long flat stretch for shuttle motion
+        const flatStart = Math.floor(segments * 0.3);
+        const flatEnd = Math.floor(segments * 0.7);
+        const flatY = this.config.baseHeight - 50;
+        
+        for (let i = flatStart; i <= flatEnd; i++) {
+          if (i >= 0 && i <= segments) {
+            points[i].y = flatY;
+          }
+        }
+        
+        // Force generate moving pad on this flat stretch
+        movingPad = movingPadSystem.generateMovingPad(
+          seed + 9999,
+          level,
+          "easy",
+          this.config.chunkWidth,
+          600,
+          getHeightAt,
+          pads,
+          false
+        );
+      }
       
       if (movingPad) {
         movingPads.push(movingPad);
