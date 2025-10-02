@@ -172,18 +172,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
     
-    // Initialize starfield (screen-space stars) - use full canvas dimensions
+    // Initialize starfield (canvas-space stars) - use full canvas dimensions
     const STAR_COUNT = shouldOptimize ? 150 : 320;
-    const screenW = c.width / dprInit;
-    const screenH = c.height / dprInit;
     for (let i = 0; i < STAR_COUNT; i++) {
-      const sx = Math.random() * screenW;
-      const sy = Math.random() * screenH;
+      const sx = Math.random() * c.width;
+      const sy = Math.random() * c.height;
       const bright = Math.random() < 0.15;
       stars.push({ 
         x: sx, 
         y: sy, 
-        size: bright ? 2.4 : 1.4, 
+        size: bright ? (2.4 * dprInit) : (1.4 * dprInit), 
         baseA: bright ? 0.95 : 0.6, 
         tw: 0.5 + Math.random() * 1.5, 
         ph: Math.random() * Math.PI * 2, 
@@ -193,34 +191,30 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     
     // Shooting star spawner - use full canvas dimensions
     const spawnShooting = () => {
-      const margin = 80;
-      const screenW = c.width / dprInit;
-      const screenH = c.height / dprInit;
+      const margin = 80 * dprInit;
       let sx = 0, sy = 0, vx = 0, vy = 0;
       const side = Math.floor(Math.random() * 3);
       if (side === 0) {
-        sx = -margin; sy = Math.random() * (screenH * 0.7);
-        vx = 180 + Math.random() * 260; vy = (Math.random() - 0.5) * 140;
+        sx = -margin; sy = Math.random() * (c.height * 0.7);
+        vx = (180 + Math.random() * 260) * dprInit; vy = (Math.random() - 0.5) * 140 * dprInit;
       } else if (side === 1) {
-        sx = screenW + margin; sy = Math.random() * (screenH * 0.7);
-        vx = -180 - Math.random() * 260; vy = (Math.random() - 0.5) * 140;
+        sx = c.width + margin; sy = Math.random() * (c.height * 0.7);
+        vx = -(180 + Math.random() * 260) * dprInit; vy = (Math.random() - 0.5) * 140 * dprInit;
       } else {
-        sx = Math.random() * screenW; sy = -margin;
-        vx = (Math.random() - 0.5) * 280; vy = 160 + Math.random() * 220;
+        sx = Math.random() * c.width; sy = -margin;
+        vx = (Math.random() - 0.5) * 280 * dprInit; vy = (160 + Math.random() * 220) * dprInit;
       }
       shooting.push({ x: sx, y: sy, vx, vy, life: 0, max: 0.6 + Math.random() * 1.0 });
     };
     
     // Background satellite spawner - use full canvas dimensions
     const spawnBgSat = () => {
-      const screenW = c.width / dprInit;
-      const screenH = c.height / dprInit;
-      const scale = 0.25;
-      const speed = 40 + Math.random() * 60;
+      const scale = 0.25 * dprInit;
+      const speed = (40 + Math.random() * 60) * dprInit;
       const fromLeft = Math.random() < 0.5;
-      const sx = fromLeft ? -120 : screenW + 120;
+      const sx = fromLeft ? -120 * dprInit : c.width + 120 * dprInit;
       const vx = fromLeft ? speed : -speed;
-      const sy = screenH * 0.28 + Math.random() * (screenH * 0.34);
+      const sy = c.height * 0.28 + Math.random() * (c.height * 0.34);
       const vy = (Math.random() - 0.5) * speed * 0.25;
       bgSats.push({ 
         x: sx, 
@@ -723,7 +717,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.beginPath();
         ctx.moveTo(sh.x, sh.y);
         ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * dprInit;
         ctx.strokeStyle = neonColor;
         ctx.stroke();
       }
@@ -736,13 +730,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.rotate(s.rot);
         ctx.scale(s.scale, s.scale);
         ctx.strokeStyle = neonColor;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 * dprInit;
         ctx.beginPath();
-        ctx.rect(-6, -2, 12, 4);
+        ctx.rect(-6 * dprInit, -2 * dprInit, 12 * dprInit, 4 * dprInit);
         ctx.stroke();
         ctx.beginPath();
-        ctx.rect(-16, -3, 8, 6);
-        ctx.rect(8, -3, 8, 6);
+        ctx.rect(-16 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
+        ctx.rect(8 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
         ctx.stroke();
         ctx.restore();
       }
