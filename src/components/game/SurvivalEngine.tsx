@@ -6,6 +6,7 @@ import { SurvivalGameOverData } from "./types/survival";
 import { EndlessTerrainGenerator, TerrainChunk } from "./systems/endlessTerrain";
 import { movingPadSystem } from "./systems/movingPads";
 import { MovingPad } from "./types";
+import { anyGamepad, readGamepad, loadProfile, vibrate } from "@/hooks/use-gamepad";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -20,6 +21,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const [fps, setFps] = useState(0);
   
   // Game state
   const [distance, setDistance] = useState(0);
@@ -36,6 +38,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   
   const keys = useRef({ left: false, right: false, thrust: false });
   const audio = useRef(new AudioManager());
+  
+  // Gamepad state
+  const gamepadRef = useRef<Gamepad | null>(null);
+  const profileRef = useRef(loadProfile("default"));
   
   // Detect touch-capable devices
   useEffect(() => {
@@ -166,11 +172,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
     
-    // Initialize starfield (screen-space stars)
+    // Initialize starfield (screen-space stars) - use full canvas dimensions
     const STAR_COUNT = shouldOptimize ? 150 : 320;
+    const screenW = c.width / dprInit;
+    const screenH = c.height / dprInit;
     for (let i = 0; i < STAR_COUNT; i++) {
-      const sx = Math.random() * getViewWidth();
-      const sy = Math.random() * getViewHeight();
+      const sx = Math.random() * screenW;
+      const sy = Math.random() * screenH;
       const bright = Math.random() < 0.15;
       stars.push({ 
         x: sx, 
@@ -183,36 +191,36 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       });
     }
     
-    // Shooting star spawner
+    // Shooting star spawner - use full canvas dimensions
     const spawnShooting = () => {
       const margin = 80;
-      const viewWpx = getViewWidth();
-      const viewHpx = getViewHeight();
+      const screenW = c.width / dprInit;
+      const screenH = c.height / dprInit;
       let sx = 0, sy = 0, vx = 0, vy = 0;
       const side = Math.floor(Math.random() * 3);
       if (side === 0) {
-        sx = -margin; sy = Math.random() * (viewHpx * 0.7);
+        sx = -margin; sy = Math.random() * (screenH * 0.7);
         vx = 180 + Math.random() * 260; vy = (Math.random() - 0.5) * 140;
       } else if (side === 1) {
-        sx = viewWpx + margin; sy = Math.random() * (viewHpx * 0.7);
+        sx = screenW + margin; sy = Math.random() * (screenH * 0.7);
         vx = -180 - Math.random() * 260; vy = (Math.random() - 0.5) * 140;
       } else {
-        sx = Math.random() * viewWpx; sy = -margin;
+        sx = Math.random() * screenW; sy = -margin;
         vx = (Math.random() - 0.5) * 280; vy = 160 + Math.random() * 220;
       }
       shooting.push({ x: sx, y: sy, vx, vy, life: 0, max: 0.6 + Math.random() * 1.0 });
     };
     
-    // Background satellite spawner
+    // Background satellite spawner - use full canvas dimensions
     const spawnBgSat = () => {
-      const viewWpx = getViewWidth();
-      const viewHpx = getViewHeight();
+      const screenW = c.width / dprInit;
+      const screenH = c.height / dprInit;
       const scale = 0.25;
       const speed = 40 + Math.random() * 60;
       const fromLeft = Math.random() < 0.5;
-      const sx = fromLeft ? -120 : viewWpx + 120;
+      const sx = fromLeft ? -120 : screenW + 120;
       const vx = fromLeft ? speed : -speed;
-      const sy = viewHpx * 0.28 + Math.random() * (viewHpx * 0.34);
+      const sy = screenH * 0.28 + Math.random() * (screenH * 0.34);
       const vy = (Math.random() - 0.5) * speed * 0.25;
       bgSats.push({ 
         x: sx, 
@@ -266,14 +274,30 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     };
     
     let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
     
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       
+      // FPS counter
+      frameCount++;
+      if (now - lastFpsUpdate >= 500) {
+        const elapsed = (now - lastFpsUpdate) / 1000;
+        setFps(Math.round(frameCount / elapsed));
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+      
       if (paused || isDead) return;
       
-      const dt = Math.min((now - lastTime) / 1000, 0.033);
+      // Frame rate limiting with clamped dt (matching main game)
+      let dt = (now - lastTime) / 1000;
       lastTime = now;
+      
+      // Clamp dt to prevent physics issues on lag spikes
+      if (dt > 0.1) dt = 0.033; // Cap at ~30fps equivalent
+      dt = Math.min(dt, 0.033); // Max 33ms timestep
       
       currentTime += dt;
       setTime(currentTime);
@@ -302,9 +326,42 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
+      // Gamepad input
+      const gp = anyGamepad();
+      if (gp) {
+        gamepadRef.current = gp;
+        const input = readGamepad(gp, profileRef.current);
+        
+        // Analog rotation (left stick X-axis)
+        if (Math.abs(input.rotation) > 0.05) {
+          shipAngularVel += input.rotation * ROTATION_ACCEL * dt * 1.2;
+        }
+        
+        // Digital rotation (shoulder buttons)
+        if (input.buttons.rotateLeft) {
+          shipAngularVel -= ROTATION_ACCEL * dt;
+        }
+        if (input.buttons.rotateRight) {
+          shipAngularVel += ROTATION_ACCEL * dt;
+        }
+        
+        // Apply thrust from gamepad
+        if (input.thrust > 0.1 && fuelAmount > 0) {
+          keys.current.thrust = true;
+          vibrate(50, input.thrust * 0.15, input.thrust * 0.3);
+        } else {
+          keys.current.thrust = false;
+        }
+        
+        // Pause button
+        if (input.buttons.pause && !paused) {
+          setPaused(true);
+        }
+      }
+      
       // Input handling and physics
       if (!isLanded) {
-        // Rotation controls
+        // Keyboard rotation controls
         if (keys.current.left) {
           shipAngularVel -= ROTATION_ACCEL * dt;
         }
@@ -818,6 +875,15 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         distance={distance}
         landings={landings}
       />
+      
+      {/* FPS Counter */}
+      <div className="fixed bottom-4 right-4 z-20 pointer-events-none select-none">
+        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-3 py-1.5">
+          <div className="text-xs font-mono text-muted-foreground">
+            {fps} FPS
+          </div>
+        </div>
+      </div>
       
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-30">
