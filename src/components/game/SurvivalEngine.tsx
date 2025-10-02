@@ -1172,32 +1172,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         ctx.restore();
       }
 
-      // Draw explosion particles with enhanced visuals
+      // Draw explosion particles (matching working Asteroids rendering)
+      ctx.globalCompositeOperation = "lighter";
       for (const p of particles) {
-        const alpha = 1 - p.life / p.max;
-        const size = 2 + (1 - alpha) * 2; // Particles shrink as they fade
-        
-        // Draw particle trail
-        ctx.globalAlpha = alpha * 0.7;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = Math.max(1, size);
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04);
-        ctx.stroke();
-        
-        // Draw particle core (brighter)
-        ctx.globalAlpha = alpha;
+        const t = 1 - p.life / p.max;
+        ctx.globalAlpha = t * 0.8;
         ctx.fillStyle = p.color;
-        ctx.shadowBlur = 12;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
       }
       ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = "source-over";
       
       // Draw ship
       ctx.save();
