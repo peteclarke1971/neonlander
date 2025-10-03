@@ -10,6 +10,9 @@ import { anyGamepad, readGamepad, loadProfile, vibrate, getLastDeviceId, setLast
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
 import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
+import { CursorManager } from "@/lib/cursorManager";
+import { loadCursorConfig } from "@/lib/cursorConfig";
+import FireworksDisplay from "./FireworksDisplay";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -49,6 +52,15 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const rotBoostActive = useRef(0);
   const gamepadInputRef = useRef<any>(null);
   
+  // Cursor management
+  const cursorManagerRef = useRef<CursorManager>();
+  
+  // Fireworks state
+  const [showFireworks, setShowFireworks] = useState(false);
+  const [fireworksActive, setFireworksActive] = useState(false);
+  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | null>(null);
+  const fireworkTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  
   // Detect touch-capable devices
   useEffect(() => {
     try {
@@ -75,6 +87,24 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
+  
+  // Cursor management
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const cursorConfig = loadCursorConfig();
+    cursorManagerRef.current = new CursorManager(cursorConfig);
+    
+    cursorManagerRef.current.attach(
+      containerRef.current,
+      () => !paused, // Hide cursor when not paused (during gameplay)
+      'global'
+    );
+    
+    return () => {
+      cursorManagerRef.current?.detach();
+    };
+  }, [paused]);
   
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
@@ -748,6 +778,38 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                   
                   setScore(currentScore);
                   setLandings(currentLandings);
+                  
+                  // Trigger fireworks based on landing count
+                  const fireworkCount = currentLandings;
+                  const isMoving = !!movingPad;
+                  const isBonus = landingPad.bonus2x;
+                  
+                  // Clear any existing firework timeouts
+                  fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
+                  fireworkTimeoutsRef.current = [];
+                  
+                  // Spawn fireworks with staggered timing
+                  for (let i = 0; i < fireworkCount; i++) {
+                    const timeout = setTimeout(() => {
+                      // Trigger a single firework by showing display momentarily
+                      setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
+                      setShowFireworks(true);
+                      setFireworksActive(true);
+                      
+                      // Hide after brief moment to allow next firework
+                      setTimeout(() => {
+                        setShowFireworks(false);
+                      }, 100);
+                    }, i * 300 + 500); // 500ms initial delay, then 300ms between each
+                    
+                    fireworkTimeoutsRef.current.push(timeout);
+                  }
+                  
+                  // Reset fireworks state after all are done
+                  const finalTimeout = setTimeout(() => {
+                    setFireworksActive(false);
+                  }, fireworkCount * 300 + 3000);
+                  fireworkTimeoutsRef.current.push(finalTimeout);
                 }
                 setFuel(fuelAmount);
                 
@@ -994,25 +1056,34 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(c.width, 0);
-      const segs = 300; // Increased resolution for accurate clipping
-      const terrainBuffer = 15 * dprInit; // Buffer below terrain line to prevent stars showing through
+      const segs = 150; // Optimized resolution for performance
+      const terrainBuffer = 40 * dprInit; // Increased buffer to prevent stars showing through
       for (let i = segs; i >= 0; i--) {
         const sx = (i / segs) * c.width;
         const worldX = cameraX + (sx - c.width / 2) / zoom;
         const worldY = getHeightAt(worldX);
-        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer;
+        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10; // Added +10 vertical offset
         ctx.lineTo(sx, sy);
       }
       ctx.closePath();
       ctx.clip();
       
-      // Draw stars
+      // Draw stars with terrain proximity culling
       ctx.shadowColor = neonColor;
-      ctx.shadowBlur = shouldOptimize ? 2 : 4;
+      ctx.shadowBlur = shouldOptimize ? (2 * dprInit) : (4 * dprInit);
       ctx.fillStyle = neonColor;
       const starLimit = shouldOptimize ? Math.min(100, stars.length) : stars.length;
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
+        
+        // Calculate world position of star to check terrain height
+        const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
+        const terrainAtStar = getHeightAt(starWorldX);
+        const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
+        
+        // Skip star if it's too close to terrain (within buffer zone)
+        if (starWorldY > terrainAtStar - 50) continue;
+        
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
         ctx.fillRect(s.x, s.y, s.size, s.size);
@@ -1263,6 +1334,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     return () => {
       cancelAnimationFrame(raf);
       audio.current.stopAllAudio();
+      // Clear firework timeouts
+      fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
     };
   }, [paused, onGameOver]);
   
@@ -1355,6 +1428,16 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           Tap screen: Thrust | Arrows/W: Keys
         </div>
       </div>
+      
+      {/* Fireworks Display */}
+      {showFireworks && landingType && (
+        <FireworksDisplay
+          landingType={landingType}
+          neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
+          onComplete={() => setShowFireworks(false)}
+          onSkip={() => setShowFireworks(false)}
+        />
+      )}
     </div>
   );
 };
