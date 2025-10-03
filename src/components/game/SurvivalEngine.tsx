@@ -47,6 +47,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
   const profileRef = useRef(loadProfile(getLastDeviceId()));
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const rotBoostActive = useRef(0);
+  const gamepadInputRef = useRef<any>(null);
   
   // Detect touch-capable devices
   useEffect(() => {
@@ -497,6 +498,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           
           gamepadRef.current = gp;
           const input = readGamepad(gp, profileRef.current);
+          gamepadInputRef.current = input;
           
           // Update rotation boost (matches main game) - only when boost button held
           const gpRotateBoost = input.rotateBoost || false;
@@ -567,6 +569,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           if (keys.current.right) {
             shipAngularVel += modifiedRotAccel * dt;
           }
+          
+          // Apply angular velocity cap (matching main game)
+          const maxAngularVel = 8.0;
+          shipAngularVel = Math.max(-maxAngularVel, Math.min(maxAngularVel, shipAngularVel));
         }
       }
       
@@ -641,8 +647,13 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
           shipY += shipVy * 60 * dt;
           shipAngle += shipAngularVel * dt;
           
-          // Angular friction (easy mode - only when no rotation input)
-          if (!keys.current.left && !keys.current.right) {
+          // Angular friction (easy mode - only when no rotation input from keyboard or gamepad)
+          const gpInput = gamepadInputRef.current;
+          const gpLeft = gpInput?.buttons?.rotateLeft || false;
+          const gpRight = gpInput?.buttons?.rotateRight || false;
+          const analogRotating = Math.abs(gpInput?.rotation || 0) > 0.05;
+          
+          if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight && !analogRotating) {
             shipAngularVel *= 0.9;
             if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
           }
