@@ -859,12 +859,6 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             padToClear = landedPad; // Mark this pad to be removed once cleared
             landedPad = null;
             
-            // Hide fireworks when taking off
-            setShowFireworks(false);
-            setFireworksActive(false);
-            fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
-            fireworkTimeoutsRef.current = [];
-            
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
           }
