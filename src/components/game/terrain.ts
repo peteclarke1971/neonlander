@@ -16,6 +16,9 @@ function mulberry32(seed: number) {
 export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1, difficulty: "easy" | "hard" = "easy"): TerrainData {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
+  
+  // Store original terrain heights before any pad modifications
+  const originalHeights = new Map<number, number>();
 
   // Generate control points and interpolate for a jagged mountainous profile
   const segments = 80; // number of segments across the world
@@ -86,11 +89,11 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     const xCenter = centerIdx * step;
     const xStart = (xCenter - width / 2 + worldWidth) % worldWidth;
     const xEnd = (xCenter + width / 2 + worldWidth) % worldWidth;
-    // Flatten nearby points first to create a pad region (broader than visual width for playability)
-    const halfCount = Math.max(1, Math.round((width / step) * 1.2));
-    const targetY = points[centerIdx].y - 8; // slightly flattened lower than surrounding
+    // Use original terrain height (don't bury the pad)
+    const targetY = originalHeights.get(centerIdx) || points[centerIdx].y;
     
-    // Ensure perfect flattening for pads
+    // Flatten nearby points to create a pad region (broader than visual width for playability)
+    const halfCount = Math.max(1, Math.round((width / step) * 1.2));
     for (let j = -halfCount; j <= halfCount; j++) {
       const idx = ((centerIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
       points[idx].y = targetY;
@@ -98,32 +101,26 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     
     const y = targetY; // use the exact flattened height
 
-    // Check for overlap with existing pads before adding (handle world wrap)
+    // Check for overlap with existing pads before adding (handle world wrap + vertical proximity)
     let overlaps = false;
     for (const existingPad of pads) {
-      let overlap = false;
+      // Calculate horizontal distance with world wrapping
+      const newPadCenterX = xStart <= xEnd ? (xStart + xEnd) / 2 : ((xStart + xEnd + worldWidth) / 2) % worldWidth;
+      const existingPadCenterX = existingPad.xStart <= existingPad.xEnd 
+        ? (existingPad.xStart + existingPad.xEnd) / 2 
+        : ((existingPad.xStart + existingPad.xEnd + worldWidth) / 2) % worldWidth;
       
-      if (xStart <= xEnd) {
-        // Normal pad (no wrap)
-        if (existingPad.xStart <= existingPad.xEnd) {
-          // Both normal
-          overlap = !(xEnd < existingPad.xStart || xStart > existingPad.xEnd);
-        } else {
-          // Existing wraps, new doesn't
-          overlap = (xStart <= existingPad.xEnd || xEnd >= existingPad.xStart);
-        }
-      } else {
-        // New pad wraps around world seam
-        if (existingPad.xStart <= existingPad.xEnd) {
-          // New wraps, existing doesn't
-          overlap = (existingPad.xStart <= xEnd || existingPad.xEnd >= xStart);
-        } else {
-          // Both wrap - always overlap
-          overlap = true;
-        }
-      }
+      const dx = Math.abs(newPadCenterX - existingPadCenterX);
+      const wrappedDx = Math.min(dx, worldWidth - dx);
       
-      if (overlap) {
+      // Calculate vertical distance
+      const dy = Math.abs(y - existingPad.y);
+      
+      // Require separation of at least 1.5x combined widths horizontally
+      const combinedWidth = (width + (existingPad.width || 50)) * 0.75; // 1.5x with 0.5x buffer
+      
+      // Check if pads are too close horizontally AND vertically
+      if (wrappedDx < combinedWidth && dy < 50) {
         overlaps = true;
         break;
       }
@@ -144,6 +141,11 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     pads[minIdx].bonus2x = true;
   }
 
+  // Store original terrain heights before pad modifications
+  for (let i = 0; i <= segments; i++) {
+    originalHeights.set(i, points[i].y);
+  }
+  
   // Re-sync seam after all modifications
   points[segments].y = points[0].y;
 
@@ -295,26 +297,36 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   };
 
   // ===== POST-PROCESS TERRAIN FIXES =====
-  // Fix static pads: snap to exact terrain height and flatten
-  for (const pad of pads) {
+  // Final validation: ensure pads are properly placed and not overlapping
+  for (let i = pads.length - 1; i >= 0; i--) {
+    const pad = pads[i];
     const padCenterX = (pad.xStart + pad.xEnd) / 2;
     const padIdx = Math.floor((padCenterX / worldWidthLocal) * segments);
     const clampedIdx = Math.max(0, Math.min(segments - 1, padIdx));
     
-    // Use exact terrain height at pad center
-    const exactTerrainY = getHeightAt(padCenterX);
-    pad.y = exactTerrainY;
+    // Get original terrain height at pad center (before any modifications)
+    const originalTerrainY = originalHeights.get(clampedIdx) || points[clampedIdx].y;
     
-    // Re-flatten terrain around pad with wider area
+    // Verify pad is not buried below original terrain
+    if (pad.y > originalTerrainY + 5) {
+      console.warn(`[Terrain] Removing buried pad at (${padCenterX.toFixed(1)}, ${pad.y.toFixed(1)}), original terrain=${originalTerrainY.toFixed(1)}`);
+      pads.splice(i, 1);
+      continue;
+    }
+    
+    // Use original terrain height for proper placement
+    pad.y = originalTerrainY;
+    
+    // Re-flatten terrain around pad using original height
     const padWidth = pad.xEnd - pad.xStart;
     const halfCount = Math.max(2, Math.round((padWidth / step) * 1.5));
     
     for (let j = -halfCount; j <= halfCount; j++) {
       const idx = ((clampedIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
-      points[idx].y = exactTerrainY;
+      points[idx].y = originalTerrainY;
     }
     
-    console.log(`[Terrain] Post-fixed static pad at (${padCenterX.toFixed(1)}, ${exactTerrainY.toFixed(1)}) width=${padWidth.toFixed(1)}`);
+    console.log(`[Terrain] Validated static pad at (${padCenterX.toFixed(1)}, ${originalTerrainY.toFixed(1)}) width=${padWidth.toFixed(1)}`);
   }
 
   // ===== Generate collectibles =====
