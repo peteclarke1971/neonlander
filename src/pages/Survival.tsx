@@ -16,6 +16,14 @@ interface HighScore {
 const Survival: React.FC = () => {
   const [view, setView] = useState<View>("game");
   const [lastResult, setLastResult] = useState<SurvivalGameOverData | null>(null);
+  const [lowGraphics, setLowGraphics] = useState(() => {
+    try {
+      const stored = localStorage.getItem("lowgfx");
+      return stored === "true";
+    } catch {
+      return false;
+    }
+  });
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -48,7 +56,7 @@ const Survival: React.FC = () => {
   };
 
   if (view === "game") {
-    return <SurvivalEngine onGameOver={handleGameOver} />;
+    return <SurvivalEngine onGameOver={handleGameOver} lowGraphics={lowGraphics} />;
   }
 
   return (

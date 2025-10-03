@@ -16,13 +16,14 @@ import FireworksDisplay from "./FireworksDisplay";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
+  lowGraphics?: boolean;
 }
 
 const BASE_HEIGHT = 360;
 const AMPLITUDE = 180;
 const CHUNK_WIDTH = 2000;
 
-export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
+export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
@@ -221,10 +222,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     
     // Performance optimization
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const shouldOptimize = isMobile;
+    const shouldOptimize = isMobile || lowGraphics;
     const THRUSTER_PARTICLE_COUNT = shouldOptimize ? 2 : 25;
     
-    const dprInit = Math.min(2, window.devicePixelRatio || 1);
+    const dprInit = shouldOptimize ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
     
@@ -266,8 +267,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     // Background satellite spawner - use full canvas dimensions
     // Spectacular explosion helper functions
     const spawnExplosion = (cx: number, cy: number) => {
-      // Primary explosion wave (120-180 fast particles)
-      const primaryCount = 120 + Math.floor(Math.random() * 60);
+      // Primary explosion wave (reduce count for low graphics)
+      const primaryCount = shouldOptimize ? 20 : (120 + Math.floor(Math.random() * 60));
       for (let i = 0; i < primaryCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 600 + Math.random() * 600; // 3x faster for dramatic expansion
@@ -291,9 +292,9 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         });
       }
       
-      // Secondary fire/smoke layer (80-120 slower particles) - delayed spawn
+      // Secondary fire/smoke layer - delayed spawn
       setTimeout(() => {
-        const secondaryCount = 80 + Math.floor(Math.random() * 40);
+        const secondaryCount = shouldOptimize ? 10 : (80 + Math.floor(Math.random() * 40));
         for (let i = 0; i < secondaryCount; i++) {
           const a = Math.random() * Math.PI * 2;
           const s = 180 + Math.random() * 220; // 2.5x faster
@@ -315,8 +316,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }, 100);
       
-      // Spark system (40-60 tiny bright sparks)
-      const sparkCount = 40 + Math.floor(Math.random() * 20);
+      // Spark system
+      const sparkCount = shouldOptimize ? 10 : (40 + Math.floor(Math.random() * 20));
       for (let i = 0; i < sparkCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 800 + Math.random() * 600; // Much faster for dramatic streaks
@@ -331,8 +332,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         });
       }
       
-      // Enhanced shockwaves (3-4 concentric rings)
-      const ringCount = 3 + Math.floor(Math.random() * 2);
+      // Enhanced shockwaves
+      const ringCount = shouldOptimize ? 1 : (3 + Math.floor(Math.random() * 2));
       for (let i = 0; i < ringCount; i++) {
         shockwaves.push({ 
           x: cx, 
@@ -348,8 +349,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
     };
 
     const spawnDebris = (cx: number, cy: number, cvx: number, cvy: number) => {
-      // Enhanced debris system (80-120 pieces)
-      const pieceCount = 80 + Math.floor(Math.random() * 40);
+      // Enhanced debris system
+      const pieceCount = shouldOptimize ? 10 : (80 + Math.floor(Math.random() * 40));
       for (let i = 0; i < pieceCount; i++) {
         const dir = Math.random() * Math.PI * 2;
         const speed = 220 + Math.random() * 320;
@@ -878,6 +879,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
       }
       
+      // Limit thruster particles for performance
+      const maxThrusterParticles = shouldOptimize ? 30 : 300;
+      if (thrusterParticles.length > maxThrusterParticles) {
+        thrusterParticles.splice(0, thrusterParticles.length - maxThrusterParticles);
+      }
+      
       // Update explosion particles (matching working Asteroids physics)
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
@@ -907,6 +914,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         }
         
         if (d.life >= d.max) debris.splice(i, 1);
+      }
+      
+      // Limit debris count
+      const maxDebris = shouldOptimize ? 20 : 40;
+      if (debris.length > maxDebris) {
+        debris.splice(0, debris.length - maxDebris);
       }
 
       // Update shockwaves
@@ -1062,7 +1075,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       
       // Draw stars with terrain proximity culling
       ctx.shadowColor = neonColor;
-      ctx.shadowBlur = shouldOptimize ? (2 * dprInit) : (4 * dprInit);
+      ctx.shadowBlur = shouldOptimize ? 0 : (2 * dprInit);
       ctx.fillStyle = neonColor;
       const starLimit = shouldOptimize ? Math.min(100, stars.length) : stars.length;
       for (let i = 0; i < starLimit; i++) {
@@ -1123,7 +1136,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       // Draw terrain
       ctx.strokeStyle = neonColor;
       ctx.shadowColor = neonColor;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = shouldOptimize ? 2 : 8;
       ctx.lineWidth = 2;
       
       for (const chunk of chunks) {
@@ -1177,10 +1190,10 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
       for (const p of thrusterParticles) {
         const t = p.life / p.max;
         const alpha = 1 - t;
-        const size = shouldOptimize ? 2 : (3 - t * 2);
+        const size = shouldOptimize ? 1.5 : (3 - t * 2);
         ctx.fillStyle = `hsla(${styles.getPropertyValue('--neon')}, ${alpha})`;
         ctx.shadowColor = neonColor;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = shouldOptimize ? 0 : 6;
         ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       }
       
