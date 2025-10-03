@@ -30,6 +30,7 @@ interface FireworksDisplayProps {
   neonColor: string;
   onComplete: () => void;
   onSkip: () => void;
+  fireworkCount?: number;
 }
 
 // Object pool for particle reuse
@@ -56,7 +57,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   landingType,
   neonColor,
   onComplete,
-  onSkip
+  onSkip,
+  fireworkCount
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -496,7 +498,14 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     // Different show types based on landing
     let launchCount: number, patterns: string[], timing: number;
     
-    switch (landingType) {
+    // If fireworkCount is provided (survival mode), use that
+    if (fireworkCount !== undefined) {
+      launchCount = fireworkCount;
+      patterns = ['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'];
+      timing = 300;
+    } else {
+      // Original logic for main game
+      switch (landingType) {
       case 'ghost-beaten':
         // Four giant ghost fireworks display
         launchCount = 4;
@@ -517,6 +526,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         launchCount = 8;
         patterns = ['starburst', 'willow', 'star'];
         timing = 200;
+      }
     }
     
     // Stagger launches with spectacular finale

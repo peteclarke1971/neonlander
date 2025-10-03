@@ -780,7 +780,6 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                   setLandings(currentLandings);
                   
                   // Trigger fireworks based on landing count
-                  const fireworkCount = currentLandings;
                   const isMoving = !!movingPad;
                   const isBonus = landingPad.bonus2x;
                   
@@ -788,28 +787,21 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
                   fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
                   fireworkTimeoutsRef.current = [];
                   
-                  // Spawn fireworks with staggered timing
-                  for (let i = 0; i < fireworkCount; i++) {
-                    const timeout = setTimeout(() => {
-                      // Trigger a single firework by showing display momentarily
-                      setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
-                      setShowFireworks(true);
-                      setFireworksActive(true);
-                      
-                      // Hide after brief moment to allow next firework
-                      setTimeout(() => {
-                        setShowFireworks(false);
-                      }, 100);
-                    }, i * 300 + 500); // 500ms initial delay, then 300ms between each
+                  // Show fireworks after brief delay
+                  const initialTimeout = setTimeout(() => {
+                    setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
+                    setShowFireworks(true);
+                    setFireworksActive(true);
                     
-                    fireworkTimeoutsRef.current.push(timeout);
-                  }
+                    // Auto-hide after 6 seconds if player doesn't take off
+                    const hideTimeout = setTimeout(() => {
+                      setShowFireworks(false);
+                      setFireworksActive(false);
+                    }, 6000);
+                    fireworkTimeoutsRef.current.push(hideTimeout);
+                  }, 500);
                   
-                  // Reset fireworks state after all are done
-                  const finalTimeout = setTimeout(() => {
-                    setFireworksActive(false);
-                  }, fireworkCount * 300 + 3000);
-                  fireworkTimeoutsRef.current.push(finalTimeout);
+                  fireworkTimeoutsRef.current.push(initialTimeout);
                 }
                 setFuel(fuelAmount);
                 
@@ -866,6 +858,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
             hasMovedFromStart = true; // Mark that player has taken off
             padToClear = landedPad; // Mark this pad to be removed once cleared
             landedPad = null;
+            
+            // Hide fireworks when taking off
+            setShowFireworks(false);
+            setFireworksActive(false);
+            fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
+            fireworkTimeoutsRef.current = [];
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
@@ -1434,6 +1432,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver }) => {
         <FireworksDisplay
           landingType={landingType}
           neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
+          fireworkCount={landings}
           onComplete={() => setShowFireworks(false)}
           onSkip={() => setShowFireworks(false)}
         />
