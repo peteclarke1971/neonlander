@@ -1471,6 +1471,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
           fireworkCount={landings}
           onComplete={() => setShowFireworks(false)}
           onSkip={() => setShowFireworks(false)}
+          lowGraphics={lowGraphics}
         />
       )}
     </div>

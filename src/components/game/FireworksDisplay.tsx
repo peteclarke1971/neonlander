@@ -31,6 +31,7 @@ interface FireworksDisplayProps {
   onComplete: () => void;
   onSkip: () => void;
   fireworkCount?: number;
+  lowGraphics?: boolean;
 }
 
 // Object pool for particle reuse
@@ -58,7 +59,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   neonColor,
   onComplete,
   onSkip,
-  fireworkCount
+  fireworkCount,
+  lowGraphics = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -746,8 +748,10 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return () => clearTimeout(timer);
   }, [onComplete, landingType]);
 
-  // Handle input for skipping
+  // Handle input for skipping (only in low graphics mode)
   useEffect(() => {
+    if (!lowGraphics) return;
+
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.code === 'ArrowUp' || e.code === 'Space') {
         onSkip();
@@ -756,10 +760,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [onSkip]);
+  }, [onSkip, lowGraphics]);
 
-  // Gamepad input for skipping
+  // Gamepad input for skipping (only in low graphics mode)
   useEffect(() => {
+    if (!lowGraphics) return;
+
     const checkGamepad = () => {
       const gamepad = anyGamepad();
       if (gamepad && (gamepad.buttons[0]?.pressed || gamepad.buttons[1]?.pressed)) {
@@ -769,7 +775,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     const interval = setInterval(checkGamepad, 100);
     return () => clearInterval(interval);
-  }, [onSkip]);
+  }, [onSkip, lowGraphics]);
 
   // Performance-optimized rendering with shapes, glow, and trails
   useEffect(() => {
