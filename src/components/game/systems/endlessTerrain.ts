@@ -201,7 +201,7 @@ export class EndlessTerrainGenerator {
       pads.push({
         xStart: padX - width / 2,
         xEnd: padX + width / 2,
-        y: targetY,
+        y: targetY - 2, // Place pad ON TOP of terrain
         multiplier,
         width,
         bonus2x: false
@@ -286,6 +286,21 @@ export class EndlessTerrainGenerator {
       
       if (movingPad) {
         movingPads.push(movingPad);
+        
+        // Flatten terrain beneath shuttle moving pads
+        if (movingPad.motion === "shuttle") {
+          const shuttleY = movingPad.pos0.y;
+          const startPadX = Math.min(movingPad.pos0.x, movingPad.pos1.x) - startX;
+          const endPadX = Math.max(movingPad.pos0.x, movingPad.pos1.x) - startX;
+          
+          // Flatten all terrain points beneath the shuttle path
+          for (let i = 0; i < points.length; i++) {
+            const pointX = points[i].x;
+            if (pointX >= startPadX - 20 && pointX <= endPadX + 20) {
+              points[i].y = shuttleY + 2; // Terrain at bottom of pad
+            }
+          }
+        }
       }
     }
     

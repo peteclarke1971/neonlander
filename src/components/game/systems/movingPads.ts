@@ -82,10 +82,10 @@ export class MovingPadSystem {
 
     if (!forced && rand() > spawnChance) return null;
 
-    // Choose motion type (prefer shuttle for forced generation)
+    // Choose motion type - only shuttle for survival mode, elevator/shuttle for caverns
     const motionTypes: MovingPad["motion"][] = isCavern 
       ? ["elevator", "shuttle"] 
-      : forced ? ["shuttle"] : ["shuttle", "arc"];
+      : ["shuttle"]; // Only horizontal shuttle pads for survival mode
     const motion = motionTypes[Math.floor(rand() * motionTypes.length)];
 
     // Speed band based on difficulty (reduced to 25% of original)

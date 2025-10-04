@@ -767,8 +767,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
                 shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
                 shipAngularVel = 0;
                 
-                // Add fuel refill (doubled)
-                const refillAmount = 60 - (currentDistance / 5000) * 30; // 60 to 30 fuel
+                // Add fuel refill (consistent throughout the game)
+                const refillAmount = 60; // Consistent 60 fuel per landing
                 fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
@@ -1151,21 +1151,50 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
         }
         ctx.stroke();
         
-        // Draw pads
+        // Draw pads with 2x labels
         for (const pad of chunk.pads) {
           ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
           ctx.fillRect(pad.xStart, pad.y - 2, pad.xEnd - pad.xStart, 4);
           ctx.strokeStyle = neonColor;
           ctx.strokeRect(pad.xStart, pad.y - 2, pad.xEnd - pad.xStart, 4);
+          
+          // Add 2x label for bonus pads
+          if (pad.bonus2x) {
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+            ctx.shadowColor = neonColor;
+            ctx.shadowBlur = 18 * dprInit;
+            ctx.fillStyle = neonColor;
+            ctx.globalAlpha = 0.95;
+            const centerX = (pad.xStart + pad.xEnd) / 2;
+            ctx.fillText("2x", centerX, pad.y + 6);
+            ctx.restore();
+          }
         }
         
-        // Draw moving pads
+        // Draw moving pads with MEGA labels
         for (const mp of chunk.movingPads) {
           const w = mp.xEnd - mp.xStart;
+          const centerX = mp.currentPos.x;
+          
           ctx.fillStyle = `rgba(255,200,100,0.3)`;
-          ctx.fillRect(mp.currentPos.x - w / 2, mp.currentPos.y - 2, w, 4);
+          ctx.fillRect(centerX - w / 2, mp.currentPos.y - 2, w, 4);
           ctx.strokeStyle = "#FFC864";
-          ctx.strokeRect(mp.currentPos.x - w / 2, mp.currentPos.y - 2, w, 4);
+          ctx.strokeRect(centerX - w / 2, mp.currentPos.y - 2, w, 4);
+          
+          // Add MEGA label
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+          ctx.shadowColor = "#FFC864";
+          ctx.shadowBlur = 18 * dprInit;
+          ctx.fillStyle = "#FFC864";
+          ctx.globalAlpha = 0.95;
+          ctx.fillText("MEGA", centerX, mp.currentPos.y - 6);
+          ctx.restore();
         }
       }
       
