@@ -23,7 +23,8 @@ export class MovingPadConstraints {
     getHeightAt: (x: number) => number,
     existingPads: Pad[],
     worldWidth: number,
-    constraints: Partial<PathConstraints> = {}
+    constraints: Partial<PathConstraints> = {},
+    movingPadWidth: number = 40
   ): boolean {
     const config = { ...this.DEFAULT_CONSTRAINTS, ...constraints };
     
@@ -43,7 +44,7 @@ export class MovingPadConstraints {
     }
 
     // Check distance from existing pads
-    if (!this.checkPadSeparation(pos0, pos1, existingPads, config.safetyMargin)) {
+    if (!this.checkPadSeparation(pos0, pos1, existingPads, movingPadWidth, config.safetyMargin)) {
       return false;
     }
 
@@ -57,7 +58,8 @@ export class MovingPadConstraints {
     existingPads: Pad[],
     worldWidth: number,
     worldHeight: number,
-    constraints: Partial<PathConstraints> = {}
+    constraints: Partial<PathConstraints> = {},
+    movingPadWidth: number = 40
   ): boolean {
     const config = { ...this.DEFAULT_CONSTRAINTS, ...constraints };
     
@@ -72,7 +74,7 @@ export class MovingPadConstraints {
     }
 
     // Check distance from existing pads
-    if (!this.checkPadSeparation(pos0, pos1, existingPads, config.safetyMargin)) {
+    if (!this.checkPadSeparation(pos0, pos1, existingPads, movingPadWidth, config.safetyMargin)) {
       return false;
     }
 
@@ -204,14 +206,20 @@ export class MovingPadConstraints {
     pos0: { x: number; y: number },
     pos1: { x: number; y: number },
     existingPads: Pad[],
+    movingPadWidth: number,
     margin: number
   ): boolean {
     for (const pad of existingPads) {
       const padCenterX = (pad.xStart + pad.xEnd) / 2;
+      const padWidth = pad.width || 50;
+      
+      // Calculate minimum distance based on pad widths
+      const minDistance = Math.max(movingPadWidth, padWidth) + 150;
+      
       const dist0 = Math.sqrt((pos0.x - padCenterX) ** 2 + (pos0.y - pad.y) ** 2);
       const dist1 = Math.sqrt((pos1.x - padCenterX) ** 2 + (pos1.y - pad.y) ** 2);
       
-      if (dist0 < margin || dist1 < margin) return false;
+      if (dist0 < minDistance || dist1 < minDistance) return false;
     }
     return true;
   }

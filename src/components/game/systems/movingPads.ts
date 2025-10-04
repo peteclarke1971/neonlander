@@ -234,15 +234,15 @@ export class MovingPadSystem {
       }
     }
 
+    // Create pad dimensions
+    const width = 24 + rand() * 16; // 24-40 pixels
+    
     // Validate path safety (simplified for now)
     const pathClearance = motion === "shuttle" ? 4 : baseClearance;
-    const pathIsValid = this.validatePath(pos0, pos1, pathClearance, getHeightAt, existingPads, worldWidth, worldHeight, motion);
+    const pathIsValid = this.validatePath(pos0, pos1, pathClearance, getHeightAt, existingPads, worldWidth, worldHeight, motion, width);
     if (!pathIsValid && !forced) {
       return null;
     }
- 
-    // Create pad dimensions
-    const width = 24 + rand() * 16; // 24-40 pixels
     const padSeed = Math.floor(rand() * 1000000);
 
     const movingPad: MovingPad = {
@@ -384,7 +384,8 @@ export class MovingPadSystem {
     existingPads: Pad[],
     worldWidth: number,
     worldHeight: number,
-    motion?: "shuttle" | "elevator" | "arc"
+    motion?: "shuttle" | "elevator" | "arc",
+    padWidth: number = 40
   ): boolean {
     // Check bounds
     const minX = Math.min(pos0.x, pos1.x);
@@ -469,34 +470,16 @@ export class MovingPadSystem {
       }
     }
 
-  // Check distance from existing pads - ensure moving pad is on isolated flat terrain
+  // Check distance from existing pads with width-aware spacing
     for (const pad of existingPads) {
       const padCenterX = (pad.xStart + pad.xEnd) / 2;
-      const padWidth = pad.xEnd - pad.xStart;
+      const existingPadWidth = pad.width || (pad.xEnd - pad.xStart);
+      const minSeparation = Math.max(padWidth, existingPadWidth) + 150;
       
-      // For horizontal moving pads, ensure significant separation on same terrain level
-      if (motion === "shuttle") {
-        const minX = Math.min(pos0.x, pos1.x) - (24 + 16) / 2; // moving pad half-width
-        const maxX = Math.max(pos0.x, pos1.x) + (24 + 16) / 2; // moving pad half-width
-        const padMinX = pad.xStart;
-        const padMaxX = pad.xEnd;
-        
-        // Check horizontal overlap with buffer
-        const horizontalBuffer = Math.max(100, padWidth * 2); // At least 100px or 2x pad width
-        if (!(maxX + horizontalBuffer < padMinX || minX - horizontalBuffer > padMaxX)) {
-          // Check if on similar terrain level (within 20px height difference)
-          const heightDiff = Math.abs(pos0.y - pad.y);
-          if (heightDiff < 20) {
-            return false; // Too close on same terrain level
-          }
-        }
-      } else {
-        // For vertical/arc moving pads, use original distance check
-        const dist0 = Math.sqrt((pos0.x - padCenterX) ** 2 + (pos0.y - pad.y) ** 2);
-        const dist1 = Math.sqrt((pos1.x - padCenterX) ** 2 + (pos1.y - pad.y) ** 2);
-        
-        if (dist0 < clearance * 2 || dist1 < clearance * 2) return false;
-      }
+      const dist0 = Math.sqrt((pos0.x - padCenterX) ** 2 + (pos0.y - pad.y) ** 2);
+      const dist1 = Math.sqrt((pos1.x - padCenterX) ** 2 + (pos1.y - pad.y) ** 2);
+      
+      if (dist0 < minSeparation || dist1 < minSeparation) return false;
     }
 
     return true;

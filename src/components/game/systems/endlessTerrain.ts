@@ -173,14 +173,37 @@ export class EndlessTerrainGenerator {
       { min: 80, max: 170, multiplier: 2 }  // Large
     ];
     
+    // Helper: Check if new pad would overlap with existing pads
+    const checkPadCollision = (newPadX: number, newPadWidth: number, existingPads: Pad[]) => {
+      for (const pad of existingPads) {
+        const padCenterX = (pad.xStart + pad.xEnd) / 2;
+        const padWidth = pad.width || 50;
+        const minDistance = (newPadWidth + padWidth) / 2 + 100;
+        if (Math.abs(newPadX - padCenterX) < minDistance) {
+          return true; // Collision detected
+        }
+      }
+      return false;
+    };
+    
     for (let i = (isFirstChunk ? 1 : 0); i < padCount; i++) {
-      const centerIdx = Math.floor(rand() * (segments - 6)) + 3;
-      const padX = startX + centerIdx * step;
+      let attempts = 0;
+      let centerIdx, padX, width, multiplier, sizeCategory;
       
-      // Pick size category
-      const sizeCategory = padSizes[Math.floor(rand() * padSizes.length)];
-      const width = sizeCategory.min + rand() * (sizeCategory.max - sizeCategory.min);
-      const multiplier = sizeCategory.multiplier;
+      // Try up to 10 times to find non-overlapping position
+      do {
+        centerIdx = Math.floor(rand() * (segments - 6)) + 3;
+        padX = startX + centerIdx * step;
+        
+        // Pick size category
+        sizeCategory = padSizes[Math.floor(rand() * padSizes.length)];
+        width = sizeCategory.min + rand() * (sizeCategory.max - sizeCategory.min);
+        multiplier = sizeCategory.multiplier;
+        attempts++;
+      } while (checkPadCollision(padX, width, pads) && attempts < 10);
+      
+      // Skip this pad if we couldn't find a valid position
+      if (attempts >= 10) continue;
       
       // Check if this is on a steep incline (jutting pad)
       const isJuttingPad = i === 0 && isSteepChunk && rand() > 0.5;
