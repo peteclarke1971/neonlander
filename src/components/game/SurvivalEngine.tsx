@@ -43,6 +43,9 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
   const [fuel, setFuel] = useState(200);
   const fuelCap = 200;
   
+  // Volcano particles state (persistent between frames)
+  const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -500,19 +503,18 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
         allAnomalies.push(...chunk.anomalies);
       }
       
-      // Update volcanoes
-      let allVolcanoParticles: VolcanoParticle[] = [];
+      // Update volcanoes (use persistent state)
       if (allVolcanoes.length > 0) {
         const level = Math.floor(currentDistance / 100) + 1; // Level based on distance
         const volcanoUpdate = updateVolcanoes(
           allVolcanoes,
-          allVolcanoParticles,
+          volcanoParticles,
           dt,
           level,
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
-        allVolcanoParticles = volcanoUpdate.newParticles;
+        setVolcanoParticles(volcanoUpdate.newParticles);
       }
       
       // Ship input and rotation (only when alive)
@@ -723,8 +725,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
           }
           
           // Check volcano particle collisions
-          if (allVolcanoParticles.length > 0) {
-            if (checkVolcanoParticleCollision(allVolcanoParticles, shipX, shipY, 8)) {
+          if (volcanoParticles.length > 0) {
+            if (checkVolcanoParticleCollision(volcanoParticles, shipX, shipY, 8)) {
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
@@ -1208,7 +1210,7 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
         drawVolcanoes(
           ctx,
           allVolcanoes,
-          allVolcanoParticles,
+          volcanoParticles,
           neonColor,
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
