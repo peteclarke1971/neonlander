@@ -41,8 +41,6 @@ const Survival: React.FC = () => {
     localStorage.setItem("survival-high-scores", JSON.stringify(seed));
     return seed;
   });
-  const [bullseyeStreak, setBullseyeStreak] = useState(0);
-  const [speedBonusStreak, setSpeedBonusStreak] = useState(0);
 
   const handleGameOver = (data: SurvivalGameOverData) => {
     setLastResult(data);
@@ -54,8 +52,6 @@ const Survival: React.FC = () => {
   };
 
   const retryGame = () => {
-    setBullseyeStreak(0);
-    setSpeedBonusStreak(0);
     setView("game");
   };
 
@@ -63,10 +59,6 @@ const Survival: React.FC = () => {
     return <SurvivalEngine 
       onGameOver={handleGameOver} 
       lowGraphics={lowGraphics}
-      bullseyeStreak={bullseyeStreak}
-      setBullseyeStreak={setBullseyeStreak}
-      speedBonusStreak={speedBonusStreak}
-      setSpeedBonusStreak={setSpeedBonusStreak}
     />;
   }
 

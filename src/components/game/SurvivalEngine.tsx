@@ -17,10 +17,6 @@ import FireworksDisplay from "./FireworksDisplay";
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
   lowGraphics?: boolean;
-  bullseyeStreak: number;
-  setBullseyeStreak: (streak: number) => void;
-  speedBonusStreak: number;
-  setSpeedBonusStreak: (streak: number) => void;
 }
 
 const BASE_HEIGHT = 360;
@@ -29,11 +25,7 @@ const CHUNK_WIDTH = 2000;
 
 export const SurvivalEngine: React.FC<Props> = ({ 
   onGameOver, 
-  lowGraphics = false,
-  bullseyeStreak,
-  setBullseyeStreak,
-  speedBonusStreak,
-  setSpeedBonusStreak
+  lowGraphics = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +48,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   
   // Volcano particles state (persistent between frames)
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
+  
+  // Bonus streak tracking (internal refs to avoid re-renders)
+  const bullseyeStreakRef = useRef(0);
+  const speedBonusStreakRef = useRef(0);
   
   // Timer state for speed bonus calculation
   const [timerActive, setTimerActive] = useState(false);
@@ -816,8 +812,8 @@ export const SurvivalEngine: React.FC<Props> = ({
                   
                   if (bullseye) {
                     // Increment bullseye streak (cap at 8x)
-                    const newStreak = Math.min(8, bullseyeStreak + 1);
-                    setBullseyeStreak(newStreak);
+                    bullseyeStreakRef.current = Math.min(8, bullseyeStreakRef.current + 1);
+                    const newStreak = bullseyeStreakRef.current;
                     
                     const bullseyeBonus = movingPad 
                       ? Math.floor(500 * newStreak * (movingPad as MovingPad).scoreMult)
@@ -829,15 +825,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                       : "500 POINT BULLSEYE";
                   } else {
                     // Reset bullseye streak on miss
-                    setBullseyeStreak(0);
+                    bullseyeStreakRef.current = 0;
                   }
                   
                   // Calculate speed bonus
                   const speedBonus = elapsed < 10;
                   if (speedBonus) {
                     // Increment speed bonus streak (cap at 8x)
-                    const newStreak = Math.min(8, speedBonusStreak + 1);
-                    setSpeedBonusStreak(newStreak);
+                    speedBonusStreakRef.current = Math.min(8, speedBonusStreakRef.current + 1);
+                    const newStreak = speedBonusStreakRef.current;
                     
                     const speedBonusPoints = movingPad 
                       ? Math.floor(500 * newStreak * (movingPad as MovingPad).scoreMult)
@@ -853,7 +849,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                     }
                   } else {
                     // Reset speed bonus streak on miss
-                    setSpeedBonusStreak(0);
+                    speedBonusStreakRef.current = 0;
                   }
                   
                   currentScore += landingScore;
