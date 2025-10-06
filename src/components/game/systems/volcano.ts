@@ -32,17 +32,41 @@ function mulberry32(seed: number) {
 }
 
 export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
-  if (level <= 3) {
+  if (level <= 1) {
+    // Very weak intro volcano - gentle learning phase
     return {
       count: 1,
-      minSize: 8, // quarter of smallest pad (32/4)
+      minSize: 6,
+      maxSize: 10,
+      baseInterval: 15, // Long time between eruptions
+      eruptionDuration: 1.2, // Short eruptions
+      particleCount: 6, // Very few particles
+      power: 0.25 // Weak ejection power
+    };
+  } else if (level <= 2) {
+    // Still gentle - building familiarity
+    return {
+      count: 1,
+      minSize: 7,
+      maxSize: 12,
+      baseInterval: 12,
+      eruptionDuration: 1.5,
+      particleCount: 8,
+      power: 0.35
+    };
+  } else if (level <= 3) {
+    // Starting to get challenging
+    return {
+      count: 1,
+      minSize: 8,
       maxSize: 16,
-      baseInterval: 8, // 8 seconds between eruptions
+      baseInterval: 8,
       eruptionDuration: 2,
       particleCount: 15,
       power: 0.6
     };
   } else if (level <= 8) {
+    // Medium difficulty
     return {
       count: 2,
       minSize: 12,
@@ -53,6 +77,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       power: 0.8
     };
   } else if (level <= 40) {
+    // High difficulty
     return {
       count: Math.min(4, 2 + Math.floor((level - 8) / 3)),
       minSize: 16,
@@ -225,12 +250,18 @@ export function updateVolcanoes(
           // Canvas Y increases downward; to shoot upward use -PI/2 as the base angle
           const angle = (Math.random() - 0.5) * Math.PI * 0.6 - Math.PI / 2; // mostly upward
           
-          // Height scaling by level: 1-10 (2x), 10-30 (3x), 30+ (4x)
-          let heightMultiplier = 2; // default 2x for levels 1-10
-          if (level >= 30) {
-            heightMultiplier = 4;
-          } else if (level >= 10) {
-            heightMultiplier = 3;
+          // Height scaling by level - gentler progression for early game
+          let heightMultiplier = 1; // Start at 1x for levels 1-2
+          if (level <= 2) {
+            heightMultiplier = 1.0; // No multiplier for intro levels
+          } else if (level <= 5) {
+            heightMultiplier = 1.5; // Gentle increase
+          } else if (level <= 10) {
+            heightMultiplier = 2.0; // Medium
+          } else if (level < 30) {
+            heightMultiplier = 3.0; // High
+          } else {
+            heightMultiplier = 4.0; // Extreme
           }
           
           const speed = volcano.power * (80 + Math.random() * 120) * heightMultiplier;
