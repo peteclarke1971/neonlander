@@ -32,7 +32,29 @@ function mulberry32(seed: number) {
 }
 
 export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
-  if (level <= 3) {
+  if (level <= 1) {
+    // Very weak starting volcanoes
+    return {
+      count: 1,
+      minSize: 6,
+      maxSize: 12,
+      baseInterval: 12, // Long interval between eruptions
+      eruptionDuration: 1.5, // Short eruption duration
+      particleCount: 8, // Few particles
+      power: 0.3 // Very weak ejection power
+    };
+  } else if (level <= 2) {
+    // Still gentle
+    return {
+      count: 1,
+      minSize: 7,
+      maxSize: 14,
+      baseInterval: 10,
+      eruptionDuration: 1.8,
+      particleCount: 10,
+      power: 0.4
+    };
+  } else if (level <= 3) {
     return {
       count: 1,
       minSize: 8, // quarter of smallest pad (32/4)
