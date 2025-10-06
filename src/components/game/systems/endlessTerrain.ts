@@ -247,7 +247,7 @@ export class EndlessTerrainGenerator {
     // Generate moving pads at higher difficulty using advanced system with guaranteed MEGA pads
     const movingPads: MovingPad[] = [];
     
-    if (difficulty > 0.1) {
+    if (difficulty > 0.05) {
       // Helper to get height at x within this chunk
       const getHeightAt = (x: number) => {
         if (x < startX || x > endX) return this.config.baseHeight;

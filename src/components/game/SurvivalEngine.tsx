@@ -46,6 +46,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
   // Volcano particles state (persistent between frames)
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
   
+  // Timer state for speed bonus calculation
+  const [timerActive, setTimerActive] = useState(false);
+  const timerActiveRef = useRef(false);
+  const lastTakeoffTime = useRef<number>(0);
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -188,6 +193,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
     type Shockwave = { x: number; y: number; life: number; max: number };
     const shockwaves: Shockwave[] = [];
     let flashT = 0; // screen flash
+    let bullseyeT = -1; // overlay timer for bullseye/speed bonus text
+    let bonusText = ""; // text to display for bonus
     
     // Starfield system (matching main game) - arrays declared here, initialized later
     type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
@@ -477,8 +484,8 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
       // Update terrain chunks - generate new chunks as ship moves right
       const rightmostChunk = chunks[chunks.length - 1];
       if (shipX > rightmostChunk.endX - CHUNK_WIDTH) {
-        // Calculate difficulty based on distance traveled
-        const difficulty = Math.min(1, currentDistance / 500); // Accelerated for testing
+        // Calculate difficulty based on distance traveled (accelerated ramp for moving pads)
+        const difficulty = Math.min(1, currentDistance / 300);
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
         
@@ -769,16 +776,59 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
                 shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
                 shipAngularVel = 0;
                 
+                // Stop speed bonus timer
+                const elapsed = currentTime - lastTakeoffTime.current;
+                timerActiveRef.current = false;
+                setTimerActive(false);
+                
                 // Add fuel refill (consistent throughout the game)
                 const refillAmount = 60; // Consistent 60 fuel per landing
                 fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
-                  const landingScore = 1000 * (landingPad.multiplier || 1);
+                  // Base landing score
+                  let landingScore = 1000 * (landingPad.multiplier || 1);
+                  
+                  // MEGA multiplier for moving pads
+                  if (movingPad) {
+                    landingScore = Math.floor(landingScore * (movingPad as MovingPad).scoreMult);
+                  }
+                  
+                  // Calculate bullseye bonus (3% tolerance like main game)
+                  const padWidth = landingPad.width || (landingPad.xEnd - landingPad.xStart);
+                  const padCenterX = movingPad 
+                    ? (movingPad as MovingPad).currentPos.x
+                    : (landingPad.xStart + landingPad.xEnd) / 2;
+                  const dx = Math.abs(shipX - padCenterX);
+                  const bullseye = dx <= padWidth * 0.03;
+                  
+                  if (bullseye) {
+                    const bullseyeBonus = movingPad 
+                      ? Math.floor(500 * (movingPad as MovingPad).scoreMult)
+                      : 500;
+                    landingScore += bullseyeBonus;
+                    bullseyeT = 0;
+                    bonusText = "500 POINT BULLSEYE";
+                  }
+                  
+                  // Calculate speed bonus
+                  const speedBonus = elapsed < 10;
+                  if (speedBonus) {
+                    const speedBonusPoints = movingPad 
+                      ? Math.floor(500 * (movingPad as MovingPad).scoreMult)
+                      : 500;
+                    landingScore += speedBonusPoints;
+                    
+                    // If both bonuses, show speed bonus after bullseye
+                    if (!bullseye) {
+                      bullseyeT = 0;
+                      bonusText = "500 POINT SPEED BONUS";
+                    }
+                  }
+                  
                   currentScore += landingScore;
                   currentLandings++;
-                  
                   setScore(currentScore);
                   setLandings(currentLandings);
                   
@@ -864,6 +914,11 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
+            
+            // Start speed bonus timer
+            lastTakeoffTime.current = currentTime;
+            timerActiveRef.current = true;
+            setTimerActive(true);
           }
         }
       }
@@ -933,6 +988,12 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
 
       // Update screen flash
       if (flashT > 0) flashT = Math.max(0, flashT - dt * 2);
+      
+      // Bullseye/Speed bonus overlay timer
+      if (bullseyeT >= 0) {
+        bullseyeT += dt;
+        if (bullseyeT > 2.2) bullseyeT = -1;
+      }
       
       // Update starfield (shooting stars and satellites)
       if (currentTime >= nextShooting) {
@@ -1335,6 +1396,30 @@ export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = fals
       ctx.restore();
       
       ctx.restore();
+      
+      // Screen-space overlays (bonus popups)
+      if (bullseyeT >= 0 && bonusText) {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const T = 2.0;
+        const t = Math.min(1, bullseyeT / T);
+        const scaleAmt = 0.85 + Math.sin(Math.PI * t) * 0.6;
+        const alpha = 1 - Math.abs(2 * t - 1);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(c.width / 2, c.height / 2);
+        ctx.scale(scaleAmt, scaleAmt);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `900 ${42 * dpr}px "Orbitron", sans-serif`;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 28;
+        ctx.globalAlpha = 0.85 * alpha;
+        ctx.strokeStyle = neonColor;
+        ctx.lineWidth = 4 * dpr;
+        ctx.strokeText(bonusText, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
       
       // Draw screen flash effect (white → orange → red gradient fade)
       if (flashT > 0) {
