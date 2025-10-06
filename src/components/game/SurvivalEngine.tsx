@@ -17,24 +17,13 @@ import FireworksDisplay from "./FireworksDisplay";
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
   lowGraphics?: boolean;
-  bullseyeStreak: number;
-  setBullseyeStreak: (streak: number) => void;
-  speedBonusStreak: number;
-  setSpeedBonusStreak: (streak: number) => void;
 }
 
 const BASE_HEIGHT = 360;
 const AMPLITUDE = 180;
 const CHUNK_WIDTH = 2000;
 
-export const SurvivalEngine: React.FC<Props> = ({ 
-  onGameOver, 
-  lowGraphics = false,
-  bullseyeStreak,
-  setBullseyeStreak,
-  speedBonusStreak,
-  setSpeedBonusStreak
-}) => {
+export const SurvivalEngine: React.FC<Props> = ({ onGameOver, lowGraphics = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
@@ -815,47 +804,27 @@ export const SurvivalEngine: React.FC<Props> = ({
                   const bullseye = dx <= padWidth * 0.03;
                   
                   if (bullseye) {
-                    // Increment streak (cap at 8x)
-                    const newStreak = Math.min(8, bullseyeStreak + 1);
-                    setBullseyeStreak(newStreak);
-                    const multiplier = newStreak;
-                    
                     const bullseyeBonus = movingPad 
-                      ? Math.floor(500 * multiplier * (movingPad as MovingPad).scoreMult)
-                      : 500 * multiplier;
+                      ? Math.floor(500 * (movingPad as MovingPad).scoreMult)
+                      : 500;
                     landingScore += bullseyeBonus;
                     bullseyeT = 0;
-                    bonusText = multiplier > 1 
-                      ? `500 POINT BULLSEYE x ${multiplier}`
-                      : "500 POINT BULLSEYE";
-                  } else {
-                    // Reset streak on miss
-                    setBullseyeStreak(0);
+                    bonusText = "500 POINT BULLSEYE";
                   }
                   
                   // Calculate speed bonus
                   const speedBonus = elapsed < 10;
                   if (speedBonus) {
-                    // Increment streak (cap at 8x)
-                    const newStreak = Math.min(8, speedBonusStreak + 1);
-                    setSpeedBonusStreak(newStreak);
-                    const multiplier = newStreak;
-                    
                     const speedBonusPoints = movingPad 
-                      ? Math.floor(500 * multiplier * (movingPad as MovingPad).scoreMult)
-                      : 500 * multiplier;
+                      ? Math.floor(500 * (movingPad as MovingPad).scoreMult)
+                      : 500;
                     landingScore += speedBonusPoints;
                     
                     // If both bonuses, show speed bonus after bullseye
                     if (!bullseye) {
                       bullseyeT = 0;
-                      bonusText = multiplier > 1
-                        ? `500 POINT SPEED BONUS x ${multiplier}`
-                        : "500 POINT SPEED BONUS";
+                      bonusText = "500 POINT SPEED BONUS";
                     }
-                  } else {
-                    // Reset streak on miss
-                    setSpeedBonusStreak(0);
                   }
                   
                   currentScore += landingScore;

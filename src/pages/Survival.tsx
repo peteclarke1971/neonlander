@@ -24,8 +24,6 @@ const Survival: React.FC = () => {
       return false;
     }
   });
-  const [bullseyeStreak, setBullseyeStreak] = useState(0);
-  const [speedBonusStreak, setSpeedBonusStreak] = useState(0);
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -54,22 +52,11 @@ const Survival: React.FC = () => {
   };
 
   const retryGame = () => {
-    setBullseyeStreak(0);
-    setSpeedBonusStreak(0);
     setView("game");
   };
 
   if (view === "game") {
-    return (
-      <SurvivalEngine 
-        onGameOver={handleGameOver} 
-        lowGraphics={lowGraphics}
-        bullseyeStreak={bullseyeStreak}
-        setBullseyeStreak={setBullseyeStreak}
-        speedBonusStreak={speedBonusStreak}
-        setSpeedBonusStreak={setSpeedBonusStreak}
-      />
-    );
+    return <SurvivalEngine onGameOver={handleGameOver} lowGraphics={lowGraphics} />;
   }
 
   return (

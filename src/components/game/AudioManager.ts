@@ -342,11 +342,9 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Plays crash sounds for explosion/crash events - use preloaded buffer for instant playback
-    const useFirst = (this.crashToggle = !this.crashToggle);
-    const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
-    if (buf) {
-      this.playOneShot(buf, 0.9);
+    // Now plays landing sound for explosion events - use preloaded buffer for instant playback
+    if (this.landingBuffer) {
+      this.playOneShot(this.landingBuffer, 0.9);
     } else {
       // Fallback to noise if buffer not available
       this.playNoise(0.35, 0.8);
@@ -357,12 +355,18 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Plays landing sound for successful landing
-    if (this.landingBuffer) {
-      this.playOneShot(this.landingBuffer, 0.7);
-    } else {
-      this.playNoise(0.2, 0.4);
+    // Now plays crash sounds for successful landing
+    if (!this.crash1Buffer && !this.crash2Buffer) {
+      // Load buffers if not available
+      await Promise.all([
+        this.loadBuffer("/audio/crash1.mp3").then(buf => this.crash1Buffer = buf),
+        this.loadBuffer("/audio/crash2.mp3").then(buf => this.crash2Buffer = buf)
+      ]);
     }
+    
+    const useFirst = (this.crashToggle = !this.crashToggle);
+    const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
+    if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
   }
 
   click() {
