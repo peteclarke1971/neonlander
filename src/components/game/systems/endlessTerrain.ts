@@ -329,8 +329,8 @@ export class EndlessTerrainGenerator {
     
     // Generate volcanoes at higher difficulty
     const volcanoes: Volcano[] = [];
-    if (difficulty > 0.2 && rand() > 0.5) {
-      const level = Math.floor(difficulty * 10) + 1;
+    if (difficulty > 0.1 && rand() > 0.5) {
+      const level = Math.max(1, Math.floor(difficulty * 8));
       const config = getVolcanoConfigForLevel(level);
       
       // Find suitable volcano placement
