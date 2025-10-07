@@ -81,6 +81,11 @@ export class MovingPadSystem {
     spawnChance = Math.min(spawnChance, 0.25); // Cap at 25%
 
     if (!forced && rand() > spawnChance) return null;
+    
+    // When forced, ensure we generate a MEGA multiplier
+    if (forced) {
+      console.info("[MovingPad] Forced MEGA pad generation");
+    }
 
     // Choose motion type - only shuttle for survival mode, elevator/shuttle for caverns
     const motionTypes: MovingPad["motion"][] = isCavern 
@@ -103,8 +108,8 @@ export class MovingPadSystem {
     // Dwell time
     const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
 
-    // Score multiplier
-    const scoreMult = speedBand === "fast" ? 3.0 : 2.0;
+    // Score multiplier - forced pads are always MEGA (3x)
+    const scoreMult = forced ? 3.0 : (speedBand === "fast" ? 3.0 : 2.0);
 
     // Generate path based on motion type
     let pos0: { x: number; y: number };

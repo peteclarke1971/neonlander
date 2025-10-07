@@ -35,6 +35,7 @@ export class EndlessTerrainGenerator {
   private config: EndlessTerrainConfig;
   private chunkCounter: number = 0;
   private lastEndY: number | null = null;
+  private lastMegaPadChunk: number = -10; // Track last MEGA pad chunk
 
   constructor(config: EndlessTerrainConfig) {
     this.config = config;
@@ -45,6 +46,10 @@ export class EndlessTerrainGenerator {
     const rand = mulberry32(seed);
     const startX = this.chunkCounter * this.config.chunkWidth;
     const endX = startX + this.config.chunkWidth;
+    
+    // Determine if this should be a MEGA pad chunk
+    const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
+    const shouldGenerateMegaPad = difficulty > 0.15 && chunksSinceLastMega >= 8; // Every 8 chunks minimum
     
     this.chunkCounter++;
     
@@ -244,11 +249,40 @@ export class EndlessTerrainGenerator {
       pads[minIdx].bonus2x = true;
     }
     
-    // Generate moving pads at higher difficulty using advanced system with guaranteed MEGA pads
+    // Generate moving pads with guaranteed MEGA system
     const movingPads: MovingPad[] = [];
     
-    if (difficulty > 0.05) {
-      // Helper to get height at x within this chunk
+    if (shouldGenerateMegaPad) {
+      // MEGA PAD TERRAIN BLOCK - Create ideal flat terrain
+      console.info("[MEGA] Generating dedicated MEGA pad chunk", { chunkCounter: this.chunkCounter - 1, difficulty });
+      
+      // Create a long, perfectly flat stretch in the middle 60% of the chunk
+      const flatStart = Math.floor(segments * 0.2);
+      const flatEnd = Math.floor(segments * 0.8);
+      const flatY = this.config.baseHeight - 30; // Consistent height
+      
+      // Flatten the terrain
+      for (let i = flatStart; i <= flatEnd; i++) {
+        points[i].y = flatY;
+      }
+      
+      // Smooth transitions at edges
+      const transitionWidth = 5;
+      for (let i = 0; i < transitionWidth; i++) {
+        const t = i / transitionWidth;
+        // Left transition
+        const leftIdx = flatStart - transitionWidth + i;
+        if (leftIdx >= 0 && leftIdx < points.length) {
+          points[leftIdx].y = points[flatStart - transitionWidth].y * (1 - t) + flatY * t;
+        }
+        // Right transition
+        const rightIdx = flatEnd + i;
+        if (rightIdx >= 0 && rightIdx < points.length) {
+          points[rightIdx].y = flatY * (1 - t) + points[Math.min(flatEnd + transitionWidth, segments)].y * t;
+        }
+      }
+      
+      // Helper to get height
       const getHeightAt = (x: number) => {
         if (x < startX || x > endX) return this.config.baseHeight;
         const localX = x - startX;
@@ -260,70 +294,60 @@ export class EndlessTerrainGenerator {
         return points[Math.max(0, Math.min(idx, points.length - 1))].y;
       };
       
-      // Convert difficulty to level (1-10)
+      // Convert difficulty to level
       const level = Math.floor(difficulty * 10) + 1;
       
-      // Try multiple times to generate moving pad (guarantees MEGA pads)
-      let movingPad: MovingPad | null = null;
-      const maxAttempts = 3;
+      // FORCE generate the MEGA pad on this perfect terrain
+      const megaPad = movingPadSystem.generateMovingPad(
+        seed + 77777, // Consistent seed offset for MEGA pads
+        level,
+        "easy",
+        this.config.chunkWidth,
+        600,
+        getHeightAt,
+        pads,
+        false, // isCavern
+        true   // FORCED - bypass spawn chance
+      );
       
-      for (let attempt = 0; attempt < maxAttempts && !movingPad; attempt++) {
-        const attemptSeed = seed + attempt * 1337;
-        movingPad = movingPadSystem.generateMovingPad(
-          attemptSeed,
-          level,
-          "easy",
-          this.config.chunkWidth,
-          600, // worldHeight
-          getHeightAt,
-          pads,
-          false // isCavern
-        );
+      if (megaPad) {
+        movingPads.push(megaPad);
+        this.lastMegaPadChunk = this.chunkCounter - 1; // Track this chunk
+        console.info("[MEGA] Successfully generated MEGA pad", { 
+          motion: megaPad.motion, 
+          scoreMult: megaPad.scoreMult,
+          speed: megaPad.speed 
+        });
+      } else {
+        console.warn("[MEGA] Failed to generate MEGA pad even with forced flag!");
       }
-      
-      // Force generation if all attempts failed - create longer flat stretch for shuttle pad
-      if (!movingPad && difficulty > 0.2) {
-        // Create a long flat stretch for shuttle motion
-        const flatStart = Math.floor(segments * 0.3);
-        const flatEnd = Math.floor(segments * 0.7);
-        const flatY = this.config.baseHeight - 50;
-        
-        for (let i = flatStart; i <= flatEnd; i++) {
-          if (i >= 0 && i <= segments) {
-            points[i].y = flatY;
-          }
+    } else if (difficulty > 0.05 && rand() < 0.15) {
+      // Regular moving pad generation (lower spawn chance, non-MEGA)
+      const getHeightAt = (x: number) => {
+        if (x < startX || x > endX) return this.config.baseHeight;
+        const localX = x - startX;
+        const idx = Math.floor(localX / step);
+        if (idx >= 0 && idx < points.length - 1) {
+          const t = (localX - idx * step) / step;
+          return points[idx].y * (1 - t) + points[idx + 1].y * t;
         }
-        
-        // Force generate moving pad on this flat stretch
-        movingPad = movingPadSystem.generateMovingPad(
-          seed + 9999,
-          level,
-          "easy",
-          this.config.chunkWidth,
-          600,
-          getHeightAt,
-          pads,
-          false
-        );
-      }
+        return points[Math.max(0, Math.min(idx, points.length - 1))].y;
+      };
+      
+      const level = Math.floor(difficulty * 10) + 1;
+      const movingPad = movingPadSystem.generateMovingPad(
+        seed + 1337,
+        level,
+        "easy",
+        this.config.chunkWidth,
+        600,
+        getHeightAt,
+        pads,
+        false
+      );
       
       if (movingPad) {
         movingPads.push(movingPad);
-        
-        // Flatten terrain beneath shuttle moving pads
-        if (movingPad.motion === "shuttle") {
-          const shuttleY = movingPad.pos0.y;
-          const startPadX = Math.min(movingPad.pos0.x, movingPad.pos1.x) - startX;
-          const endPadX = Math.max(movingPad.pos0.x, movingPad.pos1.x) - startX;
-          
-          // Flatten all terrain points beneath the shuttle path
-          for (let i = 0; i < points.length; i++) {
-            const pointX = points[i].x;
-            if (pointX >= startPadX - 20 && pointX <= endPadX + 20) {
-              points[i].y = shuttleY + 2; // Terrain at bottom of pad
-            }
-          }
-        }
       }
     }
     
