@@ -1298,27 +1298,18 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
         }
         
-        // Draw moving pads with MEGA labels
+        // Draw moving pads with full rendering (dotted paths, arrows, labels)
         for (const mp of chunk.movingPads) {
-          const w = mp.xEnd - mp.xStart;
-          const centerX = mp.currentPos.x;
-          
-          ctx.fillStyle = `rgba(255,200,100,0.3)`;
-          ctx.fillRect(centerX - w / 2, mp.currentPos.y, w, 2);
-          ctx.strokeStyle = "#FFC864";
-          ctx.strokeRect(centerX - w / 2, mp.currentPos.y, w, 2);
-          
-          // Add MEGA label
-          ctx.save();
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-          ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
-          ctx.shadowColor = "#FFC864";
-          ctx.shadowBlur = 18 * dprInit;
-          ctx.fillStyle = "#FFC864";
-          ctx.globalAlpha = 0.95;
-          ctx.fillText("MEGA", centerX, mp.currentPos.y - 4);
-          ctx.restore();
+          movingPadSystem.renderMovingPad(
+            ctx,
+            mp,
+            cameraX,
+            0, // cameraY (not used in 2D side-scrolling)
+            1, // zoom (survival mode doesn't use zoom)
+            c.width,
+            c.height,
+            neonColor
+          );
         }
       }
       

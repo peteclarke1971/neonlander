@@ -169,7 +169,12 @@ export class EndlessTerrainGenerator {
       });
     }
     
-    const padCount = isFirstChunk ? 1 : Math.max(2, Math.floor(3 - difficulty)); // 2-3 pads per chunk
+    // Only generate regular pads if this is NOT a MEGA pad chunk
+    const padCount = isFirstChunk 
+      ? 1 
+      : shouldGenerateMegaPad 
+        ? 0  // NO regular pads on MEGA chunks - they would float after terrain flattening
+        : Math.max(2, Math.floor(3 - difficulty)); // 2-3 pads per chunk
     
     // Define 3 distinct size categories
     const padSizes = [
