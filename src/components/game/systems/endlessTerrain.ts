@@ -229,7 +229,7 @@ export class EndlessTerrainGenerator {
       pads.push({
         xStart: padX - width / 2,
         xEnd: padX + width / 2,
-        y: targetY - 2, // Place pad ON TOP of terrain
+        y: targetY, // Place pad flush with flattened terrain surface
         multiplier,
         width,
         bonus2x: false

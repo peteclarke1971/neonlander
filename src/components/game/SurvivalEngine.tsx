@@ -1278,9 +1278,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         // Draw pads with 2x labels
         for (const pad of chunk.pads) {
           ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
-          ctx.fillRect(pad.xStart, pad.y - 2, pad.xEnd - pad.xStart, 4);
+          ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
           ctx.strokeStyle = neonColor;
-          ctx.strokeRect(pad.xStart, pad.y - 2, pad.xEnd - pad.xStart, 4);
+          ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
           
           // Add 2x label for bonus pads
           if (pad.bonus2x) {
@@ -1293,7 +1293,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             ctx.fillStyle = neonColor;
             ctx.globalAlpha = 0.95;
             const centerX = (pad.xStart + pad.xEnd) / 2;
-            ctx.fillText("2x", centerX, pad.y + 6);
+            ctx.fillText("2x", centerX, pad.y + 4);
             ctx.restore();
           }
         }
@@ -1304,9 +1304,9 @@ export const SurvivalEngine: React.FC<Props> = ({
           const centerX = mp.currentPos.x;
           
           ctx.fillStyle = `rgba(255,200,100,0.3)`;
-          ctx.fillRect(centerX - w / 2, mp.currentPos.y - 2, w, 4);
+          ctx.fillRect(centerX - w / 2, mp.currentPos.y, w, 2);
           ctx.strokeStyle = "#FFC864";
-          ctx.strokeRect(centerX - w / 2, mp.currentPos.y - 2, w, 4);
+          ctx.strokeRect(centerX - w / 2, mp.currentPos.y, w, 2);
           
           // Add MEGA label
           ctx.save();
@@ -1317,7 +1317,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.shadowBlur = 18 * dprInit;
           ctx.fillStyle = "#FFC864";
           ctx.globalAlpha = 0.95;
-          ctx.fillText("MEGA", centerX, mp.currentPos.y - 6);
+          ctx.fillText("MEGA", centerX, mp.currentPos.y - 4);
           ctx.restore();
         }
       }
