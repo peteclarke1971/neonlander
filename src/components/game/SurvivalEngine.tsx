@@ -53,6 +53,11 @@ export const SurvivalEngine: React.FC<Props> = ({
   const bullseyeStreakRef = useRef(0);
   const speedBonusStreakRef = useRef(0);
   
+  // Message queue for displaying multiple bonuses sequentially
+  const messageQueueRef = useRef<string[]>([]);
+  const currentMessageIndexRef = useRef(0);
+  const messageTimerRef = useRef(0);
+  
   // Timer state for speed bonus calculation
   const [timerActive, setTimerActive] = useState(false);
   const timerActiveRef = useRef(false);
@@ -810,6 +815,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                   const dx = Math.abs(shipX - padCenterX);
                   const bullseye = dx <= padWidth * 0.03;
                   
+                  const messages: string[] = [];
+                  
+                  // Calculate bullseye bonus
                   if (bullseye) {
                     // Increment bullseye streak (cap at 8x)
                     bullseyeStreakRef.current = Math.min(8, bullseyeStreakRef.current + 1);
@@ -819,10 +827,11 @@ export const SurvivalEngine: React.FC<Props> = ({
                       ? Math.floor(500 * newStreak * (movingPad as MovingPad).scoreMult)
                       : 500 * newStreak;
                     landingScore += bullseyeBonus;
-                    bullseyeT = 0;
-                    bonusText = newStreak > 1 
+                    
+                    const bullseyeMessage = newStreak > 1 
                       ? `500 POINT BULLSEYE x ${newStreak}`
                       : "500 POINT BULLSEYE";
+                    messages.push(bullseyeMessage);
                   } else {
                     // Reset bullseye streak on miss
                     bullseyeStreakRef.current = 0;
@@ -840,16 +849,22 @@ export const SurvivalEngine: React.FC<Props> = ({
                       : 500 * newStreak;
                     landingScore += speedBonusPoints;
                     
-                    // If both bonuses, show speed bonus after bullseye
-                    if (!bullseye) {
-                      bullseyeT = 0;
-                      bonusText = newStreak > 1
-                        ? `500 POINT SPEED BONUS x ${newStreak}`
-                        : "500 POINT SPEED BONUS";
-                    }
+                    const speedMessage = newStreak > 1
+                      ? `500 POINT SPEED BONUS x ${newStreak}`
+                      : "500 POINT SPEED BONUS";
+                    messages.push(speedMessage);
                   } else {
                     // Reset speed bonus streak on miss
                     speedBonusStreakRef.current = 0;
+                  }
+                  
+                  // Queue messages (speed bonus first, then bullseye)
+                  if (messages.length > 0) {
+                    messageQueueRef.current = messages.reverse(); // Reverse so speed shows first
+                    currentMessageIndexRef.current = 0;
+                    messageTimerRef.current = 0;
+                    bullseyeT = 0;
+                    bonusText = messageQueueRef.current[0];
                   }
                   
                   currentScore += landingScore;
@@ -1014,10 +1029,31 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Update screen flash
       if (flashT > 0) flashT = Math.max(0, flashT - dt * 2);
       
-      // Bullseye/Speed bonus overlay timer
+      // Bullseye/Speed bonus overlay timer with message queue
       if (bullseyeT >= 0) {
         bullseyeT += dt;
         if (bullseyeT > 2.2) bullseyeT = -1;
+      }
+      
+      // Update message queue display
+      if (messageQueueRef.current.length > 0 && currentMessageIndexRef.current < messageQueueRef.current.length) {
+        messageTimerRef.current += dt;
+        
+        // Display current message for 2 seconds
+        if (messageTimerRef.current >= 2.0) {
+          if (currentMessageIndexRef.current < messageQueueRef.current.length - 1) {
+            // Move to next message
+            currentMessageIndexRef.current++;
+            messageTimerRef.current = 0;
+            bullseyeT = 0; // Reset animation timer for next message
+            bonusText = messageQueueRef.current[currentMessageIndexRef.current];
+          } else {
+            // All messages shown, clear queue
+            messageQueueRef.current = [];
+            currentMessageIndexRef.current = 0;
+            messageTimerRef.current = 0;
+          }
+        }
       }
       
       // Update starfield (shooting stars and satellites)
@@ -1423,7 +1459,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.restore();
       
       // Screen-space overlays (bonus popups)
-      if (bullseyeT >= 0 && bonusText) {
+      if (bullseyeT >= 0 && bonusText && messageQueueRef.current.length > 0) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const T = 2.0;
         const t = Math.min(1, bullseyeT / T);
