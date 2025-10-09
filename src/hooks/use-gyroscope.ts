@@ -10,10 +10,10 @@ export interface GyroscopeConfig {
 
 export const DEFAULT_GYROSCOPE_CONFIG: GyroscopeConfig = {
   enabled: false,
-  sensitivity: 2.5,
-  deadZone: 3,
-  maxTilt: 20,
-  smoothing: 0.2,
+  sensitivity: 4.0,
+  deadZone: 1,
+  maxTilt: 15,
+  smoothing: 0.1,
 };
 
 export interface GyroscopeState {
