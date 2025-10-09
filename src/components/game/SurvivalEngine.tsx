@@ -13,6 +13,7 @@ import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModif
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import FireworksDisplay from "./FireworksDisplay";
+import { useGyroscope, DEFAULT_GYROSCOPE_CONFIG } from "@/hooks/use-gyroscope";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -32,6 +33,11 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  
+  // Gyroscope controls
+  const [gyroConfig, setGyroConfig] = useState(DEFAULT_GYROSCOPE_CONFIG);
+  const gyroscope = useGyroscope(gyroConfig);
+  const gyroRotationRef = useRef(0);
   
   // Game state
   const [distance, setDistance] = useState(0);
@@ -87,10 +93,34 @@ export const SurvivalEngine: React.FC<Props> = ({
     try {
       const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0 || (navigator as any).msMaxTouchPoints > 0;
       setIsTouch(!!hasTouch);
+      
+      // Enable gyroscope on mobile devices by default
+      if (hasTouch) {
+        setGyroConfig(prev => ({ ...prev, enabled: true }));
+      }
     } catch {
       setIsTouch(false);
     }
   }, []);
+  
+  // Update gyro rotation ref when gyroscope state changes
+  useEffect(() => {
+    if (gyroscope.isActive) {
+      gyroRotationRef.current = gyroscope.rotationInput;
+    } else {
+      gyroRotationRef.current = 0;
+    }
+  }, [gyroscope.rotationInput, gyroscope.isActive]);
+  
+  // Handle gyroscope enable request
+  const handleEnableGyro = async () => {
+    await gyroscope.requestPermission();
+  };
+  
+  // Handle gyroscope calibration
+  const handleCalibrateGyro = () => {
+    gyroscope.calibrate();
+  };
   
   useEffect(() => {
     const resize = () => {
@@ -614,12 +644,19 @@ export const SurvivalEngine: React.FC<Props> = ({
             rotModConfig
           );
           
-          // Keyboard rotation controls
-          if (keys.current.left) {
-            shipAngularVel -= modifiedRotAccel * dt;
-          }
-          if (keys.current.right) {
-            shipAngularVel += modifiedRotAccel * dt;
+          // Gyroscope analog rotation (priority over keyboard)
+          const gyroInput = gyroRotationRef.current;
+          if (Math.abs(gyroInput) > 0.05) {
+            // Analog gyroscope input with modified acceleration
+            shipAngularVel += gyroInput * modifiedRotAccel * dt * 1.2;
+          } else {
+            // Keyboard rotation controls (only if gyro not active)
+            if (keys.current.left) {
+              shipAngularVel -= modifiedRotAccel * dt;
+            }
+            if (keys.current.right) {
+              shipAngularVel += modifiedRotAccel * dt;
+            }
           }
           
           // Apply angular velocity cap (matching main game)
@@ -699,13 +736,14 @@ export const SurvivalEngine: React.FC<Props> = ({
           shipY += shipVy * 60 * dt;
           shipAngle += shipAngularVel * dt;
           
-          // Angular friction (easy mode - only when no rotation input from keyboard or gamepad)
+          // Angular friction (easy mode - only when no rotation input from keyboard, gamepad, or gyro)
           const gpInput = gamepadInputRef.current;
           const gpLeft = gpInput?.buttons?.rotateLeft || false;
           const gpRight = gpInput?.buttons?.rotateRight || false;
           const analogRotating = Math.abs(gpInput?.rotation || 0) > 0.05;
+          const gyroRotating = Math.abs(gyroRotationRef.current) > 0.05;
           
-          if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight && !analogRotating) {
+          if (!keys.current.left && !keys.current.right && !gpLeft && !gpRight && !analogRotating && !gyroRotating) {
             shipAngularVel *= 0.9;
             if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
           }
@@ -1547,6 +1585,12 @@ export const SurvivalEngine: React.FC<Props> = ({
         time={time}
         distance={distance}
         landings={landings}
+        showGyroButton={isTouch}
+        gyroActive={gyroscope.isActive}
+        gyroPermission={gyroscope.permission}
+        tiltAngle={gyroscope.tiltAngle}
+        onEnableGyro={handleEnableGyro}
+        onCalibrateGyro={handleCalibrateGyro}
       />
       
       {/* FPS Counter */}

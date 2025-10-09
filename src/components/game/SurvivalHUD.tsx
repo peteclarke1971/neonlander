@@ -1,4 +1,6 @@
 import React from "react";
+import { Button } from "@/components/ui/button";
+import { Smartphone } from "lucide-react";
 
 interface Props {
   altitude: number;
@@ -10,6 +12,13 @@ interface Props {
   time: number;
   distance: number;
   landings: number;
+  // Gyroscope controls
+  showGyroButton?: boolean;
+  gyroActive?: boolean;
+  gyroPermission?: 'pending' | 'granted' | 'denied' | 'unsupported';
+  tiltAngle?: number;
+  onEnableGyro?: () => void;
+  onCalibrateGyro?: () => void;
 }
 
 export const SurvivalHUD: React.FC<Props> = ({ 
@@ -21,7 +30,13 @@ export const SurvivalHUD: React.FC<Props> = ({
   score, 
   time, 
   distance,
-  landings 
+  landings,
+  showGyroButton = false,
+  gyroActive = false,
+  gyroPermission = 'pending',
+  tiltAngle = 0,
+  onEnableGyro,
+  onCalibrateGyro,
 }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
@@ -52,6 +67,55 @@ export const SurvivalHUD: React.FC<Props> = ({
         <div className="mt-3 text-lg font-semibold">
           Score: <span className="text-accent">{score}</span>
         </div>
+        
+        {/* Gyroscope controls */}
+        {showGyroButton && (
+          <div className="mt-3 pointer-events-auto space-y-2">
+            {!gyroActive && gyroPermission !== 'denied' && gyroPermission !== 'unsupported' && (
+              <Button 
+                onClick={onEnableGyro}
+                size="sm"
+                variant="outline"
+                className="w-full text-xs"
+              >
+                <Smartphone className="w-3 h-3 mr-1" />
+                Enable Tilt Controls
+              </Button>
+            )}
+            
+            {gyroActive && (
+              <>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-accent flex items-center gap-1">
+                    <Smartphone className="w-3 h-3" />
+                    TILT
+                  </span>
+                  <span>{tiltAngle.toFixed(1)}°</span>
+                </div>
+                <Button 
+                  onClick={onCalibrateGyro}
+                  size="sm"
+                  variant="ghost"
+                  className="w-full text-xs"
+                >
+                  Recalibrate
+                </Button>
+              </>
+            )}
+            
+            {gyroPermission === 'denied' && (
+              <div className="text-xs text-muted-foreground">
+                Tilt permission denied
+              </div>
+            )}
+            
+            {gyroPermission === 'unsupported' && (
+              <div className="text-xs text-muted-foreground">
+                Tilt not supported
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );
