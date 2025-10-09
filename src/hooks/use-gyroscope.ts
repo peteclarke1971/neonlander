@@ -64,22 +64,23 @@ export function useGyroscope(config: GyroscopeConfig = DEFAULT_GYROSCOPE_CONFIG)
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
     if (!configRef.current.enabled) return;
 
-    // gamma is the left-to-right tilt in degrees (-90 to 90)
-    // positive = tilted right, negative = tilted left
-    const gamma = event.gamma;
+    // beta is the front-to-back tilt in degrees (-180 to 180)
+    // In landscape mode: positive = tilted left, negative = tilted right
+    const beta = event.beta;
     
-    if (gamma === null) return;
+    if (beta === null) return;
 
     // Apply calibration offset
-    const adjustedGamma = gamma - calibrationOffsetRef.current;
+    const adjustedBeta = beta - calibrationOffsetRef.current;
     
     // Apply dead zone
     const { deadZone, maxTilt, sensitivity, smoothing } = configRef.current;
     let rotationInput = 0;
     
-    if (Math.abs(adjustedGamma) > deadZone) {
+    if (Math.abs(adjustedBeta) > deadZone) {
       // Map tilt to rotation input (-1 to 1)
-      const effectiveTilt = adjustedGamma - Math.sign(adjustedGamma) * deadZone;
+      // Invert so tilting right = positive rotation
+      const effectiveTilt = -(adjustedBeta - Math.sign(adjustedBeta) * deadZone);
       const effectiveMax = maxTilt - deadZone;
       rotationInput = Math.max(-1, Math.min(1, (effectiveTilt / effectiveMax) * sensitivity));
     }
@@ -92,7 +93,7 @@ export function useGyroscope(config: GyroscopeConfig = DEFAULT_GYROSCOPE_CONFIG)
     setState(prev => ({
       ...prev,
       rotationInput: smoothedRotationRef.current,
-      tiltAngle: adjustedGamma,
+      tiltAngle: adjustedBeta,
     }));
   }, []);
 
