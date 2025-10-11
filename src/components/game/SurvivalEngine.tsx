@@ -261,6 +261,8 @@ export const SurvivalEngine: React.FC<Props> = ({
     
     // Start level audio
     audio.current.stopAllAudio();
+    // Preload crash sound effects
+    try { audio.current.preloadSFX(); } catch {}
     audio.current.playLevelTrackForLevel(0);
     
     // Physics constants matching main game (EASY MODE)
