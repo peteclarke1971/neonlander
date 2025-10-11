@@ -36,6 +36,7 @@ export class EndlessTerrainGenerator {
   private chunkCounter: number = 0;
   private lastEndY: number | null = null;
   private lastMegaPadChunk: number = -10; // Track last MEGA pad chunk
+  private nextMegaPadInterval: number = 3; // Random interval for next MEGA pad (3-9 chunks)
 
   constructor(config: EndlessTerrainConfig) {
     this.config = config;
@@ -50,7 +51,7 @@ export class EndlessTerrainGenerator {
     // Determine if this should be a MEGA pad chunk
     const isForcedTestChunk = this.chunkCounter === 2; // Force MEGA on third chunk for testing
     const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
-    const shouldGenerateMegaPad = isForcedTestChunk || (difficulty > 0.15 && chunksSinceLastMega >= 8);
+    const shouldGenerateMegaPad = isForcedTestChunk || (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval);
     
     this.chunkCounter++;
     
@@ -320,10 +321,16 @@ export class EndlessTerrainGenerator {
       if (megaPad) {
         movingPads.push(megaPad);
         this.lastMegaPadChunk = this.chunkCounter - 1; // Track this chunk
+        
+        // Randomize next MEGA pad interval (3-9 chunks)
+        const rand2 = mulberry32(seed + 88888);
+        this.nextMegaPadInterval = 3 + Math.floor(rand2() * 7); // 3 to 9 chunks
+        
         console.info("[MEGA] Successfully generated MEGA pad", { 
           motion: megaPad.motion, 
           scoreMult: megaPad.scoreMult,
-          speed: megaPad.speed 
+          speed: megaPad.speed,
+          nextInterval: this.nextMegaPadInterval
         });
       } else {
         console.warn("[MEGA] Failed to generate MEGA pad even with forced flag!");
