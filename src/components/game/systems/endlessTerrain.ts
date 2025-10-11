@@ -48,7 +48,7 @@ export class EndlessTerrainGenerator {
     const endX = startX + this.config.chunkWidth;
     
     // Determine if this should be a MEGA pad chunk
-    const isForcedTestChunk = this.chunkCounter === 3; // Force MEGA on fourth chunk for testing
+    const isForcedTestChunk = this.chunkCounter === 2; // Force MEGA on third chunk for testing
     const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
     const shouldGenerateMegaPad = isForcedTestChunk || (difficulty > 0.15 && chunksSinceLastMega >= 8);
     
@@ -313,7 +313,8 @@ export class EndlessTerrainGenerator {
         getHeightAt,
         pads,
         false, // isCavern
-        true   // FORCED - bypass spawn chance
+        true,  // FORCED - bypass spawn chance
+        startX // Pass chunk start X for correct positioning
       );
       
       if (megaPad) {

@@ -67,7 +67,8 @@ export class MovingPadSystem {
     getHeightAt: (x: number) => number,
     existingPads: Pad[],
     isCavern: boolean = false,
-    forced: boolean = false
+    forced: boolean = false,
+    chunkStartX: number = 0
   ): MovingPad | null {
     if (this.settings.enabled === "off" && !forced) return null;
     // allow on easy difficulty; no early return
@@ -200,10 +201,10 @@ export class MovingPadSystem {
           const centerX = worldWidth * (0.3 + (i / samples) * 0.4); // Sample middle 40%
           const sampleWidth = 80; // Check larger area for terrain flatness
           let maxVariation = 0;
-          const baseHeight = getHeightAt(centerX);
+          const baseHeight = getHeightAt(chunkStartX + centerX);
           
           for (let j = -sampleWidth; j <= sampleWidth; j += 3) {
-            const variation = Math.abs(getHeightAt(centerX + j) - baseHeight);
+            const variation = Math.abs(getHeightAt(chunkStartX + centerX + j) - baseHeight);
             maxVariation = Math.max(maxVariation, variation);
           }
           
@@ -215,15 +216,16 @@ export class MovingPadSystem {
         
         // Use the maximum terrain height across the pad width for perfect flush placement
         const width = 105 + rand() * 60; // 105-165 pixel width (50% bigger)
-        let maxTerrainY = getHeightAt(bestX);
+        let maxTerrainY = getHeightAt(chunkStartX + bestX);
         for (let checkX = bestX - width/2; checkX <= bestX + width/2; checkX += 5) {
-          maxTerrainY = Math.max(maxTerrainY, getHeightAt(checkX));
+          maxTerrainY = Math.max(maxTerrainY, getHeightAt(chunkStartX + checkX));
         }
         
-        pos0 = { x: bestX - width / 2, y: maxTerrainY };
-        pos1 = { x: bestX + width / 2, y: maxTerrainY };
+        // Apply chunk offset to final positions
+        pos0 = { x: chunkStartX + bestX - width / 2, y: maxTerrainY };
+        pos1 = { x: chunkStartX + bestX + width / 2, y: maxTerrainY };
         
-        console.log(`[MovingPad] Forced shuttle pad at y=${maxTerrainY.toFixed(1)}, flatness=${bestFlatness.toFixed(1)}`);
+        console.log(`[MovingPad] Forced shuttle pad at x=${(chunkStartX + bestX).toFixed(1)}, y=${maxTerrainY.toFixed(1)}, flatness=${bestFlatness.toFixed(1)}`);
       } else {
         const centerX = worldWidth * (0.2 + rand() * 0.6);
         const width = 150 + rand() * 120; // 150-270 pixel width (50% bigger)
