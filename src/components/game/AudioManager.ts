@@ -331,42 +331,41 @@ export class AudioManager {
     const distanceRatio = Math.min(1, wrappedDistance / maxHearingDistance);
     const volume = Math.max(0.1, 1 - distanceRatio * 0.8); // Keep minimum 10% volume
     
-    if (this.landingBuffer) {
-      this.playSpatialOneShot(this.landingBuffer, volume, panValue);
+    // Use crash sounds for explosions (rich and deep sound)
+    const buf = this.crashToggle ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
+    if (buf) {
+      this.playSpatialOneShot(buf, volume, panValue);
     } else {
       this.playSpatialNoise(0.35, volume * 0.8, panValue);
     }
+    this.crashToggle = !this.crashToggle;
   }
 
   explosion() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Now plays landing sound for explosion events - use preloaded buffer for instant playback
-    if (this.landingBuffer) {
-      this.playOneShot(this.landingBuffer, 0.9);
+    // Use crash sounds for explosions (rich and deep sound)
+    const buf = this.crashToggle ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
+    if (buf) {
+      this.playOneShot(buf, 0.9);
     } else {
       // Fallback to noise if buffer not available
       this.playNoise(0.35, 0.8);
     }
+    this.crashToggle = !this.crashToggle;
   }
 
   async success() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Now plays crash sounds for successful landing
-    if (!this.crash1Buffer && !this.crash2Buffer) {
-      // Load buffers if not available
-      await Promise.all([
-        this.loadBuffer("/audio/crash1.mp3").then(buf => this.crash1Buffer = buf),
-        this.loadBuffer("/audio/crash2.mp3").then(buf => this.crash2Buffer = buf)
-      ]);
+    // Use landing sound for successful landing
+    if (this.landingBuffer) {
+      this.playOneShot(this.landingBuffer, 0.7);
+    } else {
+      this.playNoise(0.2, 0.4);
     }
-    
-    const useFirst = (this.crashToggle = !this.crashToggle);
-    const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
-    if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
   }
 
   click() {

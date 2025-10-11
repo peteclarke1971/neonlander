@@ -787,7 +787,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+              audio.current.explosion();
               if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
@@ -950,7 +950,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 isDead = true;
                 spawnExplosion(shipX, shipY);
                 spawnDebris(shipX, shipY, shipVx, shipVy);
-                audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+                audio.current.explosion();
                 if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
                 setTimeout(() => {
                   onGameOver({
@@ -967,7 +967,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+              audio.current.explosion();
               if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
