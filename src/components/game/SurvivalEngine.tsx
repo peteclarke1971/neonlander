@@ -822,9 +822,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 isLanded = true;
                 landedPad = landingPad;
                 shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 12;
-                shipVy = movingPad ? (movingPad as MovingPad).currentVelocity.y : 0;
-                shipVx = movingPad ? (movingPad as MovingPad).currentVelocity.x : 0;
+                // Set ship velocity to ZERO - it's now anchored to the pad
+                shipVy = 0;
+                shipVx = 0;
                 shipAngularVel = 0;
+                
+                // Freeze the moving pad when landing on it
+                if (movingPad) {
+                  (movingPad as MovingPad).frozen = true;
+                }
                 
                 // Stop speed bonus timer
                 const elapsed = currentTime - lastTakeoffTime.current;
@@ -988,6 +994,12 @@ export const SurvivalEngine: React.FC<Props> = ({
             isLanded = false;
             hasMovedFromStart = true; // Mark that player has taken off
             padToClear = landedPad; // Mark this pad to be removed once cleared
+            
+            // Unfreeze the moving pad when taking off
+            if (landedPad && (landedPad as MovingPad).frozen !== undefined) {
+              (landedPad as MovingPad).frozen = false;
+            }
+            
             landedPad = null;
             
             // Small upward impulse to help clear the pad

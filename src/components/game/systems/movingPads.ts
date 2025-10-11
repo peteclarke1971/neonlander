@@ -21,6 +21,7 @@ export interface MovingPad extends Pad {
   arcRadius?: number;
   arcAngle0?: number;
   arcAngle1?: number;
+  frozen?: boolean; // Flag to freeze pad movement when lander is on it
 }
 
 export interface MovingPadSettings {
@@ -284,6 +285,12 @@ export class MovingPadSystem {
 
   // Update moving pad physics
   updateMovingPad(pad: MovingPad, deltaTime: number): void {
+    // Don't update if pad is frozen (lander is on it)
+    if (pad.frozen) {
+      pad.currentVelocity = { x: 0, y: 0 };
+      return;
+    }
+    
     pad.phaseTimer += deltaTime;
 
     if (pad.phase === "dwelling") {

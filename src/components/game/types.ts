@@ -22,6 +22,7 @@ export interface MovingPad extends Pad {
   arcRadius?: number;
   arcAngle0?: number;
   arcAngle1?: number;
+  frozen?: boolean; // Flag to freeze pad movement when lander is on it
 }
 
 export interface Volcano {
