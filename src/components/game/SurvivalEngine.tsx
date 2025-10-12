@@ -261,8 +261,6 @@ export const SurvivalEngine: React.FC<Props> = ({
     
     // Start level audio
     audio.current.stopAllAudio();
-    // Preload crash sound effects
-    try { audio.current.preloadSFX(); } catch {}
     audio.current.playLevelTrackForLevel(0);
     
     // Physics constants matching main game (EASY MODE)
@@ -789,7 +787,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.explosion();
+              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
               if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
@@ -952,7 +950,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 isDead = true;
                 spawnExplosion(shipX, shipY);
                 spawnDebris(shipX, shipY, shipVx, shipVy);
-                audio.current.explosion();
+                audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
                 if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
                 setTimeout(() => {
                   onGameOver({
@@ -969,7 +967,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.explosion();
+              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
               if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
