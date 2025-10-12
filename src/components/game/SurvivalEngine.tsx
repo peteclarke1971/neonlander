@@ -260,6 +260,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     let prevTargetZoom = 1.0;
     
     // Start level audio
+    try { audio.current.preloadSFX(); } catch {}
     audio.current.stopAllAudio();
     audio.current.playLevelTrackForLevel(0);
     
