@@ -14,6 +14,9 @@ import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import FireworksDisplay from "./FireworksDisplay";
 import { useGyroscope, DEFAULT_GYROSCOPE_CONFIG } from "@/hooks/use-gyroscope";
+import { generateHazards, updateHazards, drawHazards, checkHazardCollision, Hazard } from "./systems/hazards";
+import { checkJunkPickup, collectJunk } from "./systems/collectibles";
+import { renderSpaceJunk, generateSparkles, updateSparkles, SparkleEffect } from "./systems/spaceJunkAssets";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -68,6 +71,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [timerActive, setTimerActive] = useState(false);
   const timerActiveRef = useRef(false);
   const lastTakeoffTime = useRef<number>(0);
+  
+  // Hazards and collectibles state
+  const hazardsRef = useRef<Hazard[]>([]);
+  const sparklesRef = useRef<Map<string, SparkleEffect[]>>(new Map());
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
@@ -199,6 +206,19 @@ export const SurvivalEngine: React.FC<Props> = ({
     for (let i = 1; i < 3; i++) {
       chunks.push(terrainGen.generateChunk(0));
     }
+    
+    // Initialize hazards and collectibles from chunks
+    hazardsRef.current = [];
+    chunks.forEach(chunk => {
+      if (chunk.hazards) {
+        hazardsRef.current.push(...chunk.hazards);
+      }
+      if (chunk.collectibles) {
+        chunk.collectibles.spaceJunk.forEach(junk => {
+          sparklesRef.current.set(junk.id, generateSparkles(junk.seed));
+        });
+      }
+    });
     
     // Place ship on first landing pad (guaranteed to exist and be suitable)
     const firstPad = chunks[0].pads[0];
@@ -532,9 +552,33 @@ export const SurvivalEngine: React.FC<Props> = ({
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
         
+        // Add new hazards from this chunk
+        if (newChunk.hazards) {
+          hazardsRef.current.push(...newChunk.hazards);
+        }
+        
+        // Initialize sparkles for new collectibles
+        if (newChunk.collectibles) {
+          newChunk.collectibles.spaceJunk.forEach(junk => {
+            sparklesRef.current.set(junk.id, generateSparkles(junk.seed));
+          });
+        }
+        
         // Remove old chunks that are far behind (keep more chunks for smooth disappearing)
         if (chunks.length > 8) {
-          chunks.shift();
+          const oldChunk = chunks.shift();
+          
+          // Remove hazards from old chunks
+          if (oldChunk && oldChunk.hazards) {
+            hazardsRef.current = hazardsRef.current.filter(h => h.x > oldChunk.startX);
+          }
+          
+          // Remove sparkles for removed collectibles
+          if (oldChunk && oldChunk.collectibles) {
+            oldChunk.collectibles.spaceJunk.forEach(junk => {
+              sparklesRef.current.delete(junk.id);
+            });
+          }
         }
       }
       
@@ -564,6 +608,12 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
+        
+        // Play explosion sound when volcanoes erupt
+        if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0) {
+          audio.current.explosion();
+        }
+        
         setVolcanoParticles(volcanoUpdate.newParticles);
       }
       
@@ -788,7 +838,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+              audio.current.explosion();
               if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
               setTimeout(() => {
                 onGameOver({
@@ -799,6 +849,48 @@ export const SurvivalEngine: React.FC<Props> = ({
                   landings: currentLandings
                 });
               }, 2500); // Longer delay to enjoy explosion
+            }
+          }
+          
+          // Update hazards (always update for movement)
+          updateHazards(hazardsRef.current, dt, CHUNK_WIDTH * 10, 600, false);
+          
+          // Check hazard collisions (only when airborne and alive)
+          if (!isLanded) {
+            if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
+              isDead = true;
+              spawnExplosion(shipX, shipY);
+              spawnDebris(shipX, shipY, shipVx, shipVy);
+              audio.current.explosion();
+              if (anyGamepad()) vibrate(500, 0.8, 1.0);
+              setTimeout(() => {
+                onGameOver({
+                  cause: "crash",
+                  distance: currentDistance,
+                  time: currentTime,
+                  score: currentScore,
+                  landings: currentLandings
+                });
+              }, 2500);
+            }
+          }
+          
+          // Check collectible pickups (only when alive)
+          for (const chunk of chunks) {
+            if (!chunk.collectibles) continue;
+            
+            for (const junk of chunk.collectibles.spaceJunk) {
+              if (checkJunkPickup({ x: shipX, y: shipY }, 16, junk)) {
+                const result = collectJunk(chunk.collectibles, junk.id);
+                if (result.fuelReward > 0) {
+                  fuelAmount = Math.min(fuelCap, fuelAmount + result.fuelReward);
+                  audio.current.success();
+                }
+                if (result.points > 0) {
+                  currentScore += result.points;
+                  setScore(currentScore);
+                }
+              }
             }
           }
           
@@ -1379,6 +1471,47 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
+      }
+      
+      // Render hazards (viewport culling included in drawHazards)
+      const allHazards = hazardsRef.current;
+      if (allHazards.length > 0) {
+        drawHazards(ctx, allHazards, neonColor, shouldOptimize ? 4 : 8);
+      }
+      
+      // Render collectibles (space junk)
+      const elapsed = currentTime;
+      for (const chunk of chunks) {
+        if (!chunk.collectibles) continue;
+        
+        // Update sparkles
+        chunk.collectibles.spaceJunk.forEach(junk => {
+          const sparkles = sparklesRef.current.get(junk.id);
+          if (sparkles) {
+            updateSparkles(sparkles, elapsed);
+          }
+        });
+        
+        // Render space junk
+        chunk.collectibles.spaceJunk.forEach(junk => {
+          if (junk.collected) return;
+          
+          // Viewport culling
+          const viewLeft = cameraX - viewWidth / 2;
+          const viewRight = cameraX + viewWidth / 2;
+          const junkLeft = junk.pos.x - 50;
+          const junkRight = junk.pos.x + 50;
+          if (junkRight < viewLeft || junkLeft > viewRight) return;
+          
+          const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
+          const scale = 1.0 + 0.1 * Math.sin(elapsed * 2 + junk.seed * 0.001);
+          const sparkles = sparklesRef.current.get(junk.id);
+          
+          ctx.save();
+          ctx.globalAlpha = 0.9;
+          renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles);
+          ctx.restore();
+        });
       }
       
       // Draw thruster particles

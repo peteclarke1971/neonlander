@@ -1,7 +1,9 @@
-import { Pad, MovingPad, Volcano } from "../types";
+import { Pad, MovingPad, Volcano, CollectiblesData } from "../types";
 import { movingPadSystem } from "./movingPads";
 import { generateVolcanoes, getVolcanoConfigForLevel } from "./volcano";
 import { generateAnomalies, Anomaly } from "./anomalies";
+import { generateHazards, Hazard } from "./hazards";
+import { generateCollectibles } from "./collectibles";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -22,6 +24,8 @@ export interface TerrainChunk {
   volcanoes: Volcano[];
   anomalies: Anomaly[];
   difficulty: number; // 0-1 difficulty factor
+  hazards: Hazard[];
+  collectibles: CollectiblesData | null;
 }
 
 export interface EndlessTerrainConfig {
@@ -413,6 +417,69 @@ export class EndlessTerrainGenerator {
       }
     }
     
+    // Generate hazards (space debris) - start from chunk 4, scale with difficulty
+    const hazards: Hazard[] = [];
+    const chunkNumber = this.chunkCounter - 1;
+    
+    if (chunkNumber >= 4) {
+      // Scale hazard count: 1 at chunk 4, up to 3 at higher chunks
+      const progressFactor = Math.min((chunkNumber - 4) / 15, 1);
+      const hazardCount = Math.floor(1 + progressFactor * 2);
+      
+      const generatedHazards = generateHazards(seed + 5555, this.config.chunkWidth, this.config.baseHeight);
+      
+      // Position hazards within chunk, always off-screen to the right
+      for (let i = 0; i < Math.min(hazardCount, generatedHazards.length); i++) {
+        const hazard = generatedHazards[i];
+        
+        // Spawn them ahead of visible area
+        const spawnOffset = this.config.chunkWidth * 0.3 + rand() * (this.config.chunkWidth * 0.5);
+        hazard.x = startX + spawnOffset;
+        
+        // Ensure hazards spawn at appropriate heights
+        const terrainY = this.config.baseHeight;
+        hazard.y = terrainY - 100 - rand() * 200;
+        
+        hazards.push(hazard);
+      }
+    }
+    
+    // Generate collectibles (space junk) - start from chunk 5, fewer than hazards
+    let collectibles: CollectiblesData | null = null;
+    if (chunkNumber >= 5 && rand() > 0.7) {
+      const progressFactor = Math.min((chunkNumber - 5) / 20, 1);
+      const junkCount = Math.floor(1 + progressFactor * 2);
+      
+      // Create placement context
+      const placementContext = {
+        worldWidth: this.config.chunkWidth,
+        worldHeight: 600,
+        getHeightAt: (x: number) => {
+          if (x < startX || x > endX) return this.config.baseHeight;
+          const localX = x - startX;
+          const idx = Math.floor(localX / step);
+          if (idx >= 0 && idx < points.length - 1) {
+            const t = (localX - idx * step) / step;
+            return points[idx].y * (1 - t) + points[idx + 1].y * t;
+          }
+          return points[Math.max(0, Math.min(idx, points.length - 1))].y;
+        },
+        pads,
+        movingPads,
+        shipHeight: 24,
+        mode: 'surface' as const,
+        startPos: { x: startX + this.config.chunkWidth * 0.4, y: this.config.baseHeight - 150 },
+        goalPos: { x: endX - this.config.chunkWidth * 0.2, y: this.config.baseHeight - 150 }
+      };
+      
+      collectibles = generateCollectibles(seed + 6666, placementContext, '#00FFFF');
+      
+      // Filter to only keep requested count
+      if (collectibles.spaceJunk.length > junkCount) {
+        collectibles.spaceJunk = collectibles.spaceJunk.slice(0, junkCount);
+      }
+    }
+    
     // Store the last Y coordinate for the next chunk
     this.lastEndY = points[points.length - 1].y;
     
@@ -424,7 +491,9 @@ export class EndlessTerrainGenerator {
       movingPads,
       volcanoes,
       anomalies,
-      difficulty
+      difficulty,
+      hazards,
+      collectibles
     };
   }
 }
