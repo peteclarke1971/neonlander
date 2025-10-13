@@ -47,7 +47,7 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
     phase: "entry" as const,
     phaseTimer: 0,
     startX,
-    endX: startX + 1600, // About 2 chunks (extended asteroid corridor)
+    endX: startX + 3200, // About 4 chunks (extended asteroid corridor)
     asteroids: [] as FieldAsteroid[],
     spawnTimer: 0,
     nextSpawnDelay: 2.0,
@@ -63,8 +63,8 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   const initialRng = mulberry32(seed);
   const initialCount = 15; // Start with 15 asteroids immediately (half density)
   for (let i = 0; i < initialCount; i++) {
-    const x = startX + 100 + initialRng() * 1200; // Spread across longer field width
-    const y = 20 + initialRng() * 450; // Spread from very top (y=20) to mid-screen (y=470)
+    const x = startX + 100 + initialRng() * 2400; // Spread across 2x longer field width
+    const y = 20 + initialRng() * 900; // Spread from very top (y=20) to near bottom (y=920)
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
       sizeRoll < 0.5 ? "small" : sizeRoll < 0.85 ? "medium" : "large";
@@ -133,7 +133,7 @@ export function spawnFieldAsteroid(
   // Spawn ahead of player, off-screen
   const spawnX = playerX + viewWidth + 100 + rng() * 200;
   // Spawn above terrain - lower Y values = higher on screen
-  const spawnY = 20 + rng() * 450; // Spread from very top (y=20) to mid-screen (y=470)
+  const spawnY = 20 + rng() * 900; // Spread from very top (y=20) to near bottom (y=920)
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -182,10 +182,10 @@ export function updateAsteroidField(
   // Update phase timer
   state.phaseTimer += dt;
   
-  // Phase transitions based on player position (adjusted for 4x longer field)
-  if (state.phase === "entry" && playerX > state.startX + 400) {
+  // Phase transitions based on player position (adjusted for 8x longer field)
+  if (state.phase === "entry" && playerX > state.startX + 800) {
     state.phase = "active";
-  } else if (state.phase === "active" && playerX > state.endX - 400) {
+  } else if (state.phase === "active" && playerX > state.endX - 800) {
     state.phase = "exit";
   }
   
@@ -231,8 +231,8 @@ export function updateAsteroidField(
     if (asteroid.y < 50) {
       asteroid.y = 50;
       asteroid.vy = Math.abs(asteroid.vy);
-    } else if (asteroid.y > 550) {
-      asteroid.y = 550;
+    } else if (asteroid.y > 950) {
+      asteroid.y = 950;
       asteroid.vy = -Math.abs(asteroid.vy);
     }
     

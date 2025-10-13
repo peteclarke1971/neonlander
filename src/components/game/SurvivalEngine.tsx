@@ -1692,32 +1692,34 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       
-      // Draw ship
-      ctx.save();
-      ctx.translate(shipX, shipY);
-      ctx.rotate(shipAngle);
-      ctx.strokeStyle = neonColor;
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = 12;
-      ctx.lineWidth = 2;
-      
-      // Ship body
-      ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(-8, 10);
-      ctx.lineTo(8, 10);
-      ctx.closePath();
-      ctx.stroke();
-      
-      // Landing legs
-      ctx.beginPath();
-      ctx.moveTo(-6, 8);
-      ctx.lineTo(-12, 12);
-      ctx.moveTo(6, 8);
-      ctx.lineTo(12, 12);
-      ctx.stroke();
-      
-      ctx.restore();
+      // Draw ship (only if alive)
+      if (!isDead) {
+        ctx.save();
+        ctx.translate(shipX, shipY);
+        ctx.rotate(shipAngle);
+        ctx.strokeStyle = neonColor;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 2;
+        
+        // Ship body
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(-8, 10);
+        ctx.lineTo(8, 10);
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Landing legs
+        ctx.beginPath();
+        ctx.moveTo(-6, 8);
+        ctx.lineTo(-12, 12);
+        ctx.moveTo(6, 8);
+        ctx.lineTo(12, 12);
+        ctx.stroke();
+        
+        ctx.restore();
+      }
       
       ctx.restore();
       
