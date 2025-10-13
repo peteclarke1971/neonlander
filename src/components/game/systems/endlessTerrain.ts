@@ -26,6 +26,8 @@ export interface TerrainChunk {
   difficulty: number; // 0-1 difficulty factor
   hazards: Hazard[];
   collectibles: CollectiblesData | null;
+  isAsteroidFieldChunk: boolean;
+  asteroidFieldPhase?: "entry" | "active" | "exit";
 }
 
 export interface EndlessTerrainConfig {
@@ -41,6 +43,9 @@ export class EndlessTerrainGenerator {
   private lastEndY: number | null = null;
   private lastMegaPadChunk: number = -10; // Track last MEGA pad chunk
   private nextMegaPadInterval: number = 3; // Random interval for next MEGA pad (3-9 chunks)
+  private lastAsteroidFieldChunk: number = -15; // Track last asteroid field chunk
+  private nextFieldInterval: number = 7; // Random interval for next field (7-10 chunks)
+  private asteroidFieldChunkCount: number = 0;
 
   constructor(config: EndlessTerrainConfig) {
     this.config = config;
@@ -52,12 +57,44 @@ export class EndlessTerrainGenerator {
     const startX = this.chunkCounter * this.config.chunkWidth;
     const endX = startX + this.config.chunkWidth;
     
-    // Determine if this should be a MEGA pad chunk
+    // Check if this should be an asteroid field chunk
+    const chunksSinceLastField = this.chunkCounter - this.lastAsteroidFieldChunk;
+    const shouldStartField = !isFirstChunk && this.chunkCounter >= 5 && chunksSinceLastField >= this.nextFieldInterval;
+    
+    let isAsteroidFieldChunk = false;
+    let asteroidFieldPhase: "entry" | "active" | "exit" | undefined = undefined;
+    
+    if (shouldStartField) {
+      // Start new asteroid field
+      this.lastAsteroidFieldChunk = this.chunkCounter;
+      this.asteroidFieldChunkCount = 0;
+      this.nextFieldInterval = 7 + Math.floor(rand() * 4); // 7-10 chunks
+      isAsteroidFieldChunk = true;
+      asteroidFieldPhase = "entry";
+    } else if (chunksSinceLastField >= 0 && chunksSinceLastField < 6) {
+      // Continue existing asteroid field
+      isAsteroidFieldChunk = true;
+      if (chunksSinceLastField < 2) {
+        asteroidFieldPhase = "entry";
+      } else if (chunksSinceLastField < 5) {
+        asteroidFieldPhase = "active";
+      } else {
+        asteroidFieldPhase = "exit";
+      }
+      this.asteroidFieldChunkCount++;
+    }
+    
+    // Determine if this should be a MEGA pad chunk (not during asteroid fields)
     const isForcedTestChunk = this.chunkCounter === 2; // Force MEGA on third chunk for testing
     const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
-    const shouldGenerateMegaPad = isForcedTestChunk || (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval);
+    const shouldGenerateMegaPad = !isAsteroidFieldChunk && (isForcedTestChunk || (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval));
     
     this.chunkCounter++;
+    
+    // Terrain density adjustment for asteroid fields
+    const terrainDensityMultiplier = isAsteroidFieldChunk 
+      ? (asteroidFieldPhase === "entry" ? 0.5 : asteroidFieldPhase === "active" ? 0.1 : 0.5)
+      : 1.0;
     
     // Generate terrain points with more variety
     const points: { x: number; y: number }[] = [];
@@ -65,7 +102,7 @@ export class EndlessTerrainGenerator {
     const step = this.config.chunkWidth / segments;
     
     // Increase amplitude and variation with difficulty
-    const amplitude = this.config.amplitude * (1 + difficulty * 0.5);
+    const amplitude = this.config.amplitude * (1 + difficulty * 0.5) * terrainDensityMultiplier;
     const variation = amplitude * (0.5 + difficulty * 0.6); // More variation
     
     // Start from the last chunk's end Y to ensure seamless connection
@@ -369,9 +406,9 @@ export class EndlessTerrainGenerator {
       }
     }
     
-    // Generate volcanoes at higher difficulty
+    // Generate volcanoes at higher difficulty (skip during asteroid fields)
     const volcanoes: Volcano[] = [];
-    if (difficulty > 0.1 && rand() > 0.5) {
+    if (difficulty > 0.1 && rand() > 0.5 && !isAsteroidFieldChunk) {
       const level = Math.max(1, Math.floor(difficulty * 8));
       const config = getVolcanoConfigForLevel(level);
       
@@ -396,9 +433,9 @@ export class EndlessTerrainGenerator {
       });
     }
     
-    // Generate anomalies (gravity wells) at medium difficulty
+    // Generate anomalies (gravity wells) at medium difficulty (skip during asteroid fields)
     const anomalies: Anomaly[] = [];
-    if (difficulty > 0.15) {
+    if (difficulty > 0.15 && !isAsteroidFieldChunk) {
       const anomCount = Math.floor(difficulty * 2); // 0-2 anomalies
       for (let i = 0; i < anomCount; i++) {
         const anomIdx = Math.floor(rand() * (segments - 8)) + 4;
@@ -417,11 +454,11 @@ export class EndlessTerrainGenerator {
       }
     }
     
-    // Generate hazards (space debris) - start from chunk 4, scale with difficulty
+    // Generate hazards (space debris) - start from chunk 4, scale with difficulty, skip during asteroid fields
     const hazards: Hazard[] = [];
     const chunkNumber = this.chunkCounter - 1;
-    
-    if (chunkNumber >= 4) {
+
+    if (chunkNumber >= 4 && !isAsteroidFieldChunk) {
       // Scale hazard count: 1 at chunk 4, up to 3 at higher chunks
       const progressFactor = Math.min((chunkNumber - 4) / 15, 1);
       const hazardCount = Math.floor(1 + progressFactor * 2);
@@ -444,9 +481,9 @@ export class EndlessTerrainGenerator {
       }
     }
     
-    // Generate collectibles (space junk) - start from chunk 5, fewer than hazards
+    // Generate collectibles (space junk) - start from chunk 5, fewer than hazards (skip during asteroid fields)
     let collectibles: CollectiblesData | null = null;
-    if (chunkNumber >= 5 && rand() > 0.7) {
+    if (chunkNumber >= 5 && rand() > 0.7 && !isAsteroidFieldChunk) {
       const progressFactor = Math.min((chunkNumber - 5) / 20, 1);
       const junkCount = Math.floor(1 + progressFactor * 2);
       
@@ -493,7 +530,9 @@ export class EndlessTerrainGenerator {
       anomalies,
       difficulty,
       hazards,
-      collectibles
+      collectibles,
+      isAsteroidFieldChunk,
+      asteroidFieldPhase
     };
   }
 }

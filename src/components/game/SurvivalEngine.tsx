@@ -17,6 +17,7 @@ import { useGyroscope, DEFAULT_GYROSCOPE_CONFIG } from "@/hooks/use-gyroscope";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision, Hazard } from "./systems/hazards";
 import { checkJunkPickup, collectJunk } from "./systems/collectibles";
 import { renderSpaceJunk, generateSparkles, updateSparkles, SparkleEffect } from "./systems/spaceJunkAssets";
+import { initAsteroidField, updateAsteroidField, renderAsteroidField, AsteroidFieldState } from "./systems/asteroidField";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -75,6 +76,12 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Hazards and collectibles state
   const hazardsRef = useRef<Hazard[]>([]);
   const sparklesRef = useRef<Map<string, SparkleEffect[]>>(new Map());
+  
+  // Asteroid field state
+  const asteroidFieldRef = useRef<AsteroidFieldState | null>(null);
+  const fieldWarningShownRef = useRef(false);
+  const [fieldMessage, setFieldMessage] = useState<string>("");
+  const [fieldMessageTimer, setFieldMessageTimer] = useState(0);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
@@ -564,6 +571,20 @@ export const SurvivalEngine: React.FC<Props> = ({
           });
         }
         
+        // Detect asteroid field entry
+        if (newChunk.isAsteroidFieldChunk && newChunk.asteroidFieldPhase === "entry" && !asteroidFieldRef.current?.active) {
+          const fieldStartX = newChunk.startX;
+          const fieldSeed = Date.now() + currentDistance;
+          asteroidFieldRef.current = initAsteroidField(fieldStartX, difficulty, fieldSeed);
+          
+          // Show HUD warning
+          if (!fieldWarningShownRef.current) {
+            setFieldMessage("ENTERING ASTEROID FIELD");
+            setFieldMessageTimer(2.0);
+            fieldWarningShownRef.current = true;
+          }
+        }
+        
         // Remove old chunks that are far behind (keep more chunks for smooth disappearing)
         if (chunks.length > 8) {
           const oldChunk = chunks.shift();
@@ -615,6 +636,11 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
         
         setVolcanoParticles(volcanoUpdate.newParticles);
+      }
+      
+      // Update field message timer
+      if (fieldMessageTimer > 0) {
+        setFieldMessageTimer(Math.max(0, fieldMessageTimer - dt));
       }
       
       // Ship input and rotation (only when alive)
@@ -892,6 +918,60 @@ export const SurvivalEngine: React.FC<Props> = ({
                 }
               }
             }
+          }
+          
+          // Update and check asteroid field collisions (only when alive and field active)
+          if (asteroidFieldRef.current?.active) {
+            const fieldUpdate = updateAsteroidField(
+              asteroidFieldRef.current,
+              dt,
+              shipX,
+              shipY,
+              8, // ship collision radius
+              viewWidth
+            );
+            
+            // Handle collision
+            if (fieldUpdate.collision) {
+              isDead = true;
+              spawnExplosion(shipX, shipY);
+              spawnDebris(shipX, shipY, shipVx, shipVy);
+              audio.current.explosion();
+              if (anyGamepad()) vibrate(500, 0.8, 1.0);
+              
+              setTimeout(() => {
+                onGameOver({
+                  cause: "crash",
+                  distance: currentDistance,
+                  time: currentTime,
+                  score: currentScore,
+                  landings: currentLandings
+                });
+              }, 2500);
+            }
+            
+            // Handle near miss bonus
+            if (fieldUpdate.nearMiss) {
+              currentScore += 10;
+              setScore(currentScore);
+              audio.current.click(); // Quick sound for near-miss
+            }
+          }
+          
+          // Detect field exit
+          if (asteroidFieldRef.current?.active && shipX > asteroidFieldRef.current.endX) {
+            // Award clear bonus if no collisions
+            if (asteroidFieldRef.current.clearedWithoutHit) {
+              currentScore += 250;
+              setScore(currentScore);
+              setFieldMessage("+250 FIELD CLEARED!");
+              setFieldMessageTimer(2.0);
+            }
+            
+            setFieldMessage("ASTEROID FIELD CLEARED");
+            setFieldMessageTimer(2.0);
+            asteroidFieldRef.current = null;
+            fieldWarningShownRef.current = false;
           }
           
           // Collision detection
@@ -1477,6 +1557,14 @@ export const SurvivalEngine: React.FC<Props> = ({
       const allHazards = hazardsRef.current;
       if (allHazards.length > 0) {
         drawHazards(ctx, allHazards, neonColor, shouldOptimize ? 4 : 8);
+      }
+      
+      // Render asteroid field (if active)
+      if (asteroidFieldRef.current?.active) {
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        renderAsteroidField(ctx, asteroidFieldRef.current, neonColor);
+        ctx.restore();
       }
       
       // Render collectibles (space junk)
