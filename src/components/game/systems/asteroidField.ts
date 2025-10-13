@@ -47,7 +47,7 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
     phase: "entry" as const,
     phaseTimer: 0,
     startX,
-    endX: startX + 400, // About half a chunk (dense asteroid corridor)
+    endX: startX + 1600, // About 2 chunks (extended asteroid corridor)
     asteroids: [] as FieldAsteroid[],
     spawnTimer: 0,
     nextSpawnDelay: 2.0,
@@ -61,10 +61,10 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   
   // Pre-spawn asteroids to create immediate dense field
   const initialRng = mulberry32(seed);
-  const initialCount = 30; // Start with 30 asteroids immediately
+  const initialCount = 15; // Start with 15 asteroids immediately (half density)
   for (let i = 0; i < initialCount; i++) {
-    const x = startX + 100 + initialRng() * 300; // Spread across field width
-    const y = 50 + initialRng() * 300; // Upper portion of screen
+    const x = startX + 100 + initialRng() * 1200; // Spread across longer field width
+    const y = 20 + initialRng() * 450; // Spread from very top (y=20) to mid-screen (y=470)
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
       sizeRoll < 0.5 ? "small" : sizeRoll < 0.85 ? "medium" : "large";
@@ -133,7 +133,7 @@ export function spawnFieldAsteroid(
   // Spawn ahead of player, off-screen
   const spawnX = playerX + viewWidth + 100 + rng() * 200;
   // Spawn above terrain - lower Y values = higher on screen
-  const spawnY = 50 + rng() * 300; // Upper 2/3 of screen
+  const spawnY = 20 + rng() * 450; // Spread from very top (y=20) to mid-screen (y=470)
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -182,10 +182,10 @@ export function updateAsteroidField(
   // Update phase timer
   state.phaseTimer += dt;
   
-  // Phase transitions based on player position (shorter for compact field)
-  if (state.phase === "entry" && playerX > state.startX + 100) {
+  // Phase transitions based on player position (adjusted for 4x longer field)
+  if (state.phase === "entry" && playerX > state.startX + 400) {
     state.phase = "active";
-  } else if (state.phase === "active" && playerX > state.endX - 100) {
+  } else if (state.phase === "active" && playerX > state.endX - 400) {
     state.phase = "exit";
   }
   
@@ -194,8 +194,8 @@ export function updateAsteroidField(
     state.spawnTimer += dt;
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
-      // 10x more asteroids: 30 in entry, 80-120 in active phase
-      const maxAsteroids = state.phase === "entry" ? 30 : Math.min(80 + Math.floor(state.difficulty * 5), 120);
+      // Half density: 15 in entry, 40-60 in active phase
+      const maxAsteroids = state.phase === "entry" ? 15 : Math.min(40 + Math.floor(state.difficulty * 2.5), 60);
       
       if (state.asteroids.length < maxAsteroids) {
         spawnFieldAsteroid(state, playerX, viewWidth, rng);
