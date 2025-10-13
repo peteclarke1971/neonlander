@@ -795,6 +795,63 @@ export const SurvivalEngine: React.FC<Props> = ({
           audio.current.setThruster(0);
         }
         
+        // Always update hazards and asteroids (even when landed)
+        updateHazards(hazardsRef.current, dt, CHUNK_WIDTH * 10, 600, false);
+        
+        // Update asteroid field (keep moving even when landed)
+        if (asteroidFieldRef.current?.active) {
+          const fieldUpdate = updateAsteroidField(
+            asteroidFieldRef.current,
+            dt,
+            shipX,
+            shipY,
+            8, // ship collision radius
+            viewWidth
+          );
+          
+          // Handle collision (only when not landed)
+          if (!isLanded && fieldUpdate.collision) {
+            isDead = true;
+            spawnExplosion(shipX, shipY);
+            spawnDebris(shipX, shipY, shipVx, shipVy);
+            audio.current.explosion();
+            if (anyGamepad()) vibrate(500, 0.8, 1.0);
+            
+            setTimeout(() => {
+              onGameOver({
+                cause: "crash",
+                distance: currentDistance,
+                time: currentTime,
+                score: currentScore,
+                landings: currentLandings
+              });
+            }, 2500);
+          }
+          
+          // Handle near miss bonus (only when not landed)
+          if (!isLanded && fieldUpdate.nearMiss) {
+            currentScore += 10;
+            setScore(currentScore);
+            audio.current.click(); // Quick sound for near-miss
+          }
+        }
+        
+        // Detect field exit (even when landed)
+        if (asteroidFieldRef.current?.active && shipX > asteroidFieldRef.current.endX) {
+          // Award clear bonus if no collisions
+          if (asteroidFieldRef.current.clearedWithoutHit) {
+            currentScore += 250;
+            setScore(currentScore);
+            setFieldMessage("+250 FIELD CLEARED!");
+            setFieldMessageTimer(2.0);
+          }
+          
+          setFieldMessage("ASTEROID FIELD CLEARED");
+          setFieldMessageTimer(2.0);
+          asteroidFieldRef.current = null;
+          fieldWarningShownRef.current = false;
+        }
+        
         // Physics (only when not landed)
         if (!isLanded) {
           // Apply anomaly forces
@@ -878,27 +935,22 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // Update hazards (always update for movement)
-          updateHazards(hazardsRef.current, dt, CHUNK_WIDTH * 10, 600, false);
-          
           // Check hazard collisions (only when airborne and alive)
-          if (!isLanded) {
-            if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
-              isDead = true;
-              spawnExplosion(shipX, shipY);
-              spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.explosion();
-              if (anyGamepad()) vibrate(500, 0.8, 1.0);
-              setTimeout(() => {
-                onGameOver({
-                  cause: "crash",
-                  distance: currentDistance,
-                  time: currentTime,
-                  score: currentScore,
-                  landings: currentLandings
-                });
-              }, 2500);
-            }
+          if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
+            isDead = true;
+            spawnExplosion(shipX, shipY);
+            spawnDebris(shipX, shipY, shipVx, shipVy);
+            audio.current.explosion();
+            if (anyGamepad()) vibrate(500, 0.8, 1.0);
+            setTimeout(() => {
+              onGameOver({
+                cause: "crash",
+                distance: currentDistance,
+                time: currentTime,
+                score: currentScore,
+                landings: currentLandings
+              });
+            }, 2500);
           }
           
           // Check collectible pickups (only when alive)
@@ -918,60 +970,6 @@ export const SurvivalEngine: React.FC<Props> = ({
                 }
               }
             }
-          }
-          
-          // Update and check asteroid field collisions (only when alive and field active)
-          if (asteroidFieldRef.current?.active) {
-            const fieldUpdate = updateAsteroidField(
-              asteroidFieldRef.current,
-              dt,
-              shipX,
-              shipY,
-              8, // ship collision radius
-              viewWidth
-            );
-            
-            // Handle collision
-            if (fieldUpdate.collision) {
-              isDead = true;
-              spawnExplosion(shipX, shipY);
-              spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.explosion();
-              if (anyGamepad()) vibrate(500, 0.8, 1.0);
-              
-              setTimeout(() => {
-                onGameOver({
-                  cause: "crash",
-                  distance: currentDistance,
-                  time: currentTime,
-                  score: currentScore,
-                  landings: currentLandings
-                });
-              }, 2500);
-            }
-            
-            // Handle near miss bonus
-            if (fieldUpdate.nearMiss) {
-              currentScore += 10;
-              setScore(currentScore);
-              audio.current.click(); // Quick sound for near-miss
-            }
-          }
-          
-          // Detect field exit
-          if (asteroidFieldRef.current?.active && shipX > asteroidFieldRef.current.endX) {
-            // Award clear bonus if no collisions
-            if (asteroidFieldRef.current.clearedWithoutHit) {
-              currentScore += 250;
-              setScore(currentScore);
-              setFieldMessage("+250 FIELD CLEARED!");
-              setFieldMessageTimer(2.0);
-            }
-            
-            setFieldMessage("ASTEROID FIELD CLEARED");
-            setFieldMessageTimer(2.0);
-            asteroidFieldRef.current = null;
-            fieldWarningShownRef.current = false;
           }
           
           // Collision detection

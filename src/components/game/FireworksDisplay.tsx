@@ -743,7 +743,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Auto-complete after extended time for spectacular show
   useEffect(() => {
-    const duration = landingType === 'ghost-beaten' ? 10000 : landingType === '2x' ? 8000 : landingType === 'moving' ? 7000 : 6000;
+    const duration = fireworkCount !== undefined 
+      ? Math.max(8000, fireworkCount * 300 + 4000) // Survival: launch time + 4s buffer for explosions
+      : landingType === 'ghost-beaten' ? 10000 
+      : landingType === '2x' ? 8000 
+      : landingType === 'moving' ? 7000 
+      : 6000;
     const timer = setTimeout(onComplete, duration);
     return () => clearTimeout(timer);
   }, [onComplete, landingType]);
