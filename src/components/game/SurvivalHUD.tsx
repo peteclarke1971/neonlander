@@ -12,6 +12,9 @@ interface Props {
   time: number;
   distance: number;
   landings: number;
+  // Shield state
+  shieldActive?: boolean;
+  shieldTimer?: number;
   // Gyroscope controls
   showGyroButton?: boolean;
   gyroActive?: boolean;
@@ -31,6 +34,8 @@ export const SurvivalHUD: React.FC<Props> = ({
   time, 
   distance,
   landings,
+  shieldActive = false,
+  shieldTimer = 0,
   showGyroButton = false,
   gyroActive = false,
   gyroPermission = 'pending',
@@ -67,6 +72,42 @@ export const SurvivalHUD: React.FC<Props> = ({
         <div className="mt-3 text-lg font-semibold">
           Score: <span className="text-accent">{score}</span>
         </div>
+        
+        {/* Shield Status Badge */}
+        {shieldActive && (
+          <div className="mt-2 flex items-center justify-between bg-accent/10 border border-accent/40 rounded px-2 py-1">
+            <div className="flex items-center gap-2">
+              <svg 
+                className="w-4 h-4" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5"
+                style={{ color: 'hsl(280, 100%, 75%)' }}
+              >
+                <path d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4z" />
+              </svg>
+              <span className="text-xs font-bold" style={{ color: 'hsl(280, 100%, 75%)' }}>
+                SHIELD
+              </span>
+            </div>
+            
+            {shieldTimer > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1 bg-accent/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-300"
+                    style={{ 
+                      width: `${(shieldTimer / 75) * 100}%`,
+                      backgroundColor: 'hsl(280, 100%, 75%)'
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-accent/60">{Math.ceil(shieldTimer)}s</span>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Gyroscope controls */}
         {showGyroButton && (

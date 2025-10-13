@@ -28,6 +28,17 @@ export const COLLECTIBLES_CONFIG = {
   fixSeedPrefix: "JUNK_FIX"
 };
 
+export const SHIELD_CONFIG = {
+  enabled: true,
+  spawnChance: 0.35, // ~1 in 3 chunks
+  pickupRadius: 18,
+  pickupScore: 50,
+  duration: 75, // seconds (soft timer)
+  bubbleRadius: 22,
+  shieldColor: "hsla(280, 100%, 70%, 0.4)",
+  shieldRimColor: "hsla(280, 100%, 85%, 0.9)"
+};
+
 export const WORMHOLE_CONFIG = {
   enabled: true,
   radius: 60, // approximately 1.9×shipHeight

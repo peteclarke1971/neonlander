@@ -83,6 +83,12 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [fieldMessage, setFieldMessage] = useState<string>("");
   const [fieldMessageTimer, setFieldMessageTimer] = useState(0);
   
+  // Shield state
+  const shieldActiveRef = useRef(false);
+  const [shieldActive, setShieldActive] = useState(false);
+  const shieldTimerRef = useRef(0);
+  const SHIELD_DURATION = 75;
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -345,6 +351,43 @@ export const SurvivalEngine: React.FC<Props> = ({
     };
     
     // Background satellite spawner - use full canvas dimensions
+    // Shield break effect (prismatic particle burst)
+    const spawnShieldBreak = (cx: number, cy: number) => {
+      // Concentric ring bursts
+      for (let ring = 0; ring < 3; ring++) {
+        const ringDelay = ring * 30;
+        setTimeout(() => {
+          shockwaves.push({
+            x: cx,
+            y: cy,
+            life: 0,
+            max: 0.4
+          });
+        }, ringDelay);
+      }
+      
+      // Prismatic particle shards
+      const shardCount = shouldOptimize ? 15 : 40;
+      for (let i = 0; i < shardCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 100 + Math.random() * 200;
+        const hue = 260 + Math.random() * 60; // Purple to cyan
+        
+        particles.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: 0,
+          max: 0.6 + Math.random() * 0.4,
+          color: `hsla(${hue}, 100%, ${60 + Math.random() * 30}%, 1)`
+        });
+      }
+      
+      flashT = 0.25;
+      cameraShake += 2;
+    };
+    
     // Spectacular explosion helper functions
     const spawnExplosion = (cx: number, cy: number) => {
       // Primary explosion wave (reduce count for low graphics)
@@ -643,6 +686,15 @@ export const SurvivalEngine: React.FC<Props> = ({
         setFieldMessageTimer(Math.max(0, fieldMessageTimer - dt));
       }
       
+      // Update shield timer
+      if (shieldActiveRef.current && shieldTimerRef.current > 0) {
+        shieldTimerRef.current -= dt;
+        if (shieldTimerRef.current <= 0) {
+          shieldActiveRef.current = false;
+          setShieldActive(false);
+        }
+      }
+      
       // Ship input and rotation (only when alive)
       if (!isDead) {
         // Gamepad input with hot-swap detection
@@ -811,21 +863,34 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Handle collision (only when not landed)
           if (!isLanded && fieldUpdate.collision) {
-            isDead = true;
-            spawnExplosion(shipX, shipY);
-            spawnDebris(shipX, shipY, shipVx, shipVy);
-            audio.current.explosion();
-            if (anyGamepad()) vibrate(500, 0.8, 1.0);
-            
-            setTimeout(() => {
-              onGameOver({
-                cause: "crash",
-                distance: currentDistance,
-                time: currentTime,
-                score: currentScore,
-                landings: currentLandings
-              });
-            }, 2500);
+            if (shieldActiveRef.current) {
+              // SHIELD SAVE!
+              spawnShieldBreak(shipX, shipY);
+              shieldActiveRef.current = false;
+              setShieldActive(false);
+              audio.current.shieldBreak();
+              
+              shipVx += (Math.random() - 0.5) * 2;
+              shipVy += (Math.random() - 0.5) * 2;
+              
+              if (anyGamepad()) vibrate(200, 0.5, 0.8);
+            } else {
+              isDead = true;
+              spawnExplosion(shipX, shipY);
+              spawnDebris(shipX, shipY, shipVx, shipVy);
+              audio.current.explosion();
+              if (anyGamepad()) vibrate(500, 0.8, 1.0);
+              
+              setTimeout(() => {
+                onGameOver({
+                  cause: "crash",
+                  distance: currentDistance,
+                  time: currentTime,
+                  score: currentScore,
+                  landings: currentLandings
+                });
+              }, 2500);
+            }
           }
           
           // Handle near miss bonus (only when not landed)
@@ -918,11 +983,49 @@ export const SurvivalEngine: React.FC<Props> = ({
           // Check volcano particle collisions
           if (volcanoParticles.length > 0) {
             if (checkVolcanoParticleCollision(volcanoParticles, shipX, shipY, 8)) {
+              if (shieldActiveRef.current) {
+                spawnShieldBreak(shipX, shipY);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                audio.current.shieldBreak();
+                shipVx += (Math.random() - 0.5) * 2;
+                shipVy += (Math.random() - 0.5) * 2;
+                if (anyGamepad()) vibrate(200, 0.5, 0.8);
+              } else {
+                isDead = true;
+                spawnExplosion(shipX, shipY);
+                spawnDebris(shipX, shipY, shipVx, shipVy);
+                audio.current.explosion();
+                if (anyGamepad()) vibrate(500, 0.8, 1.0);
+                setTimeout(() => {
+                  onGameOver({
+                    cause: "crash",
+                    distance: currentDistance,
+                    time: currentTime,
+                    score: currentScore,
+                    landings: currentLandings
+                  });
+                }, 2500);
+              }
+            }
+          }
+          
+          // Check hazard collisions (only when airborne and alive)
+          if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
+            if (shieldActiveRef.current) {
+              spawnShieldBreak(shipX, shipY);
+              shieldActiveRef.current = false;
+              setShieldActive(false);
+              audio.current.shieldBreak();
+              shipVx += (Math.random() - 0.5) * 2;
+              shipVy += (Math.random() - 0.5) * 2;
+              if (anyGamepad()) vibrate(200, 0.5, 0.8);
+            } else {
               isDead = true;
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
               audio.current.explosion();
-              if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
+              if (anyGamepad()) vibrate(500, 0.8, 1.0);
               setTimeout(() => {
                 onGameOver({
                   cause: "crash",
@@ -931,31 +1034,43 @@ export const SurvivalEngine: React.FC<Props> = ({
                   score: currentScore,
                   landings: currentLandings
                 });
-              }, 2500); // Longer delay to enjoy explosion
+              }, 2500);
             }
-          }
-          
-          // Check hazard collisions (only when airborne and alive)
-          if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
-            isDead = true;
-            spawnExplosion(shipX, shipY);
-            spawnDebris(shipX, shipY, shipVx, shipVy);
-            audio.current.explosion();
-            if (anyGamepad()) vibrate(500, 0.8, 1.0);
-            setTimeout(() => {
-              onGameOver({
-                cause: "crash",
-                distance: currentDistance,
-                time: currentTime,
-                score: currentScore,
-                landings: currentLandings
-              });
-            }, 2500);
           }
           
           // Check collectible pickups (only when alive)
           for (const chunk of chunks) {
             if (!chunk.collectibles) continue;
+            
+            // Check shield pickup
+            if (chunk.collectibles.shieldPickup && !chunk.collectibles.shieldPickup.collected) {
+              const shield = chunk.collectibles.shieldPickup;
+              const dx = shipX - shield.pos.x;
+              const dy = shipY - shield.pos.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              if (distance <= shield.radius + 16) {
+                if (shieldActiveRef.current) {
+                  // Already have shield - convert to fuel+score
+                  shield.collected = true;
+                  fuelAmount = Math.min(fuelCap, fuelAmount + 5);
+                  currentScore += 25;
+                  setScore(currentScore);
+                  audio.current.click();
+                } else {
+                  // Collect shield
+                  shield.collected = true;
+                  shieldActiveRef.current = true;
+                  setShieldActive(true);
+                  shieldTimerRef.current = SHIELD_DURATION;
+                  
+                  currentScore += 50;
+                  setScore(currentScore);
+                  
+                  audio.current.shieldPickup();
+                }
+              }
+            }
             
             for (const junk of chunk.collectibles.spaceJunk) {
               if (checkJunkPickup({ x: shipX, y: shipY }, 16, junk)) {
@@ -1117,12 +1232,51 @@ export const SurvivalEngine: React.FC<Props> = ({
                 
                 // No auto-takeoff - player must thrust to take off
               } else {
-                // Crash!
+                // Bad landing
+                if (shieldActiveRef.current) {
+                  // Shield saves but landing fails (no refuel)
+                  spawnShieldBreak(shipX, shipY);
+                  shieldActiveRef.current = false;
+                  setShieldActive(false);
+                  audio.current.shieldBreak();
+                  
+                  shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
+                  shipVx *= 0.3;
+                  shipVy = -1;
+                  if (anyGamepad()) vibrate(200, 0.5, 0.8);
+                } else {
+                  isDead = true;
+                  spawnExplosion(shipX, shipY);
+                  spawnDebris(shipX, shipY, shipVx, shipVy);
+                  audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+                  if (anyGamepad()) vibrate(500, 0.8, 1.0);
+                  setTimeout(() => {
+                    onGameOver({
+                      cause: "crash",
+                      distance: currentDistance,
+                      time: currentTime,
+                      score: currentScore,
+                      landings: currentLandings
+                    });
+                  }, 2500);
+                }
+              }
+            } else {
+              // Hit terrain
+              if (shieldActiveRef.current) {
+                spawnShieldBreak(shipX, shipY);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                audio.current.shieldBreak();
+                shipVx += (Math.random() - 0.5) * 2;
+                shipVy = -1.5;
+                if (anyGamepad()) vibrate(200, 0.5, 0.8);
+              } else {
                 isDead = true;
                 spawnExplosion(shipX, shipY);
                 spawnDebris(shipX, shipY, shipVx, shipVy);
                 audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
-                if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
+                if (anyGamepad()) vibrate(500, 0.8, 1.0);
                 setTimeout(() => {
                   onGameOver({
                     cause: "crash",
@@ -1131,24 +1285,8 @@ export const SurvivalEngine: React.FC<Props> = ({
                     score: currentScore,
                     landings: currentLandings
                   });
-                }, 2500); // Longer delay to enjoy explosion
+                }, 2500);
               }
-            } else {
-              // Hit terrain - crash!
-              isDead = true;
-              spawnExplosion(shipX, shipY);
-              spawnDebris(shipX, shipY, shipVx, shipVy);
-              audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
-              if (anyGamepad()) vibrate(500, 0.8, 1.0); // Stronger haptic pulse
-              setTimeout(() => {
-                onGameOver({
-                  cause: "crash",
-                  distance: currentDistance,
-                  time: currentTime,
-                  score: currentScore,
-                  landings: currentLandings
-                });
-              }, 2500); // Longer delay to enjoy explosion
             }
           }
           
@@ -1565,6 +1703,60 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
+      // Render shield pickups
+      for (const chunk of chunks) {
+        if (!chunk.collectibles?.shieldPickup) continue;
+        const shield = chunk.collectibles.shieldPickup;
+        if (shield.collected) continue;
+        
+        const sx = shield.pos.x;
+        const sy = shield.pos.y;
+        
+        // Idle pulse
+        shield.pulsePhase += dt * 2.5;
+        const pulse = 0.85 + Math.sin(shield.pulsePhase) * 0.15;
+        const glowSize = 20 * pulse;
+        
+        ctx.save();
+        ctx.globalAlpha = 0.6 * pulse;
+        ctx.shadowColor = "hsla(280, 100%, 70%, 0.9)";
+        ctx.shadowBlur = 25;
+        
+        // Outer glow
+        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowSize);
+        grad.addColorStop(0, "hsla(280, 100%, 80%, 0.8)");
+        grad.addColorStop(0.5, "hsla(280, 100%, 60%, 0.4)");
+        grad.addColorStop(1, "hsla(280, 100%, 40%, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, glowSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1;
+        
+        // Hexagon capsule
+        ctx.strokeStyle = "hsla(280, 100%, 85%, 1)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          const px = sx + Math.cos(angle) * 10;
+          const py = sy + Math.sin(angle) * 10;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Inner core
+        ctx.fillStyle = "hsla(280, 100%, 95%, 1)";
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
+      
       // Render collectibles (space junk)
       const elapsed = currentTime;
       for (const chunk of chunks) {
@@ -1689,6 +1881,42 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
+      
+      // Draw shield bubble (if active)
+      if (shieldActiveRef.current && !isDead) {
+        ctx.save();
+        ctx.translate(shipX, shipY);
+        
+        // Shimmer animation
+        const shimmerPhase = currentTime * 3;
+        const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
+        
+        // Bubble outline
+        ctx.strokeStyle = `hsla(280, 100%, 85%, ${shimmerAlpha + 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Prismatic sheen
+        const sheenAngle = shimmerPhase * 0.5;
+        const grad = ctx.createLinearGradient(
+          Math.cos(sheenAngle) * 22, Math.sin(sheenAngle) * 22,
+          -Math.cos(sheenAngle) * 22, -Math.sin(sheenAngle) * 22
+        );
+        grad.addColorStop(0, "hsla(260, 100%, 70%, 0.1)");
+        grad.addColorStop(0.5, "hsla(300, 100%, 80%, 0.25)");
+        grad.addColorStop(1, "hsla(260, 100%, 70%, 0.1)");
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
       
       // Draw ship (only if alive)
       if (!isDead) {
@@ -1819,6 +2047,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         time={time}
         distance={distance}
         landings={landings}
+        shieldActive={shieldActive}
+        shieldTimer={shieldTimerRef.current}
         showGyroButton={isTouch}
         gyroActive={gyroscope.isActive}
         gyroPermission={gyroscope.permission}

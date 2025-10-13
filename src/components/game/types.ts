@@ -122,9 +122,19 @@ export interface WormholeDoor {
   targetBonus: "Asteroids" | "LightCycles" | "Random";
 }
 
+export interface ShieldPickup {
+  id: string;
+  pos: { x: number; y: number };
+  collected: boolean;
+  seed: number;
+  radius: number;
+  pulsePhase: number;
+}
+
 export interface CollectiblesData {
   spaceJunk: SpaceJunk[];
   wormholeDoor?: WormholeDoor;
+  shieldPickup?: ShieldPickup;
   collected: Set<string>;
   totalCollected: number;
   setComplete: boolean;

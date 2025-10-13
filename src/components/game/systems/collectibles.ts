@@ -25,9 +25,19 @@ export interface WormholeDoor {
   targetBonus: "Asteroids" | "LightCycles" | "Random";
 }
 
+export interface ShieldPickup {
+  id: string;
+  pos: Vec2;
+  collected: boolean;
+  seed: number;
+  radius: number;
+  pulsePhase: number;
+}
+
 export interface CollectiblesData {
   spaceJunk: SpaceJunk[];
   wormholeDoor?: WormholeDoor;
+  shieldPickup?: ShieldPickup;
   collected: Set<string>;
   totalCollected: number;
   setComplete: boolean;
@@ -325,8 +335,50 @@ export function generateCollectibles(
     spaceJunk.push(fallbackJunk);
   }
   
+  // Generate shield pickup (rare spawn - ~1 per 2-3 chunks)
+  let shieldPickup: ShieldPickup | undefined = undefined;
+  const shieldRng = mulberry32(levelSeed + 99999);
+  const shieldSpawnChance = 0.35; // ~35% per chunk
+  
+  if (shieldSpawnChance > shieldRng()) {
+    // Try to find a safe position for shield
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const x = 200 + shieldRng() * (context.worldWidth - 400);
+      const y = context.mode === "surface"
+        ? 80 + shieldRng() * (context.worldHeight / 3) // Upper third for surface
+        : 100 + shieldRng() * (context.worldHeight - 200);
+      
+      const isSafe = context.mode === "surface"
+        ? isSafeSurfacePosition(x, y, context)
+        : isSafeCavernPosition(x, y, context);
+      
+      // Additional check: not directly above a pad
+      let clearOfPads = true;
+      for (const pad of context.pads) {
+        const padCenterX = (pad.xStart + pad.xEnd) / 2;
+        if (Math.abs(x - padCenterX) < 80) {
+          clearOfPads = false;
+          break;
+        }
+      }
+      
+      if (isSafe && clearOfPads) {
+        shieldPickup = {
+          id: `shield_${levelSeed}`,
+          pos: { x, y },
+          collected: false,
+          seed: levelSeed + 88888,
+          radius: 18,
+          pulsePhase: shieldRng() * Math.PI * 2
+        };
+        break;
+      }
+    }
+  }
+  
   return {
     spaceJunk,
+    shieldPickup,
     collected: new Set(),
     totalCollected: 0,
     setComplete: false

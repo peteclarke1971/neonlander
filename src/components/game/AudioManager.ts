@@ -369,6 +369,7 @@ export class AudioManager {
     if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
   }
 
+  // ===== Click sound (menu/UI feedback) =====
   click() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
@@ -381,6 +382,34 @@ export class AudioManager {
     gain.connect(this.master);
     osc.start();
     osc.stop(this.ctx.currentTime + 0.06);
+  }
+
+  // ===== Shield sounds =====
+  shieldPickup() {
+    this.success();
+    setTimeout(() => this.click(), 50);
+  }
+
+  shieldBreak() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = "sine";
+    osc.frequency.value = 1200;
+    gain.gain.value = 0.2;
+    
+    osc.connect(gain);
+    gain.connect(this.master);
+    
+    const now = this.ctx.currentTime;
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    
+    osc.start(now);
+    osc.stop(now + 0.15);
   }
 
   abort() {
