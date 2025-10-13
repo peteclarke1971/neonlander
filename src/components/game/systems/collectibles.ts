@@ -338,15 +338,27 @@ export function generateCollectibles(
   // Generate shield pickup (rare spawn - ~1 per 2-3 chunks)
   let shieldPickup: ShieldPickup | undefined = undefined;
   const shieldRng = mulberry32(levelSeed + 99999);
+  
+  // Force shield spawn in chunk 2 for testing (levelSeed 2)
+  const forceSpawn = levelSeed === 2;
   const shieldSpawnChance = 0.35; // ~35% per chunk
   
-  if (shieldSpawnChance > shieldRng()) {
+  if (forceSpawn || shieldSpawnChance > shieldRng()) {
     // Try to find a safe position for shield
     for (let attempt = 0; attempt < 50; attempt++) {
       const x = 200 + shieldRng() * (context.worldWidth - 400);
       const y = context.mode === "surface"
         ? 80 + shieldRng() * (context.worldHeight / 3) // Upper third for surface
         : 100 + shieldRng() * (context.worldHeight - 200);
+      
+      // For surface mode, ALWAYS ensure shield is above terrain
+      if (context.mode === "surface") {
+        const terrainY = context.getHeightAt(x);
+        const minClearance = context.shipHeight * 2.5; // Significant clearance above terrain
+        if (y >= terrainY - minClearance) {
+          continue; // Too close to terrain, try another position
+        }
+      }
       
       const isSafe = context.mode === "surface"
         ? isSafeSurfacePosition(x, y, context)
