@@ -42,13 +42,13 @@ export interface AsteroidFieldState {
 }
 
 export function initAsteroidField(startX: number, difficulty: number, seed: number): AsteroidFieldState {
-  return {
+  const fieldState = {
     active: true,
-    phase: "entry",
+    phase: "entry" as const,
     phaseTimer: 0,
     startX,
-    endX: startX + 4800, // About 6 chunks at 800px each
-    asteroids: [],
+    endX: startX + 400, // About half a chunk (dense asteroid corridor)
+    asteroids: [] as FieldAsteroid[],
     spawnTimer: 0,
     nextSpawnDelay: 2.0,
     nearMissCount: 0,
@@ -58,6 +58,46 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
     seed,
     lastAsteroidId: 0
   };
+  
+  // Pre-spawn asteroids to create immediate dense field
+  const initialRng = mulberry32(seed);
+  const initialCount = 30; // Start with 30 asteroids immediately
+  for (let i = 0; i < initialCount; i++) {
+    const x = startX + 100 + initialRng() * 300; // Spread across field width
+    const y = 50 + initialRng() * 300; // Upper portion of screen
+    const sizeRoll = initialRng();
+    const size: "small" | "medium" | "large" = 
+      sizeRoll < 0.5 ? "small" : sizeRoll < 0.85 ? "medium" : "large";
+    
+    const radius = size === "large" ? 40 : size === "medium" ? 25 : 15;
+    const speedMult = size === "large" ? 0.6 : size === "medium" ? 0.8 : 1.0;
+    const baseSpeed = 20 + initialRng() * 30;
+    const angleVariation = (initialRng() - 0.5) * Math.PI / 6;
+    const vx = -baseSpeed * speedMult * Math.cos(angleVariation);
+    const vy = baseSpeed * speedMult * Math.sin(angleVariation);
+    const maxSpin = size === "large" ? 1 : size === "medium" ? 2 : 3;
+    const av = (initialRng() - 0.5) * maxSpin;
+    
+    const asteroidSeed = seed + fieldState.lastAsteroidId;
+    const shapeRng = mulberry32(asteroidSeed);
+    const points = generateAsteroidShape(size, shapeRng);
+    
+    fieldState.asteroids.push({
+      id: `field-asteroid-${fieldState.lastAsteroidId++}`,
+      x,
+      y,
+      vx,
+      vy,
+      r: radius,
+      angle: initialRng() * Math.PI * 2,
+      av,
+      size,
+      points,
+      nearMissTriggered: false
+    });
+  }
+  
+  return fieldState;
 }
 
 export function spawnFieldAsteroid(
@@ -92,7 +132,8 @@ export function spawnFieldAsteroid(
   
   // Spawn ahead of player, off-screen
   const spawnX = playerX + viewWidth + 100 + rng() * 200;
-  const spawnY = 200 + rng() * 200; // Mid-screen height range
+  // Spawn above terrain - lower Y values = higher on screen
+  const spawnY = 50 + rng() * 300; // Upper 2/3 of screen
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -141,10 +182,10 @@ export function updateAsteroidField(
   // Update phase timer
   state.phaseTimer += dt;
   
-  // Phase transitions based on player position
-  if (state.phase === "entry" && playerX > state.startX + 1600) {
+  // Phase transitions based on player position (shorter for compact field)
+  if (state.phase === "entry" && playerX > state.startX + 100) {
     state.phase = "active";
-  } else if (state.phase === "active" && playerX > state.endX - 800) {
+  } else if (state.phase === "active" && playerX > state.endX - 100) {
     state.phase = "exit";
   }
   
@@ -153,17 +194,18 @@ export function updateAsteroidField(
     state.spawnTimer += dt;
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
-      const maxAsteroids = state.phase === "entry" ? 3 : Math.min(8 + Math.floor(state.difficulty * 0.5), 12);
+      // 10x more asteroids: 30 in entry, 80-120 in active phase
+      const maxAsteroids = state.phase === "entry" ? 30 : Math.min(80 + Math.floor(state.difficulty * 5), 120);
       
       if (state.asteroids.length < maxAsteroids) {
         spawnFieldAsteroid(state, playerX, viewWidth, rng);
       }
       
-      // Set next spawn delay
+      // Set next spawn delay - much faster spawning for dense field
       if (state.phase === "entry") {
-        state.nextSpawnDelay = 3.0 + rng() * 2.0; // 3-5 seconds
+        state.nextSpawnDelay = 0.3 + rng() * 0.4; // 0.3-0.7 seconds
       } else {
-        state.nextSpawnDelay = 1.5 + rng() * 1.5; // 1.5-3 seconds
+        state.nextSpawnDelay = 0.15 + rng() * 0.25; // 0.15-0.4 seconds
       }
       
       state.spawnTimer = 0;
