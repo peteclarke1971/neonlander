@@ -144,7 +144,8 @@ export function generateCavern(seed: number, level: number, difficulty: "easy" |
     mode: "caverns",
     startPos: { x: bakeResult.startPad.xStart + (bakeResult.startPad.xEnd - bakeResult.startPad.xStart) / 2, y: bakeResult.startPad.y },
     goalPos: { x: bakeResult.endPad.xStart + (bakeResult.endPad.xEnd - bakeResult.endPad.xStart) / 2, y: bakeResult.endPad.y },
-    checkCollision
+    checkCollision,
+    chunkNumber: 0 // Not chunk-based (fixed level)
   };
   
   // Use terrain-based color for cavern collectibles

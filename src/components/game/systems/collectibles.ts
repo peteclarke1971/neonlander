@@ -53,6 +53,7 @@ export interface PlacementContext {
   mode: CollectiblesMode;
   startPos: Vec2;
   goalPos: Vec2;
+  chunkNumber: number; // For force spawn logic
   // For caverns
   checkCollision?: (x: number, y: number, radius: number) => boolean;
   // For hazards/volcanoes
@@ -339,9 +340,11 @@ export function generateCollectibles(
   let shieldPickup: ShieldPickup | undefined = undefined;
   const shieldRng = mulberry32(levelSeed + 99999);
   
-  // Force shield spawn in chunk 2 for testing (levelSeed 2)
-  const forceSpawn = levelSeed === 2;
+  // Force shield spawn in chunk 2 for testing
+  const forceSpawn = context.chunkNumber === 2;
   const shieldSpawnChance = 0.35; // ~35% per chunk
+  
+  console.log(`🔍 Collectibles generation - chunk ${context.chunkNumber}, forceSpawn: ${forceSpawn}, levelSeed: ${levelSeed}`);
   
   if (forceSpawn || shieldSpawnChance > shieldRng()) {
     // For testing (chunk 2), place shield at fixed position near start
@@ -362,7 +365,7 @@ export function generateCollectibles(
         pulsePhase: shieldRng() * Math.PI * 2
       };
       
-      console.log(`✨ Shield spawned at chunk ${levelSeed} position:`, shieldPickup.pos);
+      console.log(`✨ Shield FORCE SPAWNED at chunk ${context.chunkNumber} position:`, shieldPickup.pos);
     } else {
       // Normal random placement for non-forced spawns
       for (let attempt = 0; attempt < 50; attempt++) {

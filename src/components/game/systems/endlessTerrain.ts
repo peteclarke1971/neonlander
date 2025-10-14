@@ -507,7 +507,8 @@ export class EndlessTerrainGenerator {
         shipHeight: 24,
         mode: 'surface' as const,
         startPos: { x: startX + this.config.chunkWidth * 0.4, y: this.config.baseHeight - 150 },
-        goalPos: { x: endX - this.config.chunkWidth * 0.2, y: this.config.baseHeight - 150 }
+        goalPos: { x: endX - this.config.chunkWidth * 0.2, y: this.config.baseHeight - 150 },
+        chunkNumber // Pass chunk number for force spawn logic
       };
       
       collectibles = generateCollectibles(seed + 6666, placementContext, '#00FFFF');

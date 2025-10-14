@@ -1275,7 +1275,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   mode: isCavernLevel ? "caverns" as const : "surface" as const,
                   startPos: { x: terrain.worldWidth / 2, y: 200 },
                   goalPos: { x: terrain.pads[terrain.pads.length - 1]?.xStart || terrain.worldWidth - 100, y: terrain.pads[terrain.pads.length - 1]?.y || 400 },
-                  checkCollision: isCavernLevel ? (terrain as any).checkCollision : undefined
+                  checkCollision: isCavernLevel ? (terrain as any).checkCollision : undefined,
+                  chunkNumber: 0 // Not chunk-based (fixed level)
                 };
                 collectiblesRef.current.wormholeDoor = generateWormholeDoor(seed, context);
                 if (collectiblesRef.current.wormholeDoor) {
