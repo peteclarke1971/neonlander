@@ -65,7 +65,7 @@ const Survival: React.FC = () => {
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden>
-        <HyperspaceStarfield />
+        <HyperspaceStarfield lowGraphics={lowGraphics} />
       </div>
       
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8">

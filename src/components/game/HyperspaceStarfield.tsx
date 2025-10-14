@@ -19,6 +19,7 @@ export type HyperspaceStarfieldProps = {
   cy?: number; // 0..1 relative
   allowBoost?: boolean; // allow gamepad/keyboard to trigger warp boost
   className?: string;
+  lowGraphics?: boolean; // optimize for performance
 };
 
 function mulberry32(a: number) {
@@ -31,18 +32,21 @@ function mulberry32(a: number) {
 }
 
 export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, HyperspaceStarfieldProps>(
-  ({ speed = 0.35, density = 1200, focalLength = 560, trail = 0.4, style = "glow", cx, cy, allowBoost = true, className }, ref) => {
+  ({ speed = 0.35, density = 1200, focalLength = 560, trail = 0.4, style = "glow", cx, cy, allowBoost = true, className, lowGraphics = false }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rafRef = useRef<number>(0);
     const seedRef = useRef<number>(123456789);
     const boostRef = useRef<{ t: number; d: number; peak: number }>({ t: 0, d: 0, peak: 1 });
-    const opts = useRef({ speed, density, focalLength, trail, style, cx, cy });
+    
+    // Reduce initial density for low graphics mode
+    const effectiveDensity = lowGraphics ? 400 : density;
+    const opts = useRef({ speed, density: effectiveDensity, focalLength, trail, style, cx, cy });
 
     // internal state
     const starCountRef = useRef(0);
     const arrRef = useRef<{ x: Float32Array; y: Float32Array; z: Float32Array; px: Float32Array; py: Float32Array; tw: Float32Array; ph: Float32Array } | null>(null);
       const vpRef = useRef({ cx: 0.5, cy: 0.5 });
-      const perfRef = useRef({ lowMsFor: 0, highMsFor: 0, target: density, floor: 200, ceil: 3200 });
+      const perfRef = useRef({ lowMsFor: 0, highMsFor: 0, target: effectiveDensity, floor: 200, ceil: 3200 });
       const smoothSpeedRef = useRef(0);
 
     useImperativeHandle(ref, () => ({
@@ -221,8 +225,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
         // Draw batched
         ctx.save();
-        if (styleIdx === 1) {
-          // Glow
+        if (styleIdx === 1 && !lowGraphics) {
+          // Glow (only if not in low graphics mode)
           ctx.shadowColor = color as any;
           ctx.shadowBlur = 12;
         } else {

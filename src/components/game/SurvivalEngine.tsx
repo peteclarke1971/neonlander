@@ -316,12 +316,15 @@ export const SurvivalEngine: React.FC<Props> = ({
     const shouldOptimize = isMobile || lowGraphics;
     const THRUSTER_PARTICLE_COUNT = shouldOptimize ? 2 : 25;
     
+    // World width for spatial audio (3 chunks visible at once)
+    const WORLD_WIDTH = CHUNK_WIDTH * 3;
+    
     const dprInit = shouldOptimize ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
     
     // Initialize starfield (canvas-space stars) - use full canvas dimensions
-    const STAR_COUNT = shouldOptimize ? 150 : 320;
+    const STAR_COUNT = shouldOptimize ? 120 : 320;
     for (let i = 0; i < STAR_COUNT; i++) {
       const sx = Math.random() * c.width;
       const sy = Math.random() * c.height;
@@ -372,7 +375,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Prismatic particle shards
-      const shardCount = shouldOptimize ? 15 : 40;
+      const shardCount = shouldOptimize ? 8 : 40;
       for (let i = 0; i < shardCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 100 + Math.random() * 200;
@@ -396,7 +399,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     // Spectacular explosion helper functions
     const spawnExplosion = (cx: number, cy: number) => {
       // Primary explosion wave (reduce count for low graphics)
-      const primaryCount = shouldOptimize ? 20 : (120 + Math.floor(Math.random() * 60));
+      const primaryCount = shouldOptimize ? 12 : (120 + Math.floor(Math.random() * 60));
       for (let i = 0; i < primaryCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 600 + Math.random() * 600; // 3x faster for dramatic expansion
@@ -422,7 +425,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Secondary fire/smoke layer - delayed spawn
       setTimeout(() => {
-        const secondaryCount = shouldOptimize ? 10 : (80 + Math.floor(Math.random() * 40));
+        const secondaryCount = shouldOptimize ? 6 : (80 + Math.floor(Math.random() * 40));
         for (let i = 0; i < secondaryCount; i++) {
           const a = Math.random() * Math.PI * 2;
           const s = 180 + Math.random() * 220; // 2.5x faster
@@ -445,7 +448,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }, 100);
       
       // Spark system
-      const sparkCount = shouldOptimize ? 10 : (40 + Math.floor(Math.random() * 20));
+      const sparkCount = shouldOptimize ? 5 : (40 + Math.floor(Math.random() * 20));
       for (let i = 0; i < sparkCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 800 + Math.random() * 600; // Much faster for dramatic streaks
@@ -478,7 +481,7 @@ export const SurvivalEngine: React.FC<Props> = ({
 
     const spawnDebris = (cx: number, cy: number, cvx: number, cvy: number) => {
       // Enhanced debris system
-      const pieceCount = shouldOptimize ? 10 : (80 + Math.floor(Math.random() * 40));
+      const pieceCount = shouldOptimize ? 6 : (80 + Math.floor(Math.random() * 40));
       for (let i = 0; i < pieceCount; i++) {
         const dir = Math.random() * Math.PI * 2;
         const speed = 220 + Math.random() * 320;
@@ -678,9 +681,11 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX + viewWidth / 2
         );
         
-        // Play explosion sound when volcanoes erupt
+        // Play spatial audio for volcano eruptions
         if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0) {
-          audio.current.explosion();
+          volcanoUpdate.eruptingVolcanoes.forEach(volcano => {
+            audio.current.spatialExplosion(volcano.x, shipX, WORLD_WIDTH);
+          });
         }
         
         setVolcanoParticles(volcanoUpdate.newParticles);
@@ -1480,14 +1485,16 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
-      // Update starfield (shooting stars and satellites)
-      if (currentTime >= nextShooting) {
-        spawnShooting();
-        nextShooting = currentTime + (0.6 + Math.random() * 1.6);
-      }
-      if (currentTime >= nextBgSat) {
-        spawnBgSat();
-        nextBgSat = currentTime + (5 + Math.random() * 7);
+      // Update starfield (shooting stars and satellites) - skip if optimizing
+      if (!shouldOptimize) {
+        if (currentTime >= nextShooting) {
+          spawnShooting();
+          nextShooting = currentTime + (0.6 + Math.random() * 1.6);
+        }
+        if (currentTime >= nextBgSat) {
+          spawnBgSat();
+          nextBgSat = currentTime + (5 + Math.random() * 7);
+        }
       }
       
       // Update shooting stars
@@ -1601,79 +1608,105 @@ export const SurvivalEngine: React.FC<Props> = ({
       const shake = cameraShake;
       cameraShake *= 0.9;
       
-      // Draw starfield with terrain masking (before world transform)
+      // Draw starfield with optimized rendering
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       
-      // Create terrain clipping path to mask stars behind terrain
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(c.width, 0);
-      const segs = 150; // Optimized resolution for performance
-      const terrainBuffer = 40 * dprInit; // Increased buffer to prevent stars showing through
-      for (let i = segs; i >= 0; i--) {
-        const sx = (i / segs) * c.width;
-        const worldX = cameraX + (sx - c.width / 2) / zoom;
-        const worldY = getHeightAt(worldX);
-        const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10; // Added +10 vertical offset
-        ctx.lineTo(sx, sy);
-      }
-      ctx.closePath();
-      ctx.clip();
-      
-      // Draw stars with terrain proximity culling
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = shouldOptimize ? 0 : (2 * dprInit);
-      ctx.fillStyle = neonColor;
-      const starLimit = shouldOptimize ? Math.min(100, stars.length) : stars.length;
-      for (let i = 0; i < starLimit; i++) {
-        const s = stars[i];
-        
-        // Calculate world position of star to check terrain height
-        const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
-        const terrainAtStar = getHeightAt(starWorldX);
-        const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
-        
-        // Skip star if it's too close to terrain (within buffer zone)
-        if (starWorldY > terrainAtStar - 50) continue;
-        
-        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
-        ctx.fillRect(s.x, s.y, s.size, s.size);
-      }
-      ctx.globalAlpha = 1;
-      
-      // Draw shooting stars
-      for (const sh of shooting) {
-        const t = 1 - Math.min(1, sh.life / sh.max);
-        ctx.globalAlpha = t;
+      if (shouldOptimize) {
+        // LOW GRAPHICS: Simple layered rendering without clipping
+        // Draw stars with basic culling
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 0; // No shadow blur for performance
+        ctx.fillStyle = neonColor;
+        const starLimit = Math.min(80, stars.length);
+        for (let i = 0; i < starLimit; i++) {
+          const s = stars[i];
+          
+          // Calculate world position of star to check terrain height
+          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
+          const terrainAtStar = getHeightAt(starWorldX);
+          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
+          
+          // Skip star if it's too close to terrain
+          if (starWorldY > terrainAtStar - 60) continue;
+          
+          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+          ctx.globalAlpha = Math.min(1, Math.max(0.3, a));
+          ctx.fillRect(s.x, s.y, s.size, s.size);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        // HIGH GRAPHICS: Full masking system with clipping
+        // Create terrain clipping path to mask stars behind terrain
         ctx.beginPath();
-        ctx.moveTo(sh.x, sh.y);
-        ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
-        ctx.lineWidth = 2 * dprInit;
-        ctx.strokeStyle = neonColor;
-        ctx.stroke();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(c.width, 0);
+        const segs = 150;
+        const terrainBuffer = 40 * dprInit;
+        for (let i = segs; i >= 0; i--) {
+          const sx = (i / segs) * c.width;
+          const worldX = cameraX + (sx - c.width / 2) / zoom;
+          const worldY = getHeightAt(worldX);
+          const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10;
+          ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.clip();
+        
+        // Draw stars with shadow blur
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 2 * dprInit;
+        ctx.fillStyle = neonColor;
+        for (let i = 0; i < stars.length; i++) {
+          const s = stars[i];
+          
+          // Calculate world position of star to check terrain height
+          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
+          const terrainAtStar = getHeightAt(starWorldX);
+          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
+          
+          // Skip star if it's too close to terrain (within buffer zone)
+          if (starWorldY > terrainAtStar - 50) continue;
+          
+          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+          ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+          ctx.fillRect(s.x, s.y, s.size, s.size);
+        }
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
       
-      // Draw background satellites
-      for (const s of bgSats) {
-        ctx.save();
-        ctx.translate(s.x, s.y);
-        ctx.rotate(s.rot);
-        ctx.scale(s.scale, s.scale);
-        ctx.strokeStyle = neonColor;
-        ctx.lineWidth = 1.5 * dprInit;
-        ctx.beginPath();
-        ctx.rect(-6 * dprInit, -2 * dprInit, 12 * dprInit, 4 * dprInit);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.rect(-16 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
-        ctx.rect(8 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
-        ctx.stroke();
-        ctx.restore();
+      // Draw shooting stars and satellites (skip in low graphics)
+      if (!shouldOptimize) {
+        for (const sh of shooting) {
+          const t = 1 - Math.min(1, sh.life / sh.max);
+          ctx.globalAlpha = t;
+          ctx.beginPath();
+          ctx.moveTo(sh.x, sh.y);
+          ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
+          ctx.lineWidth = 2 * dprInit;
+          ctx.strokeStyle = neonColor;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        
+        for (const s of bgSats) {
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(s.rot);
+          ctx.scale(s.scale, s.scale);
+          ctx.strokeStyle = neonColor;
+          ctx.lineWidth = 1.5 * dprInit;
+          ctx.beginPath();
+          ctx.rect(-6 * dprInit, -2 * dprInit, 12 * dprInit, 4 * dprInit);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.rect(-16 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
+          ctx.rect(8 * dprInit, -3 * dprInit, 8 * dprInit, 6 * dprInit);
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
       ctx.restore();
       
       // Apply zoom and camera transform (both horizontal and vertical)
@@ -1684,7 +1717,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Draw terrain
       ctx.strokeStyle = neonColor;
       ctx.shadowColor = neonColor;
-      ctx.shadowBlur = shouldOptimize ? 2 : 8;
+      ctx.shadowBlur = shouldOptimize ? 0 : 8;
       ctx.lineWidth = 2;
       
       for (const chunk of chunks) {
@@ -1785,7 +1818,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.save();
         ctx.globalAlpha = 0.6 * pulse;
         ctx.shadowColor = "hsla(280, 100%, 70%, 0.9)";
-        ctx.shadowBlur = 25;
+        ctx.shadowBlur = shouldOptimize ? 0 : 25;
         
         // Outer glow
         const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowSize);
