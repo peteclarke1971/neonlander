@@ -30,7 +30,7 @@ export const COLLECTIBLES_CONFIG = {
 
 export const SHIELD_CONFIG = {
   enabled: true,
-  spawnChance: 0.35, // ~1 in 3 chunks
+  spawnChance: 0.55, // ~1 in 2 chunks
   pickupRadius: 18,
   pickupScore: 50,
   duration: 75, // seconds (soft timer)
