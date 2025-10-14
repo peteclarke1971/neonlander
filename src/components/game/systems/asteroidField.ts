@@ -172,7 +172,7 @@ export function updateAsteroidField(
   playerY: number,
   shipRadius: number,
   viewWidth: number
-): { collision: boolean; nearMiss: boolean; bonusScore: number } {
+): { collision: boolean; nearMiss: boolean; bonusScore: number; collidingAsteroid: FieldAsteroid | null } {
   const rng = mulberry32(state.seed + Math.floor(state.phaseTimer * 1000));
   
   let collision = false;
@@ -244,6 +244,7 @@ export function updateAsteroidField(
     if (distance < asteroid.r + shipRadius) {
       collision = true;
       state.clearedWithoutHit = false;
+      return { collision: true, nearMiss: false, bonusScore: 0, collidingAsteroid: asteroid };
     } else if (!asteroid.nearMissTriggered && distance < asteroid.r + shipRadius + state.nearMissThreshold) {
       // Near miss detection
       asteroid.nearMissTriggered = true;
@@ -252,7 +253,7 @@ export function updateAsteroidField(
     }
   }
   
-  return { collision, nearMiss, bonusScore };
+  return { collision, nearMiss, bonusScore, collidingAsteroid: null };
 }
 
 export function renderAsteroidField(

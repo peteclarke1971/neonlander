@@ -442,7 +442,7 @@ export function checkVolcanoParticleCollision(
   landerX: number,
   landerY: number,
   landerRadius: number
-): boolean {
+): { collided: boolean; particle: VolcanoParticle | null } {
   for (const particle of particles) {
     if (particle.life <= 0) continue;
     
@@ -457,10 +457,10 @@ export function checkVolcanoParticleCollision(
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance <= landerRadius + particle.size) {
-      return true;
+      return { collided: true, particle };
     }
   }
-  return false;
+  return { collided: false, particle: null };
 }
 
 export function getVolcanoWarningState(volcanoes: Volcano[]): { hasWarning: boolean; timeToEruption: number } {

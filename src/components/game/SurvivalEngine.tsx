@@ -89,6 +89,11 @@ export const SurvivalEngine: React.FC<Props> = ({
   const shieldTimerRef = useRef(0);
   const SHIELD_DURATION = 75;
   
+  // Invulnerability state (after shield breaks)
+  const invulnerableRef = useRef(false);
+  const invulnerableTimerRef = useRef(0);
+  const INVULNERABLE_DURATION = 0.75; // seconds
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -695,6 +700,15 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
+      // Update invulnerability timer
+      if (invulnerableRef.current) {
+        invulnerableTimerRef.current -= dt;
+        if (invulnerableTimerRef.current <= 0) {
+          invulnerableRef.current = false;
+          invulnerableTimerRef.current = 0;
+        }
+      }
+      
       // Ship input and rotation (only when alive)
       if (!isDead) {
         // Gamepad input with hot-swap detection
@@ -861,17 +875,31 @@ export const SurvivalEngine: React.FC<Props> = ({
             viewWidth
           );
           
-          // Handle collision (only when not landed)
-          if (!isLanded && fieldUpdate.collision) {
-            if (shieldActiveRef.current) {
-              // SHIELD SAVE!
+          // Handle collision (only when not landed and not invulnerable)
+          if (!isLanded && fieldUpdate.collision && !invulnerableRef.current) {
+            if (shieldActiveRef.current && fieldUpdate.collidingAsteroid) {
+              // SHIELD SAVE - destroy the asteroid
+              const asteroidIndex = asteroidFieldRef.current.asteroids.indexOf(fieldUpdate.collidingAsteroid);
+              if (asteroidIndex > -1) {
+                asteroidFieldRef.current.asteroids.splice(asteroidIndex, 1);
+              }
+              
               spawnShieldBreak(shipX, shipY);
               shieldActiveRef.current = false;
               setShieldActive(false);
               audio.current.shieldBreak();
               
-              shipVx += (Math.random() - 0.5) * 2;
-              shipVy += (Math.random() - 0.5) * 2;
+              // Bounce away from asteroid
+              const dx = shipX - fieldUpdate.collidingAsteroid.x;
+              const dy = shipY - fieldUpdate.collidingAsteroid.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const bounceStrength = 150;
+              shipVx += (dx / dist) * bounceStrength * dt;
+              shipVy += (dy / dist) * bounceStrength * dt;
+              
+              // Grant brief invulnerability
+              invulnerableRef.current = true;
+              invulnerableTimerRef.current = INVULNERABLE_DURATION;
               
               if (anyGamepad()) vibrate(200, 0.5, 0.8);
             } else {
@@ -982,14 +1010,33 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Check volcano particle collisions
           if (volcanoParticles.length > 0) {
-            if (checkVolcanoParticleCollision(volcanoParticles, shipX, shipY, 8)) {
-              if (shieldActiveRef.current) {
+            const volcanoResult = checkVolcanoParticleCollision(volcanoParticles, shipX, shipY, 8);
+            if (volcanoResult.collided && !invulnerableRef.current) {
+              if (shieldActiveRef.current && volcanoResult.particle) {
+                // SHIELD SAVE - destroy the particle
+                const particleIndex = volcanoParticles.indexOf(volcanoResult.particle);
+                if (particleIndex > -1) {
+                  volcanoParticles.splice(particleIndex, 1);
+                  setVolcanoParticles([...volcanoParticles]); // Trigger state update
+                }
+                
                 spawnShieldBreak(shipX, shipY);
                 shieldActiveRef.current = false;
                 setShieldActive(false);
                 audio.current.shieldBreak();
-                shipVx += (Math.random() - 0.5) * 2;
-                shipVy += (Math.random() - 0.5) * 2;
+                
+                // Bounce away from particle
+                const dx = shipX - volcanoResult.particle.x;
+                const dy = shipY - volcanoResult.particle.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                const bounceStrength = 150;
+                shipVx += (dx / dist) * bounceStrength * dt;
+                shipVy += (dy / dist) * bounceStrength * dt;
+                
+                // Grant brief invulnerability
+                invulnerableRef.current = true;
+                invulnerableTimerRef.current = INVULNERABLE_DURATION;
+                
                 if (anyGamepad()) vibrate(200, 0.5, 0.8);
               } else {
                 isDead = true;
@@ -1011,14 +1058,32 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
           
           // Check hazard collisions (only when airborne and alive)
-          if (checkHazardCollision(hazardsRef.current, shipX, shipY, 8)) {
-            if (shieldActiveRef.current) {
+          const hazardResult = checkHazardCollision(hazardsRef.current, shipX, shipY, 8);
+          if (hazardResult.collided && !invulnerableRef.current) {
+            if (shieldActiveRef.current && hazardResult.hazard) {
+              // SHIELD SAVE - destroy the hazard
+              const hazardIndex = hazardsRef.current.indexOf(hazardResult.hazard);
+              if (hazardIndex > -1) {
+                hazardsRef.current.splice(hazardIndex, 1);
+              }
+              
               spawnShieldBreak(shipX, shipY);
               shieldActiveRef.current = false;
               setShieldActive(false);
               audio.current.shieldBreak();
-              shipVx += (Math.random() - 0.5) * 2;
-              shipVy += (Math.random() - 0.5) * 2;
+              
+              // Bounce away from hazard
+              const dx = shipX - hazardResult.hazard.x;
+              const dy = shipY - hazardResult.hazard.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const bounceStrength = 150;
+              shipVx += (dx / dist) * bounceStrength * dt;
+              shipVy += (dy / dist) * bounceStrength * dt;
+              
+              // Grant brief invulnerability
+              invulnerableRef.current = true;
+              invulnerableTimerRef.current = INVULNERABLE_DURATION;
+              
               if (anyGamepad()) vibrate(200, 0.5, 0.8);
             } else {
               isDead = true;
@@ -1923,6 +1988,16 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.save();
         ctx.translate(shipX, shipY);
         ctx.rotate(shipAngle);
+        
+        // Invulnerability flashing effect
+        if (invulnerableRef.current) {
+          const flashFreq = 8; // flashes per second
+          const flashPhase = (currentTime * flashFreq) % 1;
+          if (flashPhase < 0.5) {
+            ctx.globalAlpha = 0.3; // dim the ship
+          }
+        }
+        
         ctx.strokeStyle = neonColor;
         ctx.shadowColor = neonColor;
         ctx.shadowBlur = 12;
@@ -1944,6 +2019,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.lineTo(12, 12);
         ctx.stroke();
         
+        ctx.globalAlpha = 1;
         ctx.restore();
       }
       

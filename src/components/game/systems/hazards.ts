@@ -101,11 +101,13 @@ export function drawHazards(ctx: CanvasRenderingContext2D, hazards: Hazard[], ne
   ctx.restore();
 }
 
-export function checkHazardCollision(hazards: Hazard[], x: number, y: number, landerR: number): boolean {
+export function checkHazardCollision(hazards: Hazard[], x: number, y: number, landerR: number): { collided: boolean; hazard: Hazard | null } {
   for (const h of hazards) {
     const dx = ((x - h.x));
     const dy = (y - h.y);
-    if (dx * dx + dy * dy <= (h.r + landerR) * (h.r + landerR)) return true;
+    if (dx * dx + dy * dy <= (h.r + landerR) * (h.r + landerR)) {
+      return { collided: true, hazard: h };
+    }
   }
-  return false;
+  return { collided: false, hazard: null };
 }
