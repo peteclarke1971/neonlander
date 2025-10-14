@@ -344,21 +344,41 @@ export function generateCollectibles(
   const shieldSpawnChance = 0.35; // ~35% per chunk
   
   if (forceSpawn || shieldSpawnChance > shieldRng()) {
-    // Try to find a safe position for shield
-    for (let attempt = 0; attempt < 50; attempt++) {
-      const x = 200 + shieldRng() * (context.worldWidth - 400);
-      const y = context.mode === "surface"
-        ? 80 + shieldRng() * (context.worldHeight / 3) // Upper third for surface
-        : 100 + shieldRng() * (context.worldHeight - 200);
+    // For testing (chunk 2), place shield at fixed position near start
+    if (forceSpawn) {
+      const x = context.startPos.x + 800; // ~1.5 screens right of start
+      const y = 150; // High in the sky
       
-      // For surface mode, ALWAYS ensure shield is above terrain
-      if (context.mode === "surface") {
-        const terrainY = context.getHeightAt(x);
-        const minClearance = context.shipHeight * 2.5; // Significant clearance above terrain
-        if (y >= terrainY - minClearance) {
-          continue; // Too close to terrain, try another position
+      // Ensure above terrain
+      const terrainY = context.getHeightAt(x);
+      const finalY = Math.min(y, terrainY - context.shipHeight * 3);
+      
+      shieldPickup = {
+        id: `shield_${levelSeed}`,
+        pos: { x, y: finalY },
+        collected: false,
+        seed: levelSeed + 88888,
+        radius: 18,
+        pulsePhase: shieldRng() * Math.PI * 2
+      };
+      
+      console.log(`✨ Shield spawned at chunk ${levelSeed} position:`, shieldPickup.pos);
+    } else {
+      // Normal random placement for non-forced spawns
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const x = 200 + shieldRng() * (context.worldWidth - 400);
+        const y = context.mode === "surface"
+          ? 80 + shieldRng() * (context.worldHeight / 3) // Upper third for surface
+          : 100 + shieldRng() * (context.worldHeight - 200);
+        
+        // For surface mode, ALWAYS ensure shield is above terrain
+        if (context.mode === "surface") {
+          const terrainY = context.getHeightAt(x);
+          const minClearance = context.shipHeight * 2.5; // Significant clearance above terrain
+          if (y >= terrainY - minClearance) {
+            continue; // Too close to terrain, try another position
+          }
         }
-      }
       
       const isSafe = context.mode === "surface"
         ? isSafeSurfacePosition(x, y, context)
@@ -385,6 +405,7 @@ export function generateCollectibles(
         };
         break;
       }
+    }
     }
   }
   

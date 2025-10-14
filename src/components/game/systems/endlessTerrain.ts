@@ -483,7 +483,8 @@ export class EndlessTerrainGenerator {
     
     // Generate collectibles (space junk) - start from chunk 5, fewer than hazards (skip during asteroid fields)
     let collectibles: CollectiblesData | null = null;
-    if (chunkNumber >= 5 && rand() > 0.7 && !isAsteroidFieldChunk) {
+    const forceCollectiblesForTesting = chunkNumber === 2; // Force collectibles in chunk 2 for testing
+    if ((forceCollectiblesForTesting || (chunkNumber >= 5 && rand() > 0.7)) && !isAsteroidFieldChunk) {
       const progressFactor = Math.min((chunkNumber - 5) / 20, 1);
       const junkCount = Math.floor(1 + progressFactor * 2);
       
