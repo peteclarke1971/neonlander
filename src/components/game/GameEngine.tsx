@@ -1221,7 +1221,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Hazard collisions (airborne)
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkHazardCollision(hazards, x, y, 10)) {
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkHazardCollision(hazards, x, y, 10).collided) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1237,7 +1237,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Volcano particle collisions (airborne)
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkVolcanoParticleCollision(volcanoParticles, x, y, 10).collided) {
         running = false;
         crashed = true;
         spawnExplosion();
