@@ -18,10 +18,10 @@ const Survival: React.FC = () => {
   const [lastResult, setLastResult] = useState<SurvivalGameOverData | null>(null);
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
-      const stored = localStorage.getItem("lowgfx");
-      return stored === "true";
+      const saved = localStorage.getItem('ll-graphics-settings');
+      return saved ? JSON.parse(saved).lowGraphics : true;
     } catch {
-      return false;
+      return true; // Default to low-gfx
     }
   });
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
