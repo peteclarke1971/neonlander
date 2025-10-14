@@ -1221,7 +1221,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Hazard collisions (airborne)
-      if (running && !crashed && checkHazardCollision(hazards, x, y, 10)) {
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkHazardCollision(hazards, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1237,7 +1237,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       }
       
       // Volcano particle collisions (airborne)
-      if (running && !crashed && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkVolcanoParticleCollision(volcanoParticles, x, y, 10)) {
         running = false;
         crashed = true;
         spawnExplosion();
@@ -1310,7 +1310,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           collisionDetected = foot >= ground;
         }
         
-        if (collisionDetected) {
+        if (collisionDetected && !playerLockedRef.current && invulnerabilityTimer.current <= 0) {
           const pad = terrain.getPadAt(x);
           let nearPad: Pad | null = null;
           
