@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { SurvivalEngine } from "@/components/game/SurvivalEngine";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,18 @@ const Survival: React.FC = () => {
     return seed;
   });
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ll-graphics-settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setLowGraphics(parsed.lowGraphics);
+      }
+    } catch {
+      // Keep current value if parsing fails
+    }
+  }, []);
+
   const handleGameOver = (data: SurvivalGameOverData) => {
     setLastResult(data);
     setView("gameover");
@@ -57,6 +69,7 @@ const Survival: React.FC = () => {
 
   if (view === "game") {
     return <SurvivalEngine 
+      key={lowGraphics ? 'low' : 'high'}
       onGameOver={handleGameOver} 
       lowGraphics={lowGraphics}
     />;
