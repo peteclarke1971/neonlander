@@ -36,8 +36,11 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
-      const saved = localStorage.getItem("ll-low-graphics");
-      return saved !== "false";
+      const saved = localStorage.getItem("ll-graphics-settings");
+      if (saved) {
+        return JSON.parse(saved).lowGraphics ?? true;
+      }
+      return true;
     } catch {
       return true;
     }
@@ -419,7 +422,7 @@ useEffect(() => {
               const newValue = !lowGraphics;
               setLowGraphics(newValue);
               try {
-                localStorage.setItem("ll-low-graphics", newValue.toString());
+                localStorage.setItem("ll-graphics-settings", JSON.stringify({ lowGraphics: newValue }));
               } catch {}
             }}
           >
