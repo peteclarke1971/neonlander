@@ -41,13 +41,24 @@ export interface AsteroidFieldState {
   lastAsteroidId: number;
 }
 
-export function initAsteroidField(startX: number, difficulty: number, seed: number): AsteroidFieldState {
+export function initAsteroidField(startX: number, difficulty: number, seed: number, fieldNumber: number = 0): AsteroidFieldState {
+  // 30% compound scaling per field
+  const scale = Math.pow(1.3, fieldNumber);
+  
+  const baseWidth = 4800;
+  const baseInitialCount = 23;
+  const baseMaxY = 1350;
+  
+  const scaledWidth = Math.floor(baseWidth * scale);
+  const scaledInitialCount = Math.floor(baseInitialCount * scale);
+  const scaledMaxY = Math.floor(baseMaxY * scale);
+  
   const fieldState = {
     active: true,
     phase: "entry" as const,
     phaseTimer: 0,
     startX,
-    endX: startX + 4800, // About 6 chunks (50% longer than 3200px)
+    endX: startX + scaledWidth,
     asteroids: [] as FieldAsteroid[],
     spawnTimer: 0,
     nextSpawnDelay: 2.0,
@@ -61,10 +72,9 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   
   // Pre-spawn asteroids to create immediate dense field
   const initialRng = mulberry32(seed);
-  const initialCount = 23; // Start with 23 asteroids immediately (50% more density)
-  for (let i = 0; i < initialCount; i++) {
-    const x = startX + 100 + initialRng() * 3600; // Spread across longer field width
-    const y = 20 + initialRng() * 1350; // Spread from very top (y=20) to bottom (y=1370)
+  for (let i = 0; i < scaledInitialCount; i++) {
+    const x = startX + 100 + initialRng() * (scaledWidth - 200); // Spread across scaled field width
+    const y = 20 + initialRng() * scaledMaxY; // Spread from very top (y=20) to scaled bottom
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
       sizeRoll < 0.5 ? "small" : sizeRoll < 0.85 ? "medium" : "large";
@@ -104,9 +114,14 @@ export function spawnFieldAsteroid(
   state: AsteroidFieldState,
   playerX: number,
   viewWidth: number,
-  rng: () => number
+  rng: () => number,
+  fieldNumber: number = 0
 ): void {
   const { difficulty, phase } = state;
+  
+  // Calculate scaled vertical range based on field number
+  const baseMaxY = 1350;
+  const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.3, fieldNumber));
   
   // Size distribution based on difficulty and phase
   let sizeRoll = rng();
@@ -132,8 +147,8 @@ export function spawnFieldAsteroid(
   
   // Spawn ahead of player, off-screen
   const spawnX = playerX + viewWidth + 100 + rng() * 200;
-  // Spawn above terrain - lower Y values = higher on screen
-  const spawnY = 20 + rng() * 1350; // Spread from very top (y=20) to bottom (y=1370)
+  // Spawn above terrain - lower Y values = higher on screen (scaled vertically)
+  const spawnY = 20 + rng() * scaledMaxY;
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -171,7 +186,8 @@ export function updateAsteroidField(
   playerX: number,
   playerY: number,
   shipRadius: number,
-  viewWidth: number
+  viewWidth: number,
+  fieldNumber: number = 0
 ): { collision: boolean; nearMiss: boolean; bonusScore: number; collidingAsteroid: FieldAsteroid | null } {
   const rng = mulberry32(state.seed + Math.floor(state.phaseTimer * 1000));
   
@@ -194,11 +210,16 @@ export function updateAsteroidField(
     state.spawnTimer += dt;
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
-      // 50% more asteroids: 23 in entry, 60-90 in active phase
-      const maxAsteroids = state.phase === "entry" ? 23 : Math.min(60 + Math.floor(state.difficulty * 3.75), 90);
+      // Scale max asteroids with field number (30% compound growth)
+      const scale = Math.pow(1.3, fieldNumber);
+      const baseInitialCount = 23;
+      const baseMaxActive = 90;
+      const scaledInitialCount = Math.floor(baseInitialCount * scale);
+      const scaledMaxActive = Math.floor((60 + Math.floor(state.difficulty * 3.75)) * scale);
+      const maxAsteroids = state.phase === "entry" ? scaledInitialCount : Math.min(scaledMaxActive, Math.floor(baseMaxActive * scale));
       
       if (state.asteroids.length < maxAsteroids) {
-        spawnFieldAsteroid(state, playerX, viewWidth, rng);
+        spawnFieldAsteroid(state, playerX, viewWidth, rng, fieldNumber);
       }
       
       // Set next spawn delay - much faster spawning for dense field

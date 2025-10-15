@@ -79,6 +79,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   
   // Asteroid field state
   const asteroidFieldRef = useRef<AsteroidFieldState | null>(null);
+  const asteroidFieldCountRef = useRef(0); // Track completed asteroid fields
   const fieldWarningShownRef = useRef(false);
   const [fieldMessage, setFieldMessage] = useState<string>("");
   const [fieldMessageTimer, setFieldMessageTimer] = useState(0);
@@ -626,7 +627,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         if (newChunk.isAsteroidFieldChunk && newChunk.asteroidFieldPhase === "entry" && !asteroidFieldRef.current?.active) {
           const fieldStartX = newChunk.startX;
           const fieldSeed = Date.now() + currentDistance;
-          asteroidFieldRef.current = initAsteroidField(fieldStartX, difficulty, fieldSeed);
+          asteroidFieldRef.current = initAsteroidField(fieldStartX, difficulty, fieldSeed, asteroidFieldCountRef.current);
           
           // Show HUD warning
           if (!fieldWarningShownRef.current) {
@@ -877,7 +878,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             shipX,
             shipY,
             8, // ship collision radius
-            viewWidth
+            viewWidth,
+            asteroidFieldCountRef.current
           );
           
           // Handle collision (only when not landed and not invulnerable)
@@ -936,18 +938,28 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         // Detect field exit (even when landed)
         if (asteroidFieldRef.current?.active && shipX > asteroidFieldRef.current.endX) {
-          // Award clear bonus if no collisions
-          if (asteroidFieldRef.current.clearedWithoutHit) {
-            currentScore += 250;
-            setScore(currentScore);
-            setFieldMessage("+250 FIELD CLEARED!");
-            setFieldMessageTimer(2.0);
-          }
+          // Check if all asteroids are off-screen before clearing
+          const allAsteroidsBehind = asteroidFieldRef.current.asteroids.every(
+            asteroid => asteroid.x < shipX - viewWidth / 2 - 100
+          );
           
-          setFieldMessage("ASTEROID FIELD CLEARED");
-          setFieldMessageTimer(2.0);
-          asteroidFieldRef.current = null;
-          fieldWarningShownRef.current = false;
+          if (allAsteroidsBehind) {
+            // Award clear bonus if no collisions
+            if (asteroidFieldRef.current.clearedWithoutHit) {
+              currentScore += 250;
+              setScore(currentScore);
+              setFieldMessage("+250 FIELD CLEARED!");
+              setFieldMessageTimer(2.0);
+            }
+            
+            setFieldMessage("ASTEROID FIELD CLEARED");
+            setFieldMessageTimer(2.0);
+            asteroidFieldRef.current = null;
+            fieldWarningShownRef.current = false;
+            
+            // Increment field count for next asteroid field
+            asteroidFieldCountRef.current++;
+          }
         }
         
         // Physics (only when not landed)
