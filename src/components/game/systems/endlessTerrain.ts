@@ -101,20 +101,21 @@ export class EndlessTerrainGenerator {
     const segments = 40;
     const step = this.config.chunkWidth / segments;
     
-    // Increase amplitude and variation with difficulty
-    const amplitude = this.config.amplitude * (1 + difficulty * 0.5) * terrainDensityMultiplier;
-    const variation = amplitude * (0.5 + difficulty * 0.6); // More variation
+    // Increase amplitude and variation with difficulty - much more aggressive scaling
+    const amplitude = this.config.amplitude * (1 + difficulty * 1.5) * terrainDensityMultiplier;
+    const variation = amplitude * (0.8 + difficulty * 1.2); // Much more variation at high difficulty
     
     // Start from the last chunk's end Y to ensure seamless connection
     let current = this.lastEndY !== null 
       ? this.lastEndY 
       : this.config.baseHeight + (rand() - 0.5) * amplitude;
     
-    // Choose terrain type for this chunk
+    // Choose terrain type for this chunk - make plateaus rarer and steep terrain more common at high difficulty
     const terrainType = rand();
-    const isPlateauChunk = terrainType > 0.7;
-    const isValleyChunk = terrainType < 0.15;
-    const isSteepChunk = terrainType > 0.5 && terrainType <= 0.7;
+    const plateauThreshold = 0.7 + difficulty * 0.15; // Plateaus become impossible at difficulty ~2.0
+    const isPlateauChunk = terrainType > plateauThreshold;
+    const isValleyChunk = terrainType < 0.15 + difficulty * 0.1; // 15% → 45% at difficulty 3.0
+    const isSteepChunk = terrainType > (0.5 - difficulty * 0.15) && terrainType <= plateauThreshold; // More likely at high difficulty
     
     for (let i = 0; i <= segments; i++) {
       const x = startX + i * step;
@@ -258,14 +259,16 @@ export class EndlessTerrainGenerator {
       // Skip this pad if we couldn't find a valid position
       if (attempts >= 10) continue;
       
-      // Check if this is on a steep incline (jutting pad)
-      const isJuttingPad = i === 0 && isSteepChunk && rand() > 0.5;
+      // Check if this is on a steep incline (jutting pad) - much more likely at high difficulty
+      const juttingChance = Math.min(0.8, difficulty * 0.4); // 0% → 80% at difficulty 2.0+
+      const isJuttingPad = (isSteepChunk || difficulty > 1.0) && rand() < juttingChance;
       
-      // Flatten terrain for pad
+      // Flatten terrain for pad - much less flattening at high difficulty
       const targetY = points[centerIdx].y - 8;
-      const flattenRadius = isJuttingPad 
-        ? Math.round(width / step / 2) // Minimal flattening for jutting pads
-        : Math.max(1, Math.round((width / step) * 1.2));
+      const flattenFactor = isJuttingPad 
+        ? 0.5 
+        : Math.max(0.4, 1.2 - difficulty * 0.3); // 1.2 → 0.3 at difficulty 3.0
+      const flattenRadius = Math.max(1, Math.round((width / step) * flattenFactor));
       
       for (let j = -flattenRadius; j <= flattenRadius; j++) {
         const idx = centerIdx + j;
@@ -309,9 +312,18 @@ export class EndlessTerrainGenerator {
       const flatEnd = Math.floor(segments * 0.8);
       const flatY = this.config.baseHeight - 30; // Consistent height
       
-      // Flatten the terrain
+      // Flatten the terrain, but add gentle undulation at high difficulty
       for (let i = flatStart; i <= flatEnd; i++) {
         points[i].y = flatY;
+      }
+      
+      // Add gentle waves to MEGA terrain at high difficulty to prevent complete reset
+      if (difficulty > 0.5) {
+        for (let i = flatStart; i <= flatEnd; i++) {
+          const t = (i - flatStart) / (flatEnd - flatStart);
+          const wave = Math.sin(t * Math.PI * 3) * (20 + difficulty * 15);
+          points[i].y += wave;
+        }
       }
       
       // Smooth transitions at edges
@@ -434,20 +446,22 @@ export class EndlessTerrainGenerator {
     }
     
     // Generate anomalies (gravity wells) at medium difficulty (skip during asteroid fields)
+    // Scale both count and size with difficulty
     const anomalies: Anomaly[] = [];
     if (difficulty > 0.15 && !isAsteroidFieldChunk) {
-      const anomCount = Math.floor(difficulty * 2); // 0-2 anomalies
+      const anomCount = Math.floor(1 + difficulty * 1.5); // 1-5 anomalies at difficulty 3.0
       for (let i = 0; i < anomCount; i++) {
         const anomIdx = Math.floor(rand() * (segments - 8)) + 4;
         const anomX = startX + anomIdx * step;
         const anomY = points[anomIdx].y - 100 - rand() * 150;
         
         const kind = rand() > 0.5 ? "attract" : "repel";
+        const sizeScale = 1 + Math.min(1, difficulty * 0.33); // 1.0× → 2.0× at difficulty 3.0
         anomalies.push({
           x: anomX,
           y: anomY,
-          radius: 60 + rand() * 40,
-          strength: (0.3 + rand() * 0.4) * (kind === "attract" ? 1 : -1),
+          radius: (60 + rand() * 40) * sizeScale, // 60-100px → 120-200px at difficulty 3.0
+          strength: (0.3 + rand() * 0.4 + difficulty * 0.15) * (kind === "attract" ? 1 : -1), // Also scale strength
           falloff: 1.5 + rand() * 0.5,
           kind
         });

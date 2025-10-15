@@ -606,8 +606,8 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Update terrain chunks - generate new chunks as ship moves right
       const rightmostChunk = chunks[chunks.length - 1];
       if (shipX > rightmostChunk.endX - CHUNK_WIDTH) {
-        // Calculate difficulty based on distance traveled (accelerated ramp for moving pads)
-        const difficulty = Math.min(1, currentDistance / 300);
+        // Calculate difficulty based on distance traveled (progressive scaling, caps at 3.0 after 150km)
+        const difficulty = Math.min(3, currentDistance / 50000);
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
         
