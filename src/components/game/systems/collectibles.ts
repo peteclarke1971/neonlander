@@ -336,85 +336,11 @@ export function generateCollectibles(
     spaceJunk.push(fallbackJunk);
   }
   
-  // Generate shield pickup (rare spawn - ~1 per 2-3 chunks)
-  let shieldPickup: ShieldPickup | undefined = undefined;
-  const shieldRng = mulberry32(levelSeed + 99999);
-  
-  // Force shield spawn in chunk 2 for testing
-  const forceSpawn = context.chunkNumber === 2;
-  const shieldSpawnChance = 0.35; // ~35% per chunk
-  
-  console.log(`🔍 Collectibles generation - chunk ${context.chunkNumber}, forceSpawn: ${forceSpawn}, levelSeed: ${levelSeed}`);
-  
-  if (forceSpawn || shieldSpawnChance > shieldRng()) {
-    // For testing (chunk 2), place shield at fixed position near start
-    if (forceSpawn) {
-      const x = context.startPos.x + 800; // ~1.5 screens right of start
-      const y = 150; // High in the sky
-      
-      // Ensure above terrain
-      const terrainY = context.getHeightAt(x);
-      const finalY = Math.min(y, terrainY - context.shipHeight * 3);
-      
-      shieldPickup = {
-        id: `shield_${levelSeed}`,
-        pos: { x, y: finalY },
-        collected: false,
-        seed: levelSeed + 88888,
-        radius: 18,
-        pulsePhase: shieldRng() * Math.PI * 2
-      };
-      
-      console.log(`✨ Shield FORCE SPAWNED at chunk ${context.chunkNumber} position:`, shieldPickup.pos);
-    } else {
-      // Normal random placement for non-forced spawns
-      for (let attempt = 0; attempt < 50; attempt++) {
-        const x = 200 + shieldRng() * (context.worldWidth - 400);
-        const y = context.mode === "surface"
-          ? 80 + shieldRng() * (context.worldHeight / 3) // Upper third for surface
-          : 100 + shieldRng() * (context.worldHeight - 200);
-        
-        // For surface mode, ALWAYS ensure shield is above terrain
-        if (context.mode === "surface") {
-          const terrainY = context.getHeightAt(x);
-          const minClearance = context.shipHeight * 2.5; // Significant clearance above terrain
-          if (y >= terrainY - minClearance) {
-            continue; // Too close to terrain, try another position
-          }
-        }
-      
-      const isSafe = context.mode === "surface"
-        ? isSafeSurfacePosition(x, y, context)
-        : isSafeCavernPosition(x, y, context);
-      
-      // Additional check: not directly above a pad
-      let clearOfPads = true;
-      for (const pad of context.pads) {
-        const padCenterX = (pad.xStart + pad.xEnd) / 2;
-        if (Math.abs(x - padCenterX) < 80) {
-          clearOfPads = false;
-          break;
-        }
-      }
-      
-      if (isSafe && clearOfPads) {
-        shieldPickup = {
-          id: `shield_${levelSeed}`,
-          pos: { x, y },
-          collected: false,
-          seed: levelSeed + 88888,
-          radius: 18,
-          pulsePhase: shieldRng() * Math.PI * 2
-        };
-        break;
-      }
-    }
-    }
-  }
+  // Shield generation moved to endlessTerrain.ts for independent spawning
   
   return {
     spaceJunk,
-    shieldPickup,
+    shieldPickup: undefined, // Shield generation handled in endlessTerrain.ts
     collected: new Set(),
     totalCollected: 0,
     setComplete: false

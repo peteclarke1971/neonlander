@@ -1,4 +1,4 @@
-import { Pad, MovingPad, Volcano, CollectiblesData } from "../types";
+import { Pad, MovingPad, Volcano, CollectiblesData, ShieldPickup } from "../types";
 import { movingPadSystem } from "./movingPads";
 import { generateVolcanoes, getVolcanoConfigForLevel } from "./volcano";
 import { generateAnomalies, Anomaly } from "./anomalies";
@@ -516,6 +516,113 @@ export class EndlessTerrainGenerator {
       // Filter to only keep requested count
       if (collectibles.spaceJunk.length > junkCount) {
         collectibles.spaceJunk = collectibles.spaceJunk.slice(0, junkCount);
+      }
+    }
+    
+    // Generate shield pickup independently (not nested in collectibles) - start from chunk 3
+    let shieldPickup: ShieldPickup | undefined = undefined;
+    const forceShieldSpawn = chunkNumber === 2; // Force shield in chunk 2 for testing
+    
+    if (forceShieldSpawn || (chunkNumber >= 3 && !isAsteroidFieldChunk)) {
+      // Deterministic spawn: every 5-10 chunks
+      const chunksSinceStart = chunkNumber - 2; // Start counting from after forced spawn
+      const shouldSpawnShield = chunksSinceStart > 0 && chunksSinceStart % (5 + (seed % 6)) === 0;
+      
+      if (forceShieldSpawn || shouldSpawnShield) {
+        const shieldRng = mulberry32(seed + 88888);
+        
+        // For testing (chunk 2), place shield at fixed position
+        if (forceShieldSpawn) {
+          const x = startX + this.config.chunkWidth * 0.4;
+          const y = 150;
+          
+          // Ensure above terrain
+          const getHeightAt = (x: number) => {
+            if (x < startX || x > endX) return this.config.baseHeight;
+            const localX = x - startX;
+            const idx = Math.floor(localX / step);
+            if (idx >= 0 && idx < points.length - 1) {
+              const t = (localX - idx * step) / step;
+              return points[idx].y * (1 - t) + points[idx + 1].y * t;
+            }
+            return points[Math.max(0, Math.min(idx, points.length - 1))].y;
+          };
+          
+          const terrainY = getHeightAt(x);
+          const finalY = Math.min(y, terrainY - 72); // 3× shipHeight clearance
+          
+          shieldPickup = {
+            id: `shield_${seed}`,
+            pos: { x, y: finalY },
+            collected: false,
+            seed: seed + 88888,
+            radius: 18,
+            pulsePhase: shieldRng() * Math.PI * 2
+          };
+        } else {
+          // Normal random placement
+          for (let attempt = 0; attempt < 50; attempt++) {
+            const x = startX + 200 + shieldRng() * (this.config.chunkWidth - 400);
+            const y = 80 + shieldRng() * 200; // Upper portion of screen
+            
+            // Get terrain height at position
+            const getHeightAt = (x: number) => {
+              if (x < startX || x > endX) return this.config.baseHeight;
+              const localX = x - startX;
+              const idx = Math.floor(localX / step);
+              if (idx >= 0 && idx < points.length - 1) {
+                const t = (localX - idx * step) / step;
+                return points[idx].y * (1 - t) + points[idx + 1].y * t;
+              }
+              return points[Math.max(0, Math.min(idx, points.length - 1))].y;
+            };
+            
+            const terrainY = getHeightAt(x);
+            const minClearance = 72; // 3× shipHeight
+            
+            // Ensure above terrain with good clearance
+            if (y >= terrainY - minClearance) {
+              continue;
+            }
+            
+            // Check not directly above pads
+            let clearOfPads = true;
+            for (const pad of pads) {
+              const padCenterX = (pad.xStart + pad.xEnd) / 2;
+              if (Math.abs(x - padCenterX) < 80) {
+                clearOfPads = false;
+                break;
+              }
+            }
+            
+            if (clearOfPads) {
+              shieldPickup = {
+                id: `shield_${seed}`,
+                pos: { x, y },
+                collected: false,
+                seed: seed + 88888,
+                radius: 18,
+                pulsePhase: shieldRng() * Math.PI * 2
+              };
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Attach shield to collectibles if collectibles exist, otherwise create new collectibles data
+    if (shieldPickup) {
+      if (collectibles) {
+        collectibles.shieldPickup = shieldPickup;
+      } else {
+        collectibles = {
+          spaceJunk: [],
+          shieldPickup,
+          collected: new Set(),
+          totalCollected: 0,
+          setComplete: false
+        };
       }
     }
     
