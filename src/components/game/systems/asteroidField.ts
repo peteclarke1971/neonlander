@@ -75,10 +75,13 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   for (let i = 0; i < scaledInitialCount; i++) {
     const x = startX + 100 + initialRng() * (scaledWidth - 200); // Spread across scaled field width
     
+    // COORDINATE SYSTEM: Negative Y = above terrain, Positive Y = below terrain
     // Bias towards upper 80-90% using power distribution
     const yRoll = initialRng();
     const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
-    const y = 20 + yBias * scaledMaxY;
+    // Spawn asteroids ABOVE terrain: negative Y values
+    // Range from -scaledMaxY (high up) to -20 (just above terrain)
+    const y = -20 - yBias * scaledMaxY;
     
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
@@ -169,7 +172,8 @@ export function spawnFieldAsteroid(
   // Bias towards upper 80-90% using power distribution
   const yRoll = rng();
   const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
-  const spawnY = 20 + yBias * scaledMaxY;
+  // Spawn asteroids ABOVE terrain: negative Y values
+  const spawnY = -20 - yBias * scaledMaxY;
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -269,13 +273,19 @@ export function updateAsteroidField(
       continue;
     }
     
-    // Keep asteroids roughly in vertical bounds
-    if (asteroid.y < 50) {
-      asteroid.y = 50;
-      asteroid.vy = Math.abs(asteroid.vy);
-    } else if (asteroid.y > 1400) {
-      asteroid.y = 1400;
-      asteroid.vy = -Math.abs(asteroid.vy);
+    // Keep asteroids roughly in vertical bounds (negative Y = higher up)
+    // Calculate scaled max height for this field
+    const scale = Math.pow(1.5, fieldNumber);
+    const scaledMaxY = Math.floor(2700 * scale);
+    const minY = -scaledMaxY - 100; // Upper bound (allow some overshoot)
+    const maxY = 100; // Lower bound (below typical terrain level)
+    
+    if (asteroid.y < minY) {
+      asteroid.y = minY;
+      asteroid.vy = Math.abs(asteroid.vy); // Bounce downward
+    } else if (asteroid.y > maxY) {
+      asteroid.y = maxY;
+      asteroid.vy = -Math.abs(asteroid.vy); // Bounce upward
     }
     
     // Check collision with player
