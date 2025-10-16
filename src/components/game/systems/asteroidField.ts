@@ -42,12 +42,12 @@ export interface AsteroidFieldState {
 }
 
 export function initAsteroidField(startX: number, difficulty: number, seed: number, fieldNumber: number = 0): AsteroidFieldState {
-  // 30% compound scaling per field
-  const scale = Math.pow(1.3, fieldNumber);
+  // 50% compound scaling per field to reach 15x density faster
+  const scale = Math.pow(1.5, fieldNumber);
   
-  const baseWidth = 4800;
-  const baseInitialCount = 23;
-  const baseMaxY = 1350;
+  const baseWidth = 9600;  // 2× wider
+  const baseInitialCount = 138;  // 6× more asteroids
+  const baseMaxY = 2700;  // 2× taller
   
   const scaledWidth = Math.floor(baseWidth * scale);
   const scaledInitialCount = Math.floor(baseInitialCount * scale);
@@ -74,17 +74,29 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   const initialRng = mulberry32(seed);
   for (let i = 0; i < scaledInitialCount; i++) {
     const x = startX + 100 + initialRng() * (scaledWidth - 200); // Spread across scaled field width
-    const y = 20 + initialRng() * scaledMaxY; // Spread from very top (y=20) to scaled bottom
+    
+    // Bias towards upper 80-90% using power distribution
+    const yRoll = initialRng();
+    const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
+    const y = 20 + yBias * scaledMaxY;
+    
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
       sizeRoll < 0.5 ? "small" : sizeRoll < 0.85 ? "medium" : "large";
     
+    // Determine if this is a "fast chaos" asteroid (15% chance)
+    const isFastAsteroid = initialRng() < 0.15;
+    
     const radius = size === "large" ? 40 : size === "medium" ? 25 : 15;
     const speedMult = size === "large" ? 0.6 : size === "medium" ? 0.8 : 1.0;
+    
+    // Apply chaos multiplier if fast asteroid (3-4× speed)
+    const chaosMultiplier = isFastAsteroid ? (3 + initialRng() * 1) : 1;
+    
     const baseSpeed = 20 + initialRng() * 30;
     const angleVariation = (initialRng() - 0.5) * Math.PI / 6;
-    const vx = -baseSpeed * speedMult * Math.cos(angleVariation);
-    const vy = baseSpeed * speedMult * Math.sin(angleVariation);
+    const vx = -baseSpeed * speedMult * chaosMultiplier * Math.cos(angleVariation);
+    const vy = baseSpeed * speedMult * chaosMultiplier * Math.sin(angleVariation);
     const maxSpin = size === "large" ? 1 : size === "medium" ? 2 : 3;
     const av = (initialRng() - 0.5) * maxSpin;
     
@@ -120,8 +132,8 @@ export function spawnFieldAsteroid(
   const { difficulty, phase } = state;
   
   // Calculate scaled vertical range based on field number
-  const baseMaxY = 1350;
-  const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.3, fieldNumber));
+  const baseMaxY = 2700;  // Updated to match new base
+  const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.5, fieldNumber));
   
   // Size distribution based on difficulty and phase
   let sizeRoll = rng();
@@ -145,16 +157,25 @@ export function spawnFieldAsteroid(
   const radius = size === "large" ? 40 : size === "medium" ? 25 : 15;
   const speedMult = size === "large" ? 0.6 : size === "medium" ? 0.8 : 1.0;
   
+  // Determine if this is a "fast chaos" asteroid (15% chance)
+  const isFastAsteroid = rng() < 0.15;
+  
+  // Apply chaos multiplier if fast asteroid (3-4× speed)
+  const chaosMultiplier = isFastAsteroid ? (3 + rng() * 1) : 1;
+  
   // Spawn ahead of player, off-screen
   const spawnX = playerX + viewWidth + 100 + rng() * 200;
-  // Spawn above terrain - lower Y values = higher on screen (scaled vertically)
-  const spawnY = 20 + rng() * scaledMaxY;
+  
+  // Bias towards upper 80-90% using power distribution
+  const yRoll = rng();
+  const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
+  const spawnY = 20 + yBias * scaledMaxY;
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
   const angleVariation = (rng() - 0.5) * Math.PI / 6; // ±30 degrees
-  const vx = -baseSpeed * speedMult * Math.cos(angleVariation);
-  const vy = baseSpeed * speedMult * Math.sin(angleVariation);
+  const vx = -baseSpeed * speedMult * chaosMultiplier * Math.cos(angleVariation);
+  const vy = baseSpeed * speedMult * chaosMultiplier * Math.sin(angleVariation);
   
   // Angular velocity for spin
   const maxSpin = size === "large" ? 1 : size === "medium" ? 2 : 3;
@@ -210,12 +231,12 @@ export function updateAsteroidField(
     state.spawnTimer += dt;
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
-      // Scale max asteroids with field number (30% compound growth)
-      const scale = Math.pow(1.3, fieldNumber);
-      const baseInitialCount = 23;
-      const baseMaxActive = 90;
+      // Scale max asteroids with field number (50% compound growth)
+      const scale = Math.pow(1.5, fieldNumber);
+      const baseInitialCount = 138;  // Updated to match new base
+      const baseMaxActive = 300;  // Increased from 90 to support much larger fields
       const scaledInitialCount = Math.floor(baseInitialCount * scale);
-      const scaledMaxActive = Math.floor((60 + Math.floor(state.difficulty * 3.75)) * scale);
+      const scaledMaxActive = Math.floor((180 + Math.floor(state.difficulty * 3.75)) * scale);
       const maxAsteroids = state.phase === "entry" ? scaledInitialCount : Math.min(scaledMaxActive, Math.floor(baseMaxActive * scale));
       
       if (state.asteroids.length < maxAsteroids) {

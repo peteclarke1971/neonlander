@@ -540,7 +540,7 @@ export class EndlessTerrainGenerator {
     if (forceShieldSpawn || (chunkNumber >= 3 && !isAsteroidFieldChunk)) {
       // Deterministic spawn: every 5-10 chunks
       const chunksSinceStart = chunkNumber - 2; // Start counting from after forced spawn
-      const shouldSpawnShield = chunksSinceStart > 0 && chunksSinceStart % (5 + (seed % 6)) === 0;
+      const shouldSpawnShield = chunksSinceStart > 0 && chunksSinceStart % (2 + (seed % 2)) === 0;
       
       if (forceShieldSpawn || shouldSpawnShield) {
         const shieldRng = mulberry32(seed + 88888);
