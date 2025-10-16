@@ -95,6 +95,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   const invulnerableTimerRef = useRef(0);
   const INVULNERABLE_DURATION = 0.75; // seconds
   
+  // Unlimited fuel cheat (for testing)
+  const unlimitedFuelRef = useRef(false);
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -191,6 +194,13 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (["d", "arrowright"].includes(k)) keys.current.right = down;
       if (["w", "arrowup", " "].includes(k)) keys.current.thrust = down;
       if (["shift"].includes(k)) keys.current.rotateBoost = down;
+      
+      // Toggle unlimited fuel cheat with 'i' key (for testing)
+      if (k === "i" && down) {
+        unlimitedFuelRef.current = !unlimitedFuelRef.current;
+        console.log(`Unlimited fuel: ${unlimitedFuelRef.current ? "ON" : "OFF"}`);
+      }
+      
       if (down) audio.current.resume();
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
@@ -824,7 +834,12 @@ export const SurvivalEngine: React.FC<Props> = ({
             const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL;
             shipVx += thrustX * dt;
             shipVy += thrustY * dt;
-            fuelAmount -= FUEL_BURN * dt;
+            
+            // Only consume fuel if unlimited fuel cheat is not active
+            if (!unlimitedFuelRef.current) {
+              fuelAmount -= FUEL_BURN * dt;
+            }
+            
             audio.current.setThruster(1);
             
             // Spawn thruster particles (matching main game)
@@ -911,6 +926,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               if (anyGamepad()) vibrate(200, 0.5, 0.8);
             } else {
               isDead = true;
+              unlimitedFuelRef.current = false; // Reset cheat on death
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
               audio.current.explosion();
@@ -1057,6 +1073,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 if (anyGamepad()) vibrate(200, 0.5, 0.8);
               } else {
                 isDead = true;
+                unlimitedFuelRef.current = false; // Reset cheat on death
                 spawnExplosion(shipX, shipY);
                 spawnDebris(shipX, shipY, shipVx, shipVy);
                 audio.current.explosion();
@@ -1104,6 +1121,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               if (anyGamepad()) vibrate(200, 0.5, 0.8);
             } else {
               isDead = true;
+              unlimitedFuelRef.current = false; // Reset cheat on death
               spawnExplosion(shipX, shipY);
               spawnDebris(shipX, shipY, shipVx, shipVy);
               audio.current.explosion();
@@ -1328,6 +1346,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                   if (anyGamepad()) vibrate(200, 0.5, 0.8);
                 } else {
                   isDead = true;
+                  unlimitedFuelRef.current = false; // Reset cheat on death
                   spawnExplosion(shipX, shipY);
                   spawnDebris(shipX, shipY, shipVx, shipVy);
                   audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
@@ -1355,6 +1374,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 if (anyGamepad()) vibrate(200, 0.5, 0.8);
               } else {
                 isDead = true;
+                unlimitedFuelRef.current = false; // Reset cheat on death
                 spawnExplosion(shipX, shipY);
                 spawnDebris(shipX, shipY, shipVx, shipVy);
                 audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
