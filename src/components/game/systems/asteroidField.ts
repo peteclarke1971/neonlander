@@ -45,9 +45,9 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   // 50% compound scaling per field to reach 15x density faster
   const scale = Math.pow(1.5, fieldNumber);
   
-  const baseWidth = 9600;  // 2× wider
+  const baseWidth = 4800;  // Standard width (traversable in 30-45 seconds)
   const baseInitialCount = 138;  // 6× more asteroids
-  const baseMaxY = 2700;  // 2× taller
+  const baseMaxY = 800;  // Height range matching viewport (400 to -400)
   
   const scaledWidth = Math.floor(baseWidth * scale);
   const scaledInitialCount = Math.floor(baseInitialCount * scale);
@@ -76,12 +76,12 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
     const x = startX + 100 + initialRng() * (scaledWidth - 200); // Spread across scaled field width
     
     // COORDINATE SYSTEM: Negative Y = above terrain, Positive Y = below terrain
+    // Spawn asteroids from just below terrain (y=400) up to top of screen (y=-400)
     // Bias towards upper 80-90% using power distribution
     const yRoll = initialRng();
     const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
-    // Spawn asteroids ABOVE terrain: negative Y values
-    // Range from -scaledMaxY (high up) to -20 (just above terrain)
-    const y = -20 - yBias * scaledMaxY;
+    // Range: y=400 (just below terrain) to y=(400-scaledMaxY) (high up)
+    const y = 400 - yBias * scaledMaxY;
     
     const sizeRoll = initialRng();
     const size: "small" | "medium" | "large" = 
@@ -135,7 +135,7 @@ export function spawnFieldAsteroid(
   const { difficulty, phase } = state;
   
   // Calculate scaled vertical range based on field number
-  const baseMaxY = 2700;  // Updated to match new base
+  const baseMaxY = 800;  // Updated to match new base
   const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.5, fieldNumber));
   
   // Size distribution based on difficulty and phase
@@ -172,8 +172,8 @@ export function spawnFieldAsteroid(
   // Bias towards upper 80-90% using power distribution
   const yRoll = rng();
   const yBias = Math.pow(yRoll, 0.35); // Power curve: 90% of values < 0.5
-  // Spawn asteroids ABOVE terrain: negative Y values
-  const spawnY = -20 - yBias * scaledMaxY;
+  // Spawn asteroids from just below terrain upward into visible area
+  const spawnY = 400 - yBias * scaledMaxY;
   
   // Drift velocity: mostly horizontal (left), slight vertical variation
   const baseSpeed = 20 + rng() * 30;
@@ -223,10 +223,10 @@ export function updateAsteroidField(
   // Update phase timer
   state.phaseTimer += dt;
   
-  // Phase transitions based on player position (adjusted for longer field)
-  if (state.phase === "entry" && playerX > state.startX + 1200) {
+  // Phase transitions based on player position
+  if (state.phase === "entry" && playerX > state.startX + 600) {
     state.phase = "active";
-  } else if (state.phase === "active" && playerX > state.endX - 1200) {
+  } else if (state.phase === "active" && playerX > state.endX - 600) {
     state.phase = "exit";
   }
   
@@ -276,9 +276,9 @@ export function updateAsteroidField(
     // Keep asteroids roughly in vertical bounds (negative Y = higher up)
     // Calculate scaled max height for this field
     const scale = Math.pow(1.5, fieldNumber);
-    const scaledMaxY = Math.floor(2700 * scale);
-    const minY = -scaledMaxY - 100; // Upper bound (allow some overshoot)
-    const maxY = 100; // Lower bound (below typical terrain level)
+    const scaledMaxY = Math.floor(800 * scale);
+    const minY = 400 - scaledMaxY - 100; // Upper bound (allow some overshoot)
+    const maxY = 500; // Lower bound (just below terrain)
     
     if (asteroid.y < minY) {
       asteroid.y = minY;
