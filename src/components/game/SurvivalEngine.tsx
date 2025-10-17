@@ -566,7 +566,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     const getPadAt = (x: number, y: number) => {
       for (const chunk of chunks) {
         for (const pad of chunk.pads) {
-          if (x >= pad.xStart && x <= pad.xEnd && Math.abs(y - pad.y) < 20) {
+          if (x >= pad.xStart && x <= pad.xEnd && Math.abs(y - pad.y) < 25) {
             return pad;
           }
         }
