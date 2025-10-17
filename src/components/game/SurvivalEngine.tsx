@@ -1221,11 +1221,13 @@ export const SurvivalEngine: React.FC<Props> = ({
           let terrainY = getHeightAt(shipX);
           const shipBottom = shipY + 12;
           
+          // PRE-CHECK: Look for landing pads at the ship's collision point
+          const pad = getPadAt(shipX, shipBottom);
+          const movingPad = getMovingPadAt(shipX, shipBottom);
+          const landingPad = pad || movingPad;
+          
           if (shipBottom >= terrainY) {
-            // Check for pad landing
-            const pad = getPadAt(shipX, shipY);
-            const movingPad = getMovingPadAt(shipX, shipY);
-            const landingPad = pad || movingPad;
+            // We're touching terrain - check if it's a pad or a crash
             
             if (landingPad) {
               // Easy mode landing requirements (matching main game)
