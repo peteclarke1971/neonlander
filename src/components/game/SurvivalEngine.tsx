@@ -828,6 +828,21 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
+      // Smooth fuel display (runs every frame for smooth transitions)
+      if (!isDead) {
+        const FUEL_LERP_SPEED = 100.0; // Units per second (increased for faster response)
+        const fuelDiff = fuelAmount - smoothFuelRef.current;
+        const fuelDelta = Math.sign(fuelDiff) * Math.min(Math.abs(fuelDiff), FUEL_LERP_SPEED * dt);
+        smoothFuelRef.current += fuelDelta;
+        
+        // Clamp to actual fuel (prevent overshoot)
+        if (Math.sign(fuelDiff) === 1) {
+          smoothFuelRef.current = Math.min(smoothFuelRef.current, fuelAmount);
+        } else {
+          smoothFuelRef.current = Math.max(smoothFuelRef.current, fuelAmount);
+        }
+      }
+      
       // Thrust controls and physics (only when alive)
       if (!isDead) {
         // Thrust controls (works both landed and in-flight to allow takeoff)
@@ -842,19 +857,6 @@ export const SurvivalEngine: React.FC<Props> = ({
             // Only consume fuel if unlimited fuel cheat is not active
             if (!unlimitedFuelRef.current) {
               fuelAmount -= FUEL_BURN * dt;
-            }
-            
-            // Smooth fuel display
-            const FUEL_LERP_SPEED = 5.0; // Units per second
-            const fuelDiff = fuelAmount - smoothFuelRef.current;
-            const fuelDelta = Math.sign(fuelDiff) * Math.min(Math.abs(fuelDiff), FUEL_LERP_SPEED * dt);
-            smoothFuelRef.current += fuelDelta;
-            
-            // Clamp to actual fuel (prevent overshoot)
-            if (Math.sign(fuelDiff) === 1) {
-              smoothFuelRef.current = Math.min(smoothFuelRef.current, fuelAmount);
-            } else {
-              smoothFuelRef.current = Math.max(smoothFuelRef.current, fuelAmount);
             }
             
             // Show fuel out toast
