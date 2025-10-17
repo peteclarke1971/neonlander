@@ -1221,9 +1221,9 @@ export const SurvivalEngine: React.FC<Props> = ({
           let terrainY = getHeightAt(shipX);
           const shipBottom = shipY + 12;
           
-          // PRE-CHECK: Look for landing pads at the ship's collision point
-          const pad = getPadAt(shipX, shipBottom);
-          const movingPad = getMovingPadAt(shipX, shipBottom);
+          // PRE-CHECK: Look for landing pads using ship center (functions expect shipY, not shipBottom)
+          const pad = getPadAt(shipX, shipY);
+          const movingPad = getMovingPadAt(shipX, shipY);
           const landingPad = pad || movingPad;
           
           if (shipBottom >= terrainY) {
