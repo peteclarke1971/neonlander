@@ -2136,48 +2136,47 @@ export const SurvivalEngine: React.FC<Props> = ({
           gradient.addColorStop(0, 'hsla(40, 100%, 60%, 0.7)');
           gradient.addColorStop(1, 'hsla(40, 100%, 40%, 0.9)');
         } else {
-          // Low fuel: red gradient with flicker
-          const flicker = Math.sin(currentTime * 10) * 0.2 + 0.8;
-          gradient.addColorStop(0, `hsla(0, 100%, 60%, ${0.7 * flicker})`);
-          gradient.addColorStop(1, `hsla(0, 100%, 40%, ${0.9 * flicker})`);
+          // Low fuel: red gradient (NO FLICKER - temporarily disabled for testing)
+          gradient.addColorStop(0, 'hsla(0, 100%, 60%, 0.7)');
+          gradient.addColorStop(1, 'hsla(0, 100%, 40%, 0.9)');
         }
         
         ctx.fillStyle = gradient;
         ctx.fillRect(-8, fillY, 16, fillHeight);
         
-        // Optional: Add grid/scan-line effect for retro CRT look
-        if (!shouldOptimize && fuelPercent > 0.1) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 0.5;
-          for (let i = 0; i < 4; i++) {
-            const lineY = -10 + (i * 5);
-            if (lineY >= fillY) {
-              ctx.beginPath();
-              ctx.moveTo(-8, lineY);
-              ctx.lineTo(8, lineY);
-              ctx.stroke();
-            }
-          }
-        }
+        // Grid effect temporarily disabled for testing
+        // if (!shouldOptimize && fuelPercent > 0.1) {
+        //   ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        //   ctx.lineWidth = 0.5;
+        //   for (let i = 0; i < 4; i++) {
+        //     const lineY = -10 + (i * 5);
+        //     if (lineY >= fillY) {
+        //       ctx.beginPath();
+        //       ctx.moveTo(-8, lineY);
+        //       ctx.lineTo(8, lineY);
+        //       ctx.stroke();
+        //     }
+        //   }
+        // }
         
         ctx.restore();
         
-        // Zero fuel collapse animation
-        if (fuelAmount <= 0 && smoothFuelRef.current < 1) {
-          const pulsePhase = (currentTime * 4) % 1; // 4Hz pulse
-          const pulseSize = 2 + Math.sin(pulsePhase * Math.PI * 2) * 1.5;
-          const pulseAlpha = Math.sin(pulsePhase * Math.PI);
-          
-          ctx.save();
-          ctx.globalAlpha = pulseAlpha * 0.8;
-          ctx.fillStyle = 'hsla(0, 100%, 70%, 1)';
-          ctx.shadowColor = 'hsla(0, 100%, 70%, 1)';
-          ctx.shadowBlur = 15;
-          ctx.beginPath();
-          ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
+        // Zero fuel collapse animation temporarily disabled for testing
+        // if (fuelAmount <= 0 && smoothFuelRef.current < 1) {
+        //   const pulsePhase = (currentTime * 4) % 1; // 4Hz pulse
+        //   const pulseSize = 2 + Math.sin(pulsePhase * Math.PI * 2) * 1.5;
+        //   const pulseAlpha = Math.sin(pulsePhase * Math.PI);
+        //   
+        //   ctx.save();
+        //   ctx.globalAlpha = pulseAlpha * 0.8;
+        //   ctx.fillStyle = 'hsla(0, 100%, 70%, 1)';
+        //   ctx.shadowColor = 'hsla(0, 100%, 70%, 1)';
+        //   ctx.shadowBlur = 15;
+        //   ctx.beginPath();
+        //   ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
+        //   ctx.fill();
+        //   ctx.restore();
+        // }
         
         // 2. Draw ship outline (over fill)
         ctx.strokeStyle = neonColor;
