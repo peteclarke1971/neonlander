@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Mode } from "@/components/game/types";
-import { fetchTop } from "@/lib/leaderboard";
+import { Mode, Difficulty } from "@/components/game/types";
+import { fetchTop, fetchTopByDifficulty } from "@/lib/leaderboard";
 import { InitialsBadge } from "./InitialsBadge";
 
-interface Props { mode: Mode; }
+interface Props { 
+  mode: Mode;
+  difficulty?: Difficulty;
+}
 
-export const OnlineLeaderboard: React.FC<Props> = ({ mode }) => {
+export const OnlineLeaderboard: React.FC<Props> = ({ mode, difficulty }) => {
   const [rows, setRows] = useState<{ initials: string; score: number; difficulty: string; created_at?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,32 +17,35 @@ export const OnlineLeaderboard: React.FC<Props> = ({ mode }) => {
     let mounted = true;
     setLoading(true);
     setError(null);
-    fetchTop(mode, 10).then((res) => {
+    
+    const fetchFn = difficulty 
+      ? fetchTopByDifficulty(mode, difficulty, 10)
+      : fetchTop(mode, 10);
+    
+    fetchFn.then((res) => {
       if (!mounted) return;
       if (res.error) setError(res.error);
       setRows(res.rows || []);
       setLoading(false);
     });
+    
     return () => { mounted = false; };
-  }, [mode]);
+  }, [mode, difficulty]);
 
   return (
     <div className="mt-6 text-left bg-card/50 border border-border/60 rounded-lg p-4 w-[min(90vw,720px)]">
       <div className="flex items-center justify-between">
-        <div className="text-sm uppercase tracking-wider text-muted-foreground">Global Leaderboard · {mode === "classic" ? "Classic" : "Fixed"} (Beta)</div>
+        <div className="text-sm uppercase tracking-wider text-muted-foreground">
+          Global Leaderboard · {mode.charAt(0).toUpperCase() + mode.slice(1)}
+          {difficulty && ` · ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`}
+        </div>
       </div>
       <div className="mt-2">
         {loading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : error ? (
           <div className="text-sm text-destructive">
-            {error.includes("not configured") ? (
-              <>
-                Online leaderboard not configured yet. Connect Supabase or ensure the "scores" table exists with public read/insert.
-              </>
-            ) : (
-              <>Online leaderboard unavailable: {error}</>
-            )}
+            Online leaderboard unavailable: {error}
           </div>
         ) : rows.length === 0 ? (
           <div className="text-sm text-muted-foreground">No scores yet. Be the first!</div>
@@ -51,8 +57,10 @@ export const OnlineLeaderboard: React.FC<Props> = ({ mode }) => {
                   <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
                   <InitialsBadge initials={r.initials} />
                 </div>
-                <span className="text-accent font-semibold">{r.score}</span>
-                <span className="text-muted-foreground hidden sm:block">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</span>
+                <span className="text-accent font-semibold">{r.score.toLocaleString()}</span>
+                <span className="text-muted-foreground hidden sm:block">
+                  {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                </span>
               </li>
             ))}
           </ol>

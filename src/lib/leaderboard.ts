@@ -1,7 +1,8 @@
+import { supabase } from "@/integrations/supabase/client";
 import type { Difficulty, Mode } from "@/components/game/types";
 
 export type ScoreRow = {
-  id?: number;
+  id?: string;
   initials: string;
   score: number;
   difficulty: Difficulty;
@@ -9,57 +10,84 @@ export type ScoreRow = {
   created_at?: string;
 };
 
-// Temporary Google Sheets Web App endpoint (replace when switching to Supabase)
-const GOOGLE_SHEETS_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbya7Kpc_Ku4W47AsbNGw6BdP-pKfKWzQVVKTzHpQUff6UGUMwgY1ehsknFh2wozW7QX/exec";
-
+/**
+ * Submit a new high score to the leaderboard
+ */
 export async function submitScore(row: ScoreRow): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(GOOGLE_SHEETS_WEBAPP_URL, {
-      method: "POST",
-      // Use text/plain to avoid CORS preflight while still sending JSON the script can parse
-      headers: { "Content-Type": "text/plain;charset=UTF-8" },
-      body: JSON.stringify({
-        initials: row.initials,
+    const { error } = await supabase
+      .from('scores')
+      .insert({
+        initials: row.initials.toUpperCase().slice(0, 3),
         score: row.score,
         difficulty: row.difficulty,
         mode: row.mode,
-      }),
-    });
+      });
 
-    if (!res.ok) {
-      return { ok: false, error: `HTTP ${res.status}` };
-    }
-
-    try {
-      const data = await res.json();
-      if (data?.ok === false && data?.error) return { ok: false, error: data.error };
-    } catch {
-      // Non-JSON response from Apps Script is fine
+    if (error) {
+      console.error('Error submitting score:', error);
+      return { ok: false, error: error.message };
     }
 
     return { ok: true };
   } catch (e: any) {
+    console.error('Error submitting score:', e);
     return { ok: false, error: e?.message || "Network error" };
   }
 }
 
+/**
+ * Fetch top scores for a specific mode
+ */
 export async function fetchTop(
   mode: Mode,
   limit = 10
 ): Promise<{ rows: ScoreRow[]; error?: string }> {
   try {
-    const url = new URL(GOOGLE_SHEETS_WEBAPP_URL);
-    url.searchParams.set("mode", mode);
-    url.searchParams.set("limit", String(limit));
+    const { data, error } = await supabase
+      .from('scores')
+      .select('id, initials, score, difficulty, mode, created_at')
+      .eq('mode', mode)
+      .order('score', { ascending: false })
+      .limit(limit);
 
-    const res = await fetch(url.toString(), { method: "GET" });
-    if (!res.ok) return { rows: [], error: `HTTP ${res.status}` };
+    if (error) {
+      console.error('Error fetching scores:', error);
+      return { rows: [], error: error.message };
+    }
 
-    const data = await res.json();
-    const rows = Array.isArray(data?.rows) ? data.rows : data;
-    return { rows: (rows || []) as ScoreRow[] };
+    return { rows: (data || []) as ScoreRow[] };
   } catch (e: any) {
+    console.error('Error fetching scores:', e);
+    return { rows: [], error: e?.message || "Network error" };
+  }
+}
+
+/**
+ * Fetch top scores for a specific mode AND difficulty
+ */
+export async function fetchTopByDifficulty(
+  mode: Mode,
+  difficulty: Difficulty,
+  limit = 10
+): Promise<{ rows: ScoreRow[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('scores')
+      .select('id, initials, score, difficulty, mode, created_at')
+      .eq('mode', mode)
+      .eq('difficulty', difficulty)
+      .order('score', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching scores:', error);
+      return { rows: [], error: error.message };
+    }
+
+    return { rows: (data || []) as ScoreRow[] };
+  } catch (e: any) {
+    console.error('Error fetching scores:', e);
     return { rows: [], error: e?.message || "Network error" };
   }
 }

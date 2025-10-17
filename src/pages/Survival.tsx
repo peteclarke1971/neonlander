@@ -4,6 +4,8 @@ import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { Button } from "@/components/ui/button";
 import { SurvivalGameOverData } from "@/components/game/types/survival";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { OnlineLeaderboard } from "@/components/game/OnlineLeaderboard";
+import { submitScore } from "@/lib/leaderboard";
 
 type View = "home" | "game" | "gameover";
 
@@ -82,6 +84,14 @@ const Survival: React.FC = () => {
       
       setHighScores(updatedScores);
       localStorage.setItem("survival-mode-high-scores", JSON.stringify(updatedScores));
+      
+      // Submit to online leaderboard
+      void submitScore({
+        initials,
+        score: lastResult.score,
+        difficulty: "easy",
+        mode: "survival"
+      });
     }
     
     setNeedsInitials(false);
@@ -157,6 +167,8 @@ const Survival: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <OnlineLeaderboard mode="survival" />
 
             <Button onClick={backToMainMenu} variant="ghost">
               Back to Main Menu
