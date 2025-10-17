@@ -96,6 +96,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   const invulnerableTimerRef = useRef(0);
   const INVULNERABLE_DURATION = 0.75; // seconds
   
+  // Takeoff grace period to prevent race condition crashes
+  const takeoffGraceRef = useRef(0);
+  
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
@@ -847,6 +850,11 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (!isDead) {
         // Thrust controls (works both landed and in-flight to allow takeoff)
         if (keys.current.thrust && fuelAmount > 0) {
+          // Detect takeoff attempt and set grace period
+          if (isLanded) {
+            takeoffGraceRef.current = 0.1; // 100ms grace period
+          }
+          
           // Only apply thrust physics when not landed
           if (!isLanded) {
             const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
@@ -1025,6 +1033,11 @@ export const SurvivalEngine: React.FC<Props> = ({
           shipX += shipVx * 60 * dt;
           shipY += shipVy * 60 * dt;
           shipAngle += shipAngularVel * dt;
+          
+          // Update takeoff grace timer
+          if (takeoffGraceRef.current > 0) {
+            takeoffGraceRef.current -= dt;
+          }
           
           // Angular friction (easy mode - only when no rotation input from keyboard, gamepad, or gyro)
           const gpInput = gamepadInputRef.current;
@@ -1217,8 +1230,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // Collision detection (only when not landed)
-          if (!isLanded) {
+          // Collision detection (only when not landed AND not in takeoff grace period)
+          if (!isLanded && takeoffGraceRef.current <= 0) {
             let terrainY = getHeightAt(shipX);
             const shipBottom = shipY + 12;
             
