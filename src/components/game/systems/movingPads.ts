@@ -607,7 +607,7 @@ export class MovingPadSystem {
   // Check if lander is on moving pad (with generous tolerance for moving pads)
   isOnMovingPad(x: number, y: number, pad: MovingPad, level?: number): boolean {
     const padWidth = pad.width || 32;
-    const footY = y + 8; // Lander foot is ~8 pixels below center
+    const footY = y + 12; // Match ship's actual collision point (bottom of hull)
     
     // Performance optimization: removed debug logging
     
