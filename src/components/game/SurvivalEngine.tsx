@@ -1217,16 +1217,17 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // Collision detection
-          let terrainY = getHeightAt(shipX);
-          const shipBottom = shipY + 12;
-          
-          // PRE-CHECK: Look for landing pads using ship center (functions expect shipY, not shipBottom)
-          const pad = getPadAt(shipX, shipY);
-          const movingPad = getMovingPadAt(shipX, shipY);
-          const landingPad = pad || movingPad;
-          
-          if (shipBottom >= terrainY) {
+          // Collision detection (only when not landed)
+          if (!isLanded) {
+            let terrainY = getHeightAt(shipX);
+            const shipBottom = shipY + 12;
+            
+            // PRE-CHECK: Look for landing pads using ship center (functions expect shipY, not shipBottom)
+            const pad = getPadAt(shipX, shipY);
+            const movingPad = getMovingPadAt(shipX, shipY);
+            const landingPad = pad || movingPad;
+            
+            if (shipBottom >= terrainY) {
             // We're touching terrain - check if it's a pad or a crash
             
             if (landingPad) {
@@ -1421,6 +1422,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                   });
                 }, 2500);
               }
+            }
             }
           }
           
