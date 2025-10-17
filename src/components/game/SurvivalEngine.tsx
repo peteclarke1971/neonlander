@@ -606,13 +606,9 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       if (paused) return;
       
-      // Frame rate limiting with clamped dt (matching main game)
-      let dt = (now - lastTime) / 1000;
-      lastTime = now;
-      
-      // Clamp dt to prevent physics issues on lag spikes
-      if (dt > 0.1) dt = 0.033; // Cap at ~30fps equivalent
-      dt = Math.min(dt, 0.033); // Max 33ms timestep
+        // Frame rate limiting with clamped dt (matching main game)
+        const dt = Math.min(0.033, (now - lastTime) / 1000);
+        lastTime = now;
       
       currentTime += dt;
       setTime(currentTime);
