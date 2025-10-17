@@ -55,6 +55,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [vy, setVy] = useState(0);
   const [fuel, setFuel] = useState(200);
   const fuelCap = 200;
+  const smoothFuelRef = useRef(200); // Visual fuel (smoothed)
   
   // Volcano particles state (persistent between frames)
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
@@ -97,6 +98,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
+  
+  // Fuel out toast tracking
+  const fuelOutShownRef = useRef(false);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
@@ -269,7 +273,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     let hasMovedFromStart = false; // Prevent scoring on starting pad
     
     // Thruster particles
-    type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+    type ThrusterParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; alpha?: number };
     const thrusterParticles: ThrusterParticle[] = [];
     
     // Explosion particles
@@ -840,6 +844,26 @@ export const SurvivalEngine: React.FC<Props> = ({
               fuelAmount -= FUEL_BURN * dt;
             }
             
+            // Smooth fuel display
+            const FUEL_LERP_SPEED = 5.0; // Units per second
+            const fuelDiff = fuelAmount - smoothFuelRef.current;
+            const fuelDelta = Math.sign(fuelDiff) * Math.min(Math.abs(fuelDiff), FUEL_LERP_SPEED * dt);
+            smoothFuelRef.current += fuelDelta;
+            
+            // Clamp to actual fuel (prevent overshoot)
+            if (Math.sign(fuelDiff) === 1) {
+              smoothFuelRef.current = Math.min(smoothFuelRef.current, fuelAmount);
+            } else {
+              smoothFuelRef.current = Math.max(smoothFuelRef.current, fuelAmount);
+            }
+            
+            // Show fuel out toast
+            if (fuelAmount <= 0 && !fuelOutShownRef.current) {
+              fuelOutShownRef.current = true;
+              setFieldMessage("FUEL OUT");
+              setFieldMessageTimer(0.5);
+            }
+            
             audio.current.setThruster(1);
             
             // Spawn thruster particles (matching main game)
@@ -864,6 +888,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                   (100 + Math.random() * 200);
                 const lifespan = shouldOptimize ? 0.5 : 1.6;
                 
+                // Dim thrust when low on fuel
+                const thrustAlpha = fuelAmount < fuelCap * 0.15 ? 0.6 : 1.0;
+                
                 thrusterParticles.push({
                   x: nozzle.x,
                   y: nozzle.y,
@@ -871,7 +898,8 @@ export const SurvivalEngine: React.FC<Props> = ({
                   vy: -Math.cos(pa) * sp,
                   life: 0,
                   max: lifespan,
-                  color: neonColor
+                  color: neonColor,
+                  alpha: thrustAlpha
                 });
               }
             }
@@ -1925,7 +1953,8 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Draw thruster particles
       for (const p of thrusterParticles) {
         const t = p.life / p.max;
-        const alpha = 1 - t;
+        const baseAlpha = (p as any).alpha ?? 1.0; // Use particle alpha
+        const alpha = baseAlpha * (1 - t);
         const size = shouldOptimize ? 1.5 : (3 - t * 2);
         ctx.fillStyle = `hsla(${styles.getPropertyValue('--neon')}, ${alpha})`;
         ctx.shadowColor = neonColor;
@@ -2063,6 +2092,75 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
         }
         
+        // 1. Draw fuel fill FIRST (behind outline)
+        const fuelPercent = smoothFuelRef.current / fuelCap;
+        const fillHeight = 20 * fuelPercent; // Triangle is 20px tall
+        const fillY = 10 - fillHeight; // Start from bottom
+        
+        // Create clipping path for triangle
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(-8, 10);
+        ctx.lineTo(8, 10);
+        ctx.closePath();
+        ctx.clip();
+        
+        // Draw fuel gradient
+        const gradient = ctx.createLinearGradient(0, -10, 0, 10);
+        if (fuelPercent > 0.5) {
+          // Full/high fuel: green gradient
+          gradient.addColorStop(0, 'hsla(120, 100%, 60%, 0.7)');
+          gradient.addColorStop(1, 'hsla(120, 100%, 40%, 0.9)');
+        } else if (fuelPercent > 0.15) {
+          // Medium fuel: amber gradient
+          gradient.addColorStop(0, 'hsla(40, 100%, 60%, 0.7)');
+          gradient.addColorStop(1, 'hsla(40, 100%, 40%, 0.9)');
+        } else {
+          // Low fuel: red gradient with flicker
+          const flicker = Math.sin(currentTime * 10) * 0.2 + 0.8;
+          gradient.addColorStop(0, `hsla(0, 100%, 60%, ${0.7 * flicker})`);
+          gradient.addColorStop(1, `hsla(0, 100%, 40%, ${0.9 * flicker})`);
+        }
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(-8, fillY, 16, fillHeight);
+        
+        // Optional: Add grid/scan-line effect for retro CRT look
+        if (!shouldOptimize && fuelPercent > 0.1) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 0.5;
+          for (let i = 0; i < 4; i++) {
+            const lineY = -10 + (i * 5);
+            if (lineY >= fillY) {
+              ctx.beginPath();
+              ctx.moveTo(-8, lineY);
+              ctx.lineTo(8, lineY);
+              ctx.stroke();
+            }
+          }
+        }
+        
+        ctx.restore();
+        
+        // Zero fuel collapse animation
+        if (fuelAmount <= 0 && smoothFuelRef.current < 1) {
+          const pulsePhase = (currentTime * 4) % 1; // 4Hz pulse
+          const pulseSize = 2 + Math.sin(pulsePhase * Math.PI * 2) * 1.5;
+          const pulseAlpha = Math.sin(pulsePhase * Math.PI);
+          
+          ctx.save();
+          ctx.globalAlpha = pulseAlpha * 0.8;
+          ctx.fillStyle = 'hsla(0, 100%, 70%, 1)';
+          ctx.shadowColor = 'hsla(0, 100%, 70%, 1)';
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        
+        // 2. Draw ship outline (over fill)
         ctx.strokeStyle = neonColor;
         ctx.shadowColor = neonColor;
         ctx.shadowBlur = 12;
