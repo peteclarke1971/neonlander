@@ -98,6 +98,11 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
+  // Visual fuel state for integrated indicator
+  const visualFuelRef = useRef(200);
+  const prevFuelPercentRef = useRef(1);
+  const pendingFuelBonusRef = useRef(0);
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -1302,6 +1307,10 @@ export const SurvivalEngine: React.FC<Props> = ({
                   setScore(currentScore);
                   setLandings(currentLandings);
                   
+                  // Calculate fuel bonus but don't apply yet (will apply on takeoff)
+                  const fuelBonus = Math.min(fuelCap - fuelAmount, fuelCap * 0.15);
+                  pendingFuelBonusRef.current = fuelBonus;
+                  
                   // Trigger fireworks based on landing count
                   const isMoving = !!movingPad;
                   const isBonus = landingPad.bonus2x;
@@ -1412,6 +1421,12 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
             
             landedPad = null;
+            
+            // Apply pending fuel bonus on takeoff (triggers visual fill animation)
+            if (pendingFuelBonusRef.current > 0) {
+              fuelAmount = Math.min(fuelCap, fuelAmount + pendingFuelBonusRef.current);
+              pendingFuelBonusRef.current = 0;
+            }
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
@@ -2048,6 +2063,16 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
+      // Visual fuel interpolation (smooth animation)
+      const targetFuel = fuelAmount;
+      const visualFuel = visualFuelRef.current;
+      const fillSpeed = 100; // units per second
+      if (Math.abs(visualFuel - targetFuel) > 0.5) {
+        visualFuelRef.current += Math.sign(targetFuel - visualFuel) * fillSpeed * dt;
+      } else {
+        visualFuelRef.current = targetFuel;
+      }
+      
       // Draw ship (only if alive)
       if (!isDead) {
         ctx.save();
@@ -2063,12 +2088,68 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
         }
         
+        // Calculate fuel fill percentage with smooth interpolation
+        const fuelPercent = visualFuelRef.current / fuelCap;
+        const smoothFuelPercent = prevFuelPercentRef.current + (fuelPercent - prevFuelPercentRef.current) * 0.2;
+        prevFuelPercentRef.current = smoothFuelPercent;
+        
+        // Determine fill color based on fuel level
+        let fillColor: string;
+        let fillAlpha: number;
+        if (smoothFuelPercent > 0.5) {
+          fillColor = `hsla(180, 100%, 60%, ${smoothFuelPercent * 0.6})`; // Cyan (good)
+          fillAlpha = smoothFuelPercent * 0.6;
+        } else if (smoothFuelPercent > 0.25) {
+          fillColor = `hsla(50, 100%, 60%, ${smoothFuelPercent * 0.7})`; // Amber (warning)
+          fillAlpha = smoothFuelPercent * 0.7;
+        } else {
+          fillColor = `hsla(0, 100%, 60%, ${smoothFuelPercent * 0.8})`; // Red (critical)
+          fillAlpha = smoothFuelPercent * 0.8;
+        }
+        
+        // Low fuel flicker effect (<15%)
+        let flickerAlpha = 1;
+        if (smoothFuelPercent < 0.15 && smoothFuelPercent > 0) {
+          const flickerFreq = shouldOptimize ? 4 : 8;
+          const flickerPhase = Math.sin(currentTime * flickerFreq + Math.cos(currentTime * 13)) * 0.5 + 0.5;
+          flickerAlpha = 0.4 + flickerPhase * 0.6;
+        }
+        
+        // Draw fuel fill - clipped to triangle shape
+        if (smoothFuelPercent > 0.01) {
+          ctx.save();
+          
+          // Create clipping path for triangle
+          ctx.beginPath();
+          ctx.moveTo(0, -10);
+          ctx.lineTo(-8, 10);
+          ctx.lineTo(8, 10);
+          ctx.closePath();
+          ctx.clip();
+          
+          // Draw fill from bottom up
+          ctx.fillStyle = fillColor;
+          if (!shouldOptimize) {
+            ctx.shadowColor = fillColor;
+            ctx.shadowBlur = 8;
+          }
+          ctx.globalAlpha = fillAlpha * flickerAlpha;
+          
+          const fillHeight = 20 * smoothFuelPercent;
+          ctx.fillRect(-8, 10 - fillHeight, 16, fillHeight);
+          
+          ctx.restore();
+        }
+        
+        // Reset alpha for outline
+        ctx.globalAlpha = invulnerableRef.current ? ctx.globalAlpha : 1;
+        
         ctx.strokeStyle = neonColor;
         ctx.shadowColor = neonColor;
         ctx.shadowBlur = 12;
         ctx.lineWidth = 2;
         
-        // Ship body
+        // Ship body outline
         ctx.beginPath();
         ctx.moveTo(0, -10);
         ctx.lineTo(-8, 10);

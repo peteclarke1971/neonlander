@@ -57,12 +57,12 @@ export const SurvivalHUD: React.FC<Props> = ({
           <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
           <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
         </div>
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-accent">FUEL</span>
-            <span>{Math.max(0, fuel).toFixed(0)}</span>
+        <div className="mt-3 opacity-60">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">FUEL</span>
+            <span className="text-muted-foreground">{Math.max(0, fuel).toFixed(0)}</span>
           </div>
-          <div className="h-2 bg-secondary rounded-md overflow-hidden mt-1">
+          <div className="h-1.5 bg-secondary/40 rounded-md overflow-hidden mt-1">
             <div 
               className="h-full bg-accent" 
               style={{ width: `${Math.max(0, Math.min(100, (fuel / fuelCap * 100)))}%` }} 
