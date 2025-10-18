@@ -101,7 +101,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Visual fuel state for integrated indicator
   const visualFuelRef = useRef(200);
   const prevFuelPercentRef = useRef(1);
-  const pendingFuelBonusRef = useRef(0);
+  const fuelBeforeLandingRef = useRef(200);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
@@ -1228,6 +1228,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 timerActiveRef.current = false;
                 setTimerActive(false);
                 
+                // Store fuel before refill for visual animation
+                fuelBeforeLandingRef.current = fuelAmount;
+                
                 // Add fuel refill (consistent throughout the game)
                 const refillAmount = 60; // Consistent 60 fuel per landing
                 fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
@@ -1306,10 +1309,6 @@ export const SurvivalEngine: React.FC<Props> = ({
                   currentLandings++;
                   setScore(currentScore);
                   setLandings(currentLandings);
-                  
-                  // Calculate fuel bonus but don't apply yet (will apply on takeoff)
-                  const fuelBonus = Math.min(fuelCap - fuelAmount, fuelCap * 0.15);
-                  pendingFuelBonusRef.current = fuelBonus;
                   
                   // Trigger fireworks based on landing count
                   const isMoving = !!movingPad;
@@ -1422,11 +1421,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             landedPad = null;
             
-            // Apply pending fuel bonus on takeoff (triggers visual fill animation)
-            if (pendingFuelBonusRef.current > 0) {
-              fuelAmount = Math.min(fuelCap, fuelAmount + pendingFuelBonusRef.current);
-              pendingFuelBonusRef.current = 0;
-            }
+            // Reset visual fuel to pre-refill amount to trigger animation
+            visualFuelRef.current = fuelBeforeLandingRef.current;
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
@@ -2064,13 +2060,19 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Visual fuel interpolation (smooth animation)
-      const targetFuel = fuelAmount;
-      const visualFuel = visualFuelRef.current;
-      const fillSpeed = 100; // units per second
-      if (Math.abs(visualFuel - targetFuel) > 0.5) {
-        visualFuelRef.current += Math.sign(targetFuel - visualFuel) * fillSpeed * dt;
+      // When not landed, smoothly animate visual fuel to match actual fuel
+      if (!isLanded) {
+        const targetFuel = fuelAmount;
+        const visualFuel = visualFuelRef.current;
+        const fillSpeed = 150; // units per second (faster refill animation)
+        if (Math.abs(visualFuel - targetFuel) > 0.5) {
+          visualFuelRef.current += Math.sign(targetFuel - visualFuel) * fillSpeed * dt;
+        } else {
+          visualFuelRef.current = targetFuel;
+        }
       } else {
-        visualFuelRef.current = targetFuel;
+        // When landed, keep visual fuel at actual fuel (no animation while landed)
+        visualFuelRef.current = fuelAmount;
       }
       
       // Draw ship (only if alive)
