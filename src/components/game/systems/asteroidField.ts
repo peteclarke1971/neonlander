@@ -42,12 +42,14 @@ export interface AsteroidFieldState {
 }
 
 export function initAsteroidField(startX: number, difficulty: number, seed: number, fieldNumber: number = 0): AsteroidFieldState {
-  // 50% compound scaling per field to reach 15x density faster
-  const scale = Math.pow(1.5, fieldNumber);
-  
+  // Start with half density on first field, then ramp up with 50% compound scaling
   const baseWidth = 4800;  // Standard width (traversable in 30-45 seconds)
   const baseInitialCount = 138;  // 6× more asteroids
   const baseMaxY = 800;  // Height range matching viewport (400 to -400)
+  
+  // First field has 50% density, subsequent fields scale from baseline
+  const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
+  const scale = Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier;
   
   const scaledWidth = Math.floor(baseWidth * scale);
   const scaledInitialCount = Math.floor(baseInitialCount * scale);
@@ -136,7 +138,8 @@ export function spawnFieldAsteroid(
   
   // Calculate scaled vertical range based on field number
   const baseMaxY = 800;  // Updated to match new base
-  const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.5, fieldNumber));
+  const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
+  const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier);
   
   // Size distribution based on difficulty and phase
   let sizeRoll = rng();
@@ -235,10 +238,11 @@ export function updateAsteroidField(
     state.spawnTimer += dt;
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
-      // Scale max asteroids with field number (50% compound growth)
-      const scale = Math.pow(1.5, fieldNumber);
+      // Scale max asteroids with field number (50% compound growth, half density on first field)
       const baseInitialCount = 138;  // Updated to match new base
       const baseMaxActive = 300;  // Increased from 90 to support much larger fields
+      const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
+      const scale = Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier;
       const scaledInitialCount = Math.floor(baseInitialCount * scale);
       const scaledMaxActive = Math.floor((180 + Math.floor(state.difficulty * 3.75)) * scale);
       const maxAsteroids = state.phase === "entry" ? scaledInitialCount : Math.min(scaledMaxActive, Math.floor(baseMaxActive * scale));
@@ -275,7 +279,8 @@ export function updateAsteroidField(
     
     // Keep asteroids roughly in vertical bounds (negative Y = higher up)
     // Calculate scaled max height for this field
-    const scale = Math.pow(1.5, fieldNumber);
+    const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
+    const scale = Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier;
     const scaledMaxY = Math.floor(800 * scale);
     const minY = 400 - scaledMaxY - 100; // Upper bound (allow some overshoot)
     const maxY = 500; // Lower bound (just below terrain)
