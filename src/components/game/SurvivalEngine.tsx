@@ -850,6 +850,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           // Detect takeoff attempt and set grace period
           if (isLanded) {
             takeoffGraceRef.current = 0.1; // 100ms grace period
+            refuelingRef.current = false; // Re-enable explosions on takeoff
           }
           
           // Only apply thrust physics when not landed
@@ -1371,10 +1372,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                   fireworkTimeoutsRef.current.push(initialTimeout);
                 }
                 setFuel(fuelAmount);
-                // Clear refueling flag after sufficient time for render and state sync
-                setTimeout(() => {
-                  refuelingRef.current = false;
-                }, 200); // Increased from 50ms to 200ms for PC timing
+                // Refueling flag stays true until player takes off
                 
                 audio.current.success();
                 
