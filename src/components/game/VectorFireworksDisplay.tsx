@@ -52,11 +52,11 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
 
     // Firework positions matching diagram: left-left, left-center, right-right, right-center, center
     const fireworkPositions = [
-      { x: canvas.width * 0.15, y: explosionY, scale: 0.6, delay: 0 },      // #1 - Far left, smallest
-      { x: canvas.width * 0.35, y: explosionY, scale: 0.8, delay: 700 },    // #2 - Left of center
-      { x: canvas.width * 0.85, y: explosionY, scale: 0.8, delay: 1400 },   // #3 - Far right  
-      { x: canvas.width * 0.65, y: explosionY, scale: 0.8, delay: 2100 },   // #4 - Right of center
-      { x: canvas.width * 0.50, y: explosionY, scale: 1.2, delay: 2800 }    // #5 - Center, largest (finale)
+      { x: canvas.width * 0.15, y: explosionY, scale: 0.3, delay: 0 },      // #1 - Far left, smallest
+      { x: canvas.width * 0.35, y: explosionY, scale: 0.4, delay: 700 },    // #2 - Left of center
+      { x: canvas.width * 0.85, y: explosionY, scale: 0.4, delay: 1400 },   // #3 - Far right  
+      { x: canvas.width * 0.65, y: explosionY, scale: 0.4, delay: 2100 },   // #4 - Right of center
+      { x: canvas.width * 0.50, y: explosionY, scale: 0.6, delay: 2800 }    // #5 - Center, largest (finale)
     ];
 
     const factories = [
@@ -101,7 +101,7 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
         setSkipMessage(true);
       }
 
-      if (elapsed > 7) {
+      if (elapsed > 10) {
         onComplete();
         return;
       }
@@ -172,16 +172,16 @@ function updateVectorLine(line: VectorLine, dt: number) {
   line.x2 = line.x1 + Math.cos(line.rotation) * length;
   line.y2 = line.y1 + Math.sin(line.rotation) * length;
 
-  // Trail
-  if (line.trail.length === 0 || Math.random() < 0.3) {
+  // Trail (reduced for performance)
+  if (Math.random() < 0.15) {
     line.trail.push({
       x1: line.x1, y1: line.y1,
       x2: line.x2, y2: line.y2,
-      alpha: 1.0
+      alpha: 0.6
     });
-    if (line.trail.length > 8) line.trail.shift();
+    if (line.trail.length > 3) line.trail.shift();
   }
-  line.trail.forEach(t => t.alpha *= 0.92);
+  line.trail.forEach(t => t.alpha *= 0.85);
 
   line.life -= dt;
 }
@@ -197,35 +197,31 @@ function renderFirework(ctx: CanvasRenderingContext2D, firework: VectorFirework,
 function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics: boolean) {
   const alpha = Math.min(1, line.life / line.maxLife);
 
-  // Trail
-  line.trail.forEach(t => {
-    if (t.alpha > 0.05) {
-      ctx.strokeStyle = `rgba(255, 255, 255, ${t.alpha * 0.3})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(t.x1, t.y1);
-      ctx.lineTo(t.x2, t.y2);
-      ctx.stroke();
-    }
-  });
+  // Trail (optimized)
+  if (line.trail.length > 0) {
+    line.trail.forEach(t => {
+      if (t.alpha > 0.1) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${t.alpha * 0.2})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(t.x1, t.y1);
+        ctx.lineTo(t.x2, t.y2);
+        ctx.stroke();
+      }
+    });
+  }
 
-  // Main line
+  // Main line (shadow blur removed for performance)
   ctx.strokeStyle = line.color;
   ctx.globalAlpha = alpha;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = lowGraphics ? 1.5 : 2;
   ctx.lineCap = 'round';
-  
-  if (!lowGraphics) {
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = line.color;
-  }
   
   ctx.beginPath();
   ctx.moveTo(line.x1, line.y1);
   ctx.lineTo(line.x2, line.y2);
   ctx.stroke();
   
-  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 }
 
@@ -253,7 +249,7 @@ function createPolygonChain(x: number, y: number, color: string, scale: number):
     const velAngle = Math.atan2(centerY - y, centerX - x);
     const speed = (150 + Math.random() * 100) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 50 * scale;
+    const vy = Math.sin(velAngle) * speed;
 
     lines.push(
       createLine(x1, y1, x2, y2, vx, vy, color),
@@ -285,7 +281,7 @@ function createStarBurst(x: number, y: number, color: string, scale: number): Ve
     const velAngle = Math.atan2(centerY - y, centerX - x);
     const speed = (200 + Math.random() * 80) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 30 * scale;
+    const vy = Math.sin(velAngle) * speed;
 
     lines.push(
       createLine(x, y, x1, y1, vx, vy, color),
@@ -319,7 +315,7 @@ function createGeometricRose(x: number, y: number, color: string, scale: number)
     const velAngle = Math.atan2(centerY - y, centerX - x);
     const speed = (120 + Math.random() * 100) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 40 * scale;
+    const vy = Math.sin(velAngle) * speed;
 
     lines.push(
       createLine(x1, y1, x3, y3, vx, vy, color),
@@ -354,7 +350,7 @@ function createHeartCascade(x: number, y: number, color: string, scale: number):
     const velAngle = Math.atan2(heartY - y, heartX - x);
     const speed = (100 + Math.random() * 80) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 60 * scale;
+    const vy = Math.sin(velAngle) * speed;
 
     for (let i = 0; i < points.length - 1; i++) {
       lines.push(createLine(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], vx, vy, color));
@@ -390,7 +386,7 @@ function createHexagonalHoneycomb(x: number, y: number, color: string, scale: nu
       const velAngle = Math.atan2(centerY - y, centerX - x);
       const speed = (130 + Math.random() * 70) * scale;
       const vx = Math.cos(velAngle) * speed;
-      const vy = Math.sin(velAngle) * speed - 50 * scale;
+      const vy = Math.sin(velAngle) * speed;
 
       lines.push(createLine(x1, y1, x2, y2, vx, vy, color));
     }
