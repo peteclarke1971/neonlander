@@ -1228,12 +1228,12 @@ export const SurvivalEngine: React.FC<Props> = ({
                 timerActiveRef.current = false;
                 setTimerActive(false);
                 
-                // Store fuel before refill for visual animation
-                fuelBeforeLandingRef.current = fuelAmount;
+                // TEMPORARILY DISABLED: Store fuel before refill for visual animation
+                // fuelBeforeLandingRef.current = fuelAmount;
                 
-                // Add fuel refill (consistent throughout the game)
-                const refillAmount = 60; // Consistent 60 fuel per landing
-                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                // TEMPORARILY DISABLED: Add fuel refill (consistent throughout the game)
+                // const refillAmount = 60; // Consistent 60 fuel per landing
+                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
@@ -1421,8 +1421,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             landedPad = null;
             
-            // Reset visual fuel to pre-refill amount to trigger animation
-            visualFuelRef.current = fuelBeforeLandingRef.current;
+            // TEMPORARILY DISABLED: Reset visual fuel to pre-refill amount to trigger animation
+            // visualFuelRef.current = fuelBeforeLandingRef.current;
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
@@ -2059,21 +2059,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
-      // Visual fuel interpolation (smooth animation)
-      // When not landed, smoothly animate visual fuel to match actual fuel
-      if (!isLanded) {
-        const targetFuel = fuelAmount;
-        const visualFuel = visualFuelRef.current;
-        const fillSpeed = 150; // units per second (faster refill animation)
-        if (Math.abs(visualFuel - targetFuel) > 0.5) {
-          visualFuelRef.current += Math.sign(targetFuel - visualFuel) * fillSpeed * dt;
-        } else {
-          visualFuelRef.current = targetFuel;
-        }
-      } else {
-        // When landed, keep visual fuel at actual fuel (no animation while landed)
-        visualFuelRef.current = fuelAmount;
-      }
+      // TEMPORARILY DISABLED: Visual fuel interpolation (smooth animation)
+      // Always keep visual fuel matching actual fuel (no animation)
+      visualFuelRef.current = fuelAmount;
       
       // Draw ship (only if alive)
       if (!isDead) {
