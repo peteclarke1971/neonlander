@@ -1266,8 +1266,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 setTimerActive(false);
                 
                 // Add fuel refill (consistent throughout the game)
-                const refillAmount = 60; // Consistent 60 fuel per landing
-                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                // TEMPORARILY DISABLED FOR TESTING - Testing if refueling causes crashes
+                // const refillAmount = 60; // Consistent 60 fuel per landing
+                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
