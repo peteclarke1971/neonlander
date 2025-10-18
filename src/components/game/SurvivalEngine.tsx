@@ -108,6 +108,8 @@ export const SurvivalEngine: React.FC<Props> = ({
   const cometCooldownRef = useRef(0);
   const cometTrailAlphaRef = useRef(0);
   const cometPositionRef = useRef({ x: 0, y: 0, progress: 0 });
+  const chunksGeneratedRef = useRef(0);
+  const firstCometSpawnedRef = useRef(false);
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
@@ -248,12 +250,13 @@ export const SurvivalEngine: React.FC<Props> = ({
       seed
     });
     
-    // Generate initial chunks - first chunk is special starting chunk
-    const chunks: TerrainChunk[] = [];
-    chunks.push(terrainGen.generateChunk(0, true)); // First chunk with guaranteed starting pad
-    for (let i = 1; i < 3; i++) {
-      chunks.push(terrainGen.generateChunk(0));
-    }
+      // Generate initial chunks - first chunk is special starting chunk
+      const chunks: TerrainChunk[] = [];
+      chunks.push(terrainGen.generateChunk(0, true)); // First chunk with guaranteed starting pad
+      for (let i = 1; i < 3; i++) {
+        chunks.push(terrainGen.generateChunk(0));
+      }
+      chunksGeneratedRef.current = 3; // Track initial chunks
     
     // Initialize hazards and collectibles from chunks
     hazardsRef.current = [];
@@ -643,6 +646,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         const difficulty = Math.min(3, currentDistance / 50000);
         const newChunk = terrainGen.generateChunk(difficulty);
         chunks.push(newChunk);
+        chunksGeneratedRef.current++; // Increment chunk counter
         
         // Add new hazards from this chunk
         if (newChunk.hazards) {
@@ -1032,18 +1036,43 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
           
           // Comet event system
-          if (cometCooldownRef.current > 0) {
-            cometCooldownRef.current -= dt;
-          }
-          
-          // Random spawn chance when cooldown is ready
-          if (!cometActiveRef.current && cometCooldownRef.current <= 0) {
-            if (Math.random() < 0.02 * dt) {
+          if (!firstCometSpawnedRef.current) {
+            // First comet: guaranteed spawn during chunks 5-8
+            if (chunksGeneratedRef.current >= 5 && chunksGeneratedRef.current <= 8) {
+              // 10% chance per second during this window (much higher than normal 2%)
+              if (Math.random() < 0.1 * dt) {
+                cometActiveRef.current = true;
+                setCometActive(true);
+                cometTimerRef.current = 10.0;
+                cometTrailAlphaRef.current = 1.0;
+                cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+                firstCometSpawnedRef.current = true;
+              }
+            }
+            // If player somehow reaches chunk 9 without triggering, force spawn
+            if (chunksGeneratedRef.current > 8) {
               cometActiveRef.current = true;
               setCometActive(true);
               cometTimerRef.current = 10.0;
               cometTrailAlphaRef.current = 1.0;
               cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+              firstCometSpawnedRef.current = true;
+            }
+          } else {
+            // Subsequent comets: use existing time-based cooldown system
+            if (cometCooldownRef.current > 0) {
+              cometCooldownRef.current -= dt;
+            }
+            
+            // Random spawn chance when cooldown is ready
+            if (!cometActiveRef.current && cometCooldownRef.current <= 0) {
+              if (Math.random() < 0.02 * dt) {
+                cometActiveRef.current = true;
+                setCometActive(true);
+                cometTimerRef.current = 10.0;
+                cometTrailAlphaRef.current = 1.0;
+                cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+              }
             }
           }
           
