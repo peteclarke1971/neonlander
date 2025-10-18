@@ -320,11 +320,9 @@ export class MovingPadSystem {
         }
         pad.currentVelocity = { x: 0, y: 0 };
       } else {
-        // Continue moving with easing - but disable easing for high-speed pads to avoid velocity spikes
-        const baseSpeed = pad.baseSpeed ?? pad.speed;
-        const useLinearMotion = pad.speed >= 2 * baseSpeed;
-        const finalProgress = useLinearMotion ? progress : this.easeInOutCubic(progress);
-        this.updatePosition(pad, finalProgress);
+        // Continue moving with easing
+        const easedProgress = this.easeInOutCubic(progress);
+        this.updatePosition(pad, easedProgress);
         this.updateVelocity(pad, deltaTime);
       }
     }
@@ -609,7 +607,7 @@ export class MovingPadSystem {
   // Check if lander is on moving pad (with generous tolerance for moving pads)
   isOnMovingPad(x: number, y: number, pad: MovingPad, level?: number): boolean {
     const padWidth = pad.width || 32;
-    const footY = y + 12; // Match ship's actual collision point (bottom of hull)
+    const footY = y + 8; // Lander foot is ~8 pixels below center
     
     // Performance optimization: removed debug logging
     
@@ -626,14 +624,6 @@ export class MovingPadSystem {
     // Increase tolerance after level 5 for high-level forgiveness
     if (level && level > 5) {
       verticalTolerance = 20; // Increased to 20px for levels 6+
-    }
-    
-    // Scale tolerance with pad speed for high-speed pads (level 10+)
-    const baseSpeed = pad.baseSpeed ?? pad.speed;
-    if (pad.speed >= 2 * baseSpeed) {
-      // Add extra tolerance for fast pads: +1 pixel per 5 pixels/sec above 2x base
-      const extraTolerance = Math.floor((pad.speed - 2 * baseSpeed) / 5);
-      verticalTolerance += extraTolerance;
     }
     
     return Math.abs(footY - pad.currentPos.y) <= verticalTolerance;

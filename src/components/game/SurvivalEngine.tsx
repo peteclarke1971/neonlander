@@ -96,10 +96,6 @@ export const SurvivalEngine: React.FC<Props> = ({
   const invulnerableTimerRef = useRef(0);
   const INVULNERABLE_DURATION = 0.75; // seconds
   
-  // Takeoff grace period to prevent race condition crashes
-  const takeoffGraceRef = useRef(0);
-  const refuelingRef = useRef(false); // Disable explosions during refueling
-  
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
@@ -570,7 +566,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     const getPadAt = (x: number, y: number) => {
       for (const chunk of chunks) {
         for (const pad of chunk.pads) {
-          if (x >= pad.xStart && x <= pad.xEnd && Math.abs(y - pad.y) < 25) {
+          if (x >= pad.xStart && x <= pad.xEnd && Math.abs(y - pad.y) < 20) {
             return pad;
           }
         }
@@ -607,9 +603,13 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       if (paused) return;
       
-        // Frame rate limiting with clamped dt (matching main game)
-        const dt = Math.min(0.033, (now - lastTime) / 1000);
-        lastTime = now;
+      // Frame rate limiting with clamped dt (matching main game)
+      let dt = (now - lastTime) / 1000;
+      lastTime = now;
+      
+      // Clamp dt to prevent physics issues on lag spikes
+      if (dt > 0.1) dt = 0.033; // Cap at ~30fps equivalent
+      dt = Math.min(dt, 0.033); // Max 33ms timestep
       
       currentTime += dt;
       setTime(currentTime);
@@ -828,31 +828,10 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
-      // Smooth fuel display (runs every frame for smooth transitions)
-      if (!isDead) {
-        const FUEL_LERP_SPEED = 100.0; // Units per second (increased for faster response)
-        const fuelDiff = fuelAmount - smoothFuelRef.current;
-        const fuelDelta = Math.sign(fuelDiff) * Math.min(Math.abs(fuelDiff), FUEL_LERP_SPEED * dt);
-        smoothFuelRef.current += fuelDelta;
-        
-        // Clamp to actual fuel (prevent overshoot)
-        if (Math.sign(fuelDiff) === 1) {
-          smoothFuelRef.current = Math.min(smoothFuelRef.current, fuelAmount);
-        } else {
-          smoothFuelRef.current = Math.max(smoothFuelRef.current, fuelAmount);
-        }
-      }
-      
       // Thrust controls and physics (only when alive)
       if (!isDead) {
         // Thrust controls (works both landed and in-flight to allow takeoff)
         if (keys.current.thrust && fuelAmount > 0) {
-          // Detect takeoff attempt and set grace period
-          if (isLanded) {
-            takeoffGraceRef.current = 0.1; // 100ms grace period
-            refuelingRef.current = false; // Re-enable explosions on takeoff
-          }
-          
           // Only apply thrust physics when not landed
           if (!isLanded) {
             const thrustX = Math.sin(shipAngle) * THRUST_ACCEL;
@@ -863,6 +842,19 @@ export const SurvivalEngine: React.FC<Props> = ({
             // Only consume fuel if unlimited fuel cheat is not active
             if (!unlimitedFuelRef.current) {
               fuelAmount -= FUEL_BURN * dt;
+            }
+            
+            // Smooth fuel display
+            const FUEL_LERP_SPEED = 5.0; // Units per second
+            const fuelDiff = fuelAmount - smoothFuelRef.current;
+            const fuelDelta = Math.sign(fuelDiff) * Math.min(Math.abs(fuelDiff), FUEL_LERP_SPEED * dt);
+            smoothFuelRef.current += fuelDelta;
+            
+            // Clamp to actual fuel (prevent overshoot)
+            if (Math.sign(fuelDiff) === 1) {
+              smoothFuelRef.current = Math.min(smoothFuelRef.current, fuelAmount);
+            } else {
+              smoothFuelRef.current = Math.max(smoothFuelRef.current, fuelAmount);
             }
             
             // Show fuel out toast
@@ -1031,11 +1023,6 @@ export const SurvivalEngine: React.FC<Props> = ({
           shipX += shipVx * 60 * dt;
           shipY += shipVy * 60 * dt;
           shipAngle += shipAngularVel * dt;
-          
-          // Update takeoff grace timer
-          if (takeoffGraceRef.current > 0) {
-            takeoffGraceRef.current -= dt;
-          }
           
           // Angular friction (easy mode - only when no rotation input from keyboard, gamepad, or gyro)
           const gpInput = gamepadInputRef.current;
@@ -1228,26 +1215,15 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // PRE-LANDING CHECK: Disable explosions if ship is about to land on a pad
+          // Collision detection
+          let terrainY = getHeightAt(shipX);
           const shipBottom = shipY + 12;
-          const pad = getPadAt(shipX, shipY);
-          const movingPad = getMovingPadAt(shipX, shipY);
-          const landingPad = pad || movingPad;
           
-          if (landingPad && !isLanded) {
-            const padY = movingPad ? movingPad.currentPos.y : landingPad.y;
-            // If ship is touching or very close to pad, disable explosions
-            if (shipBottom >= padY - 2) {
-              refuelingRef.current = true;
-            }
-          }
-          
-          // Collision detection (only when not landed AND not in takeoff grace period)
-          if (!isLanded && takeoffGraceRef.current <= 0) {
-            let terrainY = getHeightAt(shipX);
-            
-            if (shipBottom >= terrainY) {
-            // We're touching terrain - check if it's a pad or a crash
+          if (shipBottom >= terrainY) {
+            // Check for pad landing
+            const pad = getPadAt(shipX, shipY);
+            const movingPad = getMovingPadAt(shipX, shipY);
+            const landingPad = pad || movingPad;
             
             if (landingPad) {
               // Easy mode landing requirements (matching main game)
@@ -1276,7 +1252,6 @@ export const SurvivalEngine: React.FC<Props> = ({
                 setTimerActive(false);
                 
                 // Add fuel refill (consistent throughout the game)
-                // refuelingRef already set to true before collision detection
                 const refillAmount = 60; // Consistent 60 fuel per landing
                 fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
@@ -1380,54 +1355,22 @@ export const SurvivalEngine: React.FC<Props> = ({
                   fireworkTimeoutsRef.current.push(initialTimeout);
                 }
                 setFuel(fuelAmount);
-                // Refueling flag stays true until player takes off
                 
                 audio.current.success();
                 
                 // No auto-takeoff - player must thrust to take off
               } else {
-                // Bad landing - only explode if not refueling
-                if (!refuelingRef.current) {
-                  if (shieldActiveRef.current) {
-                    // Shield saves but landing fails (no refuel)
-                    spawnShieldBreak(shipX, shipY);
-                    shieldActiveRef.current = false;
-                    setShieldActive(false);
-                    audio.current.shieldBreak();
-                    
-                    shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
-                    shipVx *= 0.3;
-                    shipVy = -1;
-                    if (anyGamepad()) vibrate(200, 0.5, 0.8);
-                  } else {
-                    isDead = true;
-                    unlimitedFuelRef.current = false; // Reset cheat on death
-                    spawnExplosion(shipX, shipY);
-                    spawnDebris(shipX, shipY, shipVx, shipVy);
-                    audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
-                    if (anyGamepad()) vibrate(500, 0.8, 1.0);
-                    setTimeout(() => {
-                      onGameOver({
-                        cause: "crash",
-                        distance: currentDistance,
-                        time: currentTime,
-                        score: currentScore,
-                        landings: currentLandings
-                      });
-                    }, 2500);
-                  }
-                }
-              }
-            } else {
-              // Hit terrain - only explode if not refueling
-              if (!refuelingRef.current) {
+                // Bad landing
                 if (shieldActiveRef.current) {
+                  // Shield saves but landing fails (no refuel)
                   spawnShieldBreak(shipX, shipY);
                   shieldActiveRef.current = false;
                   setShieldActive(false);
                   audio.current.shieldBreak();
-                  shipVx += (Math.random() - 0.5) * 2;
-                  shipVy = -1.5;
+                  
+                  shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
+                  shipVx *= 0.3;
+                  shipVy = -1;
                   if (anyGamepad()) vibrate(200, 0.5, 0.8);
                 } else {
                   isDead = true;
@@ -1447,7 +1390,33 @@ export const SurvivalEngine: React.FC<Props> = ({
                   }, 2500);
                 }
               }
-            }
+            } else {
+              // Hit terrain
+              if (shieldActiveRef.current) {
+                spawnShieldBreak(shipX, shipY);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                audio.current.shieldBreak();
+                shipVx += (Math.random() - 0.5) * 2;
+                shipVy = -1.5;
+                if (anyGamepad()) vibrate(200, 0.5, 0.8);
+              } else {
+                isDead = true;
+                unlimitedFuelRef.current = false; // Reset cheat on death
+                spawnExplosion(shipX, shipY);
+                spawnDebris(shipX, shipY, shipVx, shipVy);
+                audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+                if (anyGamepad()) vibrate(500, 0.8, 1.0);
+                setTimeout(() => {
+                  onGameOver({
+                    cause: "crash",
+                    distance: currentDistance,
+                    time: currentTime,
+                    score: currentScore,
+                    landings: currentLandings
+                  });
+                }, 2500);
+              }
             }
           }
           
@@ -2137,47 +2106,59 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.closePath();
         ctx.clip();
         
-        // Draw fuel gradient (TEMPORARY: Green only for testing)
+        // Draw fuel gradient
         const gradient = ctx.createLinearGradient(0, -10, 0, 10);
-        gradient.addColorStop(0, 'hsla(120, 100%, 60%, 0.7)');
-        gradient.addColorStop(1, 'hsla(120, 100%, 40%, 0.9)');
+        if (fuelPercent > 0.5) {
+          // Full/high fuel: green gradient
+          gradient.addColorStop(0, 'hsla(120, 100%, 60%, 0.7)');
+          gradient.addColorStop(1, 'hsla(120, 100%, 40%, 0.9)');
+        } else if (fuelPercent > 0.15) {
+          // Medium fuel: amber gradient
+          gradient.addColorStop(0, 'hsla(40, 100%, 60%, 0.7)');
+          gradient.addColorStop(1, 'hsla(40, 100%, 40%, 0.9)');
+        } else {
+          // Low fuel: red gradient with flicker
+          const flicker = Math.sin(currentTime * 10) * 0.2 + 0.8;
+          gradient.addColorStop(0, `hsla(0, 100%, 60%, ${0.7 * flicker})`);
+          gradient.addColorStop(1, `hsla(0, 100%, 40%, ${0.9 * flicker})`);
+        }
         
         ctx.fillStyle = gradient;
         ctx.fillRect(-8, fillY, 16, fillHeight);
         
-        // Grid effect temporarily disabled for testing
-        // if (!shouldOptimize && fuelPercent > 0.1) {
-        //   ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        //   ctx.lineWidth = 0.5;
-        //   for (let i = 0; i < 4; i++) {
-        //     const lineY = -10 + (i * 5);
-        //     if (lineY >= fillY) {
-        //       ctx.beginPath();
-        //       ctx.moveTo(-8, lineY);
-        //       ctx.lineTo(8, lineY);
-        //       ctx.stroke();
-        //     }
-        //   }
-        // }
+        // Optional: Add grid/scan-line effect for retro CRT look
+        if (!shouldOptimize && fuelPercent > 0.1) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 0.5;
+          for (let i = 0; i < 4; i++) {
+            const lineY = -10 + (i * 5);
+            if (lineY >= fillY) {
+              ctx.beginPath();
+              ctx.moveTo(-8, lineY);
+              ctx.lineTo(8, lineY);
+              ctx.stroke();
+            }
+          }
+        }
         
         ctx.restore();
         
-        // Zero fuel collapse animation temporarily disabled for testing
-        // if (fuelAmount <= 0 && smoothFuelRef.current < 1) {
-        //   const pulsePhase = (currentTime * 4) % 1; // 4Hz pulse
-        //   const pulseSize = 2 + Math.sin(pulsePhase * Math.PI * 2) * 1.5;
-        //   const pulseAlpha = Math.sin(pulsePhase * Math.PI);
-        //   
-        //   ctx.save();
-        //   ctx.globalAlpha = pulseAlpha * 0.8;
-        //   ctx.fillStyle = 'hsla(0, 100%, 70%, 1)';
-        //   ctx.shadowColor = 'hsla(0, 100%, 70%, 1)';
-        //   ctx.shadowBlur = 15;
-        //   ctx.beginPath();
-        //   ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
-        //   ctx.fill();
-        //   ctx.restore();
-        // }
+        // Zero fuel collapse animation
+        if (fuelAmount <= 0 && smoothFuelRef.current < 1) {
+          const pulsePhase = (currentTime * 4) % 1; // 4Hz pulse
+          const pulseSize = 2 + Math.sin(pulsePhase * Math.PI * 2) * 1.5;
+          const pulseAlpha = Math.sin(pulsePhase * Math.PI);
+          
+          ctx.save();
+          ctx.globalAlpha = pulseAlpha * 0.8;
+          ctx.fillStyle = 'hsla(0, 100%, 70%, 1)';
+          ctx.shadowColor = 'hsla(0, 100%, 70%, 1)';
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(0, 0, pulseSize, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
         
         // 2. Draw ship outline (over fill)
         ctx.strokeStyle = neonColor;

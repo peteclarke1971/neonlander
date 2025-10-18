@@ -1446,13 +1446,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
             // MEGA! Moving pad landing
             const landedPad = movingPadLanding;
-            
-            // Freeze pad movement for 2 frames (~32ms at 60fps) to ensure stable landing
-            landedPad.frozen = true;
-            setTimeout(() => {
-              if (landedPad) landedPad.frozen = false;
-            }, 32);
-            
             y = landedPad.currentPos.y - 8;
             vy = landedPad.currentVelocity.y; 
             vx = landedPad.currentVelocity.x; 
