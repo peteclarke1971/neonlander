@@ -1439,19 +1439,20 @@ export const SurvivalEngine: React.FC<Props> = ({
                   fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
                   fireworkTimeoutsRef.current = [];
                   
-                  // Show fireworks after brief delay
-                  const initialTimeout = setTimeout(() => {
-                    // Every 10th landing shows vector fireworks
-                    if (currentLandings % 10 === 0 && currentLandings > 0) {
-                      setLandingType('vector-special');
-                    } else {
-                      setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
-                    }
-                    setShowFireworks(true);
-                    setFireworksActive(true);
-                    
-                    // Auto-hide after appropriate duration
-                    const duration = (currentLandings % 10 === 0 && currentLandings > 0) ? 12000 : 6000;
+        // Show fireworks after brief delay
+        const initialTimeout = setTimeout(() => {
+          // Vector fireworks at landing 2, then every 10 after (12, 22, 32, etc.)
+          const isVectorFireworks = currentLandings === 2 || (currentLandings > 2 && (currentLandings - 2) % 10 === 0);
+          if (isVectorFireworks) {
+            setLandingType('vector-special');
+          } else {
+            setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
+          }
+          setShowFireworks(true);
+          setFireworksActive(true);
+          
+          // Auto-hide after appropriate duration
+          const duration = isVectorFireworks ? 12000 : 6000;
                     const hideTimeout = setTimeout(() => {
                       setShowFireworks(false);
                       setFireworksActive(false);
