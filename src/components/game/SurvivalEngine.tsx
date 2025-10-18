@@ -98,6 +98,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   
   // Takeoff grace period to prevent race condition crashes
   const takeoffGraceRef = useRef(0);
+  const refuelingRef = useRef(false); // Disable explosions during refueling
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
@@ -1226,8 +1227,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // Collision detection (only when not landed AND not in takeoff grace period)
-          if (!isLanded && takeoffGraceRef.current <= 0) {
+          // Collision detection (only when not landed AND not in takeoff grace period AND not refueling)
+          if (!isLanded && takeoffGraceRef.current <= 0 && !refuelingRef.current) {
             let terrainY = getHeightAt(shipX);
             const shipBottom = shipY + 12;
             
@@ -1266,9 +1267,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 setTimerActive(false);
                 
                 // Add fuel refill (consistent throughout the game)
-                // TEMPORARILY DISABLED FOR TESTING - Testing if refueling causes crashes
-                // const refillAmount = 60; // Consistent 60 fuel per landing
-                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                refuelingRef.current = true; // Disable explosions during refuel
+                const refillAmount = 60; // Consistent 60 fuel per landing
+                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
@@ -1370,6 +1371,10 @@ export const SurvivalEngine: React.FC<Props> = ({
                   fireworkTimeoutsRef.current.push(initialTimeout);
                 }
                 setFuel(fuelAmount);
+                // Clear refueling flag after render cycle completes
+                setTimeout(() => {
+                  refuelingRef.current = false;
+                }, 50);
                 
                 audio.current.success();
                 
