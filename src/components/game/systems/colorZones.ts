@@ -18,14 +18,14 @@ interface ColorZone {
   name: string;
 }
 
-// Define color zones with smooth transitions
+// Define color zones with smooth transitions (3x longer zones)
 const COLOR_ZONES: ColorZone[] = [
-  { startDistance: 0, endDistance: 2000, hue: 180, name: "CYAN SECTOR" },        // Classic cyan-green
-  { startDistance: 2000, endDistance: 5000, hue: 300, name: "MAGENTA SECTOR" },  // Electric magenta
-  { startDistance: 5000, endDistance: 9000, hue: 180, name: "CYAN SECTOR" },     // Bright cyan
-  { startDistance: 9000, endDistance: 14000, hue: 30, name: "AMBER SECTOR" },    // Deep orange
-  { startDistance: 14000, endDistance: 20000, hue: 270, name: "VIOLET SECTOR" }, // Royal purple
-  { startDistance: 20000, endDistance: Infinity, hue: 210, name: "AZURE SECTOR" } // Electric blue
+  { startDistance: 0, endDistance: 6000, hue: 180, name: "CYAN SECTOR" },        // Classic cyan-green
+  { startDistance: 6000, endDistance: 15000, hue: 300, name: "MAGENTA SECTOR" },  // Electric magenta
+  { startDistance: 15000, endDistance: 27000, hue: 180, name: "CYAN SECTOR" },     // Bright cyan
+  { startDistance: 27000, endDistance: 42000, hue: 30, name: "AMBER SECTOR" },    // Deep orange
+  { startDistance: 42000, endDistance: 60000, hue: 270, name: "VIOLET SECTOR" }, // Royal purple
+  { startDistance: 60000, endDistance: Infinity, hue: 210, name: "AZURE SECTOR" } // Electric blue
 ];
 
 // Default palette (classic cyan)
@@ -94,8 +94,8 @@ export function getColorForDistance(distance: number, deltaTime: number = 0): Co
   let finalHue = currentZone.hue;
   let finalName = currentZone.name;
   
-  // Start transition in the last 20% of the zone
-  const transitionStart = 0.8;
+  // Start transition in the first 80% of the zone (4x slower transitions)
+  const transitionStart = 0.2;
   if (zoneProgress >= transitionStart && currentZoneIndex < COLOR_ZONES.length - 1) {
     const nextZone = COLOR_ZONES[currentZoneIndex + 1];
     const transitionProgress = (zoneProgress - transitionStart) / (1 - transitionStart);
