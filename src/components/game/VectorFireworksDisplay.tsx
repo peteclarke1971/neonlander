@@ -48,22 +48,29 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
     canvas.width = rect.width;
     canvas.height = rect.height;
 
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    const explosionY = canvas.height * 0.35; // 35% from top, above terrain
 
-    // Schedule 5 fireworks to spawn in center with delays
-    const fireworkSchedule = [
-      { delay: 0, factory: createPolygonChain },
-      { delay: 2400, factory: createStarBurst },
-      { delay: 4800, factory: createGeometricRose },
-      { delay: 7200, factory: createHeartCascade },
-      { delay: 9600, factory: createHexagonalHoneycomb }
+    // Firework positions matching diagram: left-left, left-center, right-right, right-center, center
+    const fireworkPositions = [
+      { x: canvas.width * 0.15, y: explosionY, scale: 0.6, delay: 0 },      // #1 - Far left, smallest
+      { x: canvas.width * 0.35, y: explosionY, scale: 0.8, delay: 700 },    // #2 - Left of center
+      { x: canvas.width * 0.85, y: explosionY, scale: 0.8, delay: 1400 },   // #3 - Far right  
+      { x: canvas.width * 0.65, y: explosionY, scale: 0.8, delay: 2100 },   // #4 - Right of center
+      { x: canvas.width * 0.50, y: explosionY, scale: 1.2, delay: 2800 }    // #5 - Center, largest (finale)
     ];
 
-    fireworkSchedule.forEach(({ delay, factory }) => {
+    const factories = [
+      createPolygonChain,
+      createStarBurst,
+      createGeometricRose,
+      createHeartCascade,
+      createHexagonalHoneycomb
+    ];
+
+    fireworkPositions.forEach((pos, index) => {
       setTimeout(() => {
-        fireworksRef.current.push(factory(centerX, centerY, paletteColor));
-      }, delay);
+        fireworksRef.current.push(factories[index](pos.x, pos.y, paletteColor, pos.scale));
+      }, pos.delay);
     });
 
     function animate() {
@@ -94,7 +101,7 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
         setSkipMessage(true);
       }
 
-      if (elapsed > 12) {
+      if (elapsed > 7) {
         onComplete();
         return;
       }
@@ -224,10 +231,10 @@ function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics
 
 // Factory functions - create fireworks that explode at position
 
-function createPolygonChain(x: number, y: number, color: string): VectorFirework {
+function createPolygonChain(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numTriangles = 5;
-  const radius = 60;
+  const radius = 60 * scale;
 
   for (let i = 0; i < numTriangles; i++) {
     const angle1 = (i / numTriangles) * Math.PI * 2 - Math.PI / 2;
@@ -244,9 +251,9 @@ function createPolygonChain(x: number, y: number, color: string): VectorFirework
     const centerX = (x1 + x2 + x3) / 3;
     const centerY = (y1 + y2 + y3) / 3;
     const velAngle = Math.atan2(centerY - y, centerX - x);
-    const speed = 150 + Math.random() * 100;
+    const speed = (150 + Math.random() * 100) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 50;
+    const vy = Math.sin(velAngle) * speed - 50 * scale;
 
     lines.push(
       createLine(x1, y1, x2, y2, vx, vy, color),
@@ -258,11 +265,11 @@ function createPolygonChain(x: number, y: number, color: string): VectorFirework
   return { type: 'polygon-chain', x, y, lines, color, active: true };
 }
 
-function createStarBurst(x: number, y: number, color: string): VectorFirework {
+function createStarBurst(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numRays = 8;
-  const innerRadius = 30;
-  const outerRadius = 80;
+  const innerRadius = 30 * scale;
+  const outerRadius = 80 * scale;
 
   for (let i = 0; i < numRays; i++) {
     const angle1 = (i / numRays) * Math.PI * 2;
@@ -276,9 +283,9 @@ function createStarBurst(x: number, y: number, color: string): VectorFirework {
     const centerX = (x1 + x2) / 2;
     const centerY = (y1 + y2) / 2;
     const velAngle = Math.atan2(centerY - y, centerX - x);
-    const speed = 200 + Math.random() * 80;
+    const speed = (200 + Math.random() * 80) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 30;
+    const vy = Math.sin(velAngle) * speed - 30 * scale;
 
     lines.push(
       createLine(x, y, x1, y1, vx, vy, color),
@@ -289,10 +296,10 @@ function createStarBurst(x: number, y: number, color: string): VectorFirework {
   return { type: 'star-burst', x, y, lines, color, active: true };
 }
 
-function createGeometricRose(x: number, y: number, color: string): VectorFirework {
+function createGeometricRose(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numPetals = 6;
-  const radius = 70;
+  const radius = 70 * scale;
 
   for (let i = 0; i < numPetals; i++) {
     const angle = (i / numPetals) * Math.PI * 2;
@@ -310,9 +317,9 @@ function createGeometricRose(x: number, y: number, color: string): VectorFirewor
     const centerX = (x1 + x2 + x3) / 3;
     const centerY = (y1 + y2 + y3) / 3;
     const velAngle = Math.atan2(centerY - y, centerX - x);
-    const speed = 120 + Math.random() * 100;
+    const speed = (120 + Math.random() * 100) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 40;
+    const vy = Math.sin(velAngle) * speed - 40 * scale;
 
     lines.push(
       createLine(x1, y1, x3, y3, vx, vy, color),
@@ -324,13 +331,13 @@ function createGeometricRose(x: number, y: number, color: string): VectorFirewor
   return { type: 'geometric-rose', x, y, lines, color, active: true };
 }
 
-function createHeartCascade(x: number, y: number, color: string): VectorFirework {
+function createHeartCascade(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numHearts = 4;
 
   for (let h = 0; h < numHearts; h++) {
-    const scale = 0.6 + h * 0.15;
-    const size = 40 * scale;
+    const heartScale = 0.6 + h * 0.15;
+    const size = 40 * scale * heartScale;
     const offsetAngle = (h / numHearts) * Math.PI * 2;
     const offsetRadius = 50;
     const heartX = x + Math.cos(offsetAngle) * offsetRadius;
@@ -345,9 +352,9 @@ function createHeartCascade(x: number, y: number, color: string): VectorFirework
     }
 
     const velAngle = Math.atan2(heartY - y, heartX - x);
-    const speed = 100 + Math.random() * 80;
+    const speed = (100 + Math.random() * 80) * scale;
     const vx = Math.cos(velAngle) * speed;
-    const vy = Math.sin(velAngle) * speed - 60;
+    const vy = Math.sin(velAngle) * speed - 60 * scale;
 
     for (let i = 0; i < points.length - 1; i++) {
       lines.push(createLine(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], vx, vy, color));
@@ -357,9 +364,9 @@ function createHeartCascade(x: number, y: number, color: string): VectorFirework
   return { type: 'heart-cascade', x, y, lines, color, active: true };
 }
 
-function createHexagonalHoneycomb(x: number, y: number, color: string): VectorFirework {
+function createHexagonalHoneycomb(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
-  const hexSize = 35;
+  const hexSize = 35 * scale;
   const pattern = [
     [0, 0],
     [1, 0], [-1, 0],
@@ -381,9 +388,9 @@ function createHexagonalHoneycomb(x: number, y: number, color: string): VectorFi
       const y2 = centerY + Math.sin(angle2) * hexSize;
 
       const velAngle = Math.atan2(centerY - y, centerX - x);
-      const speed = 130 + Math.random() * 70;
+      const speed = (130 + Math.random() * 70) * scale;
       const vx = Math.cos(velAngle) * speed;
-      const vy = Math.sin(velAngle) * speed - 50;
+      const vy = Math.sin(velAngle) * speed - 50 * scale;
 
       lines.push(createLine(x1, y1, x2, y2, vx, vy, color));
     }
