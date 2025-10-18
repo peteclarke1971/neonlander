@@ -46,9 +46,14 @@ export class EndlessTerrainGenerator {
   private lastAsteroidFieldChunk: number = -15; // Track last asteroid field chunk
   private nextFieldInterval: number = 7; // Random interval for next field (7-10 chunks)
   private asteroidFieldChunkCount: number = 0;
+  private asteroidFieldNumber: number = 0; // Track which field number we're on
 
   constructor(config: EndlessTerrainConfig) {
     this.config = config;
+  }
+
+  setAsteroidFieldNumber(fieldNumber: number) {
+    this.asteroidFieldNumber = fieldNumber;
   }
 
   generateChunk(difficulty: number, isFirstChunk = false): TerrainChunk {
@@ -71,16 +76,27 @@ export class EndlessTerrainGenerator {
       this.nextFieldInterval = 7 + Math.floor(rand() * 4); // 7-10 chunks
       isAsteroidFieldChunk = true;
       asteroidFieldPhase = "entry";
-    } else if (chunksSinceLastField >= 0 && chunksSinceLastField < 6) {
-      // Continue existing asteroid field
+      // Don't increment here - field number tracks in SurvivalEngine
+    } else if (chunksSinceLastField >= 0 && chunksSinceLastField < 2.5 + (this.asteroidFieldNumber * 0.5)) {
+      // Continue existing asteroid field with dynamic length based on field number
+      // Field 0: 2.5 chunks (0.5 entry + 1.5 active + 0.5 exit)
+      // Field 1: 3.0 chunks (0.5 entry + 2.0 active + 0.5 exit)
+      // Field N: 2.5 + N×0.5 chunks
       isAsteroidFieldChunk = true;
-      if (chunksSinceLastField < 2) {
+      
+      // Entry: first 0.5 chunks
+      if (chunksSinceLastField < 0.5) {
         asteroidFieldPhase = "entry";
-      } else if (chunksSinceLastField < 5) {
-        asteroidFieldPhase = "active";
-      } else {
+      } 
+      // Exit: last 0.5 chunks
+      else if (chunksSinceLastField >= 2.0 + (this.asteroidFieldNumber * 0.5)) {
         asteroidFieldPhase = "exit";
       }
+      // Active: everything in between
+      else {
+        asteroidFieldPhase = "active";
+      }
+      
       this.asteroidFieldChunkCount++;
     }
     

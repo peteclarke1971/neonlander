@@ -42,17 +42,24 @@ export interface AsteroidFieldState {
 }
 
 export function initAsteroidField(startX: number, difficulty: number, seed: number, fieldNumber: number = 0): AsteroidFieldState {
-  // Start with half density on first field, then ramp up with 50% compound scaling
-  const baseWidth = 4800;  // Standard width (traversable in 30-45 seconds)
-  const baseInitialCount = 138;  // 6× more asteroids
-  const baseMaxY = 800;  // Height range matching viewport (400 to -400)
+  // Fractional chunk sizing with fixed entry/exit, scaling active
+  const CHUNK_WIDTH = 4000;
+  const entryWidth = CHUNK_WIDTH * 0.5;  // Fixed: 2000 units (0.5 chunks)
+  const exitWidth = CHUNK_WIDTH * 0.5;   // Fixed: 2000 units (0.5 chunks)
+  const activeWidth = CHUNK_WIDTH * (1.5 + fieldNumber * 0.5); // Scales: 6000, 8000, 10000...
+  const totalWidth = entryWidth + activeWidth + exitWidth; // 10000, 12000, 14000...
+  
+  // Asteroid density: reduced base to ⅓ (138 → 46) for shorter 2.5-chunk baseline
+  const baseInitialCount = 46;
+  const baseMaxY = 800;
   
   // First field has 50% density, subsequent fields scale from baseline
   const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
   const scale = Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier;
   
-  const scaledWidth = Math.floor(baseWidth * scale);
-  const scaledInitialCount = Math.floor(baseInitialCount * scale);
+  // Scale by total field width ratio to maintain density
+  const widthScale = totalWidth / 10000; // Relative to baseline 2.5-chunk field
+  const scaledInitialCount = Math.floor(baseInitialCount * scale * widthScale);
   const scaledMaxY = Math.floor(baseMaxY * scale);
   
   const fieldState = {
@@ -60,7 +67,7 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
     phase: "entry" as const,
     phaseTimer: 0,
     startX,
-    endX: startX + scaledWidth,
+    endX: startX + totalWidth,
     asteroids: [] as FieldAsteroid[],
     spawnTimer: 0,
     nextSpawnDelay: 2.0,
@@ -75,7 +82,7 @@ export function initAsteroidField(startX: number, difficulty: number, seed: numb
   // Pre-spawn asteroids to create immediate dense field
   const initialRng = mulberry32(seed);
   for (let i = 0; i < scaledInitialCount; i++) {
-    const x = startX + 100 + initialRng() * (scaledWidth - 200); // Spread across scaled field width
+    const x = startX + 100 + initialRng() * (totalWidth - 200); // Spread across scaled field width
     
     // COORDINATE SYSTEM: Negative Y = above terrain, Positive Y = below terrain
     // Spawn asteroids from just below terrain (y=400) up to top of screen (y=-400)
@@ -137,7 +144,7 @@ export function spawnFieldAsteroid(
   const { difficulty, phase } = state;
   
   // Calculate scaled vertical range based on field number
-  const baseMaxY = 800;  // Updated to match new base
+  const baseMaxY = 800;
   const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
   const scaledMaxY = Math.floor(baseMaxY * Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier);
   
@@ -226,10 +233,14 @@ export function updateAsteroidField(
   // Update phase timer
   state.phaseTimer += dt;
   
-  // Phase transitions based on player position
-  if (state.phase === "entry" && playerX > state.startX + 600) {
+  // Phase transitions based on player position (fractional chunks)
+  const CHUNK_WIDTH = 4000;
+  const entryWidth = CHUNK_WIDTH * 0.5;  // 2000 units
+  const exitWidth = CHUNK_WIDTH * 0.5;   // 2000 units
+  
+  if (state.phase === "entry" && playerX > state.startX + entryWidth) {
     state.phase = "active";
-  } else if (state.phase === "active" && playerX > state.endX - 600) {
+  } else if (state.phase === "active" && playerX > state.endX - exitWidth) {
     state.phase = "exit";
   }
   
@@ -239,7 +250,7 @@ export function updateAsteroidField(
     
     if (state.spawnTimer >= state.nextSpawnDelay) {
       // Scale max asteroids with field number (50% compound growth, half density on first field)
-      const baseInitialCount = 138;  // Updated to match new base
+      const baseInitialCount = 46;  // Updated to match new reduced base
       const baseMaxActive = 300;  // Increased from 90 to support much larger fields
       const firstFieldMultiplier = fieldNumber === 0 ? 0.5 : 1.0;
       const scale = Math.pow(1.5, Math.max(0, fieldNumber - 1)) * firstFieldMultiplier;

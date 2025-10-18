@@ -110,6 +110,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const cometPositionRef = useRef({ x: 0, y: 0, progress: 0 });
   const chunksGeneratedRef = useRef(0);
   const firstCometSpawnedRef = useRef(false);
+  const nextCometBlockRef = useRef(0); // Block number for next comet spawn
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
@@ -664,7 +665,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         if (newChunk.isAsteroidFieldChunk && newChunk.asteroidFieldPhase === "entry" && !asteroidFieldRef.current?.active) {
           const fieldStartX = newChunk.startX;
           const fieldSeed = Date.now() + currentDistance;
+          // Pass current field number and update terrain generator's counter
           asteroidFieldRef.current = initAsteroidField(fieldStartX, difficulty, fieldSeed, asteroidFieldCountRef.current);
+          terrainGen.setAsteroidFieldNumber(asteroidFieldCountRef.current);
           
           // Show HUD warning
           if (!fieldWarningShownRef.current) {
@@ -1039,7 +1042,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           if (!firstCometSpawnedRef.current) {
             // First comet: guaranteed spawn during chunks 5-8
             if (chunksGeneratedRef.current >= 5 && chunksGeneratedRef.current <= 8) {
-              // 10% chance per second during this window (much higher than normal 2%)
+              // 10% chance per second during this window
               if (Math.random() < 0.1 * dt) {
                 cometActiveRef.current = true;
                 setCometActive(true);
@@ -1047,6 +1050,10 @@ export const SurvivalEngine: React.FC<Props> = ({
                 cometTrailAlphaRef.current = 1.0;
                 cometPositionRef.current = { x: 0, y: 0, progress: 0 };
                 firstCometSpawnedRef.current = true;
+                
+                // Set next comet target: 8-16 blocks from now
+                const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
+                nextCometBlockRef.current = chunksGeneratedRef.current + gap;
               }
             }
             // If player somehow reaches chunk 9 without triggering, force spawn
@@ -1057,22 +1064,24 @@ export const SurvivalEngine: React.FC<Props> = ({
               cometTrailAlphaRef.current = 1.0;
               cometPositionRef.current = { x: 0, y: 0, progress: 0 };
               firstCometSpawnedRef.current = true;
+              
+              // Set next comet target
+              const gap = 8 + Math.floor(Math.random() * 9);
+              nextCometBlockRef.current = chunksGeneratedRef.current + gap;
             }
           } else {
-            // Subsequent comets: use existing time-based cooldown system
-            if (cometCooldownRef.current > 0) {
-              cometCooldownRef.current -= dt;
-            }
-            
-            // Random spawn chance when cooldown is ready
-            if (!cometActiveRef.current && cometCooldownRef.current <= 0) {
-              if (Math.random() < 0.02 * dt) {
-                cometActiveRef.current = true;
-                setCometActive(true);
-                cometTimerRef.current = 10.0;
-                cometTrailAlphaRef.current = 1.0;
-                cometPositionRef.current = { x: 0, y: 0, progress: 0 };
-              }
+            // Subsequent comets: block-based spawning
+            if (!cometActiveRef.current && chunksGeneratedRef.current >= nextCometBlockRef.current) {
+              // Spawn comet immediately when we reach the target block
+              cometActiveRef.current = true;
+              setCometActive(true);
+              cometTimerRef.current = 10.0;
+              cometTrailAlphaRef.current = 1.0;
+              cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+              
+              // Set next comet target: 8-16 blocks from now
+              const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
+              nextCometBlockRef.current = chunksGeneratedRef.current + gap;
             }
           }
           
@@ -1084,7 +1093,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             if (cometTimerRef.current <= 0) {
               cometActiveRef.current = false;
               setCometActive(false);
-              cometCooldownRef.current = 45 + Math.random() * 45;
+              // No need for cooldown timer anymore - block counter handles it
             }
           }
           
