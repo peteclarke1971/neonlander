@@ -2066,12 +2066,13 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.translate(shipX, shipY);
         ctx.rotate(shipAngle);
         
-        // Invulnerability flashing effect
+        // Store invulnerability alpha state
+        let shipAlpha = 1;
         if (invulnerableRef.current) {
           const flashFreq = 8; // flashes per second
           const flashPhase = (currentTime * flashFreq) % 1;
           if (flashPhase < 0.5) {
-            ctx.globalAlpha = 0.3; // dim the ship
+            shipAlpha = 0.3; // dim the ship
           }
         }
         
@@ -2102,7 +2103,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           flickerAlpha = 0.4 + flickerPhase * 0.6;
         }
         
-        // Draw fuel fill - clipped to triangle shape
+        // Draw fuel fill - clipped to triangle shape (with isolated alpha)
         if (smoothFuelPercent > 0.01) {
           ctx.save();
           
@@ -2114,7 +2115,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.closePath();
           ctx.clip();
           
-          // Draw fill from bottom up
+          // Draw fill from bottom up with isolated alpha
           ctx.fillStyle = fillColor;
           if (!shouldOptimize) {
             ctx.shadowColor = fillColor;
@@ -2128,8 +2129,8 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.restore();
         }
         
-        // Reset alpha for outline
-        ctx.globalAlpha = invulnerableRef.current ? ctx.globalAlpha : 1;
+        // Set alpha for ship outline
+        ctx.globalAlpha = shipAlpha;
         
         ctx.strokeStyle = neonColor;
         ctx.shadowColor = neonColor;
