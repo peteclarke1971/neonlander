@@ -1371,10 +1371,10 @@ export const SurvivalEngine: React.FC<Props> = ({
                   fireworkTimeoutsRef.current.push(initialTimeout);
                 }
                 setFuel(fuelAmount);
-                // Clear refueling flag after render cycle completes
+                // Clear refueling flag after sufficient time for render and state sync
                 setTimeout(() => {
                   refuelingRef.current = false;
-                }, 50);
+                }, 200); // Increased from 50ms to 200ms for PC timing
                 
                 audio.current.success();
                 
