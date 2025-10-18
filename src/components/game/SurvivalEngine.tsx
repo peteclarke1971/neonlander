@@ -2081,18 +2081,19 @@ export const SurvivalEngine: React.FC<Props> = ({
         const smoothFuelPercent = prevFuelPercentRef.current + (fuelPercent - prevFuelPercentRef.current) * 0.2;
         prevFuelPercentRef.current = smoothFuelPercent;
         
-        // Determine fill color based on fuel level
+        // Determine fill color based on fuel level - bright and vibrant
         let fillColor: string;
-        let fillAlpha: number;
+        const fillAlpha = 0.9; // Constant high alpha for vibrancy
+        
         if (smoothFuelPercent > 0.5) {
-          fillColor = `hsla(180, 100%, 60%, ${smoothFuelPercent * 0.6})`; // Cyan (good)
-          fillAlpha = smoothFuelPercent * 0.6;
+          // Full fuel - bright cyan matching lander/terrain
+          fillColor = `hsla(180, 100%, 50%, ${fillAlpha})`;
         } else if (smoothFuelPercent > 0.25) {
-          fillColor = `hsla(50, 100%, 60%, ${smoothFuelPercent * 0.7})`; // Amber (warning)
-          fillAlpha = smoothFuelPercent * 0.7;
+          // Mid fuel - bright orange
+          fillColor = `hsla(30, 100%, 50%, ${fillAlpha})`;
         } else {
-          fillColor = `hsla(0, 100%, 60%, ${smoothFuelPercent * 0.8})`; // Red (critical)
-          fillAlpha = smoothFuelPercent * 0.8;
+          // Low fuel - bright red
+          fillColor = `hsla(0, 100%, 50%, ${fillAlpha})`;
         }
         
         // Low fuel flicker effect (<15%)
