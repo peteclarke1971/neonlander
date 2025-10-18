@@ -1228,15 +1228,23 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
+          // PRE-LANDING CHECK: Disable explosions if ship is about to land on a pad
+          const shipBottom = shipY + 12;
+          const pad = getPadAt(shipX, shipY);
+          const movingPad = getMovingPadAt(shipX, shipY);
+          const landingPad = pad || movingPad;
+          
+          if (landingPad && !isLanded) {
+            const padY = movingPad ? movingPad.currentPos.y : landingPad.y;
+            // If ship is touching or very close to pad, disable explosions
+            if (shipBottom >= padY - 2) {
+              refuelingRef.current = true;
+            }
+          }
+          
           // Collision detection (only when not landed AND not in takeoff grace period AND not refueling)
           if (!isLanded && takeoffGraceRef.current <= 0 && !refuelingRef.current) {
             let terrainY = getHeightAt(shipX);
-            const shipBottom = shipY + 12;
-            
-            // PRE-CHECK: Look for landing pads using ship center (functions expect shipY, not shipBottom)
-            const pad = getPadAt(shipX, shipY);
-            const movingPad = getMovingPadAt(shipX, shipY);
-            const landingPad = pad || movingPad;
             
             if (shipBottom >= terrainY) {
             // We're touching terrain - check if it's a pad or a crash
@@ -1268,7 +1276,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 setTimerActive(false);
                 
                 // Add fuel refill (consistent throughout the game)
-                refuelingRef.current = true; // Disable explosions during refuel
+                // refuelingRef already set to true before collision detection
                 const refillAmount = 60; // Consistent 60 fuel per landing
                 fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
