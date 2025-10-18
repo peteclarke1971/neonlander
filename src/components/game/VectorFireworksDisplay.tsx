@@ -51,8 +51,9 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     // Initialize fireworks with staggered launch times
     const targetHeight = canvas.height * 0.35; // 35% from top
@@ -116,11 +117,15 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
   }, [paletteColor, onComplete, onSkip, lowGraphics]);
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      <canvas ref={canvasRef} className="w-full h-full" />
+    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 w-full h-full"
+        style={{ background: 'transparent' }}
+      />
       {skipMessage && (
         <div 
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/60 text-sm animate-fade-in cursor-pointer pointer-events-auto"
+          className="absolute bottom-8 text-center text-white/80 text-sm drop-shadow-lg cursor-pointer pointer-events-auto"
           onClick={onSkip}
         >
           Press THRUST to skip
