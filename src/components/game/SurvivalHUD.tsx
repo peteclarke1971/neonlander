@@ -15,6 +15,8 @@ interface Props {
   // Shield state
   shieldActive?: boolean;
   shieldTimer?: number;
+  // Color zone
+  zoneName?: string;
   // Gyroscope controls
   showGyroButton?: boolean;
   gyroActive?: boolean;
@@ -36,6 +38,7 @@ export const SurvivalHUD: React.FC<Props> = ({
   landings,
   shieldActive = false,
   shieldTimer = 0,
+  zoneName,
   showGyroButton = false,
   gyroActive = false,
   gyroPermission = 'pending',
@@ -72,6 +75,13 @@ export const SurvivalHUD: React.FC<Props> = ({
         <div className="mt-3 text-lg font-semibold">
           Score: <span className="text-accent">{score}</span>
         </div>
+        
+        {/* Zone Indicator */}
+        {zoneName && (
+          <div className="mt-2 text-xs text-accent/70 font-mono tracking-wide animate-pulse">
+            {zoneName}
+          </div>
+        )}
         
         {/* Shield Status Badge */}
         {shieldActive && (

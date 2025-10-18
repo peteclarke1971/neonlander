@@ -18,6 +18,7 @@ import { generateHazards, updateHazards, drawHazards, checkHazardCollision, Haza
 import { checkJunkPickup, collectJunk } from "./systems/collectibles";
 import { renderSpaceJunk, generateSparkles, updateSparkles, SparkleEffect } from "./systems/spaceJunkAssets";
 import { initAsteroidField, updateAsteroidField, renderAsteroidField, AsteroidFieldState } from "./systems/asteroidField";
+import { getColorForDistance, DEFAULT_PALETTE, isClassicColorsMode, ColorPalette } from "./systems/colorZones";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -48,6 +49,11 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [landings, setLandings] = useState(0);
   const [score, setScore] = useState(0);
   const [time, setTime] = useState(0);
+  
+  // Color zone state
+  const [currentPalette, setCurrentPalette] = useState<ColorPalette>(DEFAULT_PALETTE);
+  const classicColorsMode = useRef(isClassicColorsMode());
+  const lastPaletteUpdate = useRef(0);
   
   // HUD state
   const [altitude, setAltitude] = useState(0);
@@ -223,7 +229,7 @@ export const SurvivalEngine: React.FC<Props> = ({
     const c = canvasRef.current!;
     const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
-    const neonColor = `hsl(${styles.getPropertyValue('--neon')})`;
+    let neonColor = classicColorsMode.current ? `hsl(${styles.getPropertyValue('--neon')})` : currentPalette.accent;
     
     // Initialize endless terrain generator
     const seed = Math.floor(Math.random() * 1e9);
@@ -1017,6 +1023,16 @@ export const SurvivalEngine: React.FC<Props> = ({
           const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
           currentDistance = newDistance;
           setDistance(currentDistance);
+          
+          // Update color palette based on distance (throttled to every 0.1s)
+          if (!classicColorsMode.current && currentTime - lastPaletteUpdate.current > 0.1) {
+            const newPalette = getColorForDistance(currentDistance);
+            if (newPalette.hue !== currentPalette.hue || newPalette.name !== currentPalette.name) {
+              setCurrentPalette(newPalette);
+              neonColor = newPalette.accent;
+            }
+            lastPaletteUpdate.current = currentTime;
+          }
           
           // Check if we've cleared a pad after takeoff
           if (padToClear) {
@@ -1935,7 +1951,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         const t = p.life / p.max;
         const alpha = 1 - t;
         const size = shouldOptimize ? 1.5 : (3 - t * 2);
-        ctx.fillStyle = `hsla(${styles.getPropertyValue('--neon')}, ${alpha})`;
+        const particleHue = classicColorsMode.current ? styles.getPropertyValue('--neon') : `${currentPalette.hue}, ${currentPalette.saturation}%, ${currentPalette.lightness}%`;
+        ctx.fillStyle = `hsla(${particleHue}, ${alpha})`;
         ctx.shadowColor = neonColor;
         ctx.shadowBlur = shouldOptimize ? 0 : 6;
         ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
@@ -2086,8 +2103,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         const fillAlpha = 0.9; // Constant high alpha for vibrancy
         
         if (smoothFuelPercent > 0.5) {
-          // Full fuel - bright cyan matching lander/terrain
-          fillColor = `hsla(180, 100%, 50%, ${fillAlpha})`;
+          // Full fuel - use current zone color
+          const fuelHue = classicColorsMode.current ? 180 : currentPalette.hue;
+          fillColor = `hsla(${fuelHue}, 100%, 50%, ${fillAlpha})`;
         } else if (smoothFuelPercent > 0.25) {
           // Mid fuel - bright orange
           fillColor = `hsla(30, 100%, 50%, ${fillAlpha})`;
@@ -2260,6 +2278,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         landings={landings}
         shieldActive={shieldActive}
         shieldTimer={shieldTimerRef.current}
+        zoneName={classicColorsMode.current ? undefined : currentPalette.name}
         showGyroButton={isTouch}
         gyroActive={gyroscope.isActive}
         gyroPermission={gyroscope.permission}
