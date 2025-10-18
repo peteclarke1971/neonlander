@@ -15,6 +15,9 @@ interface Props {
   // Shield state
   shieldActive?: boolean;
   shieldTimer?: number;
+  // Comet event state
+  cometActive?: boolean;
+  cometTimer?: number;
   // Color zone
   zoneName?: string;
   // Gyroscope controls
@@ -38,6 +41,8 @@ export const SurvivalHUD: React.FC<Props> = ({
   landings,
   shieldActive = false,
   shieldTimer = 0,
+  cometActive = false,
+  cometTimer = 0,
   zoneName,
   showGyroButton = false,
   gyroActive = false,
@@ -114,6 +119,32 @@ export const SurvivalHUD: React.FC<Props> = ({
                   />
                 </div>
                 <span className="text-xs text-accent/60">{Math.ceil(shieldTimer)}s</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Comet Bonus Badge */}
+        {cometActive && (
+          <div className="mt-2 flex items-center justify-between bg-blue-500/20 border border-blue-400/60 rounded px-2 py-1 animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🌠</span>
+              <span className="text-xs font-bold text-blue-300">
+                COMET BONUS 2×
+              </span>
+            </div>
+            
+            {cometTimer && cometTimer > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1 bg-blue-500/30 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-300 bg-blue-400"
+                    style={{ 
+                      width: `${(cometTimer / 10) * 100}%`
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-blue-300/80">{Math.ceil(cometTimer)}s</span>
               </div>
             )}
           </div>

@@ -101,6 +101,14 @@ export const SurvivalEngine: React.FC<Props> = ({
   const invulnerableTimerRef = useRef(0);
   const INVULNERABLE_DURATION = 0.75; // seconds
   
+  // Comet event state
+  const cometActiveRef = useRef(false);
+  const [cometActive, setCometActive] = useState(false);
+  const cometTimerRef = useRef(0);
+  const cometCooldownRef = useRef(0);
+  const cometTrailAlphaRef = useRef(0);
+  const cometPositionRef = useRef({ x: 0, y: 0, progress: 0 });
+  
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
@@ -290,6 +298,10 @@ export const SurvivalEngine: React.FC<Props> = ({
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
     const debris: Debris[] = [];
+    
+    // Comet dust particles
+    type CometDustParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number };
+    const cometDustParticles: CometDustParticle[] = [];
     
     // Shockwave rings and flash on big explosions
     type Shockwave = { x: number; y: number; life: number; max: number };
@@ -1019,6 +1031,55 @@ export const SurvivalEngine: React.FC<Props> = ({
             if (Math.abs(shipAngularVel) < 0.02) shipAngularVel = 0;
           }
           
+          // Comet event system
+          if (cometCooldownRef.current > 0) {
+            cometCooldownRef.current -= dt;
+          }
+          
+          // Random spawn chance when cooldown is ready
+          if (!cometActiveRef.current && cometCooldownRef.current <= 0) {
+            if (Math.random() < 0.02 * dt) {
+              cometActiveRef.current = true;
+              setCometActive(true);
+              cometTimerRef.current = 10.0;
+              cometTrailAlphaRef.current = 1.0;
+              cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+            }
+          }
+          
+          // Update active comet
+          if (cometActiveRef.current) {
+            cometTimerRef.current -= dt;
+            cometPositionRef.current.progress += dt / 10.0;
+            
+            if (cometTimerRef.current <= 0) {
+              cometActiveRef.current = false;
+              setCometActive(false);
+              cometCooldownRef.current = 45 + Math.random() * 45;
+            }
+          }
+          
+          // Update trail fade-out
+          if (!cometActiveRef.current && cometTrailAlphaRef.current > 0) {
+            cometTrailAlphaRef.current -= dt / 3.0;
+            cometTrailAlphaRef.current = Math.max(0, cometTrailAlphaRef.current);
+          }
+          
+          // Spawn comet dust during event
+          if (cometActiveRef.current && !shouldOptimize) {
+            for (let i = 0; i < 4; i++) {
+              cometDustParticles.push({
+                x: Math.random() * c.width,
+                y: Math.random() * c.height * 0.3,
+                vx: -200 - Math.random() * 100,
+                vy: 50 + Math.random() * 50,
+                life: 0,
+                max: 2 + Math.random() * 1,
+                size: 1 + Math.random() * 2,
+              });
+            }
+          }
+          
           // Update distance (only counts forward progress)
           const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
           currentDistance = newDistance;
@@ -1250,8 +1311,11 @@ export const SurvivalEngine: React.FC<Props> = ({
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
+                  // Apply comet multiplier to all scores
+                  const cometMultiplier = cometActiveRef.current ? 2 : 1;
+                  
                   // Base landing score
-                  let landingScore = 1000 * (landingPad.multiplier || 1);
+                  let landingScore = 1000 * (landingPad.multiplier || 1) * cometMultiplier;
                   
                   // MEGA multiplier for moving pads
                   if (movingPad) {
@@ -1268,15 +1332,20 @@ export const SurvivalEngine: React.FC<Props> = ({
                   
                   const messages: string[] = [];
                   
+                  // Add comet bonus message if active
+                  if (cometMultiplier > 1) {
+                    messages.push("🌠 COMET BONUS 2× 🌠");
+                  }
+                  
                   // Calculate bullseye bonus
                   if (bullseye) {
                     // Increment bullseye streak (cap at 8x)
                     bullseyeStreakRef.current = Math.min(8, bullseyeStreakRef.current + 1);
                     const newStreak = bullseyeStreakRef.current;
                     
-                    const bullseyeBonus = movingPad 
+                    const bullseyeBonus = (movingPad 
                       ? Math.floor(500 * newStreak * (movingPad as MovingPad).scoreMult)
-                      : 500 * newStreak;
+                      : 500 * newStreak) * cometMultiplier;
                     landingScore += bullseyeBonus;
                     
                     const bullseyeMessage = newStreak > 1 
@@ -1295,9 +1364,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                     speedBonusStreakRef.current = Math.min(8, speedBonusStreakRef.current + 1);
                     const newStreak = speedBonusStreakRef.current;
                     
-                    const speedBonusPoints = movingPad 
+                    const speedBonusPoints = (movingPad 
                       ? Math.floor(500 * newStreak * (movingPad as MovingPad).scoreMult)
-                      : 500 * newStreak;
+                      : 500 * newStreak) * cometMultiplier;
                     landingScore += speedBonusPoints;
                     
                     const speedMessage = newStreak > 1
@@ -1664,6 +1733,98 @@ export const SurvivalEngine: React.FC<Props> = ({
       const shake = cameraShake;
       cameraShake *= 0.9;
       
+      // Draw comet trail (if active or fading)
+      if (cometTrailAlphaRef.current > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        const cometProgress = cometPositionRef.current.progress;
+        const trailAlpha = cometTrailAlphaRef.current;
+        
+        // Comet path: diagonal from top-left to bottom-right, screen-space
+        const startX = -c.width * 0.2;
+        const startY = -c.height * 0.3;
+        const endX = c.width * 1.2;
+        const endY = c.height * 0.6;
+        
+        // Current comet head position
+        const cometX = startX + (endX - startX) * cometProgress;
+        const cometY = startY + (endY - startY) * cometProgress;
+        
+        // Draw glowing trail behind comet
+        const trailLength = 400 * dprInit;
+        const gradient = ctx.createLinearGradient(
+          cometX, cometY,
+          cometX - trailLength * 0.5, cometY - trailLength * 0.3
+        );
+        
+        gradient.addColorStop(0, `rgba(220, 240, 255, ${0.9 * trailAlpha})`);
+        gradient.addColorStop(0.3, `rgba(180, 220, 255, ${0.6 * trailAlpha})`);
+        gradient.addColorStop(0.7, `rgba(140, 200, 255, ${0.2 * trailAlpha})`);
+        gradient.addColorStop(1, `rgba(100, 180, 255, 0)`);
+        
+        ctx.shadowColor = 'rgba(180, 220, 255, 0.8)';
+        ctx.shadowBlur = 40 * dprInit;
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 8 * dprInit;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(cometX, cometY);
+        ctx.lineTo(cometX - trailLength * 0.5, cometY - trailLength * 0.3);
+        ctx.stroke();
+        
+        // Draw comet head
+        ctx.shadowBlur = 60 * dprInit;
+        ctx.fillStyle = `rgba(255, 255, 255, ${trailAlpha})`;
+        ctx.beginPath();
+        ctx.arc(cometX, cometY, 12 * dprInit, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Secondary glow halo
+        ctx.shadowBlur = 100 * dprInit;
+        ctx.fillStyle = `rgba(180, 220, 255, ${0.4 * trailAlpha})`;
+        ctx.beginPath();
+        ctx.arc(cometX, cometY, 24 * dprInit, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
+      
+      // Draw comet dust particles
+      if (cometDustParticles.length > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        for (const p of cometDustParticles) {
+          const t = p.life / p.max;
+          const alpha = (1 - t) * 0.4;
+          ctx.fillStyle = `rgba(200, 230, 255, ${alpha})`;
+          ctx.shadowColor = 'rgba(180, 220, 255, 0.6)';
+          ctx.shadowBlur = 4 * dprInit;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * dprInit, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      
+      // Update comet dust particles
+      for (let i = cometDustParticles.length - 1; i >= 0; i--) {
+        const p = cometDustParticles[i];
+        p.life += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        
+        if (p.life >= p.max || p.x < -50 || p.y > c.height + 50) {
+          cometDustParticles.splice(i, 1);
+        }
+      }
+      
+      // Limit dust count
+      if (cometDustParticles.length > 150) {
+        cometDustParticles.splice(0, cometDustParticles.length - 150);
+      }
+      
       // Draw starfield with optimized rendering
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1770,10 +1931,20 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.scale(zoom, zoom);
       ctx.translate(-cameraX + shake, anchor);
       
-      // Draw terrain
-      ctx.strokeStyle = neonColor;
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = shouldOptimize ? 0 : 8;
+      // Draw terrain with comet lighting
+      let terrainColor = neonColor;
+      let shadowIntensity = shouldOptimize ? 0 : 8;
+      
+      if (cometActiveRef.current) {
+        // Blend terrain color toward blue-white during comet
+        const cometInfluence = cometTrailAlphaRef.current;
+        terrainColor = `hsl(200, ${80 * cometInfluence}%, ${75 * cometInfluence + 50 * (1 - cometInfluence)}%)`;
+        shadowIntensity = shouldOptimize ? 0 : 14;
+      }
+      
+      ctx.strokeStyle = terrainColor;
+      ctx.shadowColor = terrainColor;
+      ctx.shadowBlur = shadowIntensity;
       ctx.lineWidth = 2;
       
       for (const chunk of chunks) {
@@ -2202,6 +2373,16 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
+      // Comet screen brightening
+      if (cometActiveRef.current || cometTrailAlphaRef.current > 0) {
+        const brightness = cometTrailAlphaRef.current * 0.15;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = `rgba(180, 220, 255, ${brightness})`;
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.restore();
+      }
+      
       // Draw screen flash effect (white → orange → red gradient fade)
       if (flashT > 0) {
         ctx.save();
@@ -2278,6 +2459,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         landings={landings}
         shieldActive={shieldActive}
         shieldTimer={shieldTimerRef.current}
+        cometActive={cometActive}
+        cometTimer={cometTimerRef.current}
         zoneName={classicColorsMode.current ? undefined : currentPalette.name}
         showGyroButton={isTouch}
         gyroActive={gyroscope.isActive}
