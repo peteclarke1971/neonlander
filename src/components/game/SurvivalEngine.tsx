@@ -1242,8 +1242,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             }
           }
           
-          // Collision detection (only when not landed AND not in takeoff grace period AND not refueling)
-          if (!isLanded && takeoffGraceRef.current <= 0 && !refuelingRef.current) {
+          // Collision detection (only when not landed AND not in takeoff grace period)
+          if (!isLanded && takeoffGraceRef.current <= 0) {
             let terrainY = getHeightAt(shipX);
             
             if (shipBottom >= terrainY) {
@@ -1386,17 +1386,48 @@ export const SurvivalEngine: React.FC<Props> = ({
                 
                 // No auto-takeoff - player must thrust to take off
               } else {
-                // Bad landing
+                // Bad landing - only explode if not refueling
+                if (!refuelingRef.current) {
+                  if (shieldActiveRef.current) {
+                    // Shield saves but landing fails (no refuel)
+                    spawnShieldBreak(shipX, shipY);
+                    shieldActiveRef.current = false;
+                    setShieldActive(false);
+                    audio.current.shieldBreak();
+                    
+                    shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
+                    shipVx *= 0.3;
+                    shipVy = -1;
+                    if (anyGamepad()) vibrate(200, 0.5, 0.8);
+                  } else {
+                    isDead = true;
+                    unlimitedFuelRef.current = false; // Reset cheat on death
+                    spawnExplosion(shipX, shipY);
+                    spawnDebris(shipX, shipY, shipVx, shipVy);
+                    audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
+                    if (anyGamepad()) vibrate(500, 0.8, 1.0);
+                    setTimeout(() => {
+                      onGameOver({
+                        cause: "crash",
+                        distance: currentDistance,
+                        time: currentTime,
+                        score: currentScore,
+                        landings: currentLandings
+                      });
+                    }, 2500);
+                  }
+                }
+              }
+            } else {
+              // Hit terrain - only explode if not refueling
+              if (!refuelingRef.current) {
                 if (shieldActiveRef.current) {
-                  // Shield saves but landing fails (no refuel)
                   spawnShieldBreak(shipX, shipY);
                   shieldActiveRef.current = false;
                   setShieldActive(false);
                   audio.current.shieldBreak();
-                  
-                  shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
-                  shipVx *= 0.3;
-                  shipVy = -1;
+                  shipVx += (Math.random() - 0.5) * 2;
+                  shipVy = -1.5;
                   if (anyGamepad()) vibrate(200, 0.5, 0.8);
                 } else {
                   isDead = true;
@@ -1415,33 +1446,6 @@ export const SurvivalEngine: React.FC<Props> = ({
                     });
                   }, 2500);
                 }
-              }
-            } else {
-              // Hit terrain
-              if (shieldActiveRef.current) {
-                spawnShieldBreak(shipX, shipY);
-                shieldActiveRef.current = false;
-                setShieldActive(false);
-                audio.current.shieldBreak();
-                shipVx += (Math.random() - 0.5) * 2;
-                shipVy = -1.5;
-                if (anyGamepad()) vibrate(200, 0.5, 0.8);
-              } else {
-                isDead = true;
-                unlimitedFuelRef.current = false; // Reset cheat on death
-                spawnExplosion(shipX, shipY);
-                spawnDebris(shipX, shipY, shipVx, shipVy);
-                audio.current.spatialExplosion(shipX, shipY, CHUNK_WIDTH * 10);
-                if (anyGamepad()) vibrate(500, 0.8, 1.0);
-                setTimeout(() => {
-                  onGameOver({
-                    cause: "crash",
-                    distance: currentDistance,
-                    time: currentTime,
-                    score: currentScore,
-                    landings: currentLandings
-                  });
-                }, 2500);
               }
             }
             }
