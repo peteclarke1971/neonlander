@@ -85,8 +85,8 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
       lastTimeRef.current = now;
       const elapsed = (now - startTimeRef.current) / 1000;
 
-      // Clear with fade
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      // Clear with fade (faster clear = less clutter)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Update and render
@@ -172,16 +172,7 @@ function updateVectorLine(line: VectorLine, dt: number) {
   line.x2 = line.x1 + Math.cos(line.rotation) * length;
   line.y2 = line.y1 + Math.sin(line.rotation) * length;
 
-  // Trail (reduced for performance)
-  if (Math.random() < 0.15) {
-    line.trail.push({
-      x1: line.x1, y1: line.y1,
-      x2: line.x2, y2: line.y2,
-      alpha: 0.6
-    });
-    if (line.trail.length > 3) line.trail.shift();
-  }
-  line.trail.forEach(t => t.alpha *= 0.85);
+  // Trails disabled - they create too much clutter
 
   line.life -= dt;
 }
@@ -195,23 +186,20 @@ function renderFirework(ctx: CanvasRenderingContext2D, firework: VectorFirework,
 }
 
 function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics: boolean) {
-  const alpha = Math.min(1, line.life / line.maxLife);
-
-  // Trail (optimized)
-  if (line.trail.length > 0) {
-    line.trail.forEach(t => {
-      if (t.alpha > 0.1) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${t.alpha * 0.2})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(t.x1, t.y1);
-        ctx.lineTo(t.x2, t.y2);
-        ctx.stroke();
-      }
-    });
+  const lifeRatio = line.life / line.maxLife;
+  
+  // Two-phase fade: quick initial fade, then gradual burnout
+  let alpha;
+  if (lifeRatio > 0.85) {
+    // Phase 1: Quick fade of initial shape (first 15% of life = ~0.3s)
+    const fadeProgress = (lifeRatio - 0.85) / 0.15; // 0 to 1
+    alpha = 0.3 + fadeProgress * 0.7; // Fades from 1.0 down to 0.3
+  } else {
+    // Phase 2: Gradual burnout (remaining 85% of life)
+    alpha = (lifeRatio / 0.85) * 0.3; // Fades from 0.3 down to 0
   }
 
-  // Main line (shadow blur removed for performance)
+  // Main line
   ctx.strokeStyle = line.color;
   ctx.globalAlpha = alpha;
   ctx.lineWidth = lowGraphics ? 1.5 : 2;
@@ -263,30 +251,22 @@ function createPolygonChain(x: number, y: number, color: string, scale: number):
 
 function createStarBurst(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
-  const numRays = 8;
-  const innerRadius = 30 * scale;
+  const numRays = 6; // Reduced from 8
   const outerRadius = 80 * scale;
 
   for (let i = 0; i < numRays; i++) {
-    const angle1 = (i / numRays) * Math.PI * 2;
-    const angle2 = ((i + 0.5) / numRays) * Math.PI * 2;
+    const angle = (i / numRays) * Math.PI * 2;
 
-    const x1 = x + Math.cos(angle1) * outerRadius;
-    const y1 = y + Math.sin(angle1) * outerRadius;
-    const x2 = x + Math.cos(angle2) * innerRadius;
-    const y2 = y + Math.sin(angle2) * innerRadius;
+    const x1 = x + Math.cos(angle) * outerRadius;
+    const y1 = y + Math.sin(angle) * outerRadius;
 
-    const centerX = (x1 + x2) / 2;
-    const centerY = (y1 + y2) / 2;
-    const velAngle = Math.atan2(centerY - y, centerX - x);
+    const velAngle = Math.atan2(y1 - y, x1 - x);
     const speed = (200 + Math.random() * 80) * scale;
     const vx = Math.cos(velAngle) * speed;
     const vy = Math.sin(velAngle) * speed;
 
-    lines.push(
-      createLine(x, y, x1, y1, vx, vy, color),
-      createLine(x1, y1, x2, y2, vx, vy, color)
-    );
+    // Only the ray from center to tip (removed connecting lines)
+    lines.push(createLine(x, y, x1, y1, vx, vy, color));
   }
 
   return { type: 'star-burst', x, y, lines, color, active: true };
@@ -294,7 +274,7 @@ function createStarBurst(x: number, y: number, color: string, scale: number): Ve
 
 function createGeometricRose(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
-  const numPetals = 6;
+  const numPetals = 4; // Reduced from 6
   const radius = 70 * scale;
 
   for (let i = 0; i < numPetals; i++) {
@@ -305,22 +285,18 @@ function createGeometricRose(x: number, y: number, color: string, scale: number)
     const y1 = y + Math.sin(angle) * radius;
     const x2 = x + Math.cos(nextAngle) * radius;
     const y2 = y + Math.sin(nextAngle) * radius;
-    
-    const midAngle = (angle + nextAngle) / 2;
-    const x3 = x + Math.cos(midAngle) * radius * 0.4;
-    const y3 = y + Math.sin(midAngle) * radius * 0.4;
 
-    const centerX = (x1 + x2 + x3) / 3;
-    const centerY = (y1 + y2 + y3) / 3;
+    const centerX = (x1 + x2) / 2;
+    const centerY = (y1 + y2) / 2;
     const velAngle = Math.atan2(centerY - y, centerX - x);
     const speed = (120 + Math.random() * 100) * scale;
     const vx = Math.cos(velAngle) * speed;
     const vy = Math.sin(velAngle) * speed;
 
+    // Simplified to 2 lines per petal (removed middle point)
     lines.push(
-      createLine(x1, y1, x3, y3, vx, vy, color),
-      createLine(x3, y3, x2, y2, vx, vy, color),
-      createLine(x2, y2, x, y, vx, vy, color)
+      createLine(x, y, x1, y1, vx, vy, color),
+      createLine(x1, y1, x2, y2, vx, vy, color)
     );
   }
 
@@ -329,10 +305,10 @@ function createGeometricRose(x: number, y: number, color: string, scale: number)
 
 function createHeartCascade(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
-  const numHearts = 4;
+  const numHearts = 2; // Reduced from 4
 
   for (let h = 0; h < numHearts; h++) {
-    const heartScale = 0.6 + h * 0.15;
+    const heartScale = 0.7 + h * 0.2;
     const size = 40 * scale * heartScale;
     const offsetAngle = (h / numHearts) * Math.PI * 2;
     const offsetRadius = 50;
@@ -340,8 +316,8 @@ function createHeartCascade(x: number, y: number, color: string, scale: number):
     const heartY = y + Math.sin(offsetAngle) * offsetRadius;
 
     const points: [number, number][] = [];
-    for (let i = 0; i <= 20; i++) {
-      const t = (i / 20) * Math.PI * 2;
+    for (let i = 0; i <= 10; i++) { // Reduced from 20 to 10 segments
+      const t = (i / 10) * Math.PI * 2;
       const hx = heartX + size * (16 * Math.pow(Math.sin(t), 3));
       const hy = heartY - size * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
       points.push([hx, hy]);
@@ -364,11 +340,10 @@ function createHexagonalHoneycomb(x: number, y: number, color: string, scale: nu
   const lines: VectorLine[] = [];
   const hexSize = 35 * scale;
   const pattern = [
-    [0, 0],
-    [1, 0], [-1, 0],
-    [0.5, 0.866], [-0.5, 0.866],
-    [0.5, -0.866], [-0.5, -0.866]
-  ];
+    [0, 0],      // Center
+    [1, 0],      // Right
+    [-1, 0]      // Left
+  ]; // Reduced from 7 hexagons to 3
 
   pattern.forEach(([px, py]) => {
     const centerX = x + px * hexSize * 1.5;
@@ -402,14 +377,16 @@ function createLine(
   color: string
 ): VectorLine {
   const angle = Math.atan2(y2 - y1, x2 - x1);
+  const lifespan = 1.5 + Math.random() * 1; // Reduced from 3-5s to 1.5-2.5s
   return {
     x1, y1, x2, y2,
     vx: vx + (Math.random() - 0.5) * 40,
     vy: vy + (Math.random() - 0.5) * 40,
     rotation: angle,
-    rotationSpeed: (Math.random() - 0.5) * 3,
-    life: 3 + Math.random() * 2,
-    maxLife: 3 + Math.random() * 2,
+    // 20% chance for dramatic spiral effect
+    rotationSpeed: Math.random() < 0.2 ? (Math.random() - 0.5) * 8 : (Math.random() - 0.5) * 2,
+    life: lifespan,
+    maxLife: lifespan,
     color,
     trail: []
   };
