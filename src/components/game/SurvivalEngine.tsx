@@ -2121,21 +2121,10 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.closePath();
         ctx.clip();
         
-        // Draw fuel gradient
+        // Draw fuel gradient (TEMPORARY: Green only for testing)
         const gradient = ctx.createLinearGradient(0, -10, 0, 10);
-        if (fuelPercent > 0.5) {
-          // Full/high fuel: green gradient
-          gradient.addColorStop(0, 'hsla(120, 100%, 60%, 0.7)');
-          gradient.addColorStop(1, 'hsla(120, 100%, 40%, 0.9)');
-        } else if (fuelPercent > 0.15) {
-          // Medium fuel: amber gradient
-          gradient.addColorStop(0, 'hsla(40, 100%, 60%, 0.7)');
-          gradient.addColorStop(1, 'hsla(40, 100%, 40%, 0.9)');
-        } else {
-          // Low fuel: red gradient (NO FLICKER - temporarily disabled for testing)
-          gradient.addColorStop(0, 'hsla(0, 100%, 60%, 0.7)');
-          gradient.addColorStop(1, 'hsla(0, 100%, 40%, 0.9)');
-        }
+        gradient.addColorStop(0, 'hsla(120, 100%, 60%, 0.7)');
+        gradient.addColorStop(1, 'hsla(120, 100%, 40%, 0.9)');
         
         ctx.fillStyle = gradient;
         ctx.fillRect(-8, fillY, 16, fillHeight);
