@@ -55,12 +55,13 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
     canvas.height = window.innerHeight;
 
     // Initialize fireworks with staggered launch times
+    const targetHeight = canvas.height * 0.35; // 35% from top
     fireworksRef.current = [
-      createPolygonChain(canvas.width / 2, canvas.height, paletteColor, 0),
-      createStarBurst(canvas.width / 3, canvas.height, paletteColor, 0.6),
-      createGeometricRose((canvas.width * 2) / 3, canvas.height, paletteColor, 1.2),
-      createHeartCascade(canvas.width / 2, canvas.height, paletteColor, 1.8),
-      createHexagonalHoneycomb(canvas.width / 2, canvas.height, paletteColor, 2.4)
+      createPolygonChain(canvas.width / 2, canvas.height, targetHeight, paletteColor, 0),
+      createStarBurst(canvas.width / 3, canvas.height, targetHeight, paletteColor, 0.6),
+      createGeometricRose((canvas.width * 2) / 3, canvas.height, targetHeight, paletteColor, 1.2),
+      createHeartCascade(canvas.width / 2, canvas.height, targetHeight, paletteColor, 1.8),
+      createHexagonalHoneycomb(canvas.width / 2, canvas.height, targetHeight, paletteColor, 2.4)
     ];
 
     lastTimeRef.current = performance.now();
@@ -136,7 +137,7 @@ function updateFirework(firework: VectorFirework, dt: number) {
     // Update launch line
     if (firework.launchLine) {
       const line = firework.launchLine;
-      line.rotationCenter.y -= 800 * dt; // Rise upward
+      line.rotationCenter.y -= 1200 * dt; // Rise upward at 1200 px/s
       line.y1 = line.rotationCenter.y - 30;
       line.y2 = line.rotationCenter.y + 30;
       
@@ -146,7 +147,8 @@ function updateFirework(firework: VectorFirework, dt: number) {
       line.trailPoints.forEach(tp => tp.alpha *= 0.85);
     }
 
-    if (firework.stateTimer > 1.0) {
+    // Dynamic duration based on distance to travel
+    if (firework.stateTimer > firework.launchLine!.maxLife) {
       firework.state = 'form';
       firework.stateTimer = 0;
       firework.launchLine = undefined;
@@ -281,8 +283,8 @@ function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics
 
 // Factory functions for the 5 firework types
 
-function createPolygonChain(x: number, y: number, color: string, delay: number): VectorFirework {
-  const launchY = y - 250; // Launch height
+function createPolygonChain(x: number, startY: number, targetY: number, color: string, delay: number): VectorFirework {
+  const launchY = targetY;
   const lines: VectorLine[] = [];
   
   // Create pentagon that will break into 5 triangles
@@ -328,19 +330,19 @@ function createPolygonChain(x: number, y: number, color: string, delay: number):
     lines,
     color,
     launchLine: {
-      x1: x, y1: y, x2: x, y2: y,
-      vx: 0, vy: -800,
-      rotationCenter: { x, y },
+      x1: x, y1: startY, x2: x, y2: startY,
+      vx: 0, vy: -1200,
+      rotationCenter: { x, y: startY },
       rotationSpeed: 0,
-      life: 0, maxLife: 1,
+      life: 0, maxLife: (startY - targetY) / 1200,
       color, glowSize: 12,
       trailPoints: []
     }
   };
 }
 
-function createStarBurst(x: number, y: number, color: string, delay: number): VectorFirework {
-  const launchY = y - 250;
+function createStarBurst(x: number, startY: number, targetY: number, color: string, delay: number): VectorFirework {
+  const launchY = targetY;
   const lines: VectorLine[] = [];
   
   // Create 5-pointed star that breaks into 10 segments
@@ -390,19 +392,19 @@ function createStarBurst(x: number, y: number, color: string, delay: number): Ve
     lines,
     color,
     launchLine: {
-      x1: x, y1: y, x2: x, y2: y,
-      vx: 0, vy: -800,
-      rotationCenter: { x, y },
+      x1: x, y1: startY, x2: x, y2: startY,
+      vx: 0, vy: -1200,
+      rotationCenter: { x, y: startY },
       rotationSpeed: 0,
-      life: 0, maxLife: 1,
+      life: 0, maxLife: (startY - targetY) / 1200,
       color, glowSize: 12,
       trailPoints: []
     }
   };
 }
 
-function createGeometricRose(x: number, y: number, color: string, delay: number): VectorFirework {
-  const launchY = y - 250;
+function createGeometricRose(x: number, startY: number, targetY: number, color: string, delay: number): VectorFirework {
+  const launchY = targetY;
   const lines: VectorLine[] = [];
   
   // Create 3 concentric circles
@@ -439,19 +441,19 @@ function createGeometricRose(x: number, y: number, color: string, delay: number)
     lines,
     color,
     launchLine: {
-      x1: x, y1: y, x2: x, y2: y,
-      vx: 0, vy: -800,
-      rotationCenter: { x, y },
+      x1: x, y1: startY, x2: x, y2: startY,
+      vx: 0, vy: -1200,
+      rotationCenter: { x, y: startY },
       rotationSpeed: 0,
-      life: 0, maxLife: 1,
+      life: 0, maxLife: (startY - targetY) / 1200,
       color, glowSize: 12,
       trailPoints: []
     }
   };
 }
 
-function createHeartCascade(x: number, y: number, color: string, delay: number): VectorFirework {
-  const launchY = y - 250;
+function createHeartCascade(x: number, startY: number, targetY: number, color: string, delay: number): VectorFirework {
+  const launchY = targetY;
   const lines: VectorLine[] = [];
   
   // Create heart shape with line segments
@@ -489,19 +491,19 @@ function createHeartCascade(x: number, y: number, color: string, delay: number):
     lines,
     color,
     launchLine: {
-      x1: x, y1: y, x2: x, y2: y,
-      vx: 0, vy: -800,
-      rotationCenter: { x, y },
+      x1: x, y1: startY, x2: x, y2: startY,
+      vx: 0, vy: -1200,
+      rotationCenter: { x, y: startY },
       rotationSpeed: 0,
-      life: 0, maxLife: 1,
+      life: 0, maxLife: (startY - targetY) / 1200,
       color, glowSize: 12,
       trailPoints: []
     }
   };
 }
 
-function createHexagonalHoneycomb(x: number, y: number, color: string, delay: number): VectorFirework {
-  const launchY = y - 300;
+function createHexagonalHoneycomb(x: number, startY: number, targetY: number, color: string, delay: number): VectorFirework {
+  const launchY = targetY;
   const lines: VectorLine[] = [];
   
   // Create center hexagon + 6 satellite hexagons
@@ -552,11 +554,11 @@ function createHexagonalHoneycomb(x: number, y: number, color: string, delay: nu
     lines,
     color,
     launchLine: {
-      x1: x, y1: y, x2: x, y2: y,
-      vx: 0, vy: -800,
-      rotationCenter: { x, y },
+      x1: x, y1: startY, x2: x, y2: startY,
+      vx: 0, vy: -1200,
+      rotationCenter: { x, y: startY },
       rotationSpeed: 0,
-      life: 0, maxLife: 1,
+      life: 0, maxLife: (startY - targetY) / 1200,
       color, glowSize: 12,
       trailPoints: []
     }
