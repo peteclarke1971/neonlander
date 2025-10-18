@@ -1228,12 +1228,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 timerActiveRef.current = false;
                 setTimerActive(false);
                 
-                // TEMPORARILY DISABLED: Store fuel before refill for visual animation
-                // fuelBeforeLandingRef.current = fuelAmount;
-                
-                // TEMPORARILY DISABLED: Add fuel refill (consistent throughout the game)
-                // const refillAmount = 60; // Consistent 60 fuel per landing
-                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                // Add fuel refill (consistent throughout the game)
+                const refillAmount = 60; // Consistent 60 fuel per landing
+                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
