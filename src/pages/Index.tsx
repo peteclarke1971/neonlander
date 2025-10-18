@@ -504,14 +504,14 @@ const retryGame = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [view, needsInitials, lastResult, goIndex]);
 
-  // Demo timer system - 15 seconds on menu, 15 seconds per demo
+  // Demo timer system - 30 seconds on menu, 15 seconds per demo
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       
       if (view === "home") {
-        // Check if 15 seconds have passed since last interaction
-        if (now - lastInteractionTime > 15000) {
+        // Check if 30 seconds have passed since last interaction
+        if (now - lastInteractionTime > 30000) {
           startDemo(demoSequenceIndex);
         }
       } else if (view === "demo" && demoStartTime) {
