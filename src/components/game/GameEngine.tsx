@@ -2460,6 +2460,14 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               
               // Try to upload to global ghosts
               const initials = localStorage.getItem('ll-player-initials') || 'AAA';
+              console.log('🌍 Attempting to upload global ghost...', {
+                difficulty,
+                level,
+                time: hud.time,
+                initials,
+                frameCount: ghostRecording.length
+              });
+              
               const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
                 difficulty,
                 level,
@@ -2467,6 +2475,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                 ghostRecording,
                 initials
               );
+              
+              console.log('🌍 Upload result:', uploadResult);
+              
+              if (uploadResult.error) {
+                console.error('❌ Failed to upload global ghost:', uploadResult.error);
+              }
               
               if (uploadResult.uploaded && uploadResult.wasRecord) {
                 console.log('🏆 NEW GLOBAL RECORD SET!');
@@ -2505,13 +2519,27 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                 
                 // Try to upload to global ghosts
                 const initials = localStorage.getItem('ll-player-initials') || 'AAA';
-                await ghostManager.current.checkAndUploadGlobalGhost(
+                console.log('🌍 Attempting to upload global ghost (skip)...', {
+                  difficulty,
+                  level,
+                  time: hud.time,
+                  initials,
+                  frameCount: ghostRecording.length
+                });
+                
+                const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
                   difficulty,
                   level,
                   hud.time,
                   ghostRecording,
                   initials
                 );
+                
+                console.log('🌍 Upload result (skip):', uploadResult);
+                
+                if (uploadResult.error) {
+                  console.error('❌ Failed to upload global ghost (skip):', uploadResult.error);
+                }
               }
               if (existingBestTime) {
                 ghostTimeDiff = hud.time - existingBestTime;

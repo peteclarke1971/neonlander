@@ -1,6 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Difficulty, Mode } from "@/components/game/types";
 
+// Diagnostic: Check if Supabase client is properly initialized
+console.log('🔧 Leaderboard module loaded', {
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? '✓' : '❌',
+  supabaseKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? '✓' : '❌',
+  clientInitialized: !!supabase
+});
+
 export type ScoreRow = {
   id?: string;
   initials: string;
@@ -113,6 +120,8 @@ export async function checkGlobalRecord(
   completionTime: number
 ): Promise<{ isRecord: boolean; currentRecord: GlobalGhostRecord | null; error?: string }> {
   try {
+    console.log('🔍 Checking global record...', { level, difficulty, completionTime });
+    
     const { data, error } = await supabase
       .from('ghost_records')
       .select('*')
@@ -120,21 +129,31 @@ export async function checkGlobalRecord(
       .eq('difficulty', difficulty)
       .single();
 
+    console.log('🔍 Supabase query result:', { data, error, errorCode: error?.code });
+
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('Error checking global record:', error);
+      console.error('❌ Database error in checkGlobalRecord:', error);
       return { isRecord: false, currentRecord: null, error: error.message };
     }
 
     // No existing record = new record!
     if (!data) {
+      console.log('✨ No existing record found - this will be a new world record!');
       return { isRecord: true, currentRecord: null };
     }
 
     // Check if new time is faster
     const isRecord = completionTime < data.completion_time;
+    console.log('📊 Existing record comparison:', {
+      existingTime: data.completion_time,
+      newTime: completionTime,
+      isRecord,
+      existingInitials: data.initials
+    });
+    
     return { isRecord, currentRecord: data as GlobalGhostRecord };
   } catch (e: any) {
-    console.error('Error checking global record:', e);
+    console.error('💥 Exception in checkGlobalRecord:', e);
     return { isRecord: false, currentRecord: null, error: e?.message || "Network error" };
   }
 }
@@ -150,6 +169,14 @@ export async function submitGlobalGhost(
   initials: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    console.log('📤 Submitting global ghost...', {
+      level,
+      difficulty,
+      completionTime,
+      initials,
+      dataSize: JSON.stringify(ghostData).length
+    });
+    
     const { error } = await supabase
       .from('ghost_records')
       .upsert({
@@ -163,13 +190,20 @@ export async function submitGlobalGhost(
       });
 
     if (error) {
-      console.error('Error submitting global ghost:', error);
+      console.error('❌ Database error in submitGlobalGhost:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       return { ok: false, error: error.message };
     }
 
+    console.log('✅ Global ghost submitted successfully!');
     return { ok: true };
   } catch (e: any) {
-    console.error('Error submitting global ghost:', e);
+    console.error('💥 Exception in submitGlobalGhost:', e);
     return { ok: false, error: e?.message || "Network error" };
   }
 }

@@ -374,17 +374,25 @@ export class GhostManager {
     initials: string
   ): Promise<{ uploaded: boolean; wasRecord: boolean; error?: string }> {
     try {
+      console.log('📊 checkAndUploadGlobalGhost called', { difficulty, level, completionTime, initials, framesCount: frames.length });
+      
       const { checkGlobalRecord, submitGlobalGhost } = await import('@/lib/leaderboard');
+      console.log('✅ Leaderboard functions imported');
       
       const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, completionTime);
+      console.log('📊 Check global record result:', { isRecord, checkError });
       
       if (checkError) {
+        console.error('❌ checkGlobalRecord error:', checkError);
         return { uploaded: false, wasRecord: false, error: checkError };
       }
       
       if (!isRecord) {
+        console.log('ℹ️ Not a global record (existing time is faster)');
         return { uploaded: false, wasRecord: false };
       }
+      
+      console.log('🎯 This IS a global record! Preparing to upload...');
       
       const recording: GhostRecording = {
         frames,
@@ -394,6 +402,13 @@ export class GhostManager {
         gameType: "lunar-lander"
       };
       
+      console.log('📦 Ghost recording prepared:', {
+        framesCount: frames.length,
+        completionTime,
+        level,
+        dataSize: JSON.stringify(recording).length
+      });
+      
       const { ok, error: submitError } = await submitGlobalGhost(
         level,
         difficulty,
@@ -402,14 +417,17 @@ export class GhostManager {
         initials
       );
       
+      console.log('📤 Submit result:', { ok, submitError });
+      
       if (!ok) {
+        console.error('❌ submitGlobalGhost error:', submitError);
         return { uploaded: false, wasRecord: true, error: submitError };
       }
       
       console.log(`🌍 New global record uploaded for level ${level}!`);
       return { uploaded: true, wasRecord: true };
     } catch (e: any) {
-      console.error('Error checking/uploading global ghost:', e);
+      console.error('💥 Exception in checkAndUploadGlobalGhost:', e);
       return { uploaded: false, wasRecord: false, error: e?.message || "Unknown error" };
     }
   }
