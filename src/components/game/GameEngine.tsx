@@ -2449,101 +2449,170 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           landingType={landingType}
           neonColor={neonColor}
         onComplete={async () => {
+          console.log('🎯 FireworksDisplay onComplete called', {
+            mode,
+            hasGhostRecording: ghostRecording.length > 0,
+            difficulty,
+            level
+          });
+          
           // Check if this is a new best time and save ghost
           let isNewBestTime = false;
           let ghostTimeDiff: number | undefined;
+          
           if (mode === "fixed" && ghostRecording.length > 0) {
-            const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
-            if (!existingBestTime || hud.time < existingBestTime) {
-              isNewBestTime = true;
-              ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
-              
-              // Try to upload to global ghosts
-              const initials = localStorage.getItem('ll-player-initials') || '';
-              console.log('🌍 Attempting to upload global ghost...', {
-                difficulty,
-                level,
-                time: hud.time,
-                initials,
-                frameCount: ghostRecording.length
+            try {
+              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+              console.log('🕐 Best time check:', {
+                existingBestTime,
+                currentTime: hud.time,
+                isNewBest: !existingBestTime || hud.time < existingBestTime
               });
               
-              const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
-                difficulty,
-                level,
-                hud.time,
-                ghostRecording,
-                initials
-              );
-              
-              console.log('🌍 Upload result:', uploadResult);
-              
-              if (uploadResult.error) {
-                console.error('❌ Failed to upload global ghost:', uploadResult.error);
-              }
-              
-              if (uploadResult.uploaded && uploadResult.wasRecord) {
-                console.log('🏆 NEW GLOBAL RECORD SET!');
-              }
-            }
-            if (existingBestTime) {
-              ghostTimeDiff = hud.time - existingBestTime;
-            }
-          }
-          
-            onGameOver({ 
-              score: hud.score, 
-              landings: currentLandings, 
-              cause: "success", 
-              difficulty, 
-              elapsed: hud.time,
-              levelSeed: hud.levelSeed,
-              level,
-              isNewBestTime,
-              ghostTimeDiff,
-              lastEarned: lastLandingBonuses.lastEarned,
-              padBonus2x: lastLandingBonuses.padBonus2x,
-              bullseye: lastLandingBonuses.bullseye,
-              speedBonus: lastLandingBonuses.speedBonus
-            });
-        }}
-          onSkip={async () => {
-            // Check if this is a new best time and save ghost
-            let isNewBestTime = false;
-            let ghostTimeDiff: number | undefined;
-            if (mode === "fixed" && ghostRecording.length > 0) {
-              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
               if (!existingBestTime || hud.time < existingBestTime) {
                 isNewBestTime = true;
                 ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+                console.log('💾 Local ghost saved');
                 
                 // Try to upload to global ghosts
-                const initials = localStorage.getItem('ll-player-initials') || '';
-                console.log('🌍 Attempting to upload global ghost (skip)...', {
-                  difficulty,
-                  level,
-                  time: hud.time,
-                  initials,
-                  frameCount: ghostRecording.length
-                });
-                
-                const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
-                  difficulty,
-                  level,
-                  hud.time,
-                  ghostRecording,
-                  initials
-                );
-                
-                console.log('🌍 Upload result (skip):', uploadResult);
-                
-                if (uploadResult.error) {
-                  console.error('❌ Failed to upload global ghost (skip):', uploadResult.error);
+                try {
+                  const initials = localStorage.getItem('ll-player-initials') || '';
+                  console.log('🌍 Attempting to upload global ghost...', {
+                    difficulty,
+                    level,
+                    time: hud.time,
+                    initials: initials || '(empty)',
+                    frameCount: ghostRecording.length
+                  });
+                  
+                  const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
+                    difficulty,
+                    level,
+                    hud.time,
+                    ghostRecording,
+                    initials
+                  );
+                  
+                  console.log('🌍 Upload result:', uploadResult);
+                  
+                  if (uploadResult.error) {
+                    console.error('❌ Failed to upload global ghost:', uploadResult.error);
+                  }
+                  
+                  if (uploadResult.uploaded && uploadResult.wasRecord) {
+                    console.log('🏆 NEW GLOBAL RECORD SET!');
+                    // TODO: Set a flag to show world record message in UI
+                  }
+                } catch (uploadError) {
+                  console.error('💥 Exception during global ghost upload:', uploadError);
                 }
+              } else {
+                console.log('⏱️ Not a new best time, skipping ghost save');
               }
+              
               if (existingBestTime) {
                 ghostTimeDiff = hud.time - existingBestTime;
               }
+            } catch (ghostError) {
+              console.error('💥 Exception during ghost processing:', ghostError);
+            }
+          } else {
+            console.log('❌ Skipping ghost logic:', {
+              mode,
+              modeIsFixed: mode === "fixed",
+              hasRecording: ghostRecording.length > 0
+            });
+          }
+          
+          onGameOver({ 
+            score: hud.score, 
+            landings: currentLandings, 
+            cause: "success", 
+            difficulty, 
+            elapsed: hud.time,
+            levelSeed: hud.levelSeed,
+            level,
+            isNewBestTime,
+            ghostTimeDiff,
+            lastEarned: lastLandingBonuses.lastEarned,
+            padBonus2x: lastLandingBonuses.padBonus2x,
+            bullseye: lastLandingBonuses.bullseye,
+            speedBonus: lastLandingBonuses.speedBonus
+          });
+        }}
+          onSkip={async () => {
+            console.log('⏭️ FireworksDisplay onSkip called', {
+              mode,
+              hasGhostRecording: ghostRecording.length > 0,
+              difficulty,
+              level
+            });
+            
+            // Check if this is a new best time and save ghost
+            let isNewBestTime = false;
+            let ghostTimeDiff: number | undefined;
+            
+            if (mode === "fixed" && ghostRecording.length > 0) {
+              try {
+                const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+                console.log('🕐 Best time check (skip):', {
+                  existingBestTime,
+                  currentTime: hud.time,
+                  isNewBest: !existingBestTime || hud.time < existingBestTime
+                });
+                
+                if (!existingBestTime || hud.time < existingBestTime) {
+                  isNewBestTime = true;
+                  ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+                  console.log('💾 Local ghost saved (skip)');
+                  
+                  // Try to upload to global ghosts
+                  try {
+                    const initials = localStorage.getItem('ll-player-initials') || '';
+                    console.log('🌍 Attempting to upload global ghost (skip)...', {
+                      difficulty,
+                      level,
+                      time: hud.time,
+                      initials: initials || '(empty)',
+                      frameCount: ghostRecording.length
+                    });
+                    
+                    const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
+                      difficulty,
+                      level,
+                      hud.time,
+                      ghostRecording,
+                      initials
+                    );
+                    
+                    console.log('🌍 Upload result (skip):', uploadResult);
+                    
+                    if (uploadResult.error) {
+                      console.error('❌ Failed to upload global ghost (skip):', uploadResult.error);
+                    }
+                    
+                    if (uploadResult.uploaded && uploadResult.wasRecord) {
+                      console.log('🏆 NEW GLOBAL RECORD SET (skip)!');
+                    }
+                  } catch (uploadError) {
+                    console.error('💥 Exception during global ghost upload (skip):', uploadError);
+                  }
+                } else {
+                  console.log('⏱️ Not a new best time (skip), skipping ghost save');
+                }
+                
+                if (existingBestTime) {
+                  ghostTimeDiff = hud.time - existingBestTime;
+                }
+              } catch (ghostError) {
+                console.error('💥 Exception during ghost processing (skip):', ghostError);
+              }
+            } else {
+              console.log('❌ Skipping ghost logic (skip):', {
+                mode,
+                modeIsFixed: mode === "fixed",
+                hasRecording: ghostRecording.length > 0
+              });
             }
             
             onGameOver({ 
