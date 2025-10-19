@@ -72,7 +72,7 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
       setTimeout(() => {
         const factory = factoryMap[config.pattern];
         fireworksRef.current.push(
-          factory(config.x, canvas.height, config.targetY, paletteColor)
+          factory(config.x, config.targetY, paletteColor)
         );
       }, config.delay);
     });
@@ -151,92 +151,36 @@ export const VectorFireworksDisplay = ({ paletteColor, onComplete, onSkip, lowGr
 };
 
 function updateFirework(firework: VectorFirework, dt: number) {
-  const elapsed = (Date.now() - firework.launchTime) / 1000;
-
-  // STAGE 1: Launch phase (0-0.8 seconds)
-  if (firework.launchPhase && elapsed < 0.8) {
-    const launchLine = firework.lines[0];
-    if (launchLine) {
-      launchLine.x += launchLine.vx * dt * 60;
-      launchLine.y += launchLine.vy * dt * 60;
-      
-      firework.x = launchLine.x;
-      firework.y = launchLine.y;
-      
-      // Check if reached target
-      if (launchLine.y <= firework.targetY || elapsed >= 0.8) {
-        triggerBurst(firework);
-      }
-    }
-  }
+  let anyAlive = false;
   
-  // STAGE 2: Burst phase (after 0.8s)
-  else if (!firework.launchPhase) {
-    let anyAlive = false;
-    
-    firework.lines.forEach(line => {
-      if (line.type === 'burst' && line.life > 0) {
-        // Apply velocity
-        line.x += line.vx * dt * 60;
-        line.y += line.vy * dt * 60;
-        
-        // Apply gravity
-        line.vy += 0.2 * dt * 60;
-        
-        // Apply air resistance
-        line.vx *= 0.998;
-        line.vy *= 0.998;
-        
-        // Update rotation for tumbling effect
-        line.rotation += line.rotationSpeed * dt;
-        
-        // Decay life
-        line.life -= dt;
-        
-        if (line.life > 0) anyAlive = true;
-      }
-    });
-    
-    if (!anyAlive) {
-      firework.active = false;
+  firework.lines.forEach(line => {
+    if (line.life > 0) {
+      // Apply velocity
+      line.x += line.vx * dt * 60;
+      line.y += line.vy * dt * 60;
+      
+      // Apply gravity
+      line.vy += 0.2 * dt * 60;
+      
+      // Apply air resistance
+      line.vx *= 0.998;
+      line.vy *= 0.998;
+      
+      // Update rotation
+      line.rotation += line.rotationSpeed * dt;
+      
+      // Decay life (frame-based)
+      line.life -= 1;
+      
+      if (line.life > 0) anyAlive = true;
     }
+  });
+  
+  if (!anyAlive) {
+    firework.active = false;
   }
 }
 
-function triggerBurst(firework: VectorFirework) {
-  firework.launchPhase = false;
-  firework.burstTime = Date.now();
-  
-  // Remove launch comet line
-  firework.lines = [];
-  
-  // Generate 100-120 burst lines INSTANTLY
-  const numLines = 100 + Math.floor(Math.random() * 20);
-  
-  for (let i = 0; i < numLines; i++) {
-    // TRULY RANDOM 360° angle
-    const angle = Math.random() * Math.PI * 2;
-    
-    // Random speed (3-7 pixels/frame, matching particle version)
-    const speed = 3 + Math.random() * 4;
-    
-    const line: VectorLine = {
-      x: firework.x,
-      y: firework.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      rotation: angle,
-      rotationSpeed: (Math.random() - 0.5) * 0.2,
-      life: 1.5 + Math.random() * 1.0,
-      maxLife: 1.5 + Math.random() * 1.0,
-      color: firework.color,
-      length: 15 + Math.random() * 10,
-      type: 'burst'
-    };
-    
-    firework.lines.push(line);
-  }
-}
 
 function renderFirework(ctx: CanvasRenderingContext2D, firework: VectorFirework, lowGraphics: boolean) {
   firework.lines.forEach(line => {
@@ -269,167 +213,196 @@ function renderFirework(ctx: CanvasRenderingContext2D, firework: VectorFirework,
 
 // Factory functions - create fireworks with launch comets
 
-function createPolygonChain(startX: number, startY: number, targetY: number, color: string): VectorFirework {
+function createPolygonChain(startX: number, targetY: number, color: string): VectorFirework {
   const lines: VectorLine[] = [];
   
-  // Create single launch comet line
-  const launchLine: VectorLine = {
-    x: startX,
-    y: startY,
-    vx: 0,
-    vy: -(startY - targetY) / 50,
-    rotation: -Math.PI / 2,
-    rotationSpeed: 0,
-    life: 50,
-    maxLife: 50,
-    color,
-    length: 20,
-    type: 'launch'
-  };
+  // Generate 100-120 burst lines instantly at target position
+  const numLines = 100 + Math.floor(Math.random() * 20);
   
-  lines.push(launchLine);
+  for (let i = 0; i < numLines; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 4;
+    
+    lines.push({
+      x: startX,
+      y: targetY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: angle,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+      life: 120 + Math.random() * 60,
+      maxLife: 120 + Math.random() * 60,
+      color,
+      length: 15 + Math.random() * 10,
+      type: 'burst'
+    });
+  }
   
   return {
     type: 'polygon-chain',
     x: startX,
-    y: startY,
+    y: targetY,
     targetY,
     lines,
-    launchPhase: true,
+    launchPhase: false,
     launchTime: Date.now(),
-    burstTime: null,
+    burstTime: Date.now(),
     color,
     active: true
   };
 }
 
-function createStarBurst(startX: number, startY: number, targetY: number, color: string): VectorFirework {
+function createStarBurst(startX: number, targetY: number, color: string): VectorFirework {
   const lines: VectorLine[] = [];
   
-  const launchLine: VectorLine = {
-    x: startX,
-    y: startY,
-    vx: 0,
-    vy: -(startY - targetY) / 50,
-    rotation: -Math.PI / 2,
-    rotationSpeed: 0,
-    life: 50,
-    maxLife: 50,
-    color,
-    length: 20,
-    type: 'launch'
-  };
+  // Generate 100-120 burst lines instantly at target position
+  const numLines = 100 + Math.floor(Math.random() * 20);
   
-  lines.push(launchLine);
+  for (let i = 0; i < numLines; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 4;
+    
+    lines.push({
+      x: startX,
+      y: targetY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: angle,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+      life: 120 + Math.random() * 60,
+      maxLife: 120 + Math.random() * 60,
+      color,
+      length: 15 + Math.random() * 10,
+      type: 'burst'
+    });
+  }
   
   return {
     type: 'star-burst',
     x: startX,
-    y: startY,
+    y: targetY,
     targetY,
     lines,
-    launchPhase: true,
+    launchPhase: false,
     launchTime: Date.now(),
-    burstTime: null,
+    burstTime: Date.now(),
     color,
     active: true
   };
 }
 
-function createGeometricRose(startX: number, startY: number, targetY: number, color: string): VectorFirework {
+function createGeometricRose(startX: number, targetY: number, color: string): VectorFirework {
   const lines: VectorLine[] = [];
   
-  const launchLine: VectorLine = {
-    x: startX,
-    y: startY,
-    vx: 0,
-    vy: -(startY - targetY) / 50,
-    rotation: -Math.PI / 2,
-    rotationSpeed: 0,
-    life: 50,
-    maxLife: 50,
-    color,
-    length: 20,
-    type: 'launch'
-  };
+  // Generate 100-120 burst lines instantly at target position
+  const numLines = 100 + Math.floor(Math.random() * 20);
   
-  lines.push(launchLine);
+  for (let i = 0; i < numLines; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 4;
+    
+    lines.push({
+      x: startX,
+      y: targetY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: angle,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+      life: 120 + Math.random() * 60,
+      maxLife: 120 + Math.random() * 60,
+      color,
+      length: 15 + Math.random() * 10,
+      type: 'burst'
+    });
+  }
   
   return {
     type: 'geometric-rose',
     x: startX,
-    y: startY,
+    y: targetY,
     targetY,
     lines,
-    launchPhase: true,
+    launchPhase: false,
     launchTime: Date.now(),
-    burstTime: null,
+    burstTime: Date.now(),
     color,
     active: true
   };
 }
 
-function createHeartCascade(startX: number, startY: number, targetY: number, color: string): VectorFirework {
+function createHeartCascade(startX: number, targetY: number, color: string): VectorFirework {
   const lines: VectorLine[] = [];
   
-  const launchLine: VectorLine = {
-    x: startX,
-    y: startY,
-    vx: 0,
-    vy: -(startY - targetY) / 50,
-    rotation: -Math.PI / 2,
-    rotationSpeed: 0,
-    life: 50,
-    maxLife: 50,
-    color,
-    length: 20,
-    type: 'launch'
-  };
+  // Generate 100-120 burst lines instantly at target position
+  const numLines = 100 + Math.floor(Math.random() * 20);
   
-  lines.push(launchLine);
+  for (let i = 0; i < numLines; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 4;
+    
+    lines.push({
+      x: startX,
+      y: targetY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: angle,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+      life: 120 + Math.random() * 60,
+      maxLife: 120 + Math.random() * 60,
+      color,
+      length: 15 + Math.random() * 10,
+      type: 'burst'
+    });
+  }
   
   return {
     type: 'heart-cascade',
     x: startX,
-    y: startY,
+    y: targetY,
     targetY,
     lines,
-    launchPhase: true,
+    launchPhase: false,
     launchTime: Date.now(),
-    burstTime: null,
+    burstTime: Date.now(),
     color,
     active: true
   };
 }
 
-function createHexagonalHoneycomb(startX: number, startY: number, targetY: number, color: string): VectorFirework {
+function createHexagonalHoneycomb(startX: number, targetY: number, color: string): VectorFirework {
   const lines: VectorLine[] = [];
   
-  const launchLine: VectorLine = {
-    x: startX,
-    y: startY,
-    vx: 0,
-    vy: -(startY - targetY) / 50,
-    rotation: -Math.PI / 2,
-    rotationSpeed: 0,
-    life: 50,
-    maxLife: 50,
-    color,
-    length: 20,
-    type: 'launch'
-  };
+  // Generate 100-120 burst lines instantly at target position
+  const numLines = 100 + Math.floor(Math.random() * 20);
   
-  lines.push(launchLine);
+  for (let i = 0; i < numLines; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 4;
+    
+    lines.push({
+      x: startX,
+      y: targetY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: angle,
+      rotationSpeed: (Math.random() - 0.5) * 0.2,
+      life: 120 + Math.random() * 60,
+      maxLife: 120 + Math.random() * 60,
+      color,
+      length: 15 + Math.random() * 10,
+      type: 'burst'
+    });
+  }
   
   return {
     type: 'hexagonal-honeycomb',
     x: startX,
-    y: startY,
+    y: targetY,
     targetY,
     lines,
-    launchPhase: true,
+    launchPhase: false,
     launchTime: Date.now(),
-    burstTime: null,
+    burstTime: Date.now(),
     color,
     active: true
   };
