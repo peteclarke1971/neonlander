@@ -802,39 +802,37 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     // Different show types based on landing
     let launchCount: number, patterns: string[], timing: number;
     
-    // If fireworkCount is provided (survival mode), use that
-    if (fireworkCount !== undefined) {
+    // PRIORITY 1: Check for special landing types first (retro-burst, ghost-beaten)
+    if (landingType === 'retro-burst') {
+      launchCount = 12;
+      patterns = ['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'];
+      timing = 250;
+    } else if (landingType === 'ghost-beaten') {
+      launchCount = 4;
+      patterns = ['giant-ghost', 'giant-ghost', 'giant-ghost', 'giant-ghost'];
+      timing = 500;
+    } else if (fireworkCount !== undefined) {
+      // PRIORITY 2: Use fireworkCount for survival mode (regular landings)
       launchCount = fireworkCount;
       patterns = ['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'];
       timing = 300;
     } else {
-      // Original logic for main game
+      // PRIORITY 3: Use landingType for main game mode
       switch (landingType) {
-      case 'retro-burst':
-        launchCount = 12;
-        patterns = ['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'];
-        timing = 250;
-        break;
-      case 'ghost-beaten':
-        // Four giant ghost fireworks display
-        launchCount = 4;
-        patterns = ['giant-ghost', 'giant-ghost', 'giant-ghost', 'giant-ghost'];
-        timing = 500;
-        break;
-      case '2x':
-        launchCount = 12;
-        patterns = ['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'];
-        timing = 150;
-        break;
-      case 'moving':
-        launchCount = 10;
-        patterns = ['willow', 'chrysanthemum', 'crossette', 'starburst'];
-        timing = 180;
-        break;
-      default:
-        launchCount = 8;
-        patterns = ['starburst', 'willow', 'star'];
-        timing = 200;
+        case '2x':
+          launchCount = 12;
+          patterns = ['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'];
+          timing = 150;
+          break;
+        case 'moving':
+          launchCount = 10;
+          patterns = ['willow', 'chrysanthemum', 'crossette', 'starburst'];
+          timing = 180;
+          break;
+        default:
+          launchCount = 8;
+          patterns = ['starburst', 'willow', 'star'];
+          timing = 200;
       }
     }
     
