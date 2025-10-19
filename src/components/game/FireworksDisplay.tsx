@@ -13,7 +13,7 @@ interface FireworkParticle {
   color: string;
   secondaryColor?: string;
   type: 'launch' | 'burst' | 'glitter' | 'crackle' | 'comet' | 'secondary';
-  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak' | 'ghost';
+  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak' | 'ghost' | 'pentagon' | 'triangle' | 'line' | 'hexagon' | 'ship';
   size: number;
   gravity: boolean;
   rotation: number;
@@ -23,10 +23,13 @@ interface FireworkParticle {
   colorTransition: boolean;
   magneticTarget?: {x: number, y: number};
   parentId?: string;
+  vertices?: Array<{x: number, y: number}>;
+  lineSegments?: Array<{x1: number, y1: number, x2: number, y2: number}>;
+  shipScale?: number;
 }
 
 interface FireworksDisplayProps {
-  landingType: 'regular' | 'moving' | '2x' | 'ghost-beaten' | null;
+  landingType: 'regular' | 'moving' | '2x' | 'ghost-beaten' | 'retro-burst' | null;
   neonColor: string;
   onComplete: () => void;
   onSkip: () => void;
@@ -47,6 +50,7 @@ const createPooledParticle = (): PooledFireworkParticle => ({
     this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.life = 0; this.max = 0;
     this.color = ''; this.trail = []; this.colorTransition = false;
     delete this.secondaryColor; delete this.magneticTarget; delete this.parentId;
+    delete this.vertices; delete this.lineSegments; delete this.shipScale;
   }
 });
 
@@ -95,6 +99,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   // Enhanced color schemes with gradients and transitions
   const getColors = useCallback(() => {
     switch (landingType) {
+      case 'retro-burst':
+        return {
+          primary: [neonColor],
+          secondary: [neonColor],
+          glitter: [neonColor, '#FFFFFF']
+        };
       case 'ghost-beaten':
         return {
           primary: ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500', '#FFFFFF'], // Classic Pac-Man ghost colors
@@ -410,6 +420,298 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         }
         break;
         
+      case 'pentagon-shatter':
+        console.log('⬟ Creating PENTAGON SHATTER pattern');
+        const pentagonRadius = 80;
+        
+        // Create initial pentagon outline (5 sides)
+        for (let i = 0; i < 5; i++) {
+          const angle1 = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          const angle2 = ((i + 1) / 5) * Math.PI * 2 - Math.PI / 2;
+          const x1 = Math.cos(angle1) * pentagonRadius;
+          const y1 = Math.sin(angle1) * pentagonRadius;
+          const x2 = Math.cos(angle2) * pentagonRadius;
+          const y2 = Math.sin(angle2) * pentagonRadius;
+          
+          newParticles.push(createParticle(0, 0, {
+            shape: 'line',
+            color: neonColor,
+            lineSegments: [{x1, y1, x2, y2}],
+            vx: 0, vy: 0,
+            size: 3,
+            glowSize: 8,
+            life: 180,
+            max: 180
+          }));
+        }
+        
+        // After 500ms, explode into triangles
+        setTimeout(() => {
+          const triangles: FireworkParticle[] = [];
+          for (let i = 0; i < 15; i++) {
+            const angle = (i / 15) * Math.PI * 2;
+            const speed = 3 + Math.random() * 4;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            
+            const triSize = 15 + Math.random() * 10;
+            const vertices = [
+              {x: 0, y: -triSize},
+              {x: triSize * 0.866, y: triSize * 0.5},
+              {x: -triSize * 0.866, y: triSize * 0.5}
+            ];
+            
+            triangles.push(createParticle(vx, vy, {
+              shape: 'triangle',
+              color: neonColor,
+              vertices,
+              size: triSize,
+              glowSize: 6,
+              rotationSpeed: (Math.random() - 0.5) * 0.4,
+              gravity: true
+            }));
+          }
+          setParticles(prev => [...prev, ...triangles]);
+        }, 500);
+        break;
+        
+      case 'star-constellation':
+        console.log('✨ Creating STAR CONSTELLATION pattern');
+        
+        const starPoints = 5;
+        const outerRadius = 70;
+        const innerRadius = 30;
+        
+        // Draw star outline as connected line segments
+        const starLines: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
+        for (let i = 0; i < starPoints * 2; i++) {
+          const angle1 = (i / (starPoints * 2)) * Math.PI * 2 - Math.PI / 2;
+          const angle2 = ((i + 1) / (starPoints * 2)) * Math.PI * 2 - Math.PI / 2;
+          const r1 = i % 2 === 0 ? outerRadius : innerRadius;
+          const r2 = (i + 1) % 2 === 0 ? outerRadius : innerRadius;
+          
+          starLines.push({
+            x1: Math.cos(angle1) * r1,
+            y1: Math.sin(angle1) * r1,
+            x2: Math.cos(angle2) * r2,
+            y2: Math.sin(angle2) * r2
+          });
+        }
+        
+        // Each line segment becomes an independent particle
+        setTimeout(() => {
+          const starSegments: FireworkParticle[] = [];
+          starLines.forEach((segment) => {
+            const angle = Math.atan2(segment.y2 - segment.y1, segment.x2 - segment.x1);
+            const speed = 2 + Math.random() * 3;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            
+            starSegments.push(createParticle(vx, vy, {
+              shape: 'line',
+              color: neonColor,
+              lineSegments: [segment],
+              size: 3,
+              glowSize: 10,
+              rotationSpeed: (Math.random() - 0.5) * 0.3,
+              gravity: true,
+              life: 150 + Math.random() * 30,
+              max: 150 + Math.random() * 30
+            }));
+          });
+          setParticles(prev => [...prev, ...starSegments]);
+        }, 400);
+        break;
+        
+      case 'geometric-rose':
+        console.log('🌹 Creating GEOMETRIC ROSE pattern');
+        
+        const numRings = 5;
+        const petalSegments = 12;
+        
+        for (let ring = 0; ring < numRings; ring++) {
+          const ringRadius = 20 + ring * 25;
+          const ringDelay = ring * 150;
+          
+          setTimeout(() => {
+            const ringParticles: FireworkParticle[] = [];
+            for (let i = 0; i < petalSegments; i++) {
+              const angle1 = (i / petalSegments) * Math.PI * 2;
+              const angle2 = ((i + 1) / petalSegments) * Math.PI * 2;
+              
+              const x1 = Math.cos(angle1) * ringRadius;
+              const y1 = Math.sin(angle1) * ringRadius;
+              const x2 = Math.cos(angle2) * ringRadius;
+              const y2 = Math.sin(angle2) * ringRadius;
+              
+              const segmentAngle = (angle1 + angle2) / 2;
+              const speed = 1.5 + ring * 0.5;
+              const vx = Math.cos(segmentAngle) * speed;
+              const vy = Math.sin(segmentAngle) * speed;
+              
+              ringParticles.push(createParticle(vx, vy, {
+                shape: 'line',
+                color: neonColor,
+                lineSegments: [{x1, y1, x2, y2}],
+                size: 4,
+                glowSize: 8,
+                rotationSpeed: 0.05,
+                gravity: false,
+                life: 180,
+                max: 180
+              }));
+            }
+            setParticles(prev => [...prev, ...ringParticles]);
+          }, ringDelay);
+        }
+        break;
+        
+      case 'vector-heart':
+        console.log('💚 Creating VECTOR HEART pattern');
+        
+        const heartSegments = 40;
+        const heartScale = 50;
+        
+        for (let i = 0; i < heartSegments; i++) {
+          const t1 = (i / heartSegments) * Math.PI * 2;
+          const t2 = ((i + 1) / heartSegments) * Math.PI * 2;
+          
+          // Parametric heart equations
+          const x1 = 16 * Math.pow(Math.sin(t1), 3) * heartScale / 16;
+          const y1 = -(13 * Math.cos(t1) - 5 * Math.cos(2*t1) - 2 * Math.cos(3*t1) - Math.cos(4*t1)) * heartScale / 16;
+          const x2 = 16 * Math.pow(Math.sin(t2), 3) * heartScale / 16;
+          const y2 = -(13 * Math.cos(t2) - 5 * Math.cos(2*t2) - 2 * Math.cos(3*t2) - Math.cos(4*t2)) * heartScale / 16;
+          
+          const angle = Math.atan2(y2 - y1, x2 - x1);
+          const speed = 2 + Math.random() * 2;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'line',
+            color: neonColor,
+            lineSegments: [{x1: 0, y1: 0, x2: x2 - x1, y2: y2 - y1}],
+            size: 3,
+            glowSize: 8,
+            gravity: true,
+            rotationSpeed: (Math.random() - 0.5) * 0.2,
+            life: 160,
+            max: 160
+          }));
+        }
+        break;
+        
+      case 'hexagon-honeycomb':
+        console.log('⬡ Creating HEXAGON HONEYCOMB pattern');
+        
+        const hexSize = 35;
+        const positions = [
+          {x: 0, y: 0},
+          {x: hexSize * 1.5, y: 0},
+          {x: hexSize * 0.75, y: hexSize * 1.3},
+          {x: -hexSize * 0.75, y: hexSize * 1.3},
+          {x: -hexSize * 1.5, y: 0},
+          {x: -hexSize * 0.75, y: -hexSize * 1.3},
+          {x: hexSize * 0.75, y: -hexSize * 1.3}
+        ];
+        
+        positions.forEach((pos, hexIdx) => {
+          setTimeout(() => {
+            const hexParticles: FireworkParticle[] = [];
+            for (let i = 0; i < 6; i++) {
+              const angle1 = (i / 6) * Math.PI * 2;
+              const angle2 = ((i + 1) / 6) * Math.PI * 2;
+              const x1 = Math.cos(angle1) * hexSize + pos.x;
+              const y1 = Math.sin(angle1) * hexSize + pos.y;
+              const x2 = Math.cos(angle2) * hexSize + pos.x;
+              const y2 = Math.sin(angle2) * hexSize + pos.y;
+              
+              const segmentAngle = (angle1 + angle2) / 2;
+              const speed = 2 + Math.random() * 3;
+              const vx = Math.cos(segmentAngle) * speed;
+              const vy = Math.sin(segmentAngle) * speed;
+              
+              hexParticles.push(createParticle(vx, vy, {
+                shape: 'line',
+                color: neonColor,
+                lineSegments: [{x1, y1, x2, y2}],
+                size: 4,
+                glowSize: 6,
+                rotationSpeed: (Math.random() - 0.5) * 0.3,
+                gravity: true,
+                life: 140,
+                max: 140
+              }));
+            }
+            setParticles(prev => [...prev, ...hexParticles]);
+          }, hexIdx * 80);
+        });
+        break;
+        
+      case 'lander-swarm':
+        console.log('🚀 Creating LANDER SWARM pattern');
+        
+        const numLanders = 20 + Math.floor(Math.random() * 10);
+        
+        for (let i = 0; i < numLanders; i++) {
+          const angle = (i / numLanders) * Math.PI * 2;
+          const speed = 3 + Math.random() * 4;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
+          const shipScale = 8 + Math.random() * 4;
+          const landerSegments = [
+            // Main body (rectangle)
+            {x1: -1 * shipScale, y1: -1 * shipScale, x2: 1 * shipScale, y2: -1 * shipScale},
+            {x1: 1 * shipScale, y1: -1 * shipScale, x2: 1 * shipScale, y2: 1 * shipScale},
+            {x1: 1 * shipScale, y1: 1 * shipScale, x2: -1 * shipScale, y2: 1 * shipScale},
+            {x1: -1 * shipScale, y1: 1 * shipScale, x2: -1 * shipScale, y2: -1 * shipScale},
+            // Landing legs
+            {x1: -1 * shipScale, y1: 1 * shipScale, x2: -1.5 * shipScale, y2: 2 * shipScale},
+            {x1: 1 * shipScale, y1: 1 * shipScale, x2: 1.5 * shipScale, y2: 2 * shipScale},
+            // Thrust nozzle
+            {x1: 0, y1: 1 * shipScale, x2: 0, y2: 1.5 * shipScale}
+          ];
+          
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'ship',
+            color: neonColor,
+            lineSegments: landerSegments,
+            size: shipScale,
+            shipScale,
+            glowSize: 10,
+            rotationSpeed: (Math.random() - 0.5) * 0.5,
+            gravity: true,
+            life: 150,
+            max: 150
+          }));
+        }
+        
+        // Explosion after 1 second
+        setTimeout(() => {
+          const debris: FireworkParticle[] = [];
+          for (let i = 0; i < numLanders * 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 4 + Math.random() * 3;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            
+            debris.push(createParticle(vx, vy, {
+              shape: 'line',
+              color: neonColor,
+              lineSegments: [{x1: 0, y1: 0, x2: 5 + Math.random() * 5, y2: 0}],
+              size: 2,
+              glowSize: 4,
+              rotationSpeed: (Math.random() - 0.5) * 0.6,
+              gravity: true,
+              life: 100,
+              max: 100
+            }));
+          }
+          setParticles(prev => [...prev, ...debris]);
+        }, 1000);
+        break;
+        
       default: // Enhanced starburst
         console.log('💫 Creating STARBURST pattern - classic burst');
         for (let i = 0; i < baseCount; i++) {
@@ -508,6 +810,11 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     } else {
       // Original logic for main game
       switch (landingType) {
+      case 'retro-burst':
+        launchCount = 12;
+        patterns = ['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'];
+        timing = 250;
+        break;
       case 'ghost-beaten':
         // Four giant ghost fireworks display
         launchCount = 4;
@@ -882,6 +1189,53 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             break;
           case 'ghost':
             drawGhost(ctx, 0, 0, effectiveSize);
+            break;
+          case 'pentagon':
+          case 'triangle':
+            if (particle.vertices && particle.vertices.length > 0) {
+              ctx.fillStyle = particle.color;
+              ctx.globalAlpha = alpha;
+              ctx.beginPath();
+              ctx.moveTo(particle.vertices[0].x, particle.vertices[0].y);
+              for (let i = 1; i < particle.vertices.length; i++) {
+                ctx.lineTo(particle.vertices[i].x, particle.vertices[i].y);
+              }
+              ctx.closePath();
+              ctx.fill();
+              
+              if (qualitySettings.enableGlow) {
+                ctx.strokeStyle = particle.color;
+                ctx.shadowColor = particle.color;
+                ctx.shadowBlur = particle.glowSize * alpha;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+              }
+            }
+            break;
+          case 'line':
+          case 'hexagon':
+          case 'ship':
+            if (particle.lineSegments && particle.lineSegments.length > 0) {
+              ctx.strokeStyle = particle.color;
+              ctx.lineWidth = particle.size;
+              ctx.lineCap = 'round';
+              ctx.globalAlpha = alpha;
+              
+              if (qualitySettings.enableGlow) {
+                ctx.shadowColor = particle.color;
+                ctx.shadowBlur = particle.glowSize * alpha;
+              }
+              
+              particle.lineSegments.forEach(seg => {
+                ctx.beginPath();
+                ctx.moveTo(seg.x1, seg.y1);
+                ctx.lineTo(seg.x2, seg.y2);
+                ctx.stroke();
+              });
+              
+              ctx.shadowBlur = 0;
+            }
             break;
           default: // circle
             ctx.beginPath();
