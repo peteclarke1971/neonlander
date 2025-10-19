@@ -154,8 +154,8 @@ function updateFirework(firework: VectorFirework, dt: number) {
 function updateVectorLine(line: VectorLine, dt: number) {
   if (line.life <= 0) return;
 
-  const gravity = 0.15;
-  const airResistance = 0.98;
+  const gravity = 0.2;
+  const airResistance = 0.995;
   
   // Update start point (the actual particle position)
   line.x1 += line.vx * dt * 60; // Convert to pixels per frame
@@ -221,7 +221,7 @@ function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics
 function createPolygonChain(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numTriangles = 5;
-  const radius = 60 * scale;
+  const radius = 240 * scale;
 
   for (let i = 0; i < numTriangles; i++) {
     const angle1 = (i / numTriangles) * Math.PI * 2 - Math.PI / 2;
@@ -251,7 +251,7 @@ function createPolygonChain(x: number, y: number, color: string, scale: number):
 function createStarBurst(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numRays = 6;
-  const outerRadius = 80 * scale;
+  const outerRadius = 320 * scale;
 
   for (let i = 0; i < numRays; i++) {
     const angle = (i / numRays) * Math.PI * 2;
@@ -277,7 +277,7 @@ function createStarBurst(x: number, y: number, color: string, scale: number): Ve
 function createGeometricRose(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
   const numPetals = 4;
-  const radius = 70 * scale;
+  const radius = 280 * scale;
 
   for (let i = 0; i < numPetals; i++) {
     const angle = (i / numPetals) * Math.PI * 2;
@@ -306,7 +306,7 @@ function createHeartCascade(x: number, y: number, color: string, scale: number):
 
   for (let h = 0; h < numHearts; h++) {
     const heartScale = 0.7 + h * 0.2;
-    const size = 40 * scale * heartScale;
+    const size = 160 * scale * heartScale;
     const offsetAngle = (h / numHearts) * Math.PI * 2;
 
     // Generate heart shape points as offsets from center
@@ -332,7 +332,7 @@ function createHeartCascade(x: number, y: number, color: string, scale: number):
 
 function createHexagonalHoneycomb(x: number, y: number, color: string, scale: number): VectorFirework {
   const lines: VectorLine[] = [];
-  const hexSize = 35 * scale;
+  const hexSize = 140 * scale;
   const pattern = [
     [0, 0],      // Center
     [1, 0],      // Right
@@ -375,14 +375,19 @@ function createLine(
   // Calculate angle to target position (360° random)
   const angle = Math.atan2(targetOffsetY, targetOffsetX);
   
-  // Random speed similar to particle system (3-7 pixels/frame)
-  const speed = (3 + Math.random() * 4) * scale;
+  // Aggressive speed (12-20 pixels/frame base) - 4x faster
+  const speed = (12 + Math.random() * 8) * scale;
   
   // Velocity in direction of shape offset
   const vx = Math.cos(angle) * speed;
   const vy = Math.sin(angle) * speed;
   
-  const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  // Position end point along the burst direction (10-15 pixels out)
+  const initialLength = 10 + Math.random() * 5;
+  x2 = x1 + Math.cos(angle) * initialLength;
+  y2 = y1 + Math.sin(angle) * initialLength;
+  
+  const length = initialLength;
   const lifespan = 1.5 + Math.random() * 1;
   
   return {
