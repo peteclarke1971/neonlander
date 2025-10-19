@@ -1287,12 +1287,14 @@ export const SurvivalEngine: React.FC<Props> = ({
               
               if (distance <= shield.radius + 16) {
                 if (shieldActiveRef.current) {
-                  // Already have shield - convert to fuel+score
+                  // Already have shield - refill timer to maximum
                   shield.collected = true;
-                  fuelAmount = Math.min(fuelCap, fuelAmount + 5);
-                  currentScore += 25;
+                  shieldTimerRef.current = SHIELD_DURATION;
+                  
+                  currentScore += 50;
                   setScore(currentScore);
-                  audio.current.click();
+                  
+                  audio.current.shieldPickup();
                 } else {
                   // Collect shield
                   shield.collected = true;
