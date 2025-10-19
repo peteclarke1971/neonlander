@@ -21,8 +21,15 @@ interface VectorFirework {
   x: number;
   y: number;
   lines: VectorLine[];
+  shapeLinesStatic: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  }>;
   color: string;
   active: boolean;
+  createdAt: number;
 }
 
 interface Props {
@@ -181,11 +188,33 @@ function updateVectorLine(line: VectorLine, dt: number) {
 }
 
 function renderFirework(ctx: CanvasRenderingContext2D, firework: VectorFirework, lowGraphics: boolean) {
-  firework.lines.forEach(line => {
-    if (line.life > 0) {
-      renderLine(ctx, line, lowGraphics);
-    }
-  });
+  const elapsed = (Date.now() - firework.createdAt) / 1000;
+  
+  // Phase 1: Render static shape (0-1s, fades out)
+  if (elapsed < 1.0) {
+    const shapeAlpha = 1.0 - elapsed;
+    ctx.strokeStyle = firework.color;
+    ctx.globalAlpha = shapeAlpha;
+    ctx.lineWidth = 2;
+    
+    firework.shapeLinesStatic.forEach(line => {
+      ctx.beginPath();
+      ctx.moveTo(line.x1, line.y1);
+      ctx.lineTo(line.x2, line.y2);
+      ctx.stroke();
+    });
+    
+    ctx.globalAlpha = 1;
+  }
+  
+  // Phase 2: Render burst pieces (start visible after 0.5s)
+  if (elapsed > 0.5) {
+    firework.lines.forEach(line => {
+      if (line.life > 0) {
+        renderLine(ctx, line, lowGraphics);
+      }
+    });
+  }
 }
 
 function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics: boolean) {
@@ -219,149 +248,184 @@ function renderLine(ctx: CanvasRenderingContext2D, line: VectorLine, lowGraphics
 // Factory functions - create fireworks that explode at position
 
 function createPolygonChain(x: number, y: number, color: string, scale: number): VectorFirework {
+  const shapeLinesStatic: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
   const lines: VectorLine[] = [];
+  
+  // Create static shape outline (5 triangles)
   const numTriangles = 5;
-  const radius = 480 * scale;
-
+  const radius = 80 * scale;
+  
   for (let i = 0; i < numTriangles; i++) {
     const angle1 = (i / numTriangles) * Math.PI * 2 - Math.PI / 2;
     const angle2 = ((i + 1) / numTriangles) * Math.PI * 2 - Math.PI / 2;
     const angle3 = ((i + 0.5) / numTriangles) * Math.PI * 2 - Math.PI / 2;
-
-    // Shape offsets from center
-    const offset1X = Math.cos(angle1) * radius;
-    const offset1Y = Math.sin(angle1) * radius;
-    const offset2X = Math.cos(angle2) * radius;
-    const offset2Y = Math.sin(angle2) * radius;
-    const offset3X = Math.cos(angle3) * radius * 0.5;
-    const offset3Y = Math.sin(angle3) * radius * 0.5;
-
-    // Create triangle lines, all starting from center
-    const lineLength = 10 * scale;
-    lines.push(
-      createLine(x, y, x + 5, y + 5, offset1X, offset1Y, color, scale),
-      createLine(x, y, x + 5, y + 5, offset2X, offset2Y, color, scale),
-      createLine(x, y, x + 5, y + 5, offset3X, offset3Y, color, scale)
+    
+    const x1 = x + Math.cos(angle1) * radius;
+    const y1 = y + Math.sin(angle1) * radius;
+    const x2 = x + Math.cos(angle2) * radius;
+    const y2 = y + Math.sin(angle2) * radius;
+    const x3 = x + Math.cos(angle3) * radius * 0.5;
+    const y3 = y + Math.sin(angle3) * radius * 0.5;
+    
+    shapeLinesStatic.push(
+      { x1, y1, x2: x3, y2: y3 },
+      { x1: x3, y1: y3, x2, y2 },
+      { x1: x2, y1: y2, x2: x1, y2: y1 }
     );
   }
+  
+  // Generate 80-120 random burst pieces
+  const numPieces = 80 + Math.floor(Math.random() * 40);
+  for (let i = 0; i < numPieces; i++) {
+    const randomAngle = Math.random() * Math.PI * 2;
+    const fakeOffsetX = Math.cos(randomAngle) * 1000;
+    const fakeOffsetY = Math.sin(randomAngle) * 1000;
+    lines.push(createLine(x, y, x, y, fakeOffsetX, fakeOffsetY, color, scale));
+  }
 
-  return { type: 'polygon-chain', x, y, lines, color, active: true };
+  return { type: 'polygon-chain', x, y, lines, shapeLinesStatic, color, active: true, createdAt: Date.now() };
 }
 
 function createStarBurst(x: number, y: number, color: string, scale: number): VectorFirework {
+  const shapeLinesStatic: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
   const lines: VectorLine[] = [];
+  
+  // Create static shape outline (6 rays)
   const numRays = 6;
-  const outerRadius = 640 * scale;
-
+  const rayLength = 80 * scale;
+  
   for (let i = 0; i < numRays; i++) {
     const angle = (i / numRays) * Math.PI * 2;
-
-    // Shape offset from center
-    const offsetX = Math.cos(angle) * outerRadius;
-    const offsetY = Math.sin(angle) * outerRadius;
-
-    // Create ray starting from center
-    const lineLength = 20 * scale;
-    lines.push(createLine(
-      x, y, 
-      x + Math.cos(angle) * lineLength, 
-      y + Math.sin(angle) * lineLength,
-      offsetX, offsetY, 
-      color, scale
-    ));
+    shapeLinesStatic.push({
+      x1: x,
+      y1: y,
+      x2: x + Math.cos(angle) * rayLength,
+      y2: y + Math.sin(angle) * rayLength
+    });
+  }
+  
+  // Generate 80-120 random burst pieces
+  const numPieces = 80 + Math.floor(Math.random() * 40);
+  for (let i = 0; i < numPieces; i++) {
+    const randomAngle = Math.random() * Math.PI * 2;
+    const fakeOffsetX = Math.cos(randomAngle) * 1000;
+    const fakeOffsetY = Math.sin(randomAngle) * 1000;
+    lines.push(createLine(x, y, x, y, fakeOffsetX, fakeOffsetY, color, scale));
   }
 
-  return { type: 'star-burst', x, y, lines, color, active: true };
+  return { type: 'star-burst', x, y, lines, shapeLinesStatic, color, active: true, createdAt: Date.now() };
 }
 
 function createGeometricRose(x: number, y: number, color: string, scale: number): VectorFirework {
+  const shapeLinesStatic: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
   const lines: VectorLine[] = [];
+  
+  // Create static shape outline (4 petals)
   const numPetals = 4;
-  const radius = 560 * scale;
-
+  const radius = 80 * scale;
+  
   for (let i = 0; i < numPetals; i++) {
     const angle = (i / numPetals) * Math.PI * 2;
     const nextAngle = ((i + 1) / numPetals) * Math.PI * 2;
-
-    // Shape offsets from center
-    const offset1X = Math.cos(angle) * radius;
-    const offset1Y = Math.sin(angle) * radius;
-    const offset2X = Math.cos(nextAngle) * radius;
-    const offset2Y = Math.sin(nextAngle) * radius;
-
-    // Create petal lines from center
-    const lineLength = 12 * scale;
-    lines.push(
-      createLine(x, y, x + 5, y + 5, offset1X, offset1Y, color, scale),
-      createLine(x, y, x + 5, y + 5, offset2X, offset2Y, color, scale)
+    
+    const x1 = x + Math.cos(angle) * radius;
+    const y1 = y + Math.sin(angle) * radius;
+    const x2 = x + Math.cos(nextAngle) * radius;
+    const y2 = y + Math.sin(nextAngle) * radius;
+    
+    shapeLinesStatic.push(
+      { x1: x, y1: y, x2: x1, y2: y1 },
+      { x1: x1, y1: y1, x2: x2, y2: y2 }
     );
   }
+  
+  // Generate 80-120 random burst pieces
+  const numPieces = 80 + Math.floor(Math.random() * 40);
+  for (let i = 0; i < numPieces; i++) {
+    const randomAngle = Math.random() * Math.PI * 2;
+    const fakeOffsetX = Math.cos(randomAngle) * 1000;
+    const fakeOffsetY = Math.sin(randomAngle) * 1000;
+    lines.push(createLine(x, y, x, y, fakeOffsetX, fakeOffsetY, color, scale));
+  }
 
-  return { type: 'geometric-rose', x, y, lines, color, active: true };
+  return { type: 'geometric-rose', x, y, lines, shapeLinesStatic, color, active: true, createdAt: Date.now() };
 }
 
 function createHeartCascade(x: number, y: number, color: string, scale: number): VectorFirework {
+  const shapeLinesStatic: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
   const lines: VectorLine[] = [];
-  const numHearts = 2;
-
-  for (let h = 0; h < numHearts; h++) {
-    const heartScale = 0.7 + h * 0.2;
-    const size = 320 * scale * heartScale;
-    const offsetAngle = (h / numHearts) * Math.PI * 2;
-
-    // Generate heart shape points as offsets from center
-    const heartOffsets: [number, number][] = [];
-    for (let i = 0; i <= 10; i++) {
-      const t = (i / 10) * Math.PI * 2;
-      const hx = size * (16 * Math.pow(Math.sin(t), 3));
-      const hy = -size * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-      heartOffsets.push([hx, hy]);
-    }
-
-    // Create lines from center with heart-shaped burst directions
-    for (let i = 0; i < heartOffsets.length - 1; i++) {
-      const offsetX = heartOffsets[i][0];
-      const offsetY = heartOffsets[i][1];
-      
-      lines.push(createLine(x, y, x + 5, y + 5, offsetX, offsetY, color, scale));
-    }
+  
+  // Create static shape outline (heart)
+  const size = 80 * scale;
+  const heartPoints: Array<[number, number]> = [];
+  
+  for (let i = 0; i <= 20; i++) {
+    const t = (i / 20) * Math.PI * 2;
+    const hx = size * 0.8 * (16 * Math.pow(Math.sin(t), 3));
+    const hy = -size * 0.8 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+    heartPoints.push([x + hx, y + hy]);
+  }
+  
+  for (let i = 0; i < heartPoints.length - 1; i++) {
+    shapeLinesStatic.push({
+      x1: heartPoints[i][0],
+      y1: heartPoints[i][1],
+      x2: heartPoints[i + 1][0],
+      y2: heartPoints[i + 1][1]
+    });
+  }
+  
+  // Generate 80-120 random burst pieces
+  const numPieces = 80 + Math.floor(Math.random() * 40);
+  for (let i = 0; i < numPieces; i++) {
+    const randomAngle = Math.random() * Math.PI * 2;
+    const fakeOffsetX = Math.cos(randomAngle) * 1000;
+    const fakeOffsetY = Math.sin(randomAngle) * 1000;
+    lines.push(createLine(x, y, x, y, fakeOffsetX, fakeOffsetY, color, scale));
   }
 
-  return { type: 'heart-cascade', x, y, lines, color, active: true };
+  return { type: 'heart-cascade', x, y, lines, shapeLinesStatic, color, active: true, createdAt: Date.now() };
 }
 
 function createHexagonalHoneycomb(x: number, y: number, color: string, scale: number): VectorFirework {
+  const shapeLinesStatic: Array<{x1: number, y1: number, x2: number, y2: number}> = [];
   const lines: VectorLine[] = [];
-  const hexSize = 280 * scale;
+  
+  // Create static shape outline (honeycomb pattern)
+  const hexSize = 80 * scale;
   const pattern = [
     [0, 0],      // Center
     [1, 0],      // Right
     [-1, 0]      // Left
   ];
-
+  
   pattern.forEach(([px, py]) => {
-    const hexCenterOffsetX = px * hexSize * 1.5;
-    const hexCenterOffsetY = py * hexSize * 1.5;
-
+    const hexCenterX = x + px * hexSize * 1.5;
+    const hexCenterY = y + py * hexSize * 1.5;
+    
     for (let i = 0; i < 6; i++) {
       const angle1 = (i / 6) * Math.PI * 2;
       const angle2 = ((i + 1) / 6) * Math.PI * 2;
-
-      // Shape offsets from firework center
-      const offset1X = hexCenterOffsetX + Math.cos(angle1) * hexSize;
-      const offset1Y = hexCenterOffsetY + Math.sin(angle1) * hexSize;
-      const offset2X = hexCenterOffsetX + Math.cos(angle2) * hexSize;
-      const offset2Y = hexCenterOffsetY + Math.sin(angle2) * hexSize;
-
-      // Create hexagon lines from center
-      lines.push(
-        createLine(x, y, x + 5, y + 5, offset1X, offset1Y, color, scale),
-        createLine(x, y, x + 5, y + 5, offset2X, offset2Y, color, scale)
-      );
+      
+      shapeLinesStatic.push({
+        x1: hexCenterX + Math.cos(angle1) * hexSize,
+        y1: hexCenterY + Math.sin(angle1) * hexSize,
+        x2: hexCenterX + Math.cos(angle2) * hexSize,
+        y2: hexCenterY + Math.sin(angle2) * hexSize
+      });
     }
   });
+  
+  // Generate 80-120 random burst pieces
+  const numPieces = 80 + Math.floor(Math.random() * 40);
+  for (let i = 0; i < numPieces; i++) {
+    const randomAngle = Math.random() * Math.PI * 2;
+    const fakeOffsetX = Math.cos(randomAngle) * 1000;
+    const fakeOffsetY = Math.sin(randomAngle) * 1000;
+    lines.push(createLine(x, y, x, y, fakeOffsetX, fakeOffsetY, color, scale));
+  }
 
-  return { type: 'hexagonal-honeycomb', x, y, lines, color, active: true };
+  return { type: 'hexagonal-honeycomb', x, y, lines, shapeLinesStatic, color, active: true, createdAt: Date.now() };
 }
 
 function createLine(
@@ -372,13 +436,13 @@ function createLine(
   color: string,
   scale: number
 ): VectorLine {
-  // Calculate angle to target position (360° random)
+  // Calculate angle to target position (truly random 360°)
   const angle = Math.atan2(targetOffsetY, targetOffsetX);
   
-  // Massive speed variance (20-60 pixels/frame) for instant explosive separation
-  const speed = (20 + Math.random() * 40) * scale;
+  // Massive speed variance (20-100 pixels/frame) for 5x difference
+  const speed = (20 + Math.random() * 80) * scale;
   
-  // Velocity in direction of shape offset
+  // Velocity in direction of random angle
   const vx = Math.cos(angle) * speed;
   const vy = Math.sin(angle) * speed;
   
@@ -395,9 +459,7 @@ function createLine(
     vx, vy,
     color,
     rotation: angle,
-    rotationSpeed: Math.random() < 0.2 
-      ? (Math.random() - 0.5) * 8  // 20% spiral
-      : (Math.random() - 0.5) * 2,  // 80% gentle rotation
+    rotationSpeed: 0, // No rotation for burst pieces - just sparks
     life: lifespan,
     maxLife: lifespan,
     length,
