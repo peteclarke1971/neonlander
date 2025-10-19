@@ -35,6 +35,7 @@ interface FireworksDisplayProps {
   onSkip: () => void;
   fireworkCount?: number;
   lowGraphics?: boolean;
+  isWorldRecord?: boolean;
 }
 
 // Object pool for particle reuse
@@ -64,7 +65,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   onComplete,
   onSkip,
   fireworkCount,
-  lowGraphics = false
+  lowGraphics = false,
+  isWorldRecord = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1366,6 +1368,21 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         className="absolute inset-0 w-full h-full"
         style={{ background: 'transparent' }}
       />
+      
+      {/* World Record Celebration Overlay */}
+      {isWorldRecord && (
+        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="text-center animate-pulse">
+            <div className="text-6xl font-bold text-yellow-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)] mb-4">
+              🌍 NEW WORLD RECORD! 🏆
+            </div>
+            <div className="text-2xl text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]">
+              You are the fastest pilot in the galaxy!
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="absolute bottom-8 text-center text-white/80 text-sm drop-shadow-lg pointer-events-none">
         Press THRUST to continue
       </div>

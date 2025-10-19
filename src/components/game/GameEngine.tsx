@@ -80,6 +80,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   const [fireworkStartTime, setFireworkStartTime] = useState(0);
   const [neonColor, setNeonColor] = useState('#00FFFF');
   const [currentLandings, setCurrentLandings] = useState(0);
+  const [isWorldRecord, setIsWorldRecord] = useState(false);
   
   // Screen-space ship position for countdown overlay (CSS pixels)
   const [shipScreenPos, setShipScreenPos] = useState<{ x: number; y: number } | null>(null);
@@ -2448,6 +2449,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         <FireworksDisplay 
           landingType={landingType}
           neonColor={neonColor}
+          isWorldRecord={isWorldRecord}
         onComplete={async () => {
           console.log('🎯 FireworksDisplay onComplete called', {
             mode,
@@ -2502,7 +2504,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   
                   if (uploadResult.uploaded && uploadResult.wasRecord) {
                     console.log('🏆 NEW GLOBAL RECORD SET!');
-                    // TODO: Set a flag to show world record message in UI
+                    setIsWorldRecord(true); // Set flag for UI to display message
                   }
                 } catch (uploadError) {
                   console.error('💥 Exception during global ghost upload:', uploadError);
@@ -2540,6 +2542,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             bullseye: lastLandingBonuses.bullseye,
             speedBonus: lastLandingBonuses.speedBonus
           });
+          setIsWorldRecord(false); // Reset for next level
         }}
           onSkip={async () => {
             console.log('⏭️ FireworksDisplay onSkip called', {
@@ -2632,6 +2635,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               bullseye: lastLandingBonuses.bullseye,
               speedBonus: lastLandingBonuses.speedBonus
             });
+            setIsWorldRecord(false); // Reset for next level
           }}
         />
       )}

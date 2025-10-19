@@ -175,9 +175,9 @@ const Index = () => {
     if (mode === 'fixed' && gameSettings?.showGhost && globalGhostsEnabled) {
       const { GhostManager } = await import('@/components/game/GhostManager');
       const ghostManager = new GhostManager();
-      const levelToLoad = startLevel ?? 1;
+      const levelToLoad = startLevel ? (startLevel - 1) : 0; // Convert UI level (1-indexed) to game level (0-indexed)
       
-      console.log(`🌍 Downloading global ghost for level ${levelToLoad}...`);
+      console.log(`🌍 Downloading global ghost for UI level ${startLevel ?? 1} (game level ${levelToLoad})...`);
       globalGhostRecording = await ghostManager.loadGlobalGhost(d, levelToLoad);
       
       if (globalGhostRecording) {

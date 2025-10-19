@@ -216,14 +216,20 @@ export async function fetchGlobalGhost(
   difficulty: Difficulty
 ): Promise<{ record: GlobalGhostRecord | null; error?: string }> {
   try {
+    console.log('📥 Fetching global ghost:', { level, difficulty });
+    
     const { data, error } = await supabase
       .from('ghost_records')
       .select('*')
       .eq('level', level)
       .eq('difficulty', difficulty)
-      .single();
+      .order('completion_time', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    console.log('📦 Fetch result:', { hasData: !!data, error: error?.message });
+
+    if (error) {
       console.error('Error fetching global ghost:', error);
       return { record: null, error: error.message };
     }
