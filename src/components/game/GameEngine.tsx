@@ -2459,7 +2459,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
               
               // Try to upload to global ghosts
-              const initials = localStorage.getItem('ll-player-initials') || 'AAA';
+              const initials = localStorage.getItem('ll-player-initials') || '';
               console.log('🌍 Attempting to upload global ghost...', {
                 difficulty,
                 level,
@@ -2518,7 +2518,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                 ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
                 
                 // Try to upload to global ghosts
-                const initials = localStorage.getItem('ll-player-initials') || 'AAA';
+                const initials = localStorage.getItem('ll-player-initials') || '';
                 console.log('🌍 Attempting to upload global ghost (skip)...', {
                   difficulty,
                   level,

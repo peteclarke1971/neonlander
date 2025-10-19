@@ -166,14 +166,14 @@ export async function submitGlobalGhost(
   difficulty: Difficulty,
   completionTime: number,
   ghostData: any,
-  initials: string
+  initials: string = ""
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     console.log('📤 Submitting global ghost...', {
       level,
       difficulty,
       completionTime,
-      initials,
+      initials: initials || "(none)",
       dataSize: JSON.stringify(ghostData).length
     });
     
@@ -184,7 +184,7 @@ export async function submitGlobalGhost(
         difficulty,
         completion_time: completionTime,
         ghost_data: ghostData,
-        initials: initials.toUpperCase().slice(0, 3)
+        initials: initials ? initials.toUpperCase().slice(0, 3) : null
       }, {
         onConflict: 'level,difficulty'
       });

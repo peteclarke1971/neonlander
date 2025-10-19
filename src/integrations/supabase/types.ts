@@ -21,7 +21,7 @@ export type Database = {
           difficulty: string
           ghost_data: Json
           id: string
-          initials: string
+          initials: string | null
           level: number
         }
         Insert: {
@@ -30,7 +30,7 @@ export type Database = {
           difficulty: string
           ghost_data: Json
           id?: string
-          initials: string
+          initials?: string | null
           level: number
         }
         Update: {
@@ -39,7 +39,7 @@ export type Database = {
           difficulty?: string
           ghost_data?: Json
           id?: string
-          initials?: string
+          initials?: string | null
           level?: number
         }
         Relationships: []
