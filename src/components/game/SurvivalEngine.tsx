@@ -37,6 +37,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const [isUsingPCControls, setIsUsingPCControls] = useState(false);
   const [fps, setFps] = useState(0);
   
   // Gyroscope controls
@@ -212,10 +213,22 @@ export const SurvivalEngine: React.FC<Props> = ({
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
       // Use same keyboard controls as main game
-      if (["a", "arrowleft"].includes(k)) keys.current.left = down;
-      if (["d", "arrowright"].includes(k)) keys.current.right = down;
-      if (["w", "arrowup", " "].includes(k)) keys.current.thrust = down;
-      if (["shift"].includes(k)) keys.current.rotateBoost = down;
+      if (["a", "arrowleft"].includes(k)) {
+        keys.current.left = down;
+        if (down) setIsUsingPCControls(true);
+      }
+      if (["d", "arrowright"].includes(k)) {
+        keys.current.right = down;
+        if (down) setIsUsingPCControls(true);
+      }
+      if (["w", "arrowup", " "].includes(k)) {
+        keys.current.thrust = down;
+        if (down) setIsUsingPCControls(true);
+      }
+      if (["shift"].includes(k)) {
+        keys.current.rotateBoost = down;
+        if (down) setIsUsingPCControls(true);
+      }
       
       // Toggle unlimited fuel cheat with 'i' key (for testing)
       if (k === "i" && down) {
@@ -759,6 +772,9 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (!isDead) {
         // Gamepad input with hot-swap detection
         const gp = anyGamepad();
+        if (gp && !isUsingPCControls) {
+          setIsUsingPCControls(true);
+        }
         if (gp) {
           // Handle gamepad hot-swap
           if (gpDeviceIdRef.current !== gp.id) {
@@ -2508,7 +2524,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         cometActive={cometActive}
         cometTimer={cometTimerRef.current}
         zoneName={classicColorsMode.current ? undefined : currentPalette.name}
-        showGyroButton={isTouch}
+        showGyroButton={isTouch && !isUsingPCControls}
         gyroActive={gyroscope.isActive}
         gyroPermission={gyroscope.permission}
         tiltAngle={gyroscope.tiltAngle}
@@ -2536,38 +2552,40 @@ export const SurvivalEngine: React.FC<Props> = ({
         </div>
       )}
       
-      {/* Touch Controls */}
-      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none">
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            className="select-none"
-            onMouseDown={() => (keys.current.left = true)} 
-            onMouseUp={() => (keys.current.left = false)} 
-            onMouseLeave={() => (keys.current.left = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.left = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
-          >
-            <span className="select-none">Rotate ◄</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            className="select-none"
-            onMouseDown={() => (keys.current.right = true)} 
-            onMouseUp={() => (keys.current.right = false)} 
-            onMouseLeave={() => (keys.current.right = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.right = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
-          >
-            <span className="select-none">Rotate ►</span>
-          </Button>
+      {/* Touch Controls - Only show if not using PC controls */}
+      {!isUsingPCControls && (
+        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="select-none"
+              onMouseDown={() => (keys.current.left = true)} 
+              onMouseUp={() => (keys.current.left = false)} 
+              onMouseLeave={() => (keys.current.left = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.left = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
+            >
+              <span className="select-none">Rotate ◄</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="select-none"
+              onMouseDown={() => (keys.current.right = true)} 
+              onMouseUp={() => (keys.current.right = false)} 
+              onMouseLeave={() => (keys.current.right = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.right = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
+            >
+              <span className="select-none">Rotate ►</span>
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Tap screen: Thrust | Arrows/W: Keys
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground">
-          Tap screen: Thrust | Arrows/W: Keys
-        </div>
-      </div>
+      )}
       
       {/* Fireworks Display */}
       {showFireworks && landingType && (
