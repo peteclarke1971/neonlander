@@ -606,7 +606,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Calculate ghost time difference
       let ghostTimeDiff: number | undefined;
       if (isGhostMode && ghostLevel !== undefined && bestTime !== null) {
-        ghostTimeDiff = elapsed - bestTime;
+        ghostTimeDiff = elapsed - (bestTime / 1000); // Convert bestTime from ms to seconds
       }
       
       setHud({ 
