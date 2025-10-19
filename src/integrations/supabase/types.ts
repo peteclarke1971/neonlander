@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ghost_records: {
+        Row: {
+          completion_time: number
+          created_at: string | null
+          difficulty: string
+          ghost_data: Json
+          id: string
+          initials: string
+          level: number
+        }
+        Insert: {
+          completion_time: number
+          created_at?: string | null
+          difficulty: string
+          ghost_data: Json
+          id?: string
+          initials: string
+          level: number
+        }
+        Update: {
+          completion_time?: number
+          created_at?: string | null
+          difficulty?: string
+          ghost_data?: Json
+          id?: string
+          initials?: string
+          level?: number
+        }
+        Relationships: []
+      }
       scores: {
         Row: {
           created_at: string | null

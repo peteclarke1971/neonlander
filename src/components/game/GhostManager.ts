@@ -360,4 +360,137 @@ export class GhostManager {
   getAvailableGhostLevels(): number[] {
     return this.getAvailableNeonDockingGhostLevels();
   }
+
+  // ============= Global Ghost System =============
+
+  /**
+   * Check if local time beats global record and upload if so
+   */
+  async checkAndUploadGlobalGhost(
+    difficulty: 'easy' | 'hard',
+    level: number,
+    completionTime: number,
+    frames: LunarLanderGhostFrame[],
+    initials: string
+  ): Promise<{ uploaded: boolean; wasRecord: boolean; error?: string }> {
+    try {
+      const { checkGlobalRecord, submitGlobalGhost } = await import('@/lib/leaderboard');
+      
+      const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, completionTime);
+      
+      if (checkError) {
+        return { uploaded: false, wasRecord: false, error: checkError };
+      }
+      
+      if (!isRecord) {
+        return { uploaded: false, wasRecord: false };
+      }
+      
+      const recording: GhostRecording = {
+        frames,
+        completionTime,
+        level,
+        date: Date.now(),
+        gameType: "lunar-lander"
+      };
+      
+      const { ok, error: submitError } = await submitGlobalGhost(
+        level,
+        difficulty,
+        completionTime,
+        recording,
+        initials
+      );
+      
+      if (!ok) {
+        return { uploaded: false, wasRecord: true, error: submitError };
+      }
+      
+      console.log(`🌍 New global record uploaded for level ${level}!`);
+      return { uploaded: true, wasRecord: true };
+    } catch (e: any) {
+      console.error('Error checking/uploading global ghost:', e);
+      return { uploaded: false, wasRecord: false, error: e?.message || "Unknown error" };
+    }
+  }
+
+  /**
+   * Load global ghost recording (for playback)
+   */
+  async loadGlobalGhost(
+    difficulty: 'easy' | 'hard',
+    level: number
+  ): Promise<GhostRecording | null> {
+    try {
+      const { fetchGlobalGhost } = await import('@/lib/leaderboard');
+      const { record, error } = await fetchGlobalGhost(level, difficulty);
+      
+      if (error) {
+        console.error('Error loading global ghost:', error);
+        return null;
+      }
+      
+      if (!record) {
+        return null;
+      }
+      
+      return record.ghost_data as GhostRecording;
+    } catch (e: any) {
+      console.error('Error loading global ghost:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Get global ghost state at given time (for rendering during gameplay)
+   */
+  getGlobalGhostState(recording: GhostRecording | null, gameTime: number): LunarLanderGhostState | null {
+    if (!recording || recording.frames.length === 0) return null;
+    
+    if (gameTime > recording.completionTime) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    const frames = recording.frames as LunarLanderGhostFrame[];
+    
+    let prevFrame = frames[0];
+    let nextFrame = frames[0];
+    
+    for (let i = 0; i < frames.length - 1; i++) {
+      if (frames[i].timestamp <= gameTime && frames[i + 1].timestamp > gameTime) {
+        prevFrame = frames[i];
+        nextFrame = frames[i + 1];
+        break;
+      }
+    }
+    
+    if (gameTime >= frames[frames.length - 1].timestamp) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    if (gameTime <= frames[0].timestamp) {
+      return {
+        x: prevFrame.x,
+        y: prevFrame.y,
+        angle: prevFrame.angle,
+        thrust: prevFrame.thrust,
+        visible: true
+      };
+    }
+    
+    const timeDiff = nextFrame.timestamp - prevFrame.timestamp;
+    const factor = timeDiff > 0 ? (gameTime - prevFrame.timestamp) / timeDiff : 0;
+    
+    let angleDiff = nextFrame.angle - prevFrame.angle;
+    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    
+    return {
+      x: prevFrame.x + (nextFrame.x - prevFrame.x) * factor,
+      y: prevFrame.y + (nextFrame.y - prevFrame.y) * factor,
+      angle: prevFrame.angle + angleDiff * factor,
+      thrust: factor < 0.5 ? prevFrame.thrust : nextFrame.thrust,
+      visible: true
+    };
+  }
 }

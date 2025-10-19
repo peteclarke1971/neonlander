@@ -85,6 +85,14 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
     // Ghost mode on by default for fixed mode
     return mode === "fixed";
   });
+  const [globalGhostsEnabled, setGlobalGhostsEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-global-ghosts-enabled');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   const [leaderboardView, setLeaderboardView] = useState<
     | "local-classic"
     | "local-fixed"
@@ -476,18 +484,47 @@ useEffect(() => {
 
         {/* Ghost mode toggle (only visible in fixed mode) */}
         {mode === "fixed" && (
-          <div className="mt-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Ghost Mode</div>
-            <button
-              className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
-                showGhost
-                  ? "bg-green-500/20 text-green-400 border border-green-500/40"
-                  : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
-              }`}
-              onClick={() => setShowGhost(!showGhost)}
-            >
-              👻 Ghost Mode {showGhost ? "ON" : "OFF"}
-            </button>
+          <div className="mt-4 space-y-4">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Ghost Mode</div>
+              <button
+                className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                  showGhost
+                    ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                    : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+                }`}
+                onClick={() => setShowGhost(!showGhost)}
+              >
+                👻 Ghost Mode {showGhost ? "ON" : "OFF"}
+              </button>
+            </div>
+            
+            {showGhost && (
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Challenge Type</div>
+                <button
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                    globalGhostsEnabled
+                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/40"
+                      : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+                  }`}
+                  onClick={() => {
+                    const newValue = !globalGhostsEnabled;
+                    setGlobalGhostsEnabled(newValue);
+                    try {
+                      localStorage.setItem('ll-global-ghosts-enabled', JSON.stringify(newValue));
+                    } catch {}
+                  }}
+                >
+                  🌍 Challenge Global Ghosts {globalGhostsEnabled ? "ON" : "OFF"}
+                </button>
+                <div className="text-xs text-muted-foreground mt-2">
+                  {globalGhostsEnabled 
+                    ? "Race against the world's fastest times" 
+                    : "Race against your personal best times"}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

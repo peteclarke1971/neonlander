@@ -56,13 +56,15 @@ interface Props {
   showGhost?: boolean;
   ghostLevel?: number;
   isDemo?: boolean;
+  useGlobalGhost?: boolean;
+  globalGhostData?: any;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false }) => {
+export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false, useGlobalGhost = false, globalGhostData = null }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
@@ -484,9 +486,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     // Initialize ghost system
     if (isGhostMode && ghostLevel !== undefined) {
       const difficultyStr = difficulty;
-      const recording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
-      if (recording) {
-        console.log("👻 Ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (recording.completionTime).toFixed(2) + "s");
+      
+      // Use global ghost if available, otherwise fallback to local
+      if (useGlobalGhost && globalGhostData) {
+        console.log("🌍 Global ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (globalGhostData.completionTime / 1000).toFixed(2) + "s");
+      } else {
+        const recording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
+        if (recording) {
+          console.log("👻 Local ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (recording.completionTime / 1000).toFixed(2) + "s");
+        }
       }
     }
     
@@ -499,8 +507,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Load best time for HUD display
     if (mode === "fixed" && !isCavernLevel) {
-      const currentBest = ghostManager.current.getLunarLanderBestTime(difficulty, level);
-      setBestTime(currentBest);
+      if (useGlobalGhost && globalGhostData) {
+        setBestTime(globalGhostData.completionTime);
+      } else {
+        const currentBest = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+        setBestTime(currentBest);
+      }
     }
 
     let cameraX = x;
@@ -804,7 +816,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       
       // Ghost state update
       if (ghostShip && isGhostMode && ghostLevel !== undefined) {
-        const ghostState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        let ghostState = null;
+        if (useGlobalGhost && globalGhostData) {
+          ghostState = ghostManager.current.getGlobalGhostState(globalGhostData, gameTime);
+        } else {
+          ghostState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        }
         if (ghostState) {
           ghostShip.x = ghostState.x;
           ghostShip.y = ghostState.y;
@@ -833,7 +850,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       
       // Ghost playback - update ghost state
       if (isGhostMode && ghostLevel !== undefined) {
-        const ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        let ghostStateUpdate = null;
+        if (useGlobalGhost && globalGhostData) {
+          ghostStateUpdate = ghostManager.current.getGlobalGhostState(globalGhostData, gameTime);
+        } else {
+          ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        }
         setGhostState(ghostStateUpdate);
       }
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
@@ -2426,7 +2448,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         <FireworksDisplay 
           landingType={landingType}
           neonColor={neonColor}
-        onComplete={() => {
+        onComplete={async () => {
           // Check if this is a new best time and save ghost
           let isNewBestTime = false;
           let ghostTimeDiff: number | undefined;
@@ -2435,6 +2457,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
             if (!existingBestTime || hud.time < existingBestTime) {
               isNewBestTime = true;
               ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+              
+              // Try to upload to global ghosts
+              const initials = localStorage.getItem('ll-player-initials') || 'AAA';
+              const uploadResult = await ghostManager.current.checkAndUploadGlobalGhost(
+                difficulty,
+                level,
+                hud.time,
+                ghostRecording,
+                initials
+              );
+              
+              if (uploadResult.uploaded && uploadResult.wasRecord) {
+                console.log('🏆 NEW GLOBAL RECORD SET!');
+              }
             }
             if (existingBestTime) {
               ghostTimeDiff = hud.time - existingBestTime;
@@ -2457,7 +2493,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               speedBonus: lastLandingBonuses.speedBonus
             });
         }}
-          onSkip={() => {
+          onSkip={async () => {
             // Check if this is a new best time and save ghost
             let isNewBestTime = false;
             let ghostTimeDiff: number | undefined;
@@ -2466,6 +2502,16 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               if (!existingBestTime || hud.time < existingBestTime) {
                 isNewBestTime = true;
                 ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, hud.time);
+                
+                // Try to upload to global ghosts
+                const initials = localStorage.getItem('ll-player-initials') || 'AAA';
+                await ghostManager.current.checkAndUploadGlobalGhost(
+                  difficulty,
+                  level,
+                  hud.time,
+                  ghostRecording,
+                  initials
+                );
               }
               if (existingBestTime) {
                 ghostTimeDiff = hud.time - existingBestTime;

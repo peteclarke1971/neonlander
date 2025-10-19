@@ -157,13 +157,41 @@ const Index = () => {
   }, []);
 
   const [showGhost, setShowGhost] = useState(false);
+  const [useGlobalGhost, setUseGlobalGhost] = useState(false);
+  const [globalGhostData, setGlobalGhostData] = useState<any>(null);
   
-  const startGame = (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
+  const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
     if (isTransitioning) {
       console.log("⚠️ Already transitioning, ignoring start request");
       return; // Prevent multiple transitions
+    }
+    
+    // Check if we should download global ghost
+    let globalGhostRecording: any = null;
+    const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+    
+    if (mode === 'fixed' && gameSettings?.showGhost && globalGhostsEnabled) {
+      const { GhostManager } = await import('@/components/game/GhostManager');
+      const ghostManager = new GhostManager();
+      const levelToLoad = startLevel ?? 1;
+      
+      console.log(`🌍 Downloading global ghost for level ${levelToLoad}...`);
+      globalGhostRecording = await ghostManager.loadGlobalGhost(d, levelToLoad);
+      
+      if (globalGhostRecording) {
+        console.log(`✅ Global ghost loaded! Time: ${(globalGhostRecording.completionTime / 1000).toFixed(2)}s`);
+        setUseGlobalGhost(true);
+        setGlobalGhostData(globalGhostRecording);
+      } else {
+        console.log(`ℹ️ No global ghost available for level ${levelToLoad}`);
+        setUseGlobalGhost(false);
+        setGlobalGhostData(null);
+      }
+    } else {
+      setUseGlobalGhost(false);
+      setGlobalGhostData(null);
     }
     
     // Use wormhole portal transition
@@ -654,6 +682,8 @@ const retryGame = () => {
           seedOverride={seedOverride ?? undefined}
           showGhost={showGhost}
           ghostLevel={carry?.level ?? successCount}
+          useGlobalGhost={useGlobalGhost}
+          globalGhostData={globalGhostData}
         />
       )}
       {view === "demo" && (
