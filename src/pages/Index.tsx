@@ -829,6 +829,13 @@ const retryGame = () => {
                 </span>
               </div>
             )}
+            {lastResult.isWorldRecord && (
+              <div className="mt-3 animate-enter">
+                <span className="px-4 py-2 rounded-md border border-yellow-400/70 shadow-[0_0_20px_rgba(255,215,0,0.6)] font-display text-yellow-400 text-lg font-bold animate-pulse">
+                  🌍 NEW WORLD RECORD! 🌍
+                </span>
+              </div>
+            )}
             {lastResult.cause === "success" && (lastResult.padBonus2x || lastResult.bullseye || lastResult.speedBonus) && (
               <div className="mt-3 flex items-center justify-center gap-3 animate-enter">
                 {lastResult.padBonus2x && (

@@ -90,6 +90,7 @@ export interface GameOverData {
   // Ghost-related data
   isNewBestTime?: boolean;
   ghostTimeDiff?: number;
+  isWorldRecord?: boolean;
 }
 
 export interface HighScore {
