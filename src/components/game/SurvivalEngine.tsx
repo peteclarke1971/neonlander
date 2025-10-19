@@ -13,7 +13,6 @@ import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModif
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import FireworksDisplay from "./FireworksDisplay";
-import { VectorFireworksDisplay } from "./VectorFireworksDisplay";
 import { useGyroscope, DEFAULT_GYROSCOPE_CONFIG } from "@/hooks/use-gyroscope";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision, Hazard } from "./systems/hazards";
 import { checkJunkPickup, collectJunk } from "./systems/collectibles";
@@ -137,7 +136,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Fireworks state
   const [showFireworks, setShowFireworks] = useState(false);
   const [fireworksActive, setFireworksActive] = useState(false);
-  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'vector-special' | null>(null);
+  const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | null>(null);
   const fireworkTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   
   // Detect touch-capable devices
@@ -1441,21 +1440,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                   
                   // Show fireworks after brief delay
                   const initialTimeout = setTimeout(() => {
-                    // Every 10th landing shows vector fireworks
-                    if (currentLandings % 10 === 0 && currentLandings > 0) {
-                      setLandingType('vector-special');
-                    } else {
-                      setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
-                    }
+                    setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
                     setShowFireworks(true);
                     setFireworksActive(true);
                     
-                    // Auto-hide after appropriate duration
-                    const duration = (currentLandings % 10 === 0 && currentLandings > 0) ? 12000 : 6000;
+                    // Auto-hide after 6 seconds if player doesn't take off
                     const hideTimeout = setTimeout(() => {
                       setShowFireworks(false);
                       setFireworksActive(false);
-                    }, duration);
+                    }, 6000);
                     fireworkTimeoutsRef.current.push(hideTimeout);
                   }, 500);
                   
@@ -2570,26 +2563,14 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       {/* Fireworks Display */}
       {showFireworks && landingType && (
-        <>
-          {landingType === 'vector-special' ? (
-            <VectorFireworksDisplay
-              neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
-              paletteColor={currentPalette.accent}
-              onComplete={() => setShowFireworks(false)}
-              onSkip={() => setShowFireworks(false)}
-              lowGraphics={lowGraphics}
-            />
-          ) : (
-            <FireworksDisplay
-              landingType={landingType}
-              neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
-              fireworkCount={landings}
-              onComplete={() => setShowFireworks(false)}
-              onSkip={() => setShowFireworks(false)}
-              lowGraphics={lowGraphics}
-            />
-          )}
-        </>
+        <FireworksDisplay
+          landingType={landingType}
+          neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
+          fireworkCount={landings}
+          onComplete={() => setShowFireworks(false)}
+          onSkip={() => setShowFireworks(false)}
+          lowGraphics={lowGraphics}
+        />
       )}
     </div>
   );
