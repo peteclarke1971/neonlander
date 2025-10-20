@@ -271,6 +271,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Wrap initialization in async function to handle ghost loading
     const initializeGame = async () => {
+      // Clear any previous fireworks state when starting a new level
+      setShowFireworks(false);
+      setLandingType(null);
+      
       let raf = 0;
       const c = canvasRef.current!;
       const ctx = c.getContext("2d")!;
