@@ -2491,46 +2491,38 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.lineTo(12, 12);
         ctx.stroke();
         
+        // Draw spotlight cone during blackout (in ship-local coordinates)
+        if (blackoutIntensityRef.current > 0.3 && !isDead) {
+          const spotlightRange = 350;
+          const spotlightSpread = 0.22; // ~25 degrees
+          
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, 12); // Base of lander in ship-local coords
+          
+          // Left edge of cone (pointing down-left in ship space)
+          ctx.lineTo(
+            -Math.sin(spotlightSpread) * spotlightRange,
+            12 + Math.cos(spotlightSpread) * spotlightRange
+          );
+          
+          // Arc along bottom
+          ctx.arc(0, 12, spotlightRange, Math.PI/2 - spotlightSpread, Math.PI/2 + spotlightSpread);
+          
+          ctx.closePath();
+          
+          // Simplified gradient
+          const gradient = ctx.createRadialGradient(0, 12, 0, 0, 12, spotlightRange);
+          gradient.addColorStop(0, `rgba(255, 255, 200, ${0.15 * blackoutIntensityRef.current})`);
+          gradient.addColorStop(0.7, `rgba(255, 255, 180, ${0.08 * blackoutIntensityRef.current})`);
+          gradient.addColorStop(1, 'rgba(255, 255, 160, 0)');
+          
+          ctx.fillStyle = gradient;
+          ctx.fill();
+          ctx.restore();
+        }
+        
         ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-      
-      // Draw spotlight cone during blackout (after ship rendering)
-      if (blackoutIntensityRef.current > 0.3 && !isDead) {
-        ctx.save();
-        
-        // Calculate spotlight direction from ship angle
-        const spotlightAngle = shipAngle;
-        const spotlightRange = 350;
-        const spotlightSpread = 0.22; // ~25 degrees in radians
-        
-        // Create spotlight cone path
-        ctx.beginPath();
-        ctx.moveTo(shipX, shipY + 12);
-        const leftAngle = spotlightAngle - spotlightSpread;
-        const rightAngle = spotlightAngle + spotlightSpread;
-        ctx.lineTo(
-          shipX + Math.sin(leftAngle) * spotlightRange,
-          shipY + Math.cos(leftAngle) * spotlightRange
-        );
-        ctx.arc(
-          shipX, shipY + 12,
-          spotlightRange,
-          leftAngle, rightAngle
-        );
-        ctx.closePath();
-        
-        // Apply gradient fill
-        const gradient = ctx.createRadialGradient(
-          shipX, shipY + 12, 0,
-          shipX, shipY + 12, spotlightRange
-        );
-        gradient.addColorStop(0, `rgba(255, 255, 200, ${0.15 * blackoutIntensityRef.current})`);
-        gradient.addColorStop(0.7, `rgba(255, 255, 180, ${0.08 * blackoutIntensityRef.current})`);
-        gradient.addColorStop(1, 'rgba(255, 255, 160, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.fill();
         ctx.restore();
       }
       
@@ -2598,24 +2590,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
-      // Draw subtle grain overlay during blackout (optional, skip in low graphics)
-      if (blackoutIntensityRef.current > 0.2 && !shouldOptimize) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = blackoutIntensityRef.current * 0.08;
-        
-        // Film grain effect using noise
-        const imageData = ctx.getImageData(0, 0, c.width, c.height);
-        const pixels = imageData.data;
-        for (let i = 0; i < pixels.length; i += 4) {
-          const grain = (Math.random() - 0.5) * 30;
-          pixels[i] += grain;     // R
-          pixels[i + 1] += grain; // G
-          pixels[i + 2] += grain; // B
-        }
-        ctx.putImageData(imageData, 0, 0);
-        ctx.restore();
-      }
+      // Grain overlay disabled - too expensive for performance
     };
     
     raf = requestAnimationFrame(loop);
