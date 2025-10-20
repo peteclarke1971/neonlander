@@ -544,15 +544,6 @@ export class AudioManager {
     this.stopMissionSuccess();
   }
 
-  // Fade music volume to target over duration
-  fadeMusicTo(targetVolume: number, duration: number = 1.0) {
-    if (!this.ctx || !this.musicGain) return;
-    const now = this.ctx.currentTime;
-    this.musicGain.gain.cancelScheduledValues(now);
-    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, now);
-    this.musicGain.gain.linearRampToValueAtTime(targetVolume, now + duration);
-  }
-
   // ===== Collectibles audio =====
   junkPickup() {
     this.playNoise(0.15, Math.random() < 0.5 ? 0.5 : 0.7);

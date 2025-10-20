@@ -121,16 +121,6 @@ export const SurvivalEngine: React.FC<Props> = ({
   const prevFuelPercentRef = useRef(1);
   const fuelBeforeLandingRef = useRef(200);
   
-  // Blackout zone state
-  const blackoutActiveRef = useRef(false);
-  const [blackoutActive, setBlackoutActive] = useState(false);
-  const blackoutIntensityRef = useRef(0); // 0-1 fade value
-  const blackoutDurationRef = useRef(0); // Time remaining in blackout
-  const blackoutCooldownRef = useRef(0); // Cooldown until next blackout
-  const nextBlackoutDistanceRef = useRef(3000); // Distance trigger for next blackout
-  const blackoutFadeInRef = useRef(false); // Currently fading in
-  const blackoutFadeOutRef = useRef(false); // Currently fading out
-  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -1159,54 +1149,6 @@ export const SurvivalEngine: React.FC<Props> = ({
             lastPaletteUpdate.current = currentTime;
           }
           
-          // Blackout zone system
-          blackoutCooldownRef.current = Math.max(0, blackoutCooldownRef.current - dt);
-          
-          // Trigger blackout at distance milestones
-          if (currentDistance > nextBlackoutDistanceRef.current && blackoutCooldownRef.current <= 0 && !blackoutActiveRef.current) {
-            blackoutActiveRef.current = true;
-            setBlackoutActive(true);
-            blackoutFadeInRef.current = true;
-            blackoutDurationRef.current = 30; // 30s duration
-            blackoutCooldownRef.current = 30 + Math.random() * 30; // 30-60s cooldown
-            nextBlackoutDistanceRef.current = currentDistance + 3000 + Math.random() * 2000; // Next at 3-5km
-            
-            // Start music fade to silence
-            audio.current.fadeMusicTo(0, 3.0);
-          }
-          
-          // Update active blackout
-          if (blackoutActiveRef.current) {
-            blackoutDurationRef.current -= dt;
-            
-            // Start fade out when duration expires
-            if (blackoutDurationRef.current <= 0 && !blackoutFadeOutRef.current) {
-              blackoutFadeInRef.current = false;
-              blackoutFadeOutRef.current = true;
-              
-              // Restore music volume
-              audio.current.fadeMusicTo(0.5, 3.0);
-            }
-          }
-          
-          // Handle blackout fade in/out
-          const fadeSpeed = 0.5; // Exponential fade speed (higher = faster)
-          if (blackoutFadeInRef.current) {
-            blackoutIntensityRef.current += (1 - blackoutIntensityRef.current) * Math.min(1, dt * fadeSpeed);
-            if (blackoutIntensityRef.current > 0.99) {
-              blackoutIntensityRef.current = 1;
-              blackoutFadeInRef.current = false;
-            }
-          } else if (blackoutFadeOutRef.current) {
-            blackoutIntensityRef.current += (0 - blackoutIntensityRef.current) * Math.min(1, dt * fadeSpeed);
-            if (blackoutIntensityRef.current < 0.01) {
-              blackoutIntensityRef.current = 0;
-              blackoutFadeOutRef.current = false;
-              blackoutActiveRef.current = false;
-              setBlackoutActive(false);
-            }
-          }
-          
           // Check if we've cleared a pad after takeoff
           if (padToClear) {
             const padY = padToClear.y || padToClear.currentPos?.y;
@@ -1951,12 +1893,6 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       
-      // Apply blackout background darkening BEFORE rendering stars
-      if (blackoutIntensityRef.current > 0.1) {
-        ctx.fillStyle = `rgba(0, 0, 0, ${blackoutIntensityRef.current * 0.85})`;
-        ctx.fillRect(0, 0, c.width, c.height);
-      }
-      
       if (shouldOptimize) {
         // LOW GRAPHICS: Simple layered rendering without clipping
         // Draw stars with basic culling
@@ -1980,20 +1916,45 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.fillRect(s.x, s.y, s.size, s.size);
         }
         ctx.globalAlpha = 1;
-    } else {
-      // HIGH GRAPHICS: Use same efficient per-star masking as low graphics
-      ctx.shadowColor = neonColor;
-      ctx.shadowBlur = 2 * dprInit;
-      ctx.fillStyle = neonColor;
-      for (let i = 0; i < stars.length; i++) {
-        const s = stars[i];
+      } else {
+        // HIGH GRAPHICS: Full masking system with clipping
+        // Create terrain clipping path to mask stars behind terrain
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(c.width, 0);
+        const segs = 150;
+        const terrainBuffer = 40 * dprInit;
+        for (let i = segs; i >= 0; i--) {
+          const sx = (i / segs) * c.width;
+          const worldX = cameraX + (sx - c.width / 2) / zoom;
+          const worldY = getHeightAt(worldX);
+          const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10;
+          ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.clip();
         
-        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
-        ctx.fillRect(s.x, s.y, s.size, s.size);
+        // Draw stars with shadow blur
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 2 * dprInit;
+        ctx.fillStyle = neonColor;
+        for (let i = 0; i < stars.length; i++) {
+          const s = stars[i];
+          
+          // Calculate world position of star to check terrain height
+          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
+          const terrainAtStar = getHeightAt(starWorldX);
+          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
+          
+          // Skip star if it's too close to terrain (within buffer zone)
+          if (starWorldY > terrainAtStar - 50) continue;
+          
+          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+          ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+          ctx.fillRect(s.x, s.y, s.size, s.size);
+        }
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
-    }
       
       // Draw shooting stars and satellites (skip in low graphics)
       if (!shouldOptimize) {
@@ -2050,204 +2011,55 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.shadowBlur = shadowIntensity;
       ctx.lineWidth = 2;
       
-      // Use spotlight clipping mask during blackout
-      if (blackoutIntensityRef.current > 0.3) {
-        // Proximity-based terrain reveal
-        const revealRadius = 450; // Distance from lander to reveal terrain
-        const fadeStart = 350; // Start fading out at this distance
+      for (const chunk of chunks) {
+        // Improved culling: keep terrain visible for half a screen width after passing
+        if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
         
-        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        for (let i = 0; i < chunk.points.length; i++) {
+          const pt = chunk.points[i];
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
         
-        for (const chunk of chunks) {
-          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+        // Draw pads with 2x labels
+        for (const pad of chunk.pads) {
+          ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
+          ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+          ctx.strokeStyle = neonColor;
+          ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
           
-          // Check if any part of this chunk is within reveal radius
-          const chunkMinDist = Math.min(
-            ...chunk.points.map(pt => {
-              const dx = pt.x - shipX;
-              const dy = pt.y - shipY;
-              return Math.sqrt(dx * dx + dy * dy);
-            })
-          );
-          
-          // Skip chunk if it's completely outside reveal radius
-          if (chunkMinDist > revealRadius) continue;
-          
-          // Calculate alpha based on closest point distance
-          let alpha = 1.0;
-          if (chunkMinDist > fadeStart) {
-            alpha = 1.0 - (chunkMinDist - fadeStart) / (revealRadius - fadeStart);
-            alpha = Math.max(0, Math.min(1, alpha));
-          }
-          
-          ctx.globalAlpha = alpha;
-          
-          // Draw terrain fill
-          if (!shouldOptimize) {
+          // Add 2x label for bonus pads
+          if (pad.bonus2x) {
             ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-            ctx.shadowBlur = 0;
-            ctx.beginPath();
-            for (let i = 0; i < chunk.points.length; i++) {
-              const pt = chunk.points[i];
-              if (i === 0) ctx.moveTo(pt.x, pt.y);
-              else ctx.lineTo(pt.x, pt.y);
-            }
-            const lastPt = chunk.points[chunk.points.length - 1];
-            const firstPt = chunk.points[0];
-            ctx.lineTo(lastPt.x, 2000);
-            ctx.lineTo(firstPt.x, 2000);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-          }
-          
-          // Draw terrain stroke
-          ctx.beginPath();
-          for (let i = 0; i < chunk.points.length; i++) {
-            const pt = chunk.points[i];
-            if (i === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
-          }
-          ctx.stroke();
-          
-          // Draw pads within reveal radius
-          for (const pad of chunk.pads) {
-            const padCenterX = (pad.xStart + pad.xEnd) / 2;
-            const padDist = Math.sqrt((padCenterX - shipX) ** 2 + (pad.y - shipY) ** 2);
-            
-            if (padDist > revealRadius) continue;
-            
-            let padAlpha = 1.0;
-            if (padDist > fadeStart) {
-              padAlpha = 1.0 - (padDist - fadeStart) / (revealRadius - fadeStart);
-            }
-            
-            ctx.globalAlpha = padAlpha;
-            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
-            ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-            ctx.strokeStyle = neonColor;
-            ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-            
-            if (pad.bonus2x) {
-              ctx.save();
-              ctx.textAlign = "center";
-              ctx.textBaseline = "top";
-              ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
-              ctx.shadowColor = neonColor;
-              ctx.shadowBlur = 18 * dprInit;
-              ctx.fillStyle = neonColor;
-              ctx.globalAlpha = padAlpha * 0.95;
-              const centerX = padCenterX;
-              ctx.fillText("2x", centerX, pad.y + 4);
-              ctx.restore();
-            }
-          }
-          
-          // Draw moving pads within reveal radius
-          for (const mp of chunk.movingPads) {
-            const mpDist = Math.sqrt(
-              (mp.currentPos.x - shipX) ** 2 + (mp.currentPos.y - shipY) ** 2
-            );
-            
-            if (mpDist > revealRadius) continue;
-            
-            let mpAlpha = 1.0;
-            if (mpDist > fadeStart) {
-              mpAlpha = 1.0 - (mpDist - fadeStart) / (revealRadius - fadeStart);
-            }
-            
-            ctx.save();
-            ctx.globalAlpha = mpAlpha;
-            movingPadSystem.renderMovingPad(
-              ctx,
-              mp,
-              cameraX,
-              0,
-              1,
-              c.width,
-              c.height,
-              neonColor
-            );
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+            ctx.shadowColor = neonColor;
+            ctx.shadowBlur = 18 * dprInit;
+            ctx.fillStyle = neonColor;
+            ctx.globalAlpha = 0.95;
+            const centerX = (pad.xStart + pad.xEnd) / 2;
+            ctx.fillText("2x", centerX, pad.y + 4);
             ctx.restore();
           }
         }
         
-        ctx.globalAlpha = 1.0;
-        
-      } else {
-        // Normal rendering when not in blackout
-        ctx.globalAlpha = 1;
-        
-        for (const chunk of chunks) {
-          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
-          
-          if (!shouldOptimize) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-            ctx.shadowBlur = 0;
-            ctx.beginPath();
-            for (let i = 0; i < chunk.points.length; i++) {
-              const pt = chunk.points[i];
-              if (i === 0) ctx.moveTo(pt.x, pt.y);
-              else ctx.lineTo(pt.x, pt.y);
-            }
-            const lastPt = chunk.points[chunk.points.length - 1];
-            const firstPt = chunk.points[0];
-            ctx.lineTo(lastPt.x, 2000);
-            ctx.lineTo(firstPt.x, 2000);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-          }
-          
-          ctx.beginPath();
-          for (let i = 0; i < chunk.points.length; i++) {
-            const pt = chunk.points[i];
-            if (i === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
-          }
-          ctx.stroke();
-          
-          for (const pad of chunk.pads) {
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
-            ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-            ctx.strokeStyle = neonColor;
-            ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-            
-            if (pad.bonus2x) {
-              ctx.save();
-              ctx.textAlign = "center";
-              ctx.textBaseline = "top";
-              ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
-              ctx.shadowColor = neonColor;
-              ctx.shadowBlur = 18 * dprInit;
-              ctx.fillStyle = neonColor;
-              ctx.globalAlpha = 0.95;
-              const centerX = (pad.xStart + pad.xEnd) / 2;
-              ctx.fillText("2x", centerX, pad.y + 4);
-              ctx.restore();
-            }
-          }
-          
-          for (const mp of chunk.movingPads) {
-            movingPadSystem.renderMovingPad(
-              ctx,
-              mp,
-              cameraX,
-              0,
-              1,
-              c.width,
-              c.height,
-              neonColor
-            );
-          }
+        // Draw moving pads with full rendering (dotted paths, arrows, labels)
+        for (const mp of chunk.movingPads) {
+          movingPadSystem.renderMovingPad(
+            ctx,
+            mp,
+            cameraX,
+            0, // cameraY (not used in 2D side-scrolling)
+            1, // zoom (survival mode doesn't use zoom)
+            c.width,
+            c.height,
+            neonColor
+          );
         }
       }
-      
-      // Reset global alpha after terrain/pad dimming
-      ctx.globalAlpha = 1;
       
       // Draw anomalies (gravity wells)
       if (allAnomalies.length > 0) {
@@ -2256,11 +2068,6 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Draw volcanoes
       if (allVolcanoes.length > 0) {
-        // Boost volcano glow during blackout (they become primary light sources)
-        ctx.save();
-        if (blackoutIntensityRef.current > 0.3) {
-          ctx.globalAlpha = 1 + (blackoutIntensityRef.current * 0.5); // 50% brighter during blackout
-        }
         drawVolcanoes(
           ctx,
           allVolcanoes,
@@ -2269,18 +2076,12 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
-        ctx.restore();
       }
       
-      // Render hazards (viewport culling included in drawHazards) - enhanced during blackout
+      // Render hazards (viewport culling included in drawHazards)
       const allHazards = hazardsRef.current;
       if (allHazards.length > 0) {
-        ctx.save();
-        if (blackoutIntensityRef.current > 0.3) {
-          ctx.globalAlpha = 1 + (blackoutIntensityRef.current * 0.3); // 30% brighter during blackout
-        }
         drawHazards(ctx, allHazards, neonColor, shouldOptimize ? 4 : 8);
-        ctx.restore();
       }
       
       // Render asteroid field (if active)
@@ -2606,42 +2407,6 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.lineTo(12, 12);
         ctx.stroke();
         
-        // Draw spotlight cone during blackout (in ship-local coordinates)
-        if (blackoutIntensityRef.current > 0.3 && !isDead) {
-          const spotlightRange = 350;
-          const spotlightSpread = 0.22; // ~25 degrees
-          
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(0, 12); // Base of lander (apex of cone)
-          
-          // Draw to right edge first
-          const rightX = Math.sin(spotlightSpread) * spotlightRange;
-          const rightY = 12 + Math.cos(spotlightSpread) * spotlightRange;
-          ctx.lineTo(rightX, rightY);
-          
-          // Arc from right edge to left edge (clockwise)
-          ctx.arc(
-            0, 12,                        // Center at lander base
-            spotlightRange,               // Radius
-            Math.PI/2 + spotlightSpread,  // Start at right edge (down-right)
-            Math.PI/2 - spotlightSpread,  // End at left edge (down-left)
-            false                         // Clockwise direction
-          );
-          
-          ctx.closePath(); // Connects back to apex at (0, 12)
-          
-          // Dimmer spotlight since terrain reveal happens via clipping
-          const gradient = ctx.createRadialGradient(0, 12, 0, 0, 12, spotlightRange);
-          gradient.addColorStop(0, `rgba(255, 255, 200, ${0.25 * blackoutIntensityRef.current})`);
-          gradient.addColorStop(0.5, `rgba(255, 255, 180, ${0.15 * blackoutIntensityRef.current})`);
-          gradient.addColorStop(0.8, `rgba(255, 255, 160, ${0.05 * blackoutIntensityRef.current})`);
-          
-          ctx.fillStyle = gradient;
-          ctx.fill();
-          ctx.restore();
-        }
-        
         ctx.globalAlpha = 1;
         ctx.restore();
       }
@@ -2709,8 +2474,6 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.fillRect(0, 0, c.width, c.height);
         ctx.restore();
       }
-      
-      // Grain overlay disabled - too expensive for performance
     };
     
     raf = requestAnimationFrame(loop);
@@ -2769,7 +2532,6 @@ export const SurvivalEngine: React.FC<Props> = ({
         tiltAngle={gyroscope.tiltAngle}
         onEnableGyro={handleEnableGyro}
         onCalibrateGyro={handleCalibrateGyro}
-        blackoutActive={blackoutActive}
       />
       
       {/* FPS Counter */}
