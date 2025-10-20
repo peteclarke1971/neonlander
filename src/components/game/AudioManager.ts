@@ -506,6 +506,22 @@ export class AudioManager {
     }
   }
 
+  // Fade out current music
+  fadeOutMusic(duration: number = 1.5) {
+    if (!this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.linearRampToValueAtTime(0, now + duration);
+  }
+
+  // Fade in current music
+  fadeInMusic(duration: number = 3.0) {
+    if (!this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.linearRampToValueAtTime(0.5, now + duration);
+  }
+
   // Mission success music source tracking
   private missionSuccessSource?: AudioBufferSourceNode | null;
 

@@ -18,6 +18,9 @@ interface Props {
   // Comet event state
   cometActive?: boolean;
   cometTimer?: number;
+  // Blackout zone state
+  blackoutActive?: boolean;
+  blackoutTimer?: number;
   // Color zone
   zoneName?: string;
   // Gyroscope controls
@@ -43,6 +46,8 @@ export const SurvivalHUD: React.FC<Props> = ({
   shieldTimer = 0,
   cometActive = false,
   cometTimer = 0,
+  blackoutActive = false,
+  blackoutTimer = 0,
   zoneName,
   showGyroButton = false,
   gyroActive = false,
@@ -147,6 +152,27 @@ export const SurvivalHUD: React.FC<Props> = ({
                 <span className="text-xs text-blue-300/80">{Math.ceil(cometTimer)}s</span>
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Blackout Badge */}
+        {blackoutActive && (
+          <div className="mt-2 flex items-center justify-center bg-gray-900/90 border border-gray-600 rounded px-3 py-2">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-2xl font-bold text-gray-300 tracking-[0.3em] animate-pulse">
+                BLACKOUT
+              </span>
+              {blackoutTimer && blackoutTimer > 0 && (
+                <div className="w-20 h-1 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-300 bg-gray-400"
+                    style={{ 
+                      width: `${(blackoutTimer / 25) * 100}%`
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
         

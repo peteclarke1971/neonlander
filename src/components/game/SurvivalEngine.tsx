@@ -113,6 +113,18 @@ export const SurvivalEngine: React.FC<Props> = ({
   const firstCometSpawnedRef = useRef(false);
   const nextCometBlockRef = useRef(0); // Block number for next comet spawn
   
+  // Blackout zone state
+  const blackoutActiveRef = useRef(false);
+  const [blackoutActive, setBlackoutActive] = useState(false);
+  const blackoutTimerRef = useRef(0);
+  const blackoutTransitionRef = useRef(1.0); // 1.0 = full brightness, 0.0 = full blackout
+  const lastBlackoutMilestoneRef = useRef(-1);
+  const BLACKOUT_DURATION = 25; // seconds
+  const BLACKOUT_FADE_IN = 2.0; // seconds to fade into blackout
+  const BLACKOUT_FADE_OUT = 3.0; // seconds to fade out of blackout
+  const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
+  const SPOTLIGHT_RANGE = 400; // world units
+  
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
@@ -765,6 +777,50 @@ export const SurvivalEngine: React.FC<Props> = ({
         if (invulnerableTimerRef.current <= 0) {
           invulnerableRef.current = false;
           invulnerableTimerRef.current = 0;
+        }
+      }
+      
+      // Blackout trigger logic (every ~1500m, lasting 25s)
+      const blackoutInterval = 1500;
+      const distanceMilestone = Math.floor(currentDistance / blackoutInterval);
+      
+      if (!blackoutActiveRef.current && distanceMilestone > lastBlackoutMilestoneRef.current && distanceMilestone > 0) {
+        // Start new blackout
+        blackoutActiveRef.current = true;
+        setBlackoutActive(true);
+        blackoutTimerRef.current = BLACKOUT_DURATION;
+        lastBlackoutMilestoneRef.current = distanceMilestone;
+        
+        // Audio: fade out music
+        audio.current.fadeOutMusic(1.5);
+      }
+      
+      // Update blackout timer
+      if (blackoutActiveRef.current) {
+        blackoutTimerRef.current -= dt;
+        
+        // Transition phase calculations
+        if (blackoutTimerRef.current > BLACKOUT_DURATION - BLACKOUT_FADE_IN) {
+          // Fading into blackout (1.0 -> 0.0)
+          const fadeProgress = (BLACKOUT_DURATION - blackoutTimerRef.current) / BLACKOUT_FADE_IN;
+          blackoutTransitionRef.current = 1.0 - fadeProgress;
+        } else if (blackoutTimerRef.current <= BLACKOUT_FADE_OUT) {
+          // Fading out of blackout (0.0 -> 1.0)
+          const fadeProgress = blackoutTimerRef.current / BLACKOUT_FADE_OUT;
+          blackoutTransitionRef.current = 1.0 - fadeProgress;
+        } else {
+          // Full blackout
+          blackoutTransitionRef.current = 0.0;
+        }
+        
+        // End blackout
+        if (blackoutTimerRef.current <= 0) {
+          blackoutActiveRef.current = false;
+          setBlackoutActive(false);
+          blackoutTransitionRef.current = 1.0;
+          
+          // Audio: fade music back in
+          audio.current.fadeInMusic(3.0);
         }
       }
       
@@ -1889,6 +1945,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         cometDustParticles.splice(0, cometDustParticles.length - 150);
       }
       
+      // Apply blackout darkness to entire scene
+      const brightnessMultiplier = blackoutTransitionRef.current;
+      
       // Draw starfield with optimized rendering
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1902,9 +1961,9 @@ export const SurvivalEngine: React.FC<Props> = ({
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-        ctx.globalAlpha = shouldOptimize 
+        ctx.globalAlpha = (shouldOptimize 
           ? Math.min(1, Math.max(0.3, a))
-          : Math.min(1, Math.max(0.25, a));
+          : Math.min(1, Math.max(0.25, a))) * brightnessMultiplier * 0.3; // Dim stars heavily during blackout
         ctx.fillRect(s.x, s.y, s.size, s.size);
       }
       ctx.globalAlpha = 1;
@@ -1985,7 +2044,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.scale(zoom, zoom);
       ctx.translate(-cameraX + shake, anchor);
       
-      // Draw terrain with comet lighting
+      // Draw terrain with comet lighting and blackout
       let terrainColor = neonColor;
       let shadowIntensity = shouldOptimize ? 0 : 8;
       
@@ -1996,6 +2055,11 @@ export const SurvivalEngine: React.FC<Props> = ({
         shadowIntensity = shouldOptimize ? 0 : 14;
       }
       
+      // Apply blackout darkness
+      const terrainAlpha = 0.1 + (0.9 * brightnessMultiplier); // Never fully invisible
+      shadowIntensity = shadowIntensity * brightnessMultiplier;
+      
+      ctx.globalAlpha = terrainAlpha;
       ctx.strokeStyle = terrainColor;
       ctx.shadowColor = terrainColor;
       ctx.shadowBlur = shadowIntensity;
@@ -2051,13 +2115,28 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
-      // Draw anomalies (gravity wells)
+      // Reset alpha after terrain
+      ctx.globalAlpha = 1;
+      
+      // Draw anomalies (gravity wells) - enhanced glow during blackout
       if (allAnomalies.length > 0) {
+        if (blackoutActiveRef.current) {
+          ctx.save();
+          ctx.shadowBlur = (ctx.shadowBlur || 15) * 2; // Double glow
+        }
         drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor);
+        if (blackoutActiveRef.current) {
+          ctx.restore();
+        }
       }
       
-      // Draw volcanoes
+      // Draw volcanoes - enhanced glow during blackout
       if (allVolcanoes.length > 0) {
+        if (blackoutActiveRef.current) {
+          ctx.save();
+          ctx.shadowBlur = 30 * dprInit; // Increased from 15
+          ctx.shadowColor = 'rgba(255, 100, 0, 0.9)';
+        }
         drawVolcanoes(
           ctx,
           allVolcanoes,
@@ -2066,6 +2145,9 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
+        if (blackoutActiveRef.current) {
+          ctx.restore();
+        }
       }
       
       // Render hazards (viewport culling included in drawHazards)
@@ -2301,6 +2383,55 @@ export const SurvivalEngine: React.FC<Props> = ({
       // TEMPORARILY DISABLED: Visual fuel interpolation (smooth animation)
       // Always keep visual fuel matching actual fuel (no animation)
       visualFuelRef.current = fuelAmount;
+      
+      // Draw spotlight cone from lander base (during blackout)
+      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && !isDead) {
+        ctx.save();
+        
+        // Spotlight intensity (fades in/out with blackout)
+        const spotlightIntensity = 1.0 - blackoutTransitionRef.current;
+        
+        // Spotlight origin: base of lander
+        const spotX = shipX;
+        const spotY = shipY + 12; // Slightly below lander center
+        
+        // Spotlight direction: directly downward, rotated with lander
+        const spotAngle = shipAngle + Math.PI / 2; // +90° to point down from lander
+        
+        // Create spotlight cone path
+        const leftAngle = spotAngle - SPOTLIGHT_ANGLE / 2;
+        const rightAngle = spotAngle + SPOTLIGHT_ANGLE / 2;
+        
+        const leftX = spotX + Math.cos(leftAngle) * SPOTLIGHT_RANGE;
+        const leftY = spotY + Math.sin(leftAngle) * SPOTLIGHT_RANGE;
+        const rightX = spotX + Math.cos(rightAngle) * SPOTLIGHT_RANGE;
+        const rightY = spotY + Math.sin(rightAngle) * SPOTLIGHT_RANGE;
+        
+        // Draw cone with gradient
+        const gradient = ctx.createRadialGradient(
+          spotX, spotY, 0,
+          spotX, spotY, SPOTLIGHT_RANGE
+        );
+        
+        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.4 * spotlightIntensity})`);
+        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.2 * spotlightIntensity})`);
+        gradient.addColorStop(1, `rgba(255, 255, 180, 0)`);
+        
+        // Clip to cone shape
+        ctx.beginPath();
+        ctx.moveTo(spotX, spotY);
+        ctx.lineTo(leftX, leftY);
+        ctx.arc(spotX, spotY, SPOTLIGHT_RANGE, leftAngle, rightAngle);
+        ctx.lineTo(spotX, spotY);
+        ctx.closePath();
+        
+        ctx.fillStyle = gradient;
+        ctx.globalCompositeOperation = 'lighter'; // Additive blending
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over'; // Reset
+        
+        ctx.restore();
+      }
       
       // Draw ship (only if alive)
       if (!isDead) {
