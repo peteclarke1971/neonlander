@@ -1988,14 +1988,6 @@ export const SurvivalEngine: React.FC<Props> = ({
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
         
-        // Calculate world position of star to check terrain height
-        const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
-        const terrainAtStar = getHeightAt(starWorldX);
-        const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
-        
-        // Skip star if it's too close to terrain
-        if (starWorldY > terrainAtStar - 60) continue;
-        
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
         ctx.fillRect(s.x, s.y, s.size, s.size);
