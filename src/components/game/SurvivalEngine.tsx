@@ -2391,11 +2391,17 @@ export const SurvivalEngine: React.FC<Props> = ({
         // Spotlight intensity (fades in/out with blackout)
         const spotlightIntensity = 1.0 - blackoutTransitionRef.current;
         
-        // Spotlight origin: base of lander
-        const spotX = shipX;
-        const spotY = shipY + 12; // Slightly below lander center
+        // Spotlight origin: base of lander (in ship's local coordinate system)
+        // When ship is upright (angle=0), we want spotlight at (0, +12) below center
+        // This offset must rotate WITH the ship
+        const localOffsetX = 0;
+        const localOffsetY = 12; // Distance below ship center in local space
         
-        // Spotlight direction: directly downward, rotated with lander
+        // Transform local offset to world space using ship's rotation
+        const spotX = shipX + Math.cos(shipAngle) * localOffsetX - Math.sin(shipAngle) * localOffsetY;
+        const spotY = shipY + Math.sin(shipAngle) * localOffsetX + Math.cos(shipAngle) * localOffsetY;
+        
+        // Spotlight direction: directly downward from ship's perspective (perpendicular to ship)
         const spotAngle = shipAngle + Math.PI / 2; // +90° to point down from lander
         
         // Create spotlight cone path
