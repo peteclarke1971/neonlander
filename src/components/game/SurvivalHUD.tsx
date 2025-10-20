@@ -27,6 +27,8 @@ interface Props {
   tiltAngle?: number;
   onEnableGyro?: () => void;
   onCalibrateGyro?: () => void;
+  // Blackout state
+  blackoutActive?: boolean;
 }
 
 export const SurvivalHUD: React.FC<Props> = ({ 
@@ -50,6 +52,7 @@ export const SurvivalHUD: React.FC<Props> = ({
   tiltAngle = 0,
   onEnableGyro,
   onCalibrateGyro,
+  blackoutActive = false,
 }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
@@ -85,6 +88,14 @@ export const SurvivalHUD: React.FC<Props> = ({
         {zoneName && (
           <div className="mt-2 text-xs text-accent/70 font-mono tracking-wide animate-pulse">
             {zoneName}
+          </div>
+        )}
+        
+        {/* Blackout Indicator */}
+        {blackoutActive && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-red-400 animate-pulse">
+            <span>⚡</span>
+            <span className="font-bold">BLACKOUT</span>
           </div>
         )}
         

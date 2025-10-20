@@ -121,6 +121,16 @@ export const SurvivalEngine: React.FC<Props> = ({
   const prevFuelPercentRef = useRef(1);
   const fuelBeforeLandingRef = useRef(200);
   
+  // Blackout zone state
+  const blackoutActiveRef = useRef(false);
+  const [blackoutActive, setBlackoutActive] = useState(false);
+  const blackoutIntensityRef = useRef(0); // 0-1 fade value
+  const blackoutDurationRef = useRef(0); // Time remaining in blackout
+  const blackoutCooldownRef = useRef(0); // Cooldown until next blackout
+  const nextBlackoutDistanceRef = useRef(3000); // Distance trigger for next blackout
+  const blackoutFadeInRef = useRef(false); // Currently fading in
+  const blackoutFadeOutRef = useRef(false); // Currently fading out
+  
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
   
@@ -1149,6 +1159,54 @@ export const SurvivalEngine: React.FC<Props> = ({
             lastPaletteUpdate.current = currentTime;
           }
           
+          // Blackout zone system
+          blackoutCooldownRef.current = Math.max(0, blackoutCooldownRef.current - dt);
+          
+          // Trigger blackout at distance milestones
+          if (currentDistance > nextBlackoutDistanceRef.current && blackoutCooldownRef.current <= 0 && !blackoutActiveRef.current) {
+            blackoutActiveRef.current = true;
+            setBlackoutActive(true);
+            blackoutFadeInRef.current = true;
+            blackoutDurationRef.current = 10 + Math.random() * 10; // 10-20s duration
+            blackoutCooldownRef.current = 30 + Math.random() * 30; // 30-60s cooldown
+            nextBlackoutDistanceRef.current = currentDistance + 3000 + Math.random() * 2000; // Next at 3-5km
+            
+            // Start music fade to silence
+            audio.current.fadeMusicTo(0, 3.0);
+          }
+          
+          // Update active blackout
+          if (blackoutActiveRef.current) {
+            blackoutDurationRef.current -= dt;
+            
+            // Start fade out when duration expires
+            if (blackoutDurationRef.current <= 0 && !blackoutFadeOutRef.current) {
+              blackoutFadeInRef.current = false;
+              blackoutFadeOutRef.current = true;
+              
+              // Restore music volume
+              audio.current.fadeMusicTo(0.5, 3.0);
+            }
+          }
+          
+          // Handle blackout fade in/out
+          const fadeSpeed = 0.5; // Exponential fade speed (higher = faster)
+          if (blackoutFadeInRef.current) {
+            blackoutIntensityRef.current += (1 - blackoutIntensityRef.current) * Math.min(1, dt * fadeSpeed);
+            if (blackoutIntensityRef.current > 0.99) {
+              blackoutIntensityRef.current = 1;
+              blackoutFadeInRef.current = false;
+            }
+          } else if (blackoutFadeOutRef.current) {
+            blackoutIntensityRef.current += (0 - blackoutIntensityRef.current) * Math.min(1, dt * fadeSpeed);
+            if (blackoutIntensityRef.current < 0.01) {
+              blackoutIntensityRef.current = 0;
+              blackoutFadeOutRef.current = false;
+              blackoutActiveRef.current = false;
+              setBlackoutActive(false);
+            }
+          }
+          
           // Check if we've cleared a pad after takeoff
           if (padToClear) {
             const padY = padToClear.y || padToClear.currentPos?.y;
@@ -1893,6 +1951,12 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       
+      // Apply blackout background darkening BEFORE rendering stars
+      if (blackoutIntensityRef.current > 0.1) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${blackoutIntensityRef.current * 0.85})`;
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
+      
       if (shouldOptimize) {
         // LOW GRAPHICS: Simple layered rendering without clipping
         // Draw stars with basic culling
@@ -1994,6 +2058,10 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.shadowBlur = shadowIntensity;
       ctx.lineWidth = 2;
       
+      // Apply blackout dimming to terrain
+      const terrainDimming = 1 - (blackoutIntensityRef.current * 0.85); // 15% minimum brightness
+      ctx.globalAlpha = terrainDimming;
+      
       for (const chunk of chunks) {
         // Improved culling: keep terrain visible for half a screen width after passing
         if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
@@ -2008,6 +2076,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         // Draw pads with 2x labels
         for (const pad of chunk.pads) {
+          const padDimming = 1 - (blackoutIntensityRef.current * 0.8); // 20% minimum brightness for beacons
+          ctx.globalAlpha = padDimming;
           ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
           ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
           ctx.strokeStyle = neonColor;
@@ -2022,7 +2092,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             ctx.shadowColor = neonColor;
             ctx.shadowBlur = 18 * dprInit;
             ctx.fillStyle = neonColor;
-            ctx.globalAlpha = 0.95;
+            ctx.globalAlpha = 0.95 * padDimming;
             const centerX = (pad.xStart + pad.xEnd) / 2;
             ctx.fillText("2x", centerX, pad.y + 4);
             ctx.restore();
@@ -2044,6 +2114,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
+      // Reset global alpha after terrain/pad dimming
+      ctx.globalAlpha = 1;
+      
       // Draw anomalies (gravity wells)
       if (allAnomalies.length > 0) {
         drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor);
@@ -2051,6 +2124,11 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Draw volcanoes
       if (allVolcanoes.length > 0) {
+        // Boost volcano glow during blackout (they become primary light sources)
+        ctx.save();
+        if (blackoutIntensityRef.current > 0.3) {
+          ctx.globalAlpha = 1 + (blackoutIntensityRef.current * 0.5); // 50% brighter during blackout
+        }
         drawVolcanoes(
           ctx,
           allVolcanoes,
@@ -2059,12 +2137,18 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
+        ctx.restore();
       }
       
-      // Render hazards (viewport culling included in drawHazards)
+      // Render hazards (viewport culling included in drawHazards) - enhanced during blackout
       const allHazards = hazardsRef.current;
       if (allHazards.length > 0) {
+        ctx.save();
+        if (blackoutIntensityRef.current > 0.3) {
+          ctx.globalAlpha = 1 + (blackoutIntensityRef.current * 0.3); // 30% brighter during blackout
+        }
         drawHazards(ctx, allHazards, neonColor, shouldOptimize ? 4 : 8);
+        ctx.restore();
       }
       
       // Render asteroid field (if active)
@@ -2394,6 +2478,45 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
+      // Draw spotlight cone during blackout (after ship rendering)
+      if (blackoutIntensityRef.current > 0.3 && !isDead) {
+        ctx.save();
+        
+        // Calculate spotlight direction from ship angle
+        const spotlightAngle = shipAngle;
+        const spotlightRange = 350;
+        const spotlightSpread = 0.22; // ~25 degrees in radians
+        
+        // Create spotlight cone path
+        ctx.beginPath();
+        ctx.moveTo(shipX, shipY + 12);
+        const leftAngle = spotlightAngle - spotlightSpread;
+        const rightAngle = spotlightAngle + spotlightSpread;
+        ctx.lineTo(
+          shipX + Math.sin(leftAngle) * spotlightRange,
+          shipY + Math.cos(leftAngle) * spotlightRange
+        );
+        ctx.arc(
+          shipX, shipY + 12,
+          spotlightRange,
+          leftAngle, rightAngle
+        );
+        ctx.closePath();
+        
+        // Apply gradient fill
+        const gradient = ctx.createRadialGradient(
+          shipX, shipY + 12, 0,
+          shipX, shipY + 12, spotlightRange
+        );
+        gradient.addColorStop(0, `rgba(255, 255, 200, ${0.15 * blackoutIntensityRef.current})`);
+        gradient.addColorStop(0.7, `rgba(255, 255, 180, ${0.08 * blackoutIntensityRef.current})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 160, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.restore();
+      }
+      
       ctx.restore();
       
       // Screen-space overlays (bonus popups)
@@ -2457,6 +2580,25 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.fillRect(0, 0, c.width, c.height);
         ctx.restore();
       }
+      
+      // Draw subtle grain overlay during blackout (optional, skip in low graphics)
+      if (blackoutIntensityRef.current > 0.2 && !shouldOptimize) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = blackoutIntensityRef.current * 0.08;
+        
+        // Film grain effect using noise
+        const imageData = ctx.getImageData(0, 0, c.width, c.height);
+        const pixels = imageData.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+          const grain = (Math.random() - 0.5) * 30;
+          pixels[i] += grain;     // R
+          pixels[i + 1] += grain; // G
+          pixels[i + 2] += grain; // B
+        }
+        ctx.putImageData(imageData, 0, 0);
+        ctx.restore();
+      }
     };
     
     raf = requestAnimationFrame(loop);
@@ -2515,6 +2657,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         tiltAngle={gyroscope.tiltAngle}
         onEnableGyro={handleEnableGyro}
         onCalibrateGyro={handleCalibrateGyro}
+        blackoutActive={blackoutActive}
       />
       
       {/* FPS Counter */}
