@@ -2498,18 +2498,23 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(0, 12); // Base of lander in ship-local coords
+          ctx.moveTo(0, 12); // Base of lander (apex of cone)
           
-          // Left edge of cone (pointing down-left in ship space)
-          ctx.lineTo(
-            -Math.sin(spotlightSpread) * spotlightRange,
-            12 + Math.cos(spotlightSpread) * spotlightRange
+          // Draw to right edge first
+          const rightX = Math.sin(spotlightSpread) * spotlightRange;
+          const rightY = 12 + Math.cos(spotlightSpread) * spotlightRange;
+          ctx.lineTo(rightX, rightY);
+          
+          // Arc from right edge to left edge (clockwise)
+          ctx.arc(
+            0, 12,                        // Center at lander base
+            spotlightRange,               // Radius
+            Math.PI/2 + spotlightSpread,  // Start at right edge (down-right)
+            Math.PI/2 - spotlightSpread,  // End at left edge (down-left)
+            false                         // Clockwise direction
           );
           
-          // Arc along bottom
-          ctx.arc(0, 12, spotlightRange, Math.PI/2 - spotlightSpread, Math.PI/2 + spotlightSpread);
-          
-          ctx.closePath();
+          ctx.closePath(); // Connects back to apex at (0, 12)
           
           // Simplified gradient
           const gradient = ctx.createRadialGradient(0, 12, 0, 0, 12, spotlightRange);
