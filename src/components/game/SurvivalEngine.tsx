@@ -1167,7 +1167,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             blackoutActiveRef.current = true;
             setBlackoutActive(true);
             blackoutFadeInRef.current = true;
-            blackoutDurationRef.current = 10 + Math.random() * 10; // 10-20s duration
+            blackoutDurationRef.current = 30; // 30s duration
             blackoutCooldownRef.current = 30 + Math.random() * 30; // 30-60s cooldown
             nextBlackoutDistanceRef.current = currentDistance + 3000 + Math.random() * 2000; // Next at 3-5km
             
@@ -2050,9 +2050,8 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.shadowBlur = shadowIntensity;
       ctx.lineWidth = 2;
       
-      // Apply blackout dimming to terrain
-      const terrainDimming = 1 - (blackoutIntensityRef.current * 0.85); // 15% minimum brightness
-      ctx.globalAlpha = terrainDimming;
+      // Make terrain completely invisible during blackout
+      ctx.globalAlpha = blackoutIntensityRef.current > 0.3 ? 0 : 1;
       
       for (const chunk of chunks) {
         // Improved culling: keep terrain visible for half a screen width after passing
@@ -2093,7 +2092,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         // Draw pads with 2x labels
         for (const pad of chunk.pads) {
-          const padDimming = 1 - (blackoutIntensityRef.current * 0.8); // 20% minimum brightness for beacons
+          const padDimming = blackoutIntensityRef.current > 0.3 ? 0 : 1; // Invisible during blackout
           ctx.globalAlpha = padDimming;
           ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
           ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
@@ -2516,11 +2515,11 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           ctx.closePath(); // Connects back to apex at (0, 12)
           
-          // Simplified gradient
+          // Much brighter spotlight for "reveal" effect
           const gradient = ctx.createRadialGradient(0, 12, 0, 0, 12, spotlightRange);
-          gradient.addColorStop(0, `rgba(255, 255, 200, ${0.15 * blackoutIntensityRef.current})`);
-          gradient.addColorStop(0.7, `rgba(255, 255, 180, ${0.08 * blackoutIntensityRef.current})`);
-          gradient.addColorStop(1, 'rgba(255, 255, 160, 0)');
+          gradient.addColorStop(0, `rgba(255, 255, 200, ${0.6 * blackoutIntensityRef.current})`);
+          gradient.addColorStop(0.5, `rgba(255, 255, 180, ${0.4 * blackoutIntensityRef.current})`);
+          gradient.addColorStop(0.8, `rgba(255, 255, 160, ${0.15 * blackoutIntensityRef.current})`);
           
           ctx.fillStyle = gradient;
           ctx.fill();
