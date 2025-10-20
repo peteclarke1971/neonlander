@@ -1893,68 +1893,21 @@ export const SurvivalEngine: React.FC<Props> = ({
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       
-      if (shouldOptimize) {
-        // LOW GRAPHICS: Simple layered rendering without clipping
-        // Draw stars with basic culling
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = 0; // No shadow blur for performance
-        ctx.fillStyle = neonColor;
-        const starLimit = Math.min(80, stars.length);
-        for (let i = 0; i < starLimit; i++) {
-          const s = stars[i];
-          
-          // Calculate world position of star to check terrain height
-          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
-          const terrainAtStar = getHeightAt(starWorldX);
-          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
-          
-          // Skip star if it's too close to terrain
-          if (starWorldY > terrainAtStar - 60) continue;
-          
-          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-          ctx.globalAlpha = Math.min(1, Math.max(0.3, a));
-          ctx.fillRect(s.x, s.y, s.size, s.size);
-        }
-        ctx.globalAlpha = 1;
-      } else {
-        // HIGH GRAPHICS: Full masking system with clipping
-        // Create terrain clipping path to mask stars behind terrain
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(c.width, 0);
-        const segs = 150;
-        const terrainBuffer = 40 * dprInit;
-        for (let i = segs; i >= 0; i--) {
-          const sx = (i / segs) * c.width;
-          const worldX = cameraX + (sx - c.width / 2) / zoom;
-          const worldY = getHeightAt(worldX);
-          const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10;
-          ctx.lineTo(sx, sy);
-        }
-        ctx.closePath();
-        ctx.clip();
-        
-        // Draw stars with shadow blur
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = 2 * dprInit;
-        ctx.fillStyle = neonColor;
-        for (let i = 0; i < stars.length; i++) {
-          const s = stars[i];
-          
-          // Calculate world position of star to check terrain height
-          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
-          const terrainAtStar = getHeightAt(starWorldX);
-          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
-          
-          // Skip star if it's too close to terrain (within buffer zone)
-          if (starWorldY > terrainAtStar - 50) continue;
-          
-          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-          ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
-          ctx.fillRect(s.x, s.y, s.size, s.size);
-        }
-        ctx.globalAlpha = 1;
+      // Draw stars (no clipping - terrain will be filled black later)
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = shouldOptimize ? 0 : 2 * dprInit;
+      ctx.fillStyle = neonColor;
+      const starLimit = shouldOptimize ? Math.min(80, stars.length) : stars.length;
+
+      for (let i = 0; i < starLimit; i++) {
+        const s = stars[i];
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+        ctx.globalAlpha = shouldOptimize 
+          ? Math.min(1, Math.max(0.3, a))
+          : Math.min(1, Math.max(0.25, a));
+        ctx.fillRect(s.x, s.y, s.size, s.size);
       }
+      ctx.globalAlpha = 1;
       
       // Draw shooting stars and satellites (skip in low graphics)
       if (!shouldOptimize) {
@@ -1989,6 +1942,42 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.globalAlpha = 1;
       }
       ctx.restore();
+      
+      // Fill terrain shape with black to mask stars behind it
+      // This must be done BEFORE applying camera transform
+      if (!shouldOptimize) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Apply same camera transform used for terrain
+        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shake, anchor);
+        
+        // Fill terrain shape with solid black
+        ctx.fillStyle = '#000000';
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+          
+          ctx.beginPath();
+          // Start from bottom of screen
+          ctx.moveTo(chunk.startX, 2000); // Large Y value to cover bottom
+          
+          // Trace terrain shape
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            ctx.lineTo(pt.x, pt.y);
+          }
+          
+          // Close to bottom
+          ctx.lineTo(chunk.endX, 2000);
+          ctx.closePath();
+          ctx.fill();
+        }
+        
+        ctx.restore();
+      }
       
       // Apply zoom and camera transform (both horizontal and vertical)
       ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
