@@ -1916,45 +1916,28 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.fillRect(s.x, s.y, s.size, s.size);
         }
         ctx.globalAlpha = 1;
-      } else {
-        // HIGH GRAPHICS: Full masking system with clipping
-        // Create terrain clipping path to mask stars behind terrain
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(c.width, 0);
-        const segs = 150;
-        const terrainBuffer = 40 * dprInit;
-        for (let i = segs; i >= 0; i--) {
-          const sx = (i / segs) * c.width;
-          const worldX = cameraX + (sx - c.width / 2) / zoom;
-          const worldY = getHeightAt(worldX);
-          const sy = c.height / 2 + (worldY + anchor) * zoom * dprInit + terrainBuffer + 10;
-          ctx.lineTo(sx, sy);
-        }
-        ctx.closePath();
-        ctx.clip();
+    } else {
+      // HIGH GRAPHICS: Use same efficient per-star masking as low graphics
+      ctx.shadowColor = neonColor;
+      ctx.shadowBlur = 2 * dprInit;
+      ctx.fillStyle = neonColor;
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i];
         
-        // Draw stars with shadow blur
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = 2 * dprInit;
-        ctx.fillStyle = neonColor;
-        for (let i = 0; i < stars.length; i++) {
-          const s = stars[i];
-          
-          // Calculate world position of star to check terrain height
-          const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
-          const terrainAtStar = getHeightAt(starWorldX);
-          const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
-          
-          // Skip star if it's too close to terrain (within buffer zone)
-          if (starWorldY > terrainAtStar - 50) continue;
-          
-          const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
-          ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
-          ctx.fillRect(s.x, s.y, s.size, s.size);
-        }
-        ctx.globalAlpha = 1;
+        // Calculate world position of star to check terrain height
+        const starWorldX = cameraX + (s.x - c.width / 2) / zoom;
+        const terrainAtStar = getHeightAt(starWorldX);
+        const starWorldY = (s.y - c.height / 2) / (zoom * dprInit) - anchor;
+        
+        // Skip star if it's too close to terrain
+        if (starWorldY > terrainAtStar - 60) continue;
+        
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
+        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        ctx.fillRect(s.x, s.y, s.size, s.size);
       }
+      ctx.globalAlpha = 1;
+    }
       
       // Draw shooting stars and satellites (skip in low graphics)
       if (!shouldOptimize) {
