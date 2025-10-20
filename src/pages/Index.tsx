@@ -157,8 +157,7 @@ const Index = () => {
   }, []);
 
   const [showGhost, setShowGhost] = useState(false);
-  const [useGlobalGhost, setUseGlobalGhost] = useState(false);
-  const [globalGhostData, setGlobalGhostData] = useState<any>(null);
+  // Global ghost loading now handled dynamically inside GameEngine
   
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
@@ -169,30 +168,7 @@ const Index = () => {
     }
     
     // Check if we should download global ghost
-    let globalGhostRecording: any = null;
-    const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
-    
-    if (mode === 'fixed' && gameSettings?.showGhost && globalGhostsEnabled) {
-      const { GhostManager } = await import('@/components/game/GhostManager');
-      const ghostManager = new GhostManager();
-      const levelToLoad = startLevel ? (startLevel - 1) : 0; // Convert UI level (1-indexed) to game level (0-indexed)
-      
-      console.log(`🌍 Downloading global ghost for UI level ${startLevel ?? 1} (game level ${levelToLoad})...`);
-      globalGhostRecording = await ghostManager.loadGlobalGhost(d, levelToLoad);
-      
-      if (globalGhostRecording) {
-        console.log(`✅ Global ghost loaded! Time: ${(globalGhostRecording.completionTime / 1000).toFixed(2)}s`);
-        setUseGlobalGhost(true);
-        setGlobalGhostData(globalGhostRecording);
-      } else {
-        console.log(`ℹ️ No global ghost available for level ${levelToLoad}`);
-        setUseGlobalGhost(false);
-        setGlobalGhostData(null);
-      }
-    } else {
-      setUseGlobalGhost(false);
-      setGlobalGhostData(null);
-    }
+    // Ghost loading now handled dynamically inside GameEngine for each level
     
     // Use wormhole portal transition
     const transitionType = "wormhole-portal";
@@ -682,8 +658,6 @@ const retryGame = () => {
           seedOverride={seedOverride ?? undefined}
           showGhost={showGhost}
           ghostLevel={carry?.level ?? successCount}
-          useGlobalGhost={useGlobalGhost}
-          globalGhostData={globalGhostData}
         />
       )}
       {view === "demo" && (

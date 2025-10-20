@@ -56,15 +56,13 @@ interface Props {
   showGhost?: boolean;
   ghostLevel?: number;
   isDemo?: boolean;
-  useGlobalGhost?: boolean;
-  globalGhostData?: any;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false, useGlobalGhost = false, globalGhostData = null }) => {
+export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
@@ -264,9 +262,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
 
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
-    let raf = 0;
-    const c = canvasRef.current!;
-    const ctx = c.getContext("2d")!;
+    
+    let raf = 0; // Declare at useEffect level so cleanup can access it
+    
+    const initializeGame = async () => {
+      const c = canvasRef.current!;
+      const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
     const neonColor = `hsl(${styles.getPropertyValue('--neon')})`;
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
@@ -484,17 +485,33 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     const isGhostMode = showGhost && mode === "fixed" && !isCavernLevel;
     const shouldRecord = mode === "fixed" && !isCavernLevel;
     
-    // Initialize ghost system
+    // Initialize ghost system - load dynamically for current level
+    let activeGhostRecording: any = null;
+    let isUsingGlobalGhost = false;
+
     if (isGhostMode && ghostLevel !== undefined) {
       const difficultyStr = difficulty;
       
-      // Use global ghost if available, otherwise fallback to local
-      if (useGlobalGhost && globalGhostData) {
-        console.log("🌍 Global ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (globalGhostData.completionTime / 1000).toFixed(2) + "s");
-      } else {
-        const recording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
-        if (recording) {
-          console.log("👻 Local ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (recording.completionTime / 1000).toFixed(2) + "s");
+      // Check if global ghosts are enabled
+      const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+      
+      // Try to load global ghost first if enabled
+      if (globalGhostsEnabled) {
+        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, ghostLevel);
+        if (globalRecording) {
+          activeGhostRecording = globalRecording;
+          isUsingGlobalGhost = true;
+          console.log("🌍 Global ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+        }
+      }
+      
+      // Fallback to local ghost if no global ghost available
+      if (!activeGhostRecording) {
+        const localRecording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
+        if (localRecording) {
+          activeGhostRecording = localRecording;
+          isUsingGlobalGhost = false;
+          console.log("👻 Local ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (localRecording.completionTime / 1000).toFixed(2) + "s");
         }
       }
     }
@@ -508,8 +525,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Load best time for HUD display
     if (mode === "fixed" && !isCavernLevel) {
-      if (useGlobalGhost && globalGhostData) {
-        setBestTime(globalGhostData.completionTime);
+      if (isUsingGlobalGhost && activeGhostRecording) {
+        setBestTime(activeGhostRecording.completionTime);
       } else {
         const currentBest = ghostManager.current.getLunarLanderBestTime(difficulty, level);
         setBestTime(currentBest);
@@ -818,8 +835,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Ghost state update
       if (ghostShip && isGhostMode && ghostLevel !== undefined) {
         let ghostState = null;
-        if (useGlobalGhost && globalGhostData) {
-          ghostState = ghostManager.current.getGlobalGhostState(globalGhostData, gameTime);
+        if (isUsingGlobalGhost && activeGhostRecording) {
+          ghostState = ghostManager.current.getGlobalGhostState(activeGhostRecording, gameTime);
         } else {
           ghostState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
         }
@@ -852,8 +869,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       // Ghost playback - update ghost state
       if (isGhostMode && ghostLevel !== undefined) {
         let ghostStateUpdate = null;
-        if (useGlobalGhost && globalGhostData) {
-          ghostStateUpdate = ghostManager.current.getGlobalGhostState(globalGhostData, gameTime);
+        if (isUsingGlobalGhost && activeGhostRecording) {
+          ghostStateUpdate = ghostManager.current.getGlobalGhostState(activeGhostRecording, gameTime);
         } else {
           ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
         }
@@ -2316,6 +2333,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     let hudUpdateTimer = 0;
     
     raf = requestAnimationFrame(loop);
+    }; // End of initializeGame async function
+    
+    initializeGame();
 
     return () => { cancelAnimationFrame(raf); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
