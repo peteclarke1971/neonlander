@@ -80,10 +80,6 @@ export const SurvivalEngine: React.FC<Props> = ({
   const timerActiveRef = useRef(false);
   const lastTakeoffTime = useRef<number>(0);
   
-  // Offscreen canvas for spotlight clipping mask
-  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const offscreenCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-  
   // Hazards and collectibles state
   const hazardsRef = useRef<Hazard[]>([]);
   const sparklesRef = useRef<Map<string, SparkleEffect[]>>(new Map());
@@ -199,12 +195,6 @@ export const SurvivalEngine: React.FC<Props> = ({
       c.height = Math.floor(h * dpr);
       c.style.width = `${w}px`;
       c.style.height = `${h}px`;
-      
-      // Resize offscreen canvas to match
-      if (offscreenCanvasRef.current) {
-        offscreenCanvasRef.current.width = c.width;
-        offscreenCanvasRef.current.height = c.height;
-      }
     };
     resize();
     window.addEventListener("resize", resize);
@@ -274,15 +264,6 @@ export const SurvivalEngine: React.FC<Props> = ({
     const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
     let neonColor = classicColorsMode.current ? `hsl(${styles.getPropertyValue('--neon')})` : currentPalette.accent;
-    
-    // Create offscreen canvas for spotlight clipping
-    const offscreenCanvas = document.createElement('canvas');
-    const offscreenCtx = offscreenCanvas.getContext('2d', { alpha: true });
-    if (!offscreenCtx) return;
-    offscreenCanvas.width = c.width;
-    offscreenCanvas.height = c.height;
-    offscreenCanvasRef.current = offscreenCanvas;
-    offscreenCtxRef.current = offscreenCtx;
     
     // Initialize endless terrain generator
     const seed = Math.floor(Math.random() * 1e9);
@@ -2071,128 +2052,128 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Use spotlight clipping mask during blackout
       if (blackoutIntensityRef.current > 0.3) {
-        const offCtx = offscreenCtxRef.current;
-        const offCanvas = offscreenCanvasRef.current;
-        if (offCtx && offCanvas) {
-          // Step 1: Clear offscreen canvas
-          offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+        // Proximity-based terrain reveal
+        const revealRadius = 450; // Distance from lander to reveal terrain
+        const fadeStart = 350; // Start fading out at this distance
+        
+        ctx.globalAlpha = 1.0;
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
           
-          // Step 2: Draw spotlight cone as mask (in world coordinates)
-          offCtx.save();
-          offCtx.translate(-cameraX + viewWidth/2, viewHeight/2);
-          offCtx.translate(shipX, shipY);
-          offCtx.rotate(shipAngle);
+          // Check if any part of this chunk is within reveal radius
+          const chunkMinDist = Math.min(
+            ...chunk.points.map(pt => {
+              const dx = pt.x - shipX;
+              const dy = pt.y - shipY;
+              return Math.sqrt(dx * dx + dy * dy);
+            })
+          );
           
-          const spotlightRange = 350;
-          const spotlightSpread = 0.22;
+          // Skip chunk if it's completely outside reveal radius
+          if (chunkMinDist > revealRadius) continue;
           
-          offCtx.beginPath();
-          offCtx.moveTo(0, 12);
-          const rightX = Math.sin(spotlightSpread) * spotlightRange;
-          const rightY = 12 + Math.cos(spotlightSpread) * spotlightRange;
-          const leftX = -Math.sin(spotlightSpread) * spotlightRange;
-          const leftY = 12 + Math.cos(spotlightSpread) * spotlightRange;
-          offCtx.lineTo(rightX, rightY);
-          offCtx.arc(0, 12, spotlightRange, Math.PI/2 + spotlightSpread, Math.PI/2 - spotlightSpread, true);
-          offCtx.lineTo(leftX, leftY);
-          offCtx.closePath();
-          offCtx.fillStyle = 'white';
-          offCtx.fill();
-          offCtx.restore();
+          // Calculate alpha based on closest point distance
+          let alpha = 1.0;
+          if (chunkMinDist > fadeStart) {
+            alpha = 1.0 - (chunkMinDist - fadeStart) / (revealRadius - fadeStart);
+            alpha = Math.max(0, Math.min(1, alpha));
+          }
           
-          // Step 3: Set composite mode to clip terrain to spotlight
-          offCtx.globalCompositeOperation = 'source-in';
+          ctx.globalAlpha = alpha;
           
-          // Step 4: Draw terrain to offscreen canvas (full brightness)
-          offCtx.save();
-          offCtx.translate(-cameraX + viewWidth/2, viewHeight/2);
-          offCtx.strokeStyle = terrainColor;
-          offCtx.shadowColor = terrainColor;
-          offCtx.shadowBlur = shadowIntensity;
-          offCtx.lineWidth = 2;
-          offCtx.globalAlpha = 1.0;
-          
-          for (const chunk of chunks) {
-            if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
-            
-            // Draw terrain fill
-            if (!shouldOptimize) {
-              offCtx.save();
-              offCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-              offCtx.shadowBlur = 0;
-              offCtx.beginPath();
-              for (let i = 0; i < chunk.points.length; i++) {
-                const pt = chunk.points[i];
-                if (i === 0) offCtx.moveTo(pt.x, pt.y);
-                else offCtx.lineTo(pt.x, pt.y);
-              }
-              const lastPt = chunk.points[chunk.points.length - 1];
-              const firstPt = chunk.points[0];
-              offCtx.lineTo(lastPt.x, 2000);
-              offCtx.lineTo(firstPt.x, 2000);
-              offCtx.closePath();
-              offCtx.fill();
-              offCtx.restore();
-            }
-            
-            // Draw terrain stroke
-            offCtx.beginPath();
+          // Draw terrain fill
+          if (!shouldOptimize) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
             for (let i = 0; i < chunk.points.length; i++) {
               const pt = chunk.points[i];
-              if (i === 0) offCtx.moveTo(pt.x, pt.y);
-              else offCtx.lineTo(pt.x, pt.y);
+              if (i === 0) ctx.moveTo(pt.x, pt.y);
+              else ctx.lineTo(pt.x, pt.y);
             }
-            offCtx.stroke();
+            const lastPt = chunk.points[chunk.points.length - 1];
+            const firstPt = chunk.points[0];
+            ctx.lineTo(lastPt.x, 2000);
+            ctx.lineTo(firstPt.x, 2000);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+          
+          // Draw terrain stroke
+          ctx.beginPath();
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+          ctx.stroke();
+          
+          // Draw pads within reveal radius
+          for (const pad of chunk.pads) {
+            const padCenterX = (pad.xStart + pad.xEnd) / 2;
+            const padDist = Math.sqrt((padCenterX - shipX) ** 2 + (pad.y - shipY) ** 2);
             
-            // Draw pads
-            for (const pad of chunk.pads) {
-              offCtx.globalAlpha = 1.0;
-              offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
-              offCtx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-              offCtx.strokeStyle = neonColor;
-              offCtx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-              
-              if (pad.bonus2x) {
-                offCtx.save();
-                offCtx.textAlign = "center";
-                offCtx.textBaseline = "top";
-                offCtx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
-                offCtx.shadowColor = neonColor;
-                offCtx.shadowBlur = 18 * dprInit;
-                offCtx.fillStyle = neonColor;
-                offCtx.globalAlpha = 0.95;
-                const centerX = (pad.xStart + pad.xEnd) / 2;
-                offCtx.fillText("2x", centerX, pad.y + 4);
-                offCtx.restore();
-              }
+            if (padDist > revealRadius) continue;
+            
+            let padAlpha = 1.0;
+            if (padDist > fadeStart) {
+              padAlpha = 1.0 - (padDist - fadeStart) / (revealRadius - fadeStart);
             }
             
-            // Draw moving pads
-            for (const mp of chunk.movingPads) {
-              movingPadSystem.renderMovingPad(
-                offCtx,
-                mp,
-                cameraX,
-                0,
-                1,
-                c.width,
-                c.height,
-                neonColor
-              );
+            ctx.globalAlpha = padAlpha;
+            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
+            ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            ctx.strokeStyle = neonColor;
+            ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            
+            if (pad.bonus2x) {
+              ctx.save();
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+              ctx.shadowColor = neonColor;
+              ctx.shadowBlur = 18 * dprInit;
+              ctx.fillStyle = neonColor;
+              ctx.globalAlpha = padAlpha * 0.95;
+              const centerX = padCenterX;
+              ctx.fillText("2x", centerX, pad.y + 4);
+              ctx.restore();
             }
           }
           
-          offCtx.restore();
-          
-          // Step 5: Reset composite mode
-          offCtx.globalCompositeOperation = 'source-over';
-          
-          // Step 6: Draw offscreen canvas to main canvas
-          ctx.save();
-          ctx.globalAlpha = 1.0;
-          ctx.drawImage(offCanvas, 0, 0);
-          ctx.restore();
+          // Draw moving pads within reveal radius
+          for (const mp of chunk.movingPads) {
+            const mpDist = Math.sqrt(
+              (mp.currentPos.x - shipX) ** 2 + (mp.currentPos.y - shipY) ** 2
+            );
+            
+            if (mpDist > revealRadius) continue;
+            
+            let mpAlpha = 1.0;
+            if (mpDist > fadeStart) {
+              mpAlpha = 1.0 - (mpDist - fadeStart) / (revealRadius - fadeStart);
+            }
+            
+            ctx.save();
+            ctx.globalAlpha = mpAlpha;
+            movingPadSystem.renderMovingPad(
+              ctx,
+              mp,
+              cameraX,
+              0,
+              1,
+              c.width,
+              c.height,
+              neonColor
+            );
+            ctx.restore();
+          }
         }
+        
+        ctx.globalAlpha = 1.0;
         
       } else {
         // Normal rendering when not in blackout
