@@ -2066,6 +2066,31 @@ export const SurvivalEngine: React.FC<Props> = ({
         // Improved culling: keep terrain visible for half a screen width after passing
         if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
         
+        // FILL terrain first (only in high graphics) to completely mask stars
+        if (!shouldOptimize) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(0, 0, 0, 1)'; // Solid black fill
+          ctx.shadowBlur = 0; // No shadow on fill, only on stroke
+          ctx.beginPath();
+          
+          // Draw terrain outline
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+          
+          // Close path by going down to bottom of screen and back
+          const lastPt = chunk.points[chunk.points.length - 1];
+          const firstPt = chunk.points[0];
+          ctx.lineTo(lastPt.x, 2000); // Go down to bottom (well below visible area)
+          ctx.lineTo(firstPt.x, 2000); // Across bottom
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        
+        // STROKE terrain outline (both modes)
         ctx.beginPath();
         for (let i = 0; i < chunk.points.length; i++) {
           const pt = chunk.points[i];
