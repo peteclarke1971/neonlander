@@ -1960,18 +1960,25 @@ export const SurvivalEngine: React.FC<Props> = ({
         for (const chunk of chunks) {
           if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
           
-          ctx.beginPath();
-          // Start from bottom of screen
-          ctx.moveTo(chunk.startX, 2000); // Large Y value to cover bottom
+          // Calculate fill depth based on device pixel ratio for consistent appearance
+          const fillDepth = 40 * dprInit; // Scales with screen resolution
           
-          // Trace terrain shape
-          for (let i = 0; i < chunk.points.length; i++) {
+          ctx.beginPath();
+          // Start at first terrain point
+          ctx.moveTo(chunk.points[0].x, chunk.points[0].y);
+          
+          // Trace the terrain line
+          for (let i = 1; i < chunk.points.length; i++) {
             const pt = chunk.points[i];
             ctx.lineTo(pt.x, pt.y);
           }
           
-          // Close to bottom
-          ctx.lineTo(chunk.endX, 2000);
+          // Trace back underneath the terrain with scaled depth
+          for (let i = chunk.points.length - 1; i >= 0; i--) {
+            const pt = chunk.points[i];
+            ctx.lineTo(pt.x, pt.y + fillDepth);
+          }
+          
           ctx.closePath();
           ctx.fill();
         }
