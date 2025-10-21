@@ -157,22 +157,41 @@ export const SurvivalHUD: React.FC<Props> = ({
         
         {/* Blackout Badge */}
         {blackoutActive && (
-          <div className="mt-2 flex items-center justify-center bg-gray-900/90 border border-gray-600 rounded px-3 py-2">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-2xl font-bold text-gray-300 tracking-[0.3em] animate-pulse">
+          <div className="mt-2 flex items-center justify-between bg-red-950/40 border border-red-500/50 rounded px-2 py-1 animate-pulse">
+            <div className="flex items-center gap-2">
+              <svg 
+                className="w-4 h-4" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5"
+                style={{ color: 'hsl(0, 100%, 60%)' }}
+              >
+                {/* Eclipse/Blackout icon - circle with partial fill */}
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 3 A9 9 0 0 1 12 21" fill="currentColor" opacity="0.7" />
+              </svg>
+              <span className="text-xs font-bold" style={{ color: 'hsl(0, 100%, 60%)' }}>
                 BLACKOUT
               </span>
-              {blackoutTimer && blackoutTimer > 0 && (
-                <div className="w-20 h-1 bg-gray-700 rounded-full overflow-hidden">
+            </div>
+            
+            {blackoutTimer > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1 bg-red-950/40 rounded-full overflow-hidden">
                   <div 
-                    className="h-full transition-all duration-300 bg-gray-400"
+                    className="h-full transition-all duration-300"
                     style={{ 
-                      width: `${(blackoutTimer / 25) * 100}%`
+                      width: `${(blackoutTimer / 25) * 100}%`,
+                      backgroundColor: 'hsl(0, 100%, 60%)'
                     }}
                   />
                 </div>
-              )}
-            </div>
+                <span className="text-xs" style={{ color: 'hsl(0, 100%, 60%, 0.7)' }}>
+                  {Math.ceil(blackoutTimer)}s
+                </span>
+              </div>
+            )}
           </div>
         )}
         
