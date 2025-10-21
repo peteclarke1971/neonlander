@@ -118,6 +118,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [blackoutActive, setBlackoutActive] = useState(false);
   const blackoutTimerRef = useRef(0);
   const blackoutTransitionRef = useRef(1.0); // 1.0 = full brightness, 0.0 = full blackout
+  const lastBlackoutTimeRef = useRef(0); // Track when last blackout ended for cooldown
   const lastBlackoutMilestoneRef = useRef(-1);
   const BLACKOUT_DURATION = 25; // seconds
   const BLACKOUT_FADE_IN = 2.0; // seconds to fade into blackout
@@ -800,7 +801,11 @@ export const SurvivalEngine: React.FC<Props> = ({
       const blackoutInterval = 1500;
       const distanceMilestone = Math.floor(currentDistance / blackoutInterval);
       
-      if (!blackoutActiveRef.current && distanceMilestone > lastBlackoutMilestoneRef.current && distanceMilestone > 0) {
+      // Check cooldown: require 60 seconds since last blackout ended
+      const timeSinceLastBlackout = currentTime - lastBlackoutTimeRef.current;
+      const cooldownElapsed = timeSinceLastBlackout >= 60;
+      
+      if (!blackoutActiveRef.current && distanceMilestone > lastBlackoutMilestoneRef.current && distanceMilestone > 0 && cooldownElapsed) {
         // Start new blackout
         blackoutActiveRef.current = true;
         setBlackoutActive(true);
@@ -834,6 +839,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           blackoutActiveRef.current = false;
           setBlackoutActive(false);
           blackoutTransitionRef.current = 1.0;
+          lastBlackoutTimeRef.current = currentTime; // Record end time for cooldown
           
           // Audio: fade music back in
           audio.current.fadeInMusic(3.0);
@@ -2491,70 +2497,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Always keep visual fuel matching actual fuel (no animation)
       visualFuelRef.current = fuelAmount;
       
-      // Composite off-screen terrain using spotlight mask (during blackout)
-      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && !isDead && offscreenTerrainCanvasRef.current) {
-        ctx.save();
-        
-        const spotlightIntensity = 1.0 - blackoutTransitionRef.current;
-        
-        // Calculate spotlight origin (rotated with ship)
-        const localOffsetX = 0;
-        const localOffsetY = 12;
-        const spotX = shipX + Math.cos(shipAngle) * localOffsetX - Math.sin(shipAngle) * localOffsetY;
-        const spotY = shipY + Math.sin(shipAngle) * localOffsetX + Math.cos(shipAngle) * localOffsetY;
-        const spotAngle = shipAngle + Math.PI / 2;
-        
-        // Create spotlight cone path
-        const leftAngle = spotAngle - SPOTLIGHT_ANGLE / 2;
-        const rightAngle = spotAngle + SPOTLIGHT_ANGLE / 2;
-        const leftX = spotX + Math.cos(leftAngle) * SPOTLIGHT_RANGE;
-        const leftY = spotY + Math.sin(leftAngle) * SPOTLIGHT_RANGE;
-        const rightX = spotX + Math.cos(rightAngle) * SPOTLIGHT_RANGE;
-        const rightY = spotY + Math.sin(rightAngle) * SPOTLIGHT_RANGE;
-        
-        // Draw spotlight gradient with additive blending
-        const gradient = ctx.createRadialGradient(
-          spotX, spotY, 0,
-          spotX, spotY, SPOTLIGHT_RANGE
-        );
-        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.6 * spotlightIntensity})`);
-        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.3 * spotlightIntensity})`);
-        gradient.addColorStop(1, `rgba(255, 255, 180, 0)`);
-        
-        ctx.beginPath();
-        ctx.moveTo(spotX, spotY);
-        ctx.lineTo(leftX, leftY);
-        ctx.arc(spotX, spotY, SPOTLIGHT_RANGE, leftAngle, rightAngle);
-        ctx.lineTo(spotX, spotY);
-        ctx.closePath();
-        
-        ctx.fillStyle = gradient;
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fill();
-        
-        // Create clipping path for terrain composite
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.clip();
-        
-        // Draw off-screen terrain (only visible inside clip region)
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 1.0;
-        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
-        
-        // Add bloom/glow layer
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.3 * spotlightIntensity;
-        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
-        
-        ctx.restore();
-        
-        // Re-apply camera transform for remaining objects
-        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cameraX + shake, anchor);
-      }
-      
-      // Draw ship (only if alive)
+      // Draw ship BEFORE spotlight masking (so lander stays visible)
       if (!isDead) {
         ctx.save();
         ctx.translate(shipX, shipY);
@@ -2651,6 +2594,69 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         ctx.globalAlpha = 1;
         ctx.restore();
+      }
+      
+      // Composite off-screen terrain using spotlight mask (during blackout)
+      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && !isDead && offscreenTerrainCanvasRef.current) {
+        ctx.save();
+        
+        const spotlightIntensity = 1.0 - blackoutTransitionRef.current;
+        
+        // Calculate spotlight origin (rotated with ship)
+        const localOffsetX = 0;
+        const localOffsetY = 12;
+        const spotX = shipX + Math.cos(shipAngle) * localOffsetX - Math.sin(shipAngle) * localOffsetY;
+        const spotY = shipY + Math.sin(shipAngle) * localOffsetX + Math.cos(shipAngle) * localOffsetY;
+        const spotAngle = shipAngle + Math.PI / 2;
+        
+        // Create spotlight cone path
+        const leftAngle = spotAngle - SPOTLIGHT_ANGLE / 2;
+        const rightAngle = spotAngle + SPOTLIGHT_ANGLE / 2;
+        const leftX = spotX + Math.cos(leftAngle) * SPOTLIGHT_RANGE;
+        const leftY = spotY + Math.sin(leftAngle) * SPOTLIGHT_RANGE;
+        const rightX = spotX + Math.cos(rightAngle) * SPOTLIGHT_RANGE;
+        const rightY = spotY + Math.sin(rightAngle) * SPOTLIGHT_RANGE;
+        
+        // Draw spotlight gradient with additive blending
+        const gradient = ctx.createRadialGradient(
+          spotX, spotY, 0,
+          spotX, spotY, SPOTLIGHT_RANGE
+        );
+        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.6 * spotlightIntensity})`);
+        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.3 * spotlightIntensity})`);
+        gradient.addColorStop(1, `rgba(255, 255, 180, 0)`);
+        
+        ctx.beginPath();
+        ctx.moveTo(spotX, spotY);
+        ctx.lineTo(leftX, leftY);
+        ctx.arc(spotX, spotY, SPOTLIGHT_RANGE, leftAngle, rightAngle);
+        ctx.lineTo(spotX, spotY);
+        ctx.closePath();
+        
+        ctx.fillStyle = gradient;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fill();
+        
+        // Create clipping path for terrain composite
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clip();
+        
+        // Draw off-screen terrain (only visible inside clip region)
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        // Add bloom/glow layer
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 * spotlightIntensity;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        ctx.restore();
+        
+        // Re-apply camera transform for remaining objects
+        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shake, anchor);
       }
       
       ctx.restore();
