@@ -152,6 +152,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'retro-burst' | null>(null);
   const fireworkTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   
+  // Off-screen canvas for spotlight masking
+  const offscreenTerrainCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenTerrainCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  
   // Detect touch-capable devices
   useEffect(() => {
     try {
@@ -197,6 +201,12 @@ export const SurvivalEngine: React.FC<Props> = ({
       c.height = Math.floor(h * dpr);
       c.style.width = `${w}px`;
       c.style.height = `${h}px`;
+      
+      // Sync off-screen canvas size with main canvas
+      if (offscreenTerrainCanvasRef.current) {
+        offscreenTerrainCanvasRef.current.width = c.width;
+        offscreenTerrainCanvasRef.current.height = c.height;
+      }
     };
     resize();
     window.addEventListener("resize", resize);
@@ -266,6 +276,12 @@ export const SurvivalEngine: React.FC<Props> = ({
     const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
     let neonColor = classicColorsMode.current ? `hsl(${styles.getPropertyValue('--neon')})` : currentPalette.accent;
+    
+    // Create off-screen canvas for terrain masking
+    offscreenTerrainCanvasRef.current = document.createElement('canvas');
+    offscreenTerrainCanvasRef.current.width = c.width;
+    offscreenTerrainCanvasRef.current.height = c.height;
+    offscreenTerrainCtxRef.current = offscreenTerrainCanvasRef.current.getContext('2d', { alpha: true });
     
     // Initialize endless terrain generator
     const seed = Math.floor(Math.random() * 1e9);
@@ -2055,68 +2071,159 @@ export const SurvivalEngine: React.FC<Props> = ({
         shadowIntensity = shouldOptimize ? 0 : 14;
       }
       
-      // Apply blackout darkness
-      const terrainAlpha = 0.1 + (0.9 * brightnessMultiplier); // Never fully invisible
-      shadowIntensity = shadowIntensity * brightnessMultiplier;
-      
-      ctx.globalAlpha = terrainAlpha;
-      ctx.strokeStyle = terrainColor;
-      ctx.shadowColor = terrainColor;
-      ctx.shadowBlur = shadowIntensity;
-      ctx.lineWidth = 2;
-      
-      for (const chunk of chunks) {
-        // Improved culling: keep terrain visible for half a screen width after passing
-        if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+      // BLACKOUT MODE: Render terrain to off-screen canvas for spotlight masking
+      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && offscreenTerrainCtxRef.current) {
+        const offCtx = offscreenTerrainCtxRef.current;
         
-        ctx.beginPath();
-        for (let i = 0; i < chunk.points.length; i++) {
-          const pt = chunk.points[i];
-          if (i === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.stroke();
+        // Clear off-screen canvas
+        offCtx.clearRect(0, 0, c.width, c.height);
         
-        // Draw pads with 2x labels
-        for (const pad of chunk.pads) {
-          ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
-          ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
-          ctx.strokeStyle = neonColor;
-          ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+        // Apply same camera transform as main canvas
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        offCtx.scale(zoom, zoom);
+        offCtx.translate(-cameraX + shake, anchor);
+        
+        // Render terrain at FULL BRIGHTNESS to off-screen canvas
+        offCtx.globalAlpha = 1.0;
+        offCtx.strokeStyle = terrainColor;
+        offCtx.shadowColor = terrainColor;
+        offCtx.shadowBlur = shadowIntensity * 1.5; // Enhanced glow for spotlight
+        offCtx.lineWidth = 2;
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
           
-          // Add 2x label for bonus pads
-          if (pad.bonus2x) {
-            ctx.save();
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
-            ctx.shadowColor = neonColor;
-            ctx.shadowBlur = 18 * dprInit;
-            ctx.fillStyle = neonColor;
-            ctx.globalAlpha = 0.95;
-            const centerX = (pad.xStart + pad.xEnd) / 2;
-            ctx.fillText("2x", centerX, pad.y + 4);
-            ctx.restore();
+          offCtx.beginPath();
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) offCtx.moveTo(pt.x, pt.y);
+            else offCtx.lineTo(pt.x, pt.y);
+          }
+          offCtx.stroke();
+          
+          // Draw pads with enhanced brightness
+          for (const pad of chunk.pads) {
+            offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+            offCtx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            offCtx.strokeStyle = terrainColor;
+            offCtx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            
+            if (pad.bonus2x) {
+              offCtx.save();
+              offCtx.textAlign = "center";
+              offCtx.textBaseline = "top";
+              offCtx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+              offCtx.shadowColor = terrainColor;
+              offCtx.shadowBlur = 25 * dprInit;
+              offCtx.fillStyle = terrainColor;
+              offCtx.globalAlpha = 1.0;
+              const centerX = (pad.xStart + pad.xEnd) / 2;
+              offCtx.fillText("2x", centerX, pad.y + 4);
+              offCtx.restore();
+            }
+          }
+          
+          // Draw moving pads
+          for (const mp of chunk.movingPads) {
+            movingPadSystem.renderMovingPad(
+              offCtx,
+              mp,
+              cameraX,
+              0,
+              1,
+              c.width,
+              c.height,
+              terrainColor
+            );
           }
         }
         
-        // Draw moving pads with full rendering (dotted paths, arrows, labels)
-        for (const mp of chunk.movingPads) {
-          movingPadSystem.renderMovingPad(
-            ctx,
-            mp,
-            cameraX,
-            0, // cameraY (not used in 2D side-scrolling)
-            1, // zoom (survival mode doesn't use zoom)
-            c.width,
-            c.height,
-            neonColor
-          );
+        offCtx.globalAlpha = 1;
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Draw very faint terrain outline on main canvas (alpha 0.05)
+        ctx.globalAlpha = 0.05;
+        ctx.strokeStyle = terrainColor;
+        ctx.shadowColor = terrainColor;
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2;
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+          
+          ctx.beginPath();
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+          ctx.stroke();
         }
+        
+        ctx.globalAlpha = 1;
+        
+      } else {
+        // NORMAL MODE: Render terrain directly to main canvas
+        const terrainAlpha = 0.1 + (0.9 * brightnessMultiplier);
+        shadowIntensity = shadowIntensity * brightnessMultiplier;
+        
+        ctx.globalAlpha = terrainAlpha;
+        ctx.strokeStyle = terrainColor;
+        ctx.shadowColor = terrainColor;
+        ctx.shadowBlur = shadowIntensity;
+        ctx.lineWidth = 2;
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+          
+          ctx.beginPath();
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          }
+          ctx.stroke();
+          
+          // Draw pads with 2x labels
+          for (const pad of chunk.pads) {
+            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.3)` : `rgba(100,255,255,0.3)`;
+            ctx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            ctx.strokeStyle = neonColor;
+            ctx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            
+            if (pad.bonus2x) {
+              ctx.save();
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+              ctx.shadowColor = neonColor;
+              ctx.shadowBlur = 18 * dprInit;
+              ctx.fillStyle = neonColor;
+              ctx.globalAlpha = 0.95;
+              const centerX = (pad.xStart + pad.xEnd) / 2;
+              ctx.fillText("2x", centerX, pad.y + 4);
+              ctx.restore();
+            }
+          }
+          
+          // Draw moving pads
+          for (const mp of chunk.movingPads) {
+            movingPadSystem.renderMovingPad(
+              ctx,
+              mp,
+              cameraX,
+              0,
+              1,
+              c.width,
+              c.height,
+              neonColor
+            );
+          }
+        }
+        
+        ctx.globalAlpha = 1;
       }
-      
-      // Reset alpha after terrain
-      ctx.globalAlpha = 1;
       
       // Draw anomalies (gravity wells) - enhanced glow during blackout
       if (allAnomalies.length > 0) {
@@ -2384,46 +2491,36 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Always keep visual fuel matching actual fuel (no animation)
       visualFuelRef.current = fuelAmount;
       
-      // Draw spotlight cone from lander base (during blackout)
-      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && !isDead) {
+      // Composite off-screen terrain using spotlight mask (during blackout)
+      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && !isDead && offscreenTerrainCanvasRef.current) {
         ctx.save();
         
-        // Spotlight intensity (fades in/out with blackout)
         const spotlightIntensity = 1.0 - blackoutTransitionRef.current;
         
-        // Spotlight origin: base of lander (in ship's local coordinate system)
-        // When ship is upright (angle=0), we want spotlight at (0, +12) below center
-        // This offset must rotate WITH the ship
+        // Calculate spotlight origin (rotated with ship)
         const localOffsetX = 0;
-        const localOffsetY = 12; // Distance below ship center in local space
-        
-        // Transform local offset to world space using ship's rotation
+        const localOffsetY = 12;
         const spotX = shipX + Math.cos(shipAngle) * localOffsetX - Math.sin(shipAngle) * localOffsetY;
         const spotY = shipY + Math.sin(shipAngle) * localOffsetX + Math.cos(shipAngle) * localOffsetY;
-        
-        // Spotlight direction: directly downward from ship's perspective (perpendicular to ship)
-        const spotAngle = shipAngle + Math.PI / 2; // +90° to point down from lander
+        const spotAngle = shipAngle + Math.PI / 2;
         
         // Create spotlight cone path
         const leftAngle = spotAngle - SPOTLIGHT_ANGLE / 2;
         const rightAngle = spotAngle + SPOTLIGHT_ANGLE / 2;
-        
         const leftX = spotX + Math.cos(leftAngle) * SPOTLIGHT_RANGE;
         const leftY = spotY + Math.sin(leftAngle) * SPOTLIGHT_RANGE;
         const rightX = spotX + Math.cos(rightAngle) * SPOTLIGHT_RANGE;
         const rightY = spotY + Math.sin(rightAngle) * SPOTLIGHT_RANGE;
         
-        // Draw cone with gradient
+        // Draw spotlight gradient with additive blending
         const gradient = ctx.createRadialGradient(
           spotX, spotY, 0,
           spotX, spotY, SPOTLIGHT_RANGE
         );
-        
-        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.4 * spotlightIntensity})`);
-        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.2 * spotlightIntensity})`);
+        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.6 * spotlightIntensity})`);
+        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.3 * spotlightIntensity})`);
         gradient.addColorStop(1, `rgba(255, 255, 180, 0)`);
         
-        // Clip to cone shape
         ctx.beginPath();
         ctx.moveTo(spotX, spotY);
         ctx.lineTo(leftX, leftY);
@@ -2432,11 +2529,29 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.closePath();
         
         ctx.fillStyle = gradient;
-        ctx.globalCompositeOperation = 'lighter'; // Additive blending
+        ctx.globalCompositeOperation = 'lighter';
         ctx.fill();
-        ctx.globalCompositeOperation = 'source-over'; // Reset
+        
+        // Create clipping path for terrain composite
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clip();
+        
+        // Draw off-screen terrain (only visible inside clip region)
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        // Add bloom/glow layer
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 * spotlightIntensity;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
         
         ctx.restore();
+        
+        // Re-apply camera transform for remaining objects
+        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shake, anchor);
       }
       
       // Draw ship (only if alive)
