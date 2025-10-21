@@ -832,7 +832,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             firstBlackoutTriggeredRef.current = true;
             
             // Audio: fade out music
-            audio.current.fadeOutMusic(1.5);
+          audio.current.fadeOutMusic(5.0);
           }
         }
         
@@ -843,7 +843,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           blackoutTimerRef.current = BLACKOUT_DURATION;
           
           // Audio: fade out music
-          audio.current.fadeOutMusic(1.5);
+          audio.current.fadeOutMusic(5.0);
         }
       }
       
@@ -878,7 +878,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           nextBlackoutTimeRef.current = currentTime + randomCooldown;
           
           // Audio: fade music back in
-          audio.current.fadeInMusic(3.0);
+          audio.current.fadeInMusic(5.0);
         }
       }
       

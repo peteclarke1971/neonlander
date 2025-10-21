@@ -510,7 +510,9 @@ export class AudioManager {
   fadeOutMusic(duration: number = 1.5) {
     if (!this.ctx || !this.musicGain) return;
     const now = this.ctx.currentTime;
+    const currentGain = this.musicGain.gain.value;
     this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.setValueAtTime(currentGain, now);
     this.musicGain.gain.linearRampToValueAtTime(0, now + duration);
   }
 
@@ -518,7 +520,9 @@ export class AudioManager {
   fadeInMusic(duration: number = 3.0) {
     if (!this.ctx || !this.musicGain) return;
     const now = this.ctx.currentTime;
+    const currentGain = this.musicGain.gain.value;
     this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.setValueAtTime(currentGain, now);
     this.musicGain.gain.linearRampToValueAtTime(0.5, now + duration);
   }
 
