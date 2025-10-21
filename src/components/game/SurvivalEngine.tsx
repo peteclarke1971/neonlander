@@ -149,6 +149,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
+  // REM: REMOVE LATER - Unbreakable shield cheat (for testing)
+  const unbreakableShieldRef = useRef(false);
+  
   // Visual fuel state for integrated indicator
   const visualFuelRef = useRef(200);
   const prevFuelPercentRef = useRef(1);
@@ -277,6 +280,12 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (k === "i" && down) {
         unlimitedFuelRef.current = !unlimitedFuelRef.current;
         console.log(`Unlimited fuel: ${unlimitedFuelRef.current ? "ON" : "OFF"}`);
+      }
+      
+      // REM: REMOVE LATER - Toggle unbreakable shield with 's' key (for testing)
+      if (k === "s" && down) {
+        unbreakableShieldRef.current = !unbreakableShieldRef.current;
+        console.log(`Unbreakable shield: ${unbreakableShieldRef.current ? "ON" : "OFF"}`);
       }
       
       if (down) audio.current.resume();
@@ -800,7 +809,8 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Update shield timer
-      if (shieldActiveRef.current && shieldTimerRef.current > 0) {
+      // REM: REMOVE LATER - Skip timer countdown if unbreakable cheat is active
+      if (shieldActiveRef.current && shieldTimerRef.current > 0 && !unbreakableShieldRef.current) {
         shieldTimerRef.current -= dt;
         if (shieldTimerRef.current <= 0) {
           shieldActiveRef.current = false;
@@ -1091,10 +1101,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 asteroidFieldRef.current.asteroids.splice(asteroidIndex, 1);
               }
               
-              spawnShieldBreak(shipX, shipY);
-              shieldActiveRef.current = false;
-              setShieldActive(false);
-              audio.current.shieldBreak();
+              // REM: REMOVE LATER - Skip shield break if unbreakable cheat is active
+              if (!unbreakableShieldRef.current) {
+                spawnShieldBreak(shipX, shipY);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                audio.current.shieldBreak();
+              } else {
+                console.log("Shield absorbed asteroid hit (unbreakable mode)");
+              }
               
               // Bounce away from asteroid
               const dx = shipX - fieldUpdate.collidingAsteroid.x;
@@ -1328,10 +1343,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                   setVolcanoParticles([...volcanoParticles]); // Trigger state update
                 }
                 
-                spawnShieldBreak(shipX, shipY);
-                shieldActiveRef.current = false;
-                setShieldActive(false);
-                audio.current.shieldBreak();
+                // REM: REMOVE LATER - Skip shield break if unbreakable cheat is active
+                if (!unbreakableShieldRef.current) {
+                  spawnShieldBreak(shipX, shipY);
+                  shieldActiveRef.current = false;
+                  setShieldActive(false);
+                  audio.current.shieldBreak();
+                } else {
+                  console.log("Shield absorbed volcano particle (unbreakable mode)");
+                }
                 
                 // Bounce away from particle
                 const dx = shipX - volcanoResult.particle.x;
@@ -1376,10 +1396,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 hazardsRef.current.splice(hazardIndex, 1);
               }
               
-              spawnShieldBreak(shipX, shipY);
-              shieldActiveRef.current = false;
-              setShieldActive(false);
-              audio.current.shieldBreak();
+              // REM: REMOVE LATER - Skip shield break if unbreakable cheat is active
+              if (!unbreakableShieldRef.current) {
+                spawnShieldBreak(shipX, shipY);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                audio.current.shieldBreak();
+              } else {
+                console.log("Shield absorbed hazard hit (unbreakable mode)");
+              }
               
               // Bounce away from hazard
               const dx = shipX - hazardResult.hazard.x;
@@ -1628,10 +1653,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 // Bad landing
                 if (shieldActiveRef.current) {
                   // Shield saves but landing fails (no refuel)
-                  spawnShieldBreak(shipX, shipY);
-                  shieldActiveRef.current = false;
-                  setShieldActive(false);
-                  audio.current.shieldBreak();
+                  // REM: REMOVE LATER - Skip shield break if unbreakable cheat is active
+                  if (!unbreakableShieldRef.current) {
+                    spawnShieldBreak(shipX, shipY);
+                    shieldActiveRef.current = false;
+                    setShieldActive(false);
+                    audio.current.shieldBreak();
+                  } else {
+                    console.log("Shield absorbed bad landing (unbreakable mode)");
+                  }
                   
                   shipY = (movingPad ? movingPad.currentPos.y : landingPad.y) - 20;
                   shipVx *= 0.3;
@@ -1658,10 +1688,15 @@ export const SurvivalEngine: React.FC<Props> = ({
             } else {
               // Hit terrain
               if (shieldActiveRef.current) {
-                spawnShieldBreak(shipX, shipY);
-                shieldActiveRef.current = false;
-                setShieldActive(false);
-                audio.current.shieldBreak();
+                // REM: REMOVE LATER - Skip shield break if unbreakable cheat is active
+                if (!unbreakableShieldRef.current) {
+                  spawnShieldBreak(shipX, shipY);
+                  shieldActiveRef.current = false;
+                  setShieldActive(false);
+                  audio.current.shieldBreak();
+                } else {
+                  console.log("Shield absorbed terrain crash (unbreakable mode)");
+                }
                 shipVx += (Math.random() - 0.5) * 2;
                 shipVy = -1.5;
                 if (anyGamepad()) vibrate(200, 0.5, 0.8);
