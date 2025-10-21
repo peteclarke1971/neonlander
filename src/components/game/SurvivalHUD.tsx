@@ -195,8 +195,8 @@ export const SurvivalHUD: React.FC<Props> = ({
           </div>
         )}
         
-        {/* Gyroscope controls */}
-        {showGyroButton && (
+        {/* Gyroscope controls - HIDDEN FOR NOW */}
+        {/* {showGyroButton && (
           <div className="mt-3 pointer-events-auto space-y-2">
             {!gyroActive && gyroPermission !== 'denied' && gyroPermission !== 'unsupported' && (
               <Button 
@@ -242,7 +242,7 @@ export const SurvivalHUD: React.FC<Props> = ({
               </div>
             )}
           </div>
-        )}
+        )} */}
       </div>
     </aside>
   );
