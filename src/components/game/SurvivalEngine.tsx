@@ -2046,7 +2046,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + currentTime * s.tw));
         ctx.globalAlpha = (shouldOptimize 
           ? Math.min(1, Math.max(0.3, a))
-          : Math.min(1, Math.max(0.25, a))) * brightnessMultiplier * 0.3; // Dim stars heavily during blackout
+          : Math.min(1, Math.max(0.25, a))) * brightnessMultiplier;
         ctx.fillRect(s.x, s.y, s.size, s.size);
       }
       ctx.globalAlpha = 1;
