@@ -19,6 +19,9 @@ import { checkJunkPickup, collectJunk } from "./systems/collectibles";
 import { renderSpaceJunk, generateSparkles, updateSparkles, SparkleEffect } from "./systems/spaceJunkAssets";
 import { initAsteroidField, updateAsteroidField, renderAsteroidField, AsteroidFieldState } from "./systems/asteroidField";
 import { getColorForDistance, DEFAULT_PALETTE, isClassicColorsMode, ColorPalette } from "./systems/colorZones";
+import { createWeatherState, updateWeatherTransition, getWeatherIntensity, generateLightningBolt, getLightningLimit, WeatherState, WeatherParticle, LightningBolt } from "./systems/weather";
+import { spawnRainParticles, spawnDustParticles, spawnPlasmaParticles, updateRainParticles, updateDustParticles, updatePlasmaParticles, applyTransitionAlpha } from "./systems/weatherParticles";
+import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLightningBolts, renderRainbowDiffraction, renderPadResidue, updateLightningBolts } from "./systems/weatherRenderer";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -125,6 +128,16 @@ export const SurvivalEngine: React.FC<Props> = ({
   const BLACKOUT_FADE_OUT = 3.0; // seconds to fade out of blackout
   const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
   const SPOTLIGHT_RANGE = 400; // world units
+  
+  // Weather system state
+  const weatherStateRef = useRef<WeatherState>(createWeatherState());
+  const weatherParticlesRef = useRef<WeatherParticle[]>([]);
+  const lightningBoltsRef = useRef<LightningBolt[]>([]);
+  const lightningSpawnTimerRef = useRef(0);
+  const hudFlickerRef = useRef(1.0);
+  const padBeaconFlickerRef = useRef(1.0);
+  const rainbowAlphaRef = useRef(0);
+  const padResidueMapRef = useRef<Map<string, { alpha: number; color: string }>>(new Map());
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
@@ -858,6 +871,31 @@ export const SurvivalEngine: React.FC<Props> = ({
           // Audio: fade music back in
           audio.current.fadeInMusic(3.0);
         }
+      }
+      
+      // Weather system updates
+      updateWeatherTransition(weatherStateRef.current, dt, currentDistance);
+      const weatherIntensity = getWeatherIntensity(weatherStateRef.current);
+      const currentWeather = weatherStateRef.current.currentWeather;
+      
+      if (currentWeather === "neon-rain" && weatherIntensity > 0) {
+        spawnRainParticles(weatherParticlesRef.current, c.width / dprInit, c.height / dprInit, 5, weatherIntensity, lowGraphics);
+        updateRainParticles(weatherParticlesRef.current, dt, c.width / dprInit, c.height / dprInit);
+      } else if (currentWeather === "dust-clouds" && weatherIntensity > 0) {
+        spawnDustParticles(weatherParticlesRef.current, cameraX, c.width / dprInit, c.height / dprInit, 3, weatherIntensity, neonColor, lowGraphics);
+        updateDustParticles(weatherParticlesRef.current, dt, cameraX, c.width / dprInit, c.height / dprInit, shipX, shipY, keys.current.thrust, neonColor);
+      } else if (currentWeather === "plasma-drizzle" && weatherIntensity > 0) {
+        spawnPlasmaParticles(weatherParticlesRef.current, c.width / dprInit, c.height / dprInit, 4, weatherIntensity, lowGraphics);
+        updatePlasmaParticles(weatherParticlesRef.current, dt, c.width / dprInit, c.height / dprInit, shipX, shipY, shieldActiveRef.current, 50);
+      } else if (currentWeather === "em-storm" && weatherIntensity > 0) {
+        lightningSpawnTimerRef.current -= dt;
+        if (lightningSpawnTimerRef.current <= 0 && lightningBoltsRef.current.length < getLightningLimit(lowGraphics)) {
+          lightningBoltsRef.current.push(generateLightningBolt(c.width / dprInit, c.height / dprInit));
+          lightningSpawnTimerRef.current = 0.8 + Math.random() * 2.2;
+        }
+        updateLightningBolts(lightningBoltsRef.current, dt);
+        hudFlickerRef.current = Math.random() < 0.05 ? 0.5 : 1.0;
+        padBeaconFlickerRef.current = Math.random() < 0.08 ? 0.3 : 1.0;
       }
       
       // Ship input and rotation (only when alive)

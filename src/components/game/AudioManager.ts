@@ -627,4 +627,42 @@ export class AudioManager {
     // Play a warping sound effect
     this.playNoise(1.2, 0.7);
   }
+
+  // Weather audio
+  private weatherLoopGain?: GainNode;
+  
+  startWeatherAmbient(type: string) {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    this.stopWeatherAmbient();
+    
+    if (!this.weatherLoopGain) {
+      this.weatherLoopGain = this.ctx.createGain();
+      this.weatherLoopGain.gain.value = 0;
+      this.weatherLoopGain.connect(this.master);
+    }
+    
+    // Synthesize ambient based on type
+    const gain = this.weatherLoopGain.gain;
+    gain.cancelScheduledValues(this.ctx.currentTime);
+    gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + 3);
+  }
+  
+  stopWeatherAmbient() {
+    if (!this.ctx || !this.weatherLoopGain) return;
+    this.weatherLoopGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 3);
+  }
+  
+  setMusicWeatherEQ(type: string) {
+    if (!this.musicGain) return;
+    // Adjust music volume based on weather
+    const targetVol = type === "clear" ? 0.5 : type === "em-storm" ? 0.3 : 0.4;
+    if (this.ctx) {
+      this.musicGain.gain.linearRampToValueAtTime(targetVol, this.ctx.currentTime + 2);
+    }
+  }
+  
+  playLightningCrack() {
+    this.playNoise(0.1, 0.9);
+  }
 }
