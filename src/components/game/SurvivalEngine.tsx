@@ -2076,6 +2076,22 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       ctx.restore();
       
+      // Render dust clouds (world-space, after stars, before terrain mask)
+      const isDustActive = weatherStateRef.current.currentWeather === "dust-clouds" || 
+        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "dust-clouds");
+      if (isDustActive) {
+        renderDustClouds(
+          ctx, 
+          weatherParticlesRef.current, 
+          cameraX, 
+          zoom, 
+          anchor, 
+          neonColor, 
+          dprInit,
+          shouldOptimize
+        );
+      }
+      
       // Fill terrain shape with black to mask stars behind it
       // This must be done BEFORE applying camera transform
       if (!shouldOptimize) {
@@ -2744,6 +2760,63 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = `rgba(180, 220, 255, ${brightness})`;
         ctx.fillRect(0, 0, c.width, c.height);
+        ctx.restore();
+      }
+      
+      // Render weather particles (screen-space, after ship, before HUD)
+      const isRainActive = weatherStateRef.current.currentWeather === "neon-rain" || 
+        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "neon-rain");
+      if (isRainActive) {
+        renderRainParticles(ctx, weatherParticlesRef.current, dprInit, shouldOptimize);
+      }
+      
+      const isPlasmaActive = weatherStateRef.current.currentWeather === "plasma-drizzle" || 
+        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "plasma-drizzle");
+      if (isPlasmaActive) {
+        renderPlasmaParticles(ctx, weatherParticlesRef.current, dprInit, shouldOptimize);
+      }
+      
+      // Render lightning bolts
+      const isStormActive = weatherStateRef.current.currentWeather === "em-storm" || 
+        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "em-storm");
+      if (isStormActive) {
+        renderLightningBolts(ctx, lightningBoltsRef.current, dprInit, shouldOptimize);
+      }
+      
+      // Render rainbow diffraction after plasma drizzle
+      if (rainbowAlphaRef.current > 0) {
+        renderRainbowDiffraction(ctx, c.width / dprInit, c.height / dprInit, rainbowAlphaRef.current, dprInit);
+      }
+      
+      // Render pad residue glow on landing pads
+      if (padResidueMapRef.current.size > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shake, anchor);
+        
+        // Collect all pads from chunks
+        for (const chunk of chunks) {
+          for (let i = 0; i < chunk.pads.length; i++) {
+            const globalPadKey = `${chunk.startX}-${i}`;
+            const residueData = padResidueMapRef.current.get(globalPadKey);
+            if (!residueData || residueData.alpha <= 0) continue;
+            
+            const pad = chunk.pads[i];
+            const padWidth = pad.xEnd - pad.xStart;
+            renderPadResidue(
+              ctx,
+              pad.xStart,
+              pad.y,
+              padWidth,
+              residueData.alpha,
+              residueData.color,
+              dprInit
+            );
+          }
+        }
+        
         ctx.restore();
       }
       
