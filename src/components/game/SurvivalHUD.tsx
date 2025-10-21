@@ -30,6 +30,8 @@ interface Props {
   tiltAngle?: number;
   onEnableGyro?: () => void;
   onCalibrateGyro?: () => void;
+  // Weather effect
+  weatherType?: string;
 }
 
 export const SurvivalHUD: React.FC<Props> = ({ 
@@ -55,6 +57,7 @@ export const SurvivalHUD: React.FC<Props> = ({
   tiltAngle = 0,
   onEnableGyro,
   onCalibrateGyro,
+  weatherType,
 }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
@@ -192,6 +195,15 @@ export const SurvivalHUD: React.FC<Props> = ({
                 </span>
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Weather Effect Indicator */}
+        {weatherType && weatherType !== 'clear' && (
+          <div className="mt-2 flex items-center justify-center bg-cyan-500/20 border border-cyan-400/60 rounded px-2 py-1">
+            <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+              ⚡ {weatherType.replace('-', ' ')}
+            </span>
           </div>
         )}
         

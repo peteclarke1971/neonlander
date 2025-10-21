@@ -2910,6 +2910,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         blackoutActive={blackoutActive}
         blackoutTimer={blackoutTimerRef.current}
         zoneName={classicColorsMode.current ? undefined : currentPalette.name}
+        weatherType={weatherStateRef.current.currentWeather}
         showGyroButton={isTouch && !isUsingPCControls}
         gyroActive={gyroscope.isActive}
         gyroPermission={gyroscope.permission}
