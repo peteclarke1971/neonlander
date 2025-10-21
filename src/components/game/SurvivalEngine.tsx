@@ -118,8 +118,8 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [blackoutActive, setBlackoutActive] = useState(false);
   const blackoutTimerRef = useRef(0);
   const blackoutTransitionRef = useRef(1.0); // 1.0 = full brightness, 0.0 = full blackout
-  const lastBlackoutTimeRef = useRef(0); // Track when last blackout ended for cooldown
-  const lastBlackoutMilestoneRef = useRef(-1);
+  const firstBlackoutTriggeredRef = useRef(false); // Track if first blackout has happened
+  const nextBlackoutTimeRef = useRef(0); // When next blackout should trigger
   const BLACKOUT_DURATION = 25; // seconds
   const BLACKOUT_FADE_IN = 2.0; // seconds to fade into blackout
   const BLACKOUT_FADE_OUT = 3.0; // seconds to fade out of blackout
@@ -797,23 +797,34 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
       }
       
-      // Blackout trigger logic (every ~1500m, lasting 25s)
-      const blackoutInterval = 1500;
-      const distanceMilestone = Math.floor(currentDistance / blackoutInterval);
-      
-      // Check cooldown: require 60 seconds since last blackout ended
-      const timeSinceLastBlackout = currentTime - lastBlackoutTimeRef.current;
-      const cooldownElapsed = timeSinceLastBlackout >= 60;
-      
-      if (!blackoutActiveRef.current && distanceMilestone > lastBlackoutMilestoneRef.current && distanceMilestone > 0 && cooldownElapsed) {
-        // Start new blackout
-        blackoutActiveRef.current = true;
-        setBlackoutActive(true);
-        blackoutTimerRef.current = BLACKOUT_DURATION;
-        lastBlackoutMilestoneRef.current = distanceMilestone;
+      // Blackout trigger logic
+      if (!blackoutActiveRef.current && !isDead) {
         
-        // Audio: fade out music
-        audio.current.fadeOutMusic(1.5);
+        // FIRST BLACKOUT: Distance-based (1500-1700m)
+        if (!firstBlackoutTriggeredRef.current && currentDistance >= 1500) {
+          // Random trigger point between 1500-1700m
+          const randomTriggerDistance = 1500 + Math.random() * 200;
+          
+          if (currentDistance >= randomTriggerDistance) {
+            blackoutActiveRef.current = true;
+            setBlackoutActive(true);
+            blackoutTimerRef.current = BLACKOUT_DURATION;
+            firstBlackoutTriggeredRef.current = true;
+            
+            // Audio: fade out music
+            audio.current.fadeOutMusic(1.5);
+          }
+        }
+        
+        // SUBSEQUENT BLACKOUTS: Time-based (60-120s after previous ends)
+        else if (firstBlackoutTriggeredRef.current && currentTime >= nextBlackoutTimeRef.current) {
+          blackoutActiveRef.current = true;
+          setBlackoutActive(true);
+          blackoutTimerRef.current = BLACKOUT_DURATION;
+          
+          // Audio: fade out music
+          audio.current.fadeOutMusic(1.5);
+        }
       }
       
       // Update blackout timer
@@ -839,7 +850,10 @@ export const SurvivalEngine: React.FC<Props> = ({
           blackoutActiveRef.current = false;
           setBlackoutActive(false);
           blackoutTransitionRef.current = 1.0;
-          lastBlackoutTimeRef.current = currentTime; // Record end time for cooldown
+          
+          // Schedule next blackout: random 60-120 seconds from now
+          const randomCooldown = 60 + Math.random() * 60; // 60-120 seconds
+          nextBlackoutTimeRef.current = currentTime + randomCooldown;
           
           // Audio: fade music back in
           audio.current.fadeInMusic(3.0);
@@ -2773,6 +2787,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         shieldTimer={shieldTimerRef.current}
         cometActive={cometActive}
         cometTimer={cometTimerRef.current}
+        blackoutActive={blackoutActive}
+        blackoutTimer={blackoutTimerRef.current}
         zoneName={classicColorsMode.current ? undefined : currentPalette.name}
         showGyroButton={isTouch && !isUsingPCControls}
         gyroActive={gyroscope.isActive}
