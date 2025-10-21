@@ -32,7 +32,14 @@ const BASE_HEIGHT = 360;
 const AMPLITUDE = 180;
 const CHUNK_WIDTH = 2000;
 
-export const SurvivalEngine: React.FC<Props> = ({ 
+// Smooth easing function for blackout transitions (ease-in-out cubic)
+const easeInOutCubic = (t: number): number => {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+};
+
+export const SurvivalEngine: React.FC<Props> = ({
   onGameOver, 
   lowGraphics = false
 }) => {
@@ -844,17 +851,19 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (blackoutActiveRef.current) {
         blackoutTimerRef.current -= dt;
         
-        // Transition phase calculations
+        // Transition phase calculations with smooth easing
         if (blackoutTimerRef.current > BLACKOUT_DURATION - BLACKOUT_FADE_IN) {
-          // Fading into blackout (1.0 -> 0.0)
-          const fadeProgress = (BLACKOUT_DURATION - blackoutTimerRef.current) / BLACKOUT_FADE_IN;
-          blackoutTransitionRef.current = 1.0 - fadeProgress;
+          // Fading INTO blackout (brightness: 1.0 -> 0.0)
+          const rawProgress = (BLACKOUT_DURATION - blackoutTimerRef.current) / BLACKOUT_FADE_IN;
+          const easedProgress = easeInOutCubic(rawProgress);
+          blackoutTransitionRef.current = 1.0 - easedProgress;
         } else if (blackoutTimerRef.current <= BLACKOUT_FADE_OUT) {
-          // Fading out of blackout (0.0 -> 1.0)
-          const fadeProgress = blackoutTimerRef.current / BLACKOUT_FADE_OUT;
-          blackoutTransitionRef.current = 1.0 - fadeProgress;
+          // Fading OUT of blackout (brightness: 0.0 -> 1.0)
+          const rawProgress = blackoutTimerRef.current / BLACKOUT_FADE_OUT;
+          const easedProgress = easeInOutCubic(1.0 - rawProgress);
+          blackoutTransitionRef.current = easedProgress;
         } else {
-          // Full blackout
+          // Full blackout (middle phase)
           blackoutTransitionRef.current = 0.0;
         }
         
