@@ -78,10 +78,11 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
   // Initialize level
   useEffect(() => {
     const config = getTimeTrialLevelConfig(level);
-    const seed = config.seed + (difficulty === "hard" ? 500000 : 0);
+    const seedOffset = difficulty === "hard" ? 500000 : 0;
+    const seed = config.seed + seedOffset;
     
     // Generate terrain
-    const terrain = generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, AMPLITUDE, level, difficulty);
+    const terrain = generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, AMPLITUDE, level, difficulty as any);
     terrainRef.current = terrain;
     
     // Create numbered sequential pads
@@ -117,12 +118,12 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
     angle.current = 0;
     
     // Start audio
-    audio.current.startLevel(1);
+    audio.current.preloadSFX();
     
     setUiMode(false);
     
     return () => {
-      audio.current.stop();
+      audio.current.stopAllAudio();
       setUiMode(true);
     };
   }, [level, difficulty]);
@@ -199,16 +200,17 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
       
       // Read gamepad input
       if (anyGamepad()) {
-        const profile = loadProfile(null);
-        const gp = readGamepad(profile, 0);
-        if (gp) {
-          keys.current.left = gp.analogX < -0.3 || gp.dpadLeft;
-          keys.current.right = gp.analogX > 0.3 || gp.dpadRight;
-          keys.current.thrust = gp.thrust > 0.5;
-          keys.current.abort = gp.faceDown || gp.start;
-          
+        const gps = navigator.getGamepads();
+        const gamepad = gps[0] || gps[1] || gps[2] || gps[3];
+        if (gamepad) {
+          const profile = loadProfile(gamepad.id);
+          const input = readGamepad(gamepad, profile);
+          keys.current.left = input.rotation < -0.3 || input.buttons.rotateLeft;
+          keys.current.right = input.rotation > 0.3 || input.buttons.rotateRight;
+          keys.current.thrust = input.thrust > 0.5;
+          keys.current.abort = input.buttons.abort || input.buttons.pause;
           // Skip fireworks
-          if (showFireworks && gp.thrust) {
+          if (showFireworks && input.thrust > 0.5) {
             setFireworksSkipped(true);
           }
         }
@@ -216,7 +218,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
       
       // Handle abort
       if (keys.current.abort) {
-        audio.current.stop();
+        audio.current.stopAllAudio();
         onGameOver({
           cause: "crash",
           completionTime: gameTimeRef.current,
@@ -244,9 +246,9 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
         vx.current += Math.sin(angle.current) * THRUST_POWER;
         vy.current -= Math.cos(angle.current) * THRUST_POWER;
         fuel.current = Math.max(0, fuel.current - FUEL_BURN_RATE);
-        audio.current.thruster(true);
+        audio.current.setThruster(1);
       } else {
-        audio.current.thruster(false);
+        audio.current.setThruster(0);
       }
       
       // Apply gravity
@@ -289,7 +291,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
           
           if (angleOk && speedOk) {
             // Successful landing!
-            audio.current.landing();
+            audio.current.success();
             
             // Mark pad as inactive (vanish it)
             padsRef.current[currentTargetPad.current].isActive = false;
@@ -313,7 +315,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
               setCompleted(true);
               recordingActive.current = false;
               setShowFireworks(true);
-              audio.current.missionSuccess();
+              audio.current.playMissionSuccess();
               
               // Trigger game over after fireworks (or when skipped)
               setTimeout(() => {
@@ -347,7 +349,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
       
       // Check fuel depletion
       if (fuel.current <= 0 && vy.current > 0) {
-        audio.current.stop();
+        audio.current.stopAllAudio();
         onGameOver({
           cause: "fuel",
           completionTime: gameTimeRef.current,
@@ -374,7 +376,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
   }, [paused, completed, level, difficulty, onGameOver, showFireworks, fireworksSkipped]);
   
   const handleCrash = () => {
-    audio.current.crash();
+    audio.current.explosion();
     
     // Find last landed pad as checkpoint
     const lastPadIndex = Math.max(0, currentTargetPad.current - 1);
@@ -623,6 +625,9 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
       {showFireworks && !fireworksSkipped && (
         <div className="fixed inset-0 pointer-events-none z-50">
           <FireworksDisplay
+            landingType="regular"
+            neonColor="#00FFFF"
+            onSkip={() => setFireworksSkipped(true)}
             onComplete={() => {
               onGameOver({
                 cause: "success",
