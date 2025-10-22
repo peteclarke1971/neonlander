@@ -1590,51 +1590,148 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               setShowFireworks(true);
             }, 500);
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
-            // successful landing - end run (non-cavern levels)
-            const landedPad = (pad || nearPad)!;
-            y = landedPad.y - 8;
-            vy = 0; vx = 0; av = 0; angle = 0;
-            const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
-            let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
-            const applied2x = !!landedPad.bonus2x;
-            if (applied2x) earned *= 2;
-            const pWidth = landedPad.width ?? (landedPad.xEnd >= landedPad.xStart ? (landedPad.xEnd - landedPad.xStart) : (terrain.worldWidth - landedPad.xStart + landedPad.xEnd));
-            const pCenter = (landedPad.xEnd >= landedPad.xStart)
-              ? (landedPad.xStart + landedPad.xEnd) / 2
-              : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
-            let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
-            const bullseye = Math.abs(dx) <= pWidth * 0.03;
-            if (bullseye) { earned += 500; bullseyeT = 0; }
-            const speedBonus = elapsed < 10;
-            if (speedBonus) { earned += 500; }
-            score += earned;
-            landings += 1;
-            setCurrentLandings(landings);
-            
-            // Save landing bonus information for game over screen
-            setLastLandingBonuses({
-              bullseye,
-              speedBonus,
-              padBonus2x: applied2x,
-              lastEarned: earned
-            });
-            
-            cameraShake = 6;
-            audio.current.success();
-            audio.current.stopThruster();
-            try { audio.current.stopFuelAlarm(); } catch {}
-            if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
-            running = false;
-            setTimeout(() => {
-              // Ghost-beating check: get the current best time and compare
-              const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
-              const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
+            // Time Trial Mode: Check for sequenced landing
+            if (mode === "timetrial" && !isCavernLevel) {
+              const landedPad = (pad || nearPad)!;
+              const ttState = timeTrialStateRef.current;
               
-              const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
+              // Check if this is a sequenced pad
+              const sequencedPad = ttState.sequencedPads.find(p => 
+                p.xStart === landedPad.xStart && p.y === landedPad.y
+              );
               
-              setLandingType(padType);
-              setShowFireworks(true);
-            }, 500);
+              if (sequencedPad) {
+                // Check if landing on correct pad in sequence
+                if (sequencedPad.sequenceNumber === ttState.currentTarget) {
+                  // Correct pad! Advance sequence
+                  y = landedPad.y - 8;
+                  vy = 0; vx = 0; av = 0; angle = 0;
+                  
+                  // Start timer on first landing
+                  if (!ttState.raceActive) {
+                    setTimeTrialState(prev => ({
+                      ...prev,
+                      raceStartTime: elapsed,
+                      raceActive: true
+                    }));
+                  }
+                  
+                  // Mark pad as completed and advance target
+                  const updatedPads = ttState.sequencedPads.map(p =>
+                    p.sequenceNumber === sequencedPad.sequenceNumber
+                      ? { ...p, completed: true }
+                      : p
+                  );
+                  
+                  const newTarget = ttState.currentTarget + 1;
+                  const completedSeq = [...ttState.completedSequence, sequencedPad.sequenceNumber];
+                  
+                  setTimeTrialState(prev => ({
+                    ...prev,
+                    sequencedPads: updatedPads,
+                    currentTarget: newTarget,
+                    completedSequence: completedSeq
+                  }));
+                  
+                  // Check if all pads completed
+                  if (newTarget > ttState.totalPadsRequired) {
+                    // Race complete!
+                    const completionTime = elapsed - ttState.raceStartTime;
+                    
+                    setTimeTrialState(prev => ({
+                      ...prev,
+                      raceEndTime: elapsed,
+                      raceActive: false
+                    }));
+                    
+                    console.log("⏱️ Time Trial Complete!", {
+                      completionTime,
+                      completedSequence: completedSeq,
+                      level
+                    });
+                    
+                    cameraShake = 6;
+                    audio.current.success();
+                    audio.current.stopThruster();
+                    try { audio.current.stopFuelAlarm(); } catch {}
+                    running = false;
+                    
+                    setTimeout(() => {
+                      setLandingType('regular');
+                      setShowFireworks(true);
+                    }, 500);
+                  } else {
+                    // More pads to go - play landing sound and continue
+                    audio.current.success();
+                    cameraShake = 3;
+                    
+                    // Brief pause (can take off immediately)
+                    setTimeout(() => {
+                      // Auto-resume (ship is on pad, can thrust immediately)
+                    }, 100);
+                  }
+                } else {
+                  // Wrong pad - currently just warning, no penalty
+                  console.warn("⚠️ Wrong pad! Expected", ttState.currentTarget, "but landed on", sequencedPad.sequenceNumber);
+                  // For now, allow takeoff without penalty - could add penalty later
+                  y = landedPad.y - 8;
+                  vy = 0; vx = 0; av = 0; angle = 0;
+                  audio.current.success();
+                  cameraShake = 2;
+                  
+                  setTimeout(() => {
+                    // Resume
+                  }, 100);
+                }
+              }
+            } else {
+              // Regular landing logic (non-time-trial)
+              // Regular landing logic (non-time-trial)
+              const landedPad = (pad || nearPad)!;
+              y = landedPad.y - 8;
+              vy = 0; vx = 0; av = 0; angle = 0;
+              const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
+              let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
+              const applied2x = !!landedPad.bonus2x;
+              if (applied2x) earned *= 2;
+              const pWidth = landedPad.width ?? (landedPad.xEnd >= landedPad.xStart ? (landedPad.xEnd - landedPad.xStart) : (terrain.worldWidth - landedPad.xStart + landedPad.xEnd));
+              const pCenter = (landedPad.xEnd >= landedPad.xStart)
+                ? (landedPad.xStart + landedPad.xEnd) / 2
+                : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
+              let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
+              const bullseye = Math.abs(dx) <= pWidth * 0.03;
+              if (bullseye) { earned += 500; bullseyeT = 0; }
+              const speedBonus = elapsed < 10;
+              if (speedBonus) { earned += 500; }
+              score += earned;
+              landings += 1;
+              setCurrentLandings(landings);
+              
+              // Save landing bonus information for game over screen
+              setLastLandingBonuses({
+                bullseye,
+                speedBonus,
+                padBonus2x: applied2x,
+                lastEarned: earned
+              });
+              
+              cameraShake = 6;
+              audio.current.success();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+              if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
+              running = false;
+              setTimeout(() => {
+                // Ghost-beating check: get the current best time and compare
+                const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
+                const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
+                
+                const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
+                
+                setLandingType(padType);
+                setShowFireworks(true);
+              }, 500);
+            }
           } else {
             // crash
             running = false;
@@ -2082,8 +2179,42 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               ctx.shadowBlur = 24;
               ctx.stroke();
             }
-            // Bonus label
-            if (pad.bonus2x) {
+            // Bonus label or Time Trial sequence number
+            if (mode === "timetrial" && !isCavernLevel) {
+              // Draw sequence number for Time Trial pads
+              const ttState = timeTrialStateRef.current;
+              const sequencedPad = ttState.sequencedPads.find(p => 
+                p.xStart === pad.xStart && p.y === pad.y
+              );
+              
+              if (sequencedPad) {
+                const isTarget = sequencedPad.sequenceNumber === ttState.currentTarget;
+                const isCompleted = sequencedPad.completed;
+                
+                ctx.save();
+                ctx.textAlign = "center";
+                ctx.textBaseline = "bottom";
+                ctx.font = `bold ${isTarget ? 24 : 18}px "Orbitron", monospace`;
+                
+                // Color based on status
+                const numberColor = isCompleted 
+                  ? "#00FF00"  // Green for completed
+                  : isTarget 
+                    ? "#FFFF00"  // Yellow for current target
+                    : "#888888"; // Gray for future pads
+                
+                ctx.fillStyle = numberColor;
+                ctx.shadowColor = numberColor;
+                ctx.shadowBlur = isTarget ? 20 : 10;
+                ctx.globalAlpha = isTarget ? 1 : 0.7;
+                
+                // Draw number above pad
+                const numberY = pad.y - (isTarget ? 25 : 20);
+                ctx.fillText(sequencedPad.sequenceNumber.toString(), center + offset, numberY);
+                
+                ctx.restore();
+              }
+            } else if (pad.bonus2x) {
               ctx.save();
               ctx.textAlign = "center";
               ctx.textBaseline = "top";

@@ -113,9 +113,9 @@ const navigate = useNavigate();
     }
   }, [lastPlayedSeed]);
 
-  // Auto-enable ghost mode when switching to fixed mode
+  // Auto-enable ghost mode when switching to fixed mode or time trial
   useEffect(() => {
-    if (mode === "fixed") {
+    if (mode === "fixed" || mode === "timetrial") {
       setShowGhost(true);
     }
   }, [mode]);
@@ -479,11 +479,12 @@ useEffect(() => {
   >
     <ToggleGroupItem ref={modeFixedRef} value="fixed" variant="outline" aria-label="Campaign mode" onFocus={() => { lastModeFocus.current = "fixed"; }}>Campaign</ToggleGroupItem>
     <ToggleGroupItem ref={modeClassicRef} value="classic" variant="outline" aria-label="Classic mode" onFocus={() => { lastModeFocus.current = "classic"; }}>Classic</ToggleGroupItem>
+    <ToggleGroupItem value="timetrial" variant="outline" aria-label="Time Trial mode">⏱️ Time Trial</ToggleGroupItem>
   </ToggleGroup>
         </div>
 
-        {/* Ghost mode toggle (only visible in fixed mode) */}
-        {mode === "fixed" && (
+        {/* Ghost mode toggle (only visible in fixed or time trial mode) */}
+        {(mode === "fixed" || mode === "timetrial") && (
           <div className="mt-4 space-y-4">
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Ghost Mode</div>
