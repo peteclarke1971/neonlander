@@ -15,7 +15,6 @@ import NeonRacing from "./pages/NeonRacing";
 import NeonDocking from "./pages/NeonDocking";
 import Duel from "./pages/Duel";
 import Survival from "./pages/Survival";
-import TimeTrial from "./pages/TimeTrial";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +34,6 @@ const App = () => (
           <Route path="/neon-racing" element={<NeonRacing />} />
           <Route path="/neon-docking" element={<NeonDocking />} />
           <Route path="/survival" element={<Survival />} />
-          <Route path="/time-trial" element={<TimeTrial />} />
           <Route path="/cavern-fx-demo" element={<CavernFXDemo />} />
           <Route path="/settings/controls" element={<ControlsSettings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
