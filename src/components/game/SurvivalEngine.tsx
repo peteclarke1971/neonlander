@@ -2143,7 +2143,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         
         // Apply same camera transform used for terrain
-        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.translate(c.width / 2, c.height / 2);
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shake, anchor);
         
@@ -2174,7 +2174,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Apply zoom and camera transform (both horizontal and vertical)
-      ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+      ctx.translate(c.width / 2, c.height / 2);
       ctx.scale(zoom, zoom);
       ctx.translate(-cameraX + shake, anchor);
       
@@ -2198,7 +2198,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         // Apply same camera transform as main canvas
         offCtx.setTransform(1, 0, 0, 1, 0, 0);
-        offCtx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        offCtx.translate(c.width / 2, c.height / 2);
         offCtx.scale(zoom, zoom);
         offCtx.translate(-cameraX + shake, anchor);
         
@@ -2766,7 +2766,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
         
         // Re-apply camera transform for remaining objects
-        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.translate(c.width / 2, c.height / 2);
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shake, anchor);
       }
