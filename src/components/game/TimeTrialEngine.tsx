@@ -73,7 +73,41 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
   const ghostFrames = useRef<TimeTrialSnapshot[]>([]);
   const recordingActive = useRef(false);
   
+  // Starfield
+  type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
+  const starsRef = useRef<Star[]>([]);
+  
   const gravity = difficulty === "easy" ? 0.08 : 0.12;
+  
+  // Initialize starfield
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const dpr = window.devicePixelRatio || 1;
+    const pxW = canvas.width / dpr;
+    const pxH = canvas.height / dpr;
+    
+    const STAR_COUNT = 320;
+    const stars: Star[] = [];
+    
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const sx = Math.random() * pxW;
+      const sy = Math.random() * pxH;
+      const bright = Math.random() < 0.15;
+      stars.push({ 
+        x: sx, 
+        y: sy, 
+        size: bright ? 2.4 : 1.4, 
+        baseA: bright ? 0.95 : 0.6, 
+        tw: 0.5 + Math.random() * 1.5, 
+        ph: Math.random() * Math.PI * 2, 
+        bright 
+      });
+    }
+    
+    starsRef.current = stars;
+  }, []);
   
   // Initialize level
   useEffect(() => {
@@ -437,9 +471,25 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     
+    const pxW = canvas.width / dpr;
+    const pxH = canvas.height / dpr;
+    
     // Clear
     ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    ctx.fillRect(0, 0, pxW, pxH);
+    
+    // Draw starfield (screen-space, before camera transform)
+    const stars = starsRef.current;
+    const elapsed = performance.now() / 1000;
+    
+    for (const s of stars) {
+      const twinkle = Math.sin(s.ph + elapsed * s.tw) * 0.3 + 0.7;
+      const alpha = s.baseA * twinkle;
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
     
     // Camera
     const cameraX = x.current;
