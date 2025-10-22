@@ -6,22 +6,22 @@ interface Props extends HUDSnapshot {
   ghostTimeDiff?: number;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialMode, currentTargetPad, totalPads, raceTime }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          {timeTrialMode ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}
+          {timeTrialTarget ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}
         </div>
         
-        {timeTrialMode ? (
+        {timeTrialTarget !== undefined ? (
           // Time Trial specific HUD
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
             <div className="text-accent">TARGET</div>
-            <div className="text-lg font-bold">Pad {currentTargetPad}/{totalPads}</div>
+            <div className="text-lg font-bold">Pad {timeTrialTarget}/{timeTrialTotalPads}</div>
             <div className="text-accent">TIME</div>
             <div className="text-lg font-bold text-accent">
-              {raceTime !== undefined ? (raceTime / 1000).toFixed(3) : '0.000'}s
+              {timeTrialRaceTime !== undefined ? (timeTrialRaceTime / 1000).toFixed(3) : '0.000'}s
             </div>
             <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
             <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
@@ -53,7 +53,7 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
           </div>
         )}
         
-        {!timeTrialMode && (
+        {timeTrialTarget === undefined && (
           <>
             <div className="mt-3">
               <div className="flex items-center justify-between text-sm"><span className="text-accent">FUEL</span><span>{Math.max(0, fuel).toFixed(0)}</span></div>
@@ -72,19 +72,19 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
           </>
         )}
         
-        {bestTime && !timeTrialMode && (
+        {bestTime && timeTrialTarget === undefined && (
           <div className="text-xs text-muted-foreground mt-1">
             Best: {bestTime.toFixed(1)}s
           </div>
         )}
         
-        {bestTime && timeTrialMode && (
+        {bestTime && timeTrialTarget !== undefined && (
           <div className="text-xs text-muted-foreground mt-2">
             Best: {(bestTime / 1000).toFixed(3)}s
           </div>
         )}
         
-        {collectibles && !timeTrialMode && (
+        {collectibles && timeTrialTarget === undefined && (
           <div className="mt-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-accent">JUNK</span>

@@ -8,12 +8,13 @@ import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad, CollectiblesData, SpaceJunk, WormholeDoor } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad, CollectiblesData, SpaceJunk, WormholeDoor, SequencedPad } from "./types";
 import { checkJunkPickup, checkWormholeEntry, collectJunk, generateWormholeDoor } from "./systems/collectibles";
 import { renderSpaceJunk, renderWormholeDoor, generateSparkles, updateSparkles, SPACE_JUNK_ASSETS } from "./systems/spaceJunkAssets";
 import { generateTerrain } from "./terrain";
 import { movingPadSystem } from "./systems/movingPads";
 import FireworksDisplay from './FireworksDisplay';
+import { getTimeTrialLevelConfig } from "./systems/timeTrialLevels";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -127,6 +128,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   // Collectibles state
   const collectiblesRef = useRef<CollectiblesData | null>(null);
   const sparklesRef = useRef<Map<string, any>>(new Map());
+  
+  // Time Trial state
+  const [timeTrialState, setTimeTrialState] = useState({
+    sequencedPads: [] as SequencedPad[],
+    currentTarget: 1,
+    completedSequence: [] as number[],
+    raceStartTime: 0,
+    raceEndTime: 0,
+    raceActive: false,
+    totalPadsRequired: 2
+  });
+  const timeTrialStateRef = useRef(timeTrialState);
+  useEffect(() => { timeTrialStateRef.current = timeTrialState; }, [timeTrialState]);
 
   // Controls state
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean; rotateBoost: boolean }>({ left: false, right: false, thrust: false, abort: false, rotateBoost: false });
@@ -291,12 +305,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     
     // Determine seed based on override/mode and level type
     let seed: number;
+    let isTimeTrial = mode === "timetrial";
+    let timeTrialConfig;
+    
     if (typeof seedOverride === "number" && Number.isFinite(seedOverride)) {
       seed = (Math.abs(Math.floor(seedOverride)) >>> 0);
       console.log("🌱 Using seed override:", seed);
     } else if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
       console.log("🕳️ Using cavern seed:", seed, "for level", level);
+    } else if (isTimeTrial) {
+      // Time Trial uses fixed levels with deterministic seeds
+      timeTrialConfig = getTimeTrialLevelConfig(level);
+      seed = timeTrialConfig.seed;
+      console.log("⏱️ Using Time Trial seed:", seed, "for level", level, "with", timeTrialConfig.padCount, "pads");
     } else {
       // For classic mode (non-caverns), always use random generation
       seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
@@ -309,8 +331,35 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       ? generateCavern(seed, level, difficulty)
       : (() => {
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
-          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty);
+          const isTimeTrialMode = mode === "timetrial";
+          const timeTrialPadCount = timeTrialConfig?.padCount;
+          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount);
          })();
+    
+    // Setup Time Trial state if in time trial mode
+    if (isTimeTrial && !isCavernLevel && terrain.pads && timeTrialConfig) {
+      const sequencedPads = terrain.pads.map((pad, idx) => ({
+        ...pad,
+        sequenceNumber: idx + 1,
+        completed: false
+      })) as SequencedPad[];
+      
+      setTimeTrialState({
+        sequencedPads,
+        currentTarget: 1,
+        completedSequence: [],
+        raceStartTime: 0,
+        raceEndTime: 0,
+        raceActive: false,
+        totalPadsRequired: timeTrialConfig.padCount
+      });
+      
+      console.log("⏱️ Time Trial initialized:", {
+        level,
+        padCount: timeTrialConfig.padCount,
+        pads: sequencedPads.map(p => ({ seq: p.sequenceNumber, x: (p.xStart + p.xEnd) / 2 }))
+      });
+    }
     
     // ===== RUNTIME SANITY CHECKS =====
     if (!isCavernLevel && terrain.pads) {
@@ -626,6 +675,15 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         ghostTimeDiff = elapsed - bestTime;
       }
       
+      // Calculate time trial data
+      const ttState = timeTrialStateRef.current;
+      const timeTrialData = mode === "timetrial" ? {
+        currentTarget: ttState.currentTarget,
+        totalPads: ttState.totalPadsRequired,
+        raceTime: ttState.raceActive ? (elapsed - ttState.raceStartTime) : 0,
+        raceActive: ttState.raceActive
+      } : undefined;
+      
       setHud({ 
         altitude, 
         vx, 
@@ -637,7 +695,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         difficulty, 
         levelSeed, 
         rotateBoostActive: rotBoostActive.current > 1.1, 
-        ghostTimeDiff 
+        ghostTimeDiff,
+        timeTrialTarget: timeTrialData?.currentTarget,
+        timeTrialTotalPads: timeTrialData?.totalPads,
+        timeTrialRaceTime: timeTrialData?.raceTime,
+        timeTrialRaceActive: timeTrialData?.raceActive
       });
     };
 

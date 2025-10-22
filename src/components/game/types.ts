@@ -79,10 +79,10 @@ export interface HUDSnapshot {
   rotateBoostActive?: boolean;
   ghostTimeDiff?: number;
   // Time Trial specific fields
-  timeTrialMode?: boolean;
-  currentTargetPad?: number;
-  totalPads?: number;
-  raceTime?: number;
+  timeTrialTarget?: number;
+  timeTrialTotalPads?: number;
+  timeTrialRaceTime?: number;
+  timeTrialRaceActive?: boolean;
 }
 
 export interface GameOverData {

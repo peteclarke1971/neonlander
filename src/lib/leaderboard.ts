@@ -262,7 +262,7 @@ export async function submitTimeTrialScore(
         mode: 'timetrial' as Mode,
         level,
         completion_time: completionTime
-      });
+      } as any);
 
     if (error) {
       console.error('Error submitting time trial score:', error);
@@ -283,11 +283,13 @@ export async function fetchTimeTrialLeaderboard(
   level: number,
   difficulty: Difficulty,
   limit = 10
-): Promise<{ rows: any[]; error?: string }> {
+): Promise<{ rows: ScoreRow[]; error?: string }> {
   try {
-    const { data, error } = await supabase
+    const query: any = supabase
       .from('scores')
-      .select('*')
+      .select('*');
+    
+    const { data, error } = await query
       .eq('mode', 'timetrial')
       .eq('level', level)
       .eq('difficulty', difficulty)
@@ -299,7 +301,7 @@ export async function fetchTimeTrialLeaderboard(
       return { rows: [], error: error.message };
     }
 
-    return { rows: data || [] };
+    return { rows: (data as ScoreRow[]) || [] };
   } catch (e: any) {
     console.error('Error fetching time trial leaderboard:', e);
     return { rows: [], error: e?.message || "Network error" };
