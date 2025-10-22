@@ -240,3 +240,80 @@ export async function fetchGlobalGhost(
     return { record: null, error: e?.message || "Network error" };
   }
 }
+
+// ============================================
+// TIME TRIAL LEADERBOARD FUNCTIONS
+// ============================================
+
+export type TimeTrialScoreRow = {
+  id?: string;
+  initials: string;
+  completion_time: number; // milliseconds
+  level: number;
+  difficulty: Difficulty;
+  created_at?: string;
+};
+
+/**
+ * Submit a time trial score to the leaderboard
+ */
+export async function submitTimeTrialScore(
+  level: number,
+  difficulty: Difficulty,
+  completionTime: number,
+  initials: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('scores')
+      .insert({
+        initials: initials.toUpperCase().slice(0, 3),
+        mode_type: 'timetrial',
+        level,
+        difficulty,
+        completion_time: completionTime,
+        score: 0, // Time trial doesn't use score
+        mode: 'fixed' // Fallback for legacy mode column
+      });
+
+    if (error) {
+      console.error('Error submitting time trial score:', error);
+      return { ok: false, error: error.message };
+    }
+
+    return { ok: true };
+  } catch (e: any) {
+    console.error('Error submitting time trial score:', e);
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+/**
+ * Fetch top times for a specific time trial level
+ */
+export async function fetchTimeTrialLeaderboard(
+  level: number,
+  difficulty: Difficulty,
+  limit = 10
+): Promise<{ rows: TimeTrialScoreRow[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('scores')
+      .select('id, initials, completion_time, level, difficulty, created_at')
+      .eq('mode_type', 'timetrial')
+      .eq('level', level)
+      .eq('difficulty', difficulty)
+      .order('completion_time', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching time trial leaderboard:', error);
+      return { rows: [], error: error.message };
+    }
+
+    return { rows: data as TimeTrialScoreRow[] };
+  } catch (e: any) {
+    console.error('Error fetching time trial leaderboard:', e);
+    return { rows: [], error: e?.message || "Network error" };
+  }
+}
