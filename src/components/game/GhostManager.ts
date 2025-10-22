@@ -511,4 +511,130 @@ export class GhostManager {
       visible: true
     };
   }
+
+  // ============= Time Trial Ghost System =============
+
+  /**
+   * Save a Time Trial ghost recording
+   */
+  saveTimeTrialGhost(difficulty: string, level: number, frames: LunarLanderGhostFrame[], completionTime: number): void {
+    const recording: GhostRecording = {
+      frames,
+      completionTime,
+      level,
+      date: Date.now(),
+      gameType: "lunar-lander"
+    };
+    
+    try {
+      const key = `time-trial-ghost-${difficulty}-level-${level}`;
+      localStorage.setItem(key, JSON.stringify(recording));
+    } catch (error) {
+      console.warn('Failed to save time trial ghost recording:', error);
+    }
+  }
+
+  /**
+   * Load Time Trial ghost recording
+   */
+  loadTimeTrialGhost(difficulty: string, level: number): GhostRecording | null {
+    try {
+      const key = `time-trial-ghost-${difficulty}-level-${level}`;
+      const data = localStorage.getItem(key);
+      if (!data) return null;
+      
+      const recording = JSON.parse(data) as GhostRecording;
+      
+      if (!recording.frames || !Array.isArray(recording.frames) || 
+          typeof recording.completionTime !== 'number') {
+        return null;
+      }
+      
+      return recording;
+    } catch (error) {
+      console.warn('Failed to load time trial ghost recording:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get best time for Time Trial level
+   */
+  getTimeTrialBestTime(difficulty: string, level: number): number | null {
+    const ghost = this.loadTimeTrialGhost(difficulty, level);
+    return ghost ? ghost.completionTime : null;
+  }
+
+  /**
+   * Check if Time Trial ghost exists
+   */
+  hasTimeTrialGhost(difficulty: string, level: number): boolean {
+    return this.getTimeTrialBestTime(difficulty, level) !== null;
+  }
+
+  /**
+   * Get Time Trial ghost state at given time
+   */
+  getTimeTrialGhostState(difficulty: string, level: number, gameTime: number): LunarLanderGhostState | null {
+    const recording = this.loadTimeTrialGhost(difficulty, level);
+    if (!recording || recording.frames.length === 0) return null;
+    
+    if (gameTime > recording.completionTime) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    const frames = recording.frames as LunarLanderGhostFrame[];
+    
+    let prevFrame = frames[0];
+    let nextFrame = frames[0];
+    
+    for (let i = 0; i < frames.length - 1; i++) {
+      if (frames[i].timestamp <= gameTime && frames[i + 1].timestamp > gameTime) {
+        prevFrame = frames[i];
+        nextFrame = frames[i + 1];
+        break;
+      }
+    }
+    
+    if (gameTime >= frames[frames.length - 1].timestamp) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    if (gameTime <= frames[0].timestamp) {
+      return {
+        x: prevFrame.x,
+        y: prevFrame.y,
+        angle: prevFrame.angle,
+        thrust: prevFrame.thrust,
+        visible: true
+      };
+    }
+    
+    const timeDiff = nextFrame.timestamp - prevFrame.timestamp;
+    const factor = timeDiff > 0 ? (gameTime - prevFrame.timestamp) / timeDiff : 0;
+    
+    let angleDiff = nextFrame.angle - prevFrame.angle;
+    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    
+    return {
+      x: prevFrame.x + (nextFrame.x - prevFrame.x) * factor,
+      y: prevFrame.y + (nextFrame.y - prevFrame.y) * factor,
+      angle: prevFrame.angle + angleDiff * factor,
+      thrust: factor < 0.5 ? prevFrame.thrust : nextFrame.thrust,
+      visible: true
+    };
+  }
+
+  /**
+   * Clear Time Trial ghost
+   */
+  clearTimeTrialGhost(difficulty: string, level: number): void {
+    try {
+      const key = `time-trial-ghost-${difficulty}-level-${level}`;
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('Failed to clear time trial ghost recording:', error);
+    }
+  }
 }

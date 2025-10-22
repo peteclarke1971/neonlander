@@ -15,6 +15,8 @@ export type ScoreRow = {
   difficulty: Difficulty;
   mode: Mode;
   created_at?: string;
+  level?: number;
+  completion_time?: number;
 };
 
 /**
@@ -238,5 +240,68 @@ export async function fetchGlobalGhost(
   } catch (e: any) {
     console.error('Error fetching global ghost:', e);
     return { record: null, error: e?.message || "Network error" };
+  }
+}
+
+/**
+ * Submit a Time Trial completion time to the leaderboard
+ */
+export async function submitTimeTrialScore(
+  level: number,
+  difficulty: Difficulty,
+  completionTime: number,
+  initials: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('scores')
+      .insert({
+        initials: initials.toUpperCase().slice(0, 3),
+        score: 0,
+        difficulty,
+        mode: 'timetrial' as Mode,
+        level,
+        completion_time: completionTime
+      });
+
+    if (error) {
+      console.error('Error submitting time trial score:', error);
+      return { ok: false, error: error.message };
+    }
+
+    return { ok: true };
+  } catch (e: any) {
+    console.error('Error submitting time trial score:', e);
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+/**
+ * Fetch Time Trial leaderboard for a specific level and difficulty
+ */
+export async function fetchTimeTrialLeaderboard(
+  level: number,
+  difficulty: Difficulty,
+  limit = 10
+): Promise<{ rows: any[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('scores')
+      .select('*')
+      .eq('mode', 'timetrial')
+      .eq('level', level)
+      .eq('difficulty', difficulty)
+      .order('completion_time', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching time trial leaderboard:', error);
+      return { rows: [], error: error.message };
+    }
+
+    return { rows: data || [] };
+  } catch (e: any) {
+    console.error('Error fetching time trial leaderboard:', e);
+    return { rows: [], error: e?.message || "Network error" };
   }
 }

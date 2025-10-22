@@ -6,48 +6,85 @@ interface Props extends HUDSnapshot {
   ghostTimeDiff?: number;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialMode, currentTargetPad, totalPads, raceTime }) => {
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          Flight HUD — {difficulty}
+          {timeTrialMode ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
-          <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
-          <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
-          <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
-          <div className="text-accent">TIME</div>
-          <div className="flex flex-col">
-            <span>{time.toFixed(1)} s</span>
-            {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.1 && (
-              <span className={`text-xs ${ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                Ghost: {ghostTimeDiff > 0 ? '+' : ''}{ghostTimeDiff.toFixed(1)}s
-              </span>
+        
+        {timeTrialMode ? (
+          // Time Trial specific HUD
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
+            <div className="text-accent">TARGET</div>
+            <div className="text-lg font-bold">Pad {currentTargetPad}/{totalPads}</div>
+            <div className="text-accent">TIME</div>
+            <div className="text-lg font-bold text-accent">
+              {raceTime !== undefined ? (raceTime / 1000).toFixed(3) : '0.000'}s
+            </div>
+            <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
+            <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
+            <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
+            {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.01 && (
+              <>
+                <div className="text-accent">GHOST</div>
+                <div className={ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}>
+                  {ghostTimeDiff > 0 ? '+' : ''}{(ghostTimeDiff / 1000).toFixed(3)}s
+                </div>
+              </>
             )}
           </div>
-        </div>
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-sm"><span className="text-accent">FUEL</span><span>{Math.max(0, fuel).toFixed(0)}</span></div>
-          <div className="h-2 bg-secondary rounded-md overflow-hidden mt-1">
-            <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, (fuelCap ? (fuel / fuelCap * 100) : fuel)))}%` }} />
+        ) : (
+          // Regular game HUD
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
+            <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
+            <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
+            <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
+            <div className="text-accent">TIME</div>
+            <div className="flex flex-col">
+              <span>{time.toFixed(1)} s</span>
+              {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.1 && (
+                <span className={`text-xs ${ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  Ghost: {ghostTimeDiff > 0 ? '+' : ''}{ghostTimeDiff.toFixed(1)}s
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="mt-3 text-lg font-semibold">
-          Score: <span className="text-accent">{score}</span>
-          {rotateBoostActive && (
-            <span className="ml-2 px-1 py-0.5 text-xs bg-accent/20 text-accent rounded border border-accent/40">
-              2× ROT
-            </span>
-          )}
-        </div>
-        {bestTime && (
+        )}
+        
+        {!timeTrialMode && (
+          <>
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-sm"><span className="text-accent">FUEL</span><span>{Math.max(0, fuel).toFixed(0)}</span></div>
+              <div className="h-2 bg-secondary rounded-md overflow-hidden mt-1">
+                <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, (fuelCap ? (fuel / fuelCap * 100) : fuel)))}%` }} />
+              </div>
+            </div>
+            <div className="mt-3 text-lg font-semibold">
+              Score: <span className="text-accent">{score}</span>
+              {rotateBoostActive && (
+                <span className="ml-2 px-1 py-0.5 text-xs bg-accent/20 text-accent rounded border border-accent/40">
+                  2× ROT
+                </span>
+              )}
+            </div>
+          </>
+        )}
+        
+        {bestTime && !timeTrialMode && (
           <div className="text-xs text-muted-foreground mt-1">
             Best: {bestTime.toFixed(1)}s
           </div>
         )}
         
-        {collectibles && (
+        {bestTime && timeTrialMode && (
+          <div className="text-xs text-muted-foreground mt-2">
+            Best: {(bestTime / 1000).toFixed(3)}s
+          </div>
+        )}
+        
+        {collectibles && !timeTrialMode && (
           <div className="mt-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-accent">JUNK</span>

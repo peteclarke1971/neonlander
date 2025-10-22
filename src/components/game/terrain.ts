@@ -1,4 +1,4 @@
-import { Pad, TerrainData, MovingPad, CollectiblesData } from "./types";
+import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -13,7 +13,7 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1, difficulty: "easy" | "hard" = "easy"): TerrainData {
+export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1, difficulty: "easy" | "hard" = "easy", isTimeTrial = false, timeTrialPadCount?: number): TerrainData {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
   
@@ -56,8 +56,59 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   }
 
   // Place landing pads sized from tiny to large
-  const padCount = 4;
+  // In Time Trial mode, use specified pad count for sequenced pads
+  const padCount = isTimeTrial && timeTrialPadCount ? timeTrialPadCount : 4;
   const pads: Pad[] = [];
+  const sequencedPads: SequencedPad[] = [];
+  
+  if (isTimeTrial && timeTrialPadCount) {
+    // Generate sequenced pads for Time Trial mode
+    // Space them evenly across the world and make them all medium-sized for fairness
+    const spacing = worldWidth / (timeTrialPadCount + 1);
+    
+    for (let i = 0; i < timeTrialPadCount; i++) {
+      const sequenceNumber = i + 1;
+      const xCenter = spacing * (i + 1);
+      const centerIdx = Math.floor((xCenter / worldWidth) * segments);
+      
+      // Make all sequenced pads medium-sized (fair and visible)
+      const width = step * (1.0 + rand() * 0.4); // ~50-70px
+      const multiplier = 3; // Standard medium pad multiplier
+      
+      const xStart = (xCenter - width / 2 + worldWidth) % worldWidth;
+      const xEnd = (xCenter + width / 2 + worldWidth) % worldWidth;
+      const targetY = originalHeights.get(centerIdx) || points[centerIdx].y;
+      
+      // Flatten terrain around the pad
+      const halfCount = Math.max(1, Math.round((width / step) * 1.2));
+      for (let j = -halfCount; j <= halfCount; j++) {
+        const idx = ((centerIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
+        points[idx].y = targetY;
+      }
+      
+      sequencedPads.push({
+        xStart,
+        xEnd,
+        y: targetY,
+        multiplier,
+        width,
+        bonus2x: false,
+        sequenceNumber,
+        completed: false
+      });
+      
+      // Also add to regular pads array for terrain compatibility
+      pads.push({
+        xStart,
+        xEnd,
+        y: targetY,
+        multiplier,
+        width,
+        bonus2x: false
+      });
+    }
+  } else {
+    // Regular pad generation for non-Time Trial modes
   for (let i = 0; i < padCount; i++) {
     // Prefer steep areas for some pads to create cliff platforms
     let centerIdx = Math.floor(rand() * (segments - 6)) + 3;
@@ -130,6 +181,7 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
       pads.push({ xStart, xEnd, y, multiplier, width, bonus2x: false });
     }
   }
+  } // End regular pad generation
 
   // Mark smallest pad as 2x bonus pad (most difficult)
   if (pads.length > 0) {
@@ -384,6 +436,7 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
     getHeightAt, 
     getPadAt, 
     getMovingPadAt,
-    isCavern: false 
+    isCavern: false,
+    sequencedPads: isTimeTrial ? sequencedPads : undefined
   };
 }

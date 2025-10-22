@@ -1,5 +1,5 @@
 export type Difficulty = "easy" | "hard";
-export type Mode = "classic" | "fixed" | "caverns" | "survival";
+export type Mode = "classic" | "fixed" | "caverns" | "survival" | "timetrial";
 
 export interface MovingPad extends Pad {
   motion: "shuttle" | "elevator" | "arc";
@@ -47,6 +47,11 @@ export interface Pad {
   bonus2x?: boolean; // special 2x pad bonus flag
 }
 
+export interface SequencedPad extends Pad {
+  sequenceNumber: number; // 1-5 for time trial mode
+  completed?: boolean;
+}
+
 export interface TerrainData {
   worldWidth: number;
   points: { x: number; y: number }[];
@@ -58,6 +63,7 @@ export interface TerrainData {
   getPadAt: (x: number) => Pad | null;
   getMovingPadAt?: (x: number, y: number, level?: number) => MovingPad | null;
   isCavern?: false;
+  sequencedPads?: SequencedPad[]; // For time trial mode
 }
 
 export interface HUDSnapshot {
@@ -72,6 +78,11 @@ export interface HUDSnapshot {
   levelSeed?: number;
   rotateBoostActive?: boolean;
   ghostTimeDiff?: number;
+  // Time Trial specific fields
+  timeTrialMode?: boolean;
+  currentTargetPad?: number;
+  totalPads?: number;
+  raceTime?: number;
 }
 
 export interface GameOverData {
@@ -91,6 +102,10 @@ export interface GameOverData {
   isNewBestTime?: boolean;
   ghostTimeDiff?: number;
   isWorldRecord?: boolean;
+  // Time Trial specific data
+  completedSequence?: number[];
+  totalPadsRequired?: number;
+  timeTrialCompletionTime?: number;
 }
 
 export interface HighScore {
