@@ -1,7 +1,8 @@
-import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad } from "./types";
+import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
+import { TimeTrialLevelConfig } from "./systems/timeTrialLevels";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -13,7 +14,19 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateTerrain(seed: number, worldWidth: number, base: number, amplitude: number, complexity = 0, level = 1, difficulty: "easy" | "hard" = "easy", isTimeTrial = false, timeTrialPadCount?: number): TerrainData {
+export function generateTerrain(
+  seed: number, 
+  worldWidth: number, 
+  base: number, 
+  amplitude: number, 
+  complexity = 0, 
+  level = 1, 
+  difficulty: "easy" | "hard" = "easy", 
+  isTimeTrial = false, 
+  timeTrialPadCount?: number,
+  mode?: Mode,
+  timeTrialLevelConfig?: TimeTrialLevelConfig
+): TerrainData {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
   
@@ -234,10 +247,10 @@ export function generateTerrain(seed: number, worldWidth: number, base: number, 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
   
-  // Generate moving pads for every level with increasing speed
-  const shouldGenerateMovingPad = true; // Always generate moving pads
+  // Only generate moving pads if NOT in Time Trial mode OR if Time Trial allows mega pads
+  const allowMovingPads = !isTimeTrial || (timeTrialLevelConfig?.allowMegaPad === true);
   
-  if (shouldGenerateMovingPad) {
+  if (allowMovingPads) {
     let movingPad = movingPadSystem.generateMovingPad(
       seed ^ 0x4D4F5649, // "MOVI" in hex
       level,

@@ -14,28 +14,44 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
           {timeTrialTarget ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}
         </div>
         
-        {timeTrialTarget !== undefined ? (
-          // Time Trial specific HUD
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
-            <div className="text-accent">TARGET</div>
-            <div className="text-lg font-bold">Pad {timeTrialTarget}/{timeTrialTotalPads}</div>
-            <div className="text-accent">TIME</div>
-            <div className="text-lg font-bold text-accent">
-              {timeTrialRaceTime !== undefined ? (timeTrialRaceTime / 1000).toFixed(3) : '0.000'}s
+  {timeTrialTarget !== undefined ? (
+    <>
+      {/* Time Trial specific HUD */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
+        <div className="text-accent">TARGET</div>
+        <div className="text-lg font-bold">Pad {timeTrialTarget}/{timeTrialTotalPads}</div>
+        <div className="text-accent">TIME</div>
+        <div className="text-lg font-bold text-accent">
+          {timeTrialRaceTime !== undefined ? (timeTrialRaceTime / 1000).toFixed(3) : '0.000'}s
+        </div>
+        <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
+        <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
+        <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
+        {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.01 && (
+          <>
+            <div className="text-accent">GHOST</div>
+            <div className={ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}>
+              {ghostTimeDiff > 0 ? '+' : ''}{(ghostTimeDiff / 1000).toFixed(3)}s
             </div>
-            <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
-            <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
-            <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
-            {ghostTimeDiff !== undefined && Math.abs(ghostTimeDiff) > 0.01 && (
-              <>
-                <div className="text-accent">GHOST</div>
-                <div className={ghostTimeDiff > 0 ? 'text-red-400' : 'text-green-400'}>
-                  {ghostTimeDiff > 0 ? '+' : ''}{(ghostTimeDiff / 1000).toFixed(3)}s
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
+          </>
+        )}
+      </div>
+      
+      {/* Fuel bar for Time Trial */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-accent">FUEL</span>
+          <span>{Math.max(0, fuel).toFixed(0)}</span>
+        </div>
+        <div className="h-2 bg-secondary rounded-md overflow-hidden mt-1">
+          <div 
+            className="h-full bg-accent transition-all duration-200" 
+            style={{ width: `${Math.max(0, Math.min(100, (fuelCap ? (fuel / fuelCap * 100) : fuel)))}%` }} 
+          />
+        </div>
+      </div>
+    </>
+  ) : (
           // Regular game HUD
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
             <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>

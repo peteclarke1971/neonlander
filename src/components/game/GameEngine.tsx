@@ -333,7 +333,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
           const isTimeTrialMode = mode === "timetrial";
           const timeTrialPadCount = timeTrialConfig?.padCount;
-          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount);
+          return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount, mode, timeTrialConfig);
          })();
     
     // Setup Time Trial state if in time trial mode
@@ -1606,6 +1606,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   // Correct pad! Advance sequence
                   y = landedPad.y - 8;
                   vy = 0; vx = 0; av = 0; angle = 0;
+                  
+                  // Award fuel bonus for successful landing
+                  fuel += 25;
+                  fuel = Math.min(fuel, fuelCap); // Don't exceed fuel cap
                   
                   // Start timer on first landing
                   if (!ttState.raceActive) {
