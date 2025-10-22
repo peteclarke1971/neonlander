@@ -494,7 +494,7 @@ export const TimeTrialEngine: React.FC<Props> = ({ level, difficulty, onGameOver
     // Camera
     const cameraX = x.current;
     const zoom = 1.5;
-    const anchor = canvas.height / dpr / 2 + 50;
+    const anchor = -y.current + pxH * 0.45; // Keep lander at 45% from top
     
     ctx.save();
     ctx.translate(canvas.width / (2 * dpr), canvas.height / (2 * dpr));
