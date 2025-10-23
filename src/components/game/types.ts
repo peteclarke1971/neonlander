@@ -83,6 +83,7 @@ export interface HUDSnapshot {
   timeTrialTotalPads?: number;
   timeTrialRaceTime?: number;
   timeTrialRaceActive?: boolean;
+  timeTrialLevel?: number;
 }
 
 export interface GameOverData {

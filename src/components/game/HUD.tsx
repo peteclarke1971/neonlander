@@ -1,4 +1,7 @@
-import { HUDSnapshot, CollectiblesData } from "./types";
+import { HUDSnapshot, CollectiblesData, Difficulty } from "./types";
+import { useEffect, useState } from "react";
+import { GhostManager } from "./GhostManager";
+import { fetchTimeTrialLeaderboard } from "@/lib/leaderboard";
 
 interface Props extends HUDSnapshot {
   collectibles?: CollectiblesData;
@@ -6,7 +9,37 @@ interface Props extends HUDSnapshot {
   ghostTimeDiff?: number;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive, timeTrialLevel }) => {
+  const [localRecord, setLocalRecord] = useState<{ time: number; initials: string } | null>(null);
+  const [globalRecord, setGlobalRecord] = useState<{ time: number; initials: string } | null>(null);
+  
+  // Fetch Time Trial records when in Time Trial mode
+  useEffect(() => {
+    if (timeTrialTarget === undefined || timeTrialLevel === undefined) return;
+    
+    const fetchRecords = async () => {
+      const ghostManager = new GhostManager();
+      
+      // Local record
+      const localTime = ghostManager.getTimeTrialBestTime(difficulty, timeTrialLevel);
+      if (localTime) {
+        const localInitials = localStorage.getItem(`time-trial-initials-${difficulty}-${timeTrialLevel}`) || '???';
+        setLocalRecord({ time: localTime, initials: localInitials });
+      }
+      
+      // Global record
+      try {
+        const { rows } = await fetchTimeTrialLeaderboard(timeTrialLevel, difficulty, 1);
+        if (rows && rows.length > 0 && rows[0].completion_time) {
+          setGlobalRecord({ time: rows[0].completion_time, initials: rows[0].initials });
+        }
+      } catch (err) {
+        console.error("Failed to fetch Time Trial leaderboard:", err);
+      }
+    };
+    
+    fetchRecords();
+  }, [timeTrialTarget, timeTrialLevel, difficulty]);
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
@@ -50,6 +83,24 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
           />
         </div>
       </div>
+      
+      {/* Records display - only show when race hasn't started */}
+      {!timeTrialRaceActive && (
+        <div className="mt-3 space-y-1 text-xs font-mono">
+          {localRecord && (
+            <div className="flex justify-between gap-4">
+              <span className="text-accent">Best: {(localRecord.time / 1000).toFixed(2)}s</span>
+              <span className="text-muted-foreground">Pilot: {localRecord.initials}</span>
+            </div>
+          )}
+          {globalRecord && (
+            <div className="flex justify-between gap-4">
+              <span className="text-yellow-400">World: {(globalRecord.time / 1000).toFixed(2)}s</span>
+              <span className="text-muted-foreground">Pilot: {globalRecord.initials}</span>
+            </div>
+          )}
+        </div>
+      )}
     </>
   ) : (
           // Regular game HUD

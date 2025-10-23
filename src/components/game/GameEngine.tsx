@@ -41,6 +41,8 @@ import { PerformanceManager } from "./utils/performanceManager";
 import { particlePool, debrisPool } from "./utils/objectPool";
 import { GhostManager, LunarLanderGhostFrame, LunarLanderGhostState } from "./GhostManager";
 import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
+import { InitialsEntry } from "./InitialsEntry";
+import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
 
 interface Props {
   difficulty: Difficulty;
@@ -141,6 +143,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   });
   const timeTrialStateRef = useRef(timeTrialState);
   useEffect(() => { timeTrialStateRef.current = timeTrialState; }, [timeTrialState]);
+  
+  // Time Trial ghost recording refs
+  const timeTrialGhostFrames = useRef<LunarLanderGhostFrame[]>([]);
+  const timeTrialLoadedGhost = useRef<any>(null);
+  const timeTrialGhostType = useRef<'local' | 'global'>('local');
+  
+  // Session initials for Time Trial
+  const [sessionInitials, setSessionInitials] = useState<string | null>(null);
+  const [pendingInitialsEntry, setPendingInitialsEntry] = useState(false);
+  const pendingSubmissionRef = useRef<{
+    level: number;
+    difficulty: Difficulty;
+    completionTime: number;
+    ghostFrames: LunarLanderGhostFrame[];
+    isLocalRecord: boolean;
+    isGlobalRecord: boolean;
+  } | null>(null);
 
   // Controls state
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean; rotateBoost: boolean }>({ left: false, right: false, thrust: false, abort: false, rotateBoost: false });
@@ -173,6 +192,73 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   // Demo AI system
   const demoAI = useRef<DemoAIState | null>(null);
   const [demoStartTime, setDemoStartTime] = useState<number>(0);
+  
+  // Time Trial record submission helpers (component level)
+  const submitTimeTrialRecord = async (
+    initials: string,
+    levelNum: number,
+    diff: Difficulty,
+    completionTime: number,
+    frames: LunarLanderGhostFrame[],
+    isLocalRecord: boolean,
+    isGlobalRecord: boolean
+  ) => {
+    if (isLocalRecord) {
+      localStorage.setItem(`time-trial-initials-${diff}-${levelNum}`, initials);
+    }
+    
+    if (isGlobalRecord) {
+      try {
+        await submitTimeTrialScore(levelNum, diff, completionTime, initials);
+        
+        const recording = {
+          frames,
+          completionTime,
+          level: levelNum,
+          date: Date.now(),
+          gameType: "lunar-lander" as const
+        };
+        
+        await submitGlobalGhost(levelNum, diff, completionTime, recording, initials);
+        console.log('🌍 Global Time Trial record submitted!');
+      } catch (err) {
+        console.error('Failed to submit global Time Trial record:', err);
+      }
+    }
+  };
+  
+  const handleInitialsSubmit = async (initials: string) => {
+    setSessionInitials(initials);
+    setPendingInitialsEntry(false);
+    
+    const pending = pendingSubmissionRef.current;
+    if (pending) {
+      await submitTimeTrialRecord(
+        initials,
+        pending.level,
+        pending.difficulty,
+        pending.completionTime,
+        pending.ghostFrames,
+        pending.isLocalRecord,
+        pending.isGlobalRecord
+      );
+      pendingSubmissionRef.current = null;
+      
+      onGameOver({
+        score: 0,
+        landings: currentLandings,
+        cause: "success",
+        difficulty: pending.difficulty,
+        elapsed: hud.time,
+        levelSeed: hud.levelSeed,
+        level: pending.level,
+        timeTrialCompletionTime: pending.completionTime,
+        completedSequence: timeTrialStateRef.current.completedSequence,
+        totalPadsRequired: timeTrialStateRef.current.totalPadsRequired,
+        isNewBestTime: pending.isLocalRecord
+      });
+    }
+  };
   
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
@@ -572,6 +658,35 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       console.log("🔴 Ghost recording started for", difficulty, "level", level);
     }
     
+    // Load Time Trial ghost if in time trial mode
+    if (isTimeTrial && showGhost) {
+      const challengeGlobal = localStorage.getItem('challenge-global-ghosts') === 'true';
+      
+      if (challengeGlobal) {
+        // Try global ghost first
+        try {
+          const { record } = await fetchGlobalGhost(level, difficulty);
+          if (record && record.ghost_data) {
+            timeTrialLoadedGhost.current = record.ghost_data;
+            timeTrialGhostType.current = 'global';
+            console.log("👻 Global Time Trial ghost loaded for level", level, "- time to beat:", (record.completion_time / 1000).toFixed(3) + "s");
+          }
+        } catch (err) {
+          console.error("Failed to load global Time Trial ghost:", err);
+        }
+      }
+      
+      // Fallback to local ghost if no global or if disabled
+      if (!timeTrialLoadedGhost.current) {
+        const localGhost = ghostManager.current.loadTimeTrialGhost(difficulty, level);
+        if (localGhost) {
+          timeTrialLoadedGhost.current = localGhost;
+          timeTrialGhostType.current = 'local';
+          console.log("👻 Local Time Trial ghost loaded for level", level, "- time to beat:", (localGhost.completionTime / 1000).toFixed(3) + "s");
+        }
+      }
+    }
+    
     // Load best time for HUD display
     if (mode === "fixed" && !isCavernLevel) {
       if (isUsingGlobalGhost && activeGhostRecording) {
@@ -680,7 +795,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       const timeTrialData = mode === "timetrial" ? {
         currentTarget: ttState.currentTarget,
         totalPads: ttState.totalPadsRequired,
-        raceTime: ttState.raceActive ? (elapsed - ttState.raceStartTime) : 0,
+        raceTime: ttState.raceActive ? (performance.now() - ttState.raceStartTime) : 0,
         raceActive: ttState.raceActive
       } : undefined;
       
@@ -699,7 +814,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         timeTrialTarget: timeTrialData?.currentTarget,
         timeTrialTotalPads: timeTrialData?.totalPads,
         timeTrialRaceTime: timeTrialData?.raceTime,
-        timeTrialRaceActive: timeTrialData?.raceActive
+        timeTrialRaceActive: timeTrialData?.raceActive,
+        timeTrialLevel: mode === "timetrial" ? level : undefined
       });
     };
 
@@ -749,6 +865,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         });
       }
     };
+    
     const spawnShooting = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const viewWpx = c.width / dpr;
@@ -925,6 +1042,23 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           fuel
         };
         setGhostRecording(prev => [...prev, newFrame]);
+        lastRecordTime.current = gameTime;
+      }
+      
+      // Time Trial ghost recording
+      if (mode === "timetrial" && timeTrialStateRef.current.raceActive && running && gameTime - lastRecordTime.current >= 0.05) {
+        const raceTime = performance.now() - timeTrialStateRef.current.raceStartTime;
+        const ttFrame: LunarLanderGhostFrame = {
+          timestamp: raceTime,
+          x,
+          y,
+          vx,
+          vy,
+          angle,
+          thrust: keys.current.thrust,
+          fuel
+        };
+        timeTrialGhostFrames.current.push(ttFrame);
         lastRecordTime.current = gameTime;
       }
       
@@ -1615,9 +1749,12 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   if (!ttState.raceActive) {
                     setTimeTrialState(prev => ({
                       ...prev,
-                      raceStartTime: elapsed,
+                      raceStartTime: performance.now(),
                       raceActive: true
                     }));
+                    // Start ghost recording
+                    timeTrialGhostFrames.current = [];
+                    console.log("🔴 Time Trial ghost recording started");
                   }
                   
                   // Mark pad as completed and advance target
@@ -1640,11 +1777,11 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   // Check if all pads completed
                   if (newTarget > ttState.totalPadsRequired) {
                     // Race complete!
-                    const completionTime = elapsed - ttState.raceStartTime;
+                    const completionTime = performance.now() - ttState.raceStartTime;
                     
                     setTimeTrialState(prev => ({
                       ...prev,
-                      raceEndTime: elapsed,
+                      raceEndTime: completionTime,
                       raceActive: false
                     }));
                     
@@ -2347,6 +2484,36 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           ctx.restore();
         }
       }
+      
+      // Time Trial ghost rendering
+      if (mode === "timetrial" && timeTrialLoadedGhost.current && timeTrialStateRef.current.raceActive) {
+        const raceTime = performance.now() - timeTrialStateRef.current.raceStartTime;
+        const ttGhostState = timeTrialGhostType.current === 'global'
+          ? ghostManager.current.getGlobalGhostState(timeTrialLoadedGhost.current, raceTime)
+          : ghostManager.current.getTimeTrialGhostState(difficulty, level, raceTime);
+        
+        if (ttGhostState && ttGhostState.visible) {
+          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            ctx.save();
+            ctx.translate(ttGhostState.x + offset, ttGhostState.y);
+            ctx.rotate(ttGhostState.angle);
+            ctx.globalAlpha = 0.4;
+            ctx.beginPath();
+            ctx.moveTo(0, -10);
+            ctx.lineTo(8, 10);
+            ctx.lineTo(-8, 10);
+            ctx.closePath();
+            ctx.strokeStyle = timeTrialGhostType.current === 'global' ? '#FFD700' : '#00ff80';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+            ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
 
       // Lander
       if (!crashed) {
@@ -2650,8 +2817,21 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       {/* Top controls */}
       <div className="absolute top-4 right-4 z-20 flex gap-2 select-none">
         <Button variant="hero" className="select-none" onClick={() => setPaused((p) => !p)}><span className="select-none">{paused ? "Resume" : "Pause"}</span></Button>
-        <Button variant="outline" className="select-none" onClick={onExit}><span className="select-none">Exit</span></Button>
+        <Button variant="outline" className="select-none" onClick={() => {
+          setSessionInitials(null); // Reset session initials
+          onExit();
+        }}><span className="select-none">Exit</span></Button>
       </div>
+      
+      {/* Initials Entry Modal */}
+      {pendingInitialsEntry && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50">
+          <InitialsEntry
+            score={0}
+            onSubmit={handleInitialsSubmit}
+          />
+        </div>
+      )}
       
       {/* Countdown Overlay */}
       <CountdownOverlay 
@@ -2678,6 +2858,81 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           // Check if this is a new best time and save ghost
           let isNewBestTime = false;
           let ghostTimeDiff: number | undefined;
+          
+          // Time Trial completion handling
+          if (mode === "timetrial" && timeTrialGhostFrames.current.length > 0) {
+            try {
+              const completionTime = timeTrialStateRef.current.raceEndTime;
+              console.log('⏱️ Time Trial completed:', {
+                completionTime,
+                frameCount: timeTrialGhostFrames.current.length,
+                level,
+                difficulty
+              });
+              
+              // Save ghost locally
+              ghostManager.current.saveTimeTrialGhost(difficulty, level, timeTrialGhostFrames.current, completionTime);
+              
+              // Check if new local record
+              const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
+              const isNewLocalRecord = !previousBest || completionTime < previousBest;
+              
+              // Check if potential global record
+              let isNewGlobalRecord = false;
+              if (isNewLocalRecord) {
+                const { checkGlobalRecord } = await import('@/lib/leaderboard');
+                const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
+                isNewGlobalRecord = isRecord;
+              }
+              
+              // Handle initials entry
+              if (isNewLocalRecord || isNewGlobalRecord) {
+                if (!sessionInitials) {
+                  // Need to collect initials
+                  setPendingInitialsEntry(true);
+                  pendingSubmissionRef.current = {
+                    level,
+                    difficulty,
+                    completionTime,
+                    ghostFrames: [...timeTrialGhostFrames.current],
+                    isLocalRecord: isNewLocalRecord,
+                    isGlobalRecord: isNewGlobalRecord
+                  };
+                  console.log('📝 Waiting for initials entry...');
+                  return; // Don't call onGameOver yet
+                } else {
+                  // Use existing session initials
+                  await submitTimeTrialRecord(
+                    sessionInitials,
+                    level,
+                    difficulty,
+                    completionTime,
+                    timeTrialGhostFrames.current,
+                    isNewLocalRecord,
+                    isNewGlobalRecord
+                  );
+                }
+              }
+              
+              // Pass completion data to game over
+              onGameOver({
+                score: 0,
+                landings: currentLandings,
+                cause: "success",
+                difficulty,
+                elapsed: hud.time,
+                levelSeed: hud.levelSeed,
+                level,
+                timeTrialCompletionTime: completionTime,
+                completedSequence: timeTrialStateRef.current.completedSequence,
+                totalPadsRequired: timeTrialStateRef.current.totalPadsRequired,
+                isNewBestTime: isNewLocalRecord
+              });
+              return;
+            } catch (error) {
+              console.error('💥 Error handling Time Trial completion:', error);
+            }
+          }
           
           if (mode === "fixed" && ghostRecording.length > 0) {
             try {
