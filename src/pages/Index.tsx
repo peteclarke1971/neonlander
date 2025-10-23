@@ -362,6 +362,26 @@ const retryGame = () => {
     setView("game");
   };
 
+  const handleRetryLevel = () => {
+    setGameKey(prev => prev + 1); // Force GameEngine remount with same level
+  };
+
+  const handleContinueLevel = (nextLevel: number) => {
+    // Update carry/successCount to reflect the next level
+    setCarry({ score: 0, landings: 0, level: nextLevel });
+    setSuccessCount(nextLevel);
+    // Update neon color for next level
+    const colors = [
+      "330 100% 60%", "50 100% 60%", "140 100% 55%",
+      "270 100% 70%", "25 100% 60%", "0 100% 60%",
+    ];
+    const idx = Math.floor(nextLevel / 2) % colors.length;
+    const root = document.documentElement;
+    root.style.setProperty("--neon", colors[idx]);
+    root.style.setProperty("--neon-2", colors[idx]);
+    setGameKey(prev => prev + 1); // Force GameEngine remount with new level
+  };
+
   // Focus initial gameover button on entering the view
   useEffect(() => {
     if (view !== "gameover") return;
@@ -658,6 +678,8 @@ const retryGame = () => {
           seedOverride={seedOverride ?? undefined}
           showGhost={showGhost}
           ghostLevel={carry?.level ?? successCount}
+          onRetryLevel={mode === "timetrial" ? handleRetryLevel : undefined}
+          onContinueLevel={mode === "timetrial" ? handleContinueLevel : undefined}
         />
       )}
       {view === "demo" && (

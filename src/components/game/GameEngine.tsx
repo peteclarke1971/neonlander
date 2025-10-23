@@ -59,13 +59,32 @@ interface Props {
   showGhost?: boolean;
   ghostLevel?: number;
   isDemo?: boolean;
+  onRetryLevel?: () => void;
+  onContinueLevel?: (nextLevel: number) => void;
 }
 
 const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
-export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, initialScore, initialLandings, level = 0, mode, lowGraphics, showCavernFX = false, cavernFXParams, seedOverride, showGhost = false, ghostLevel, isDemo = false }) => {
+export const GameEngine: React.FC<Props> = ({ 
+  difficulty, 
+  onExit, 
+  onGameOver, 
+  initialScore, 
+  initialLandings, 
+  level = 0, 
+  mode, 
+  lowGraphics, 
+  showCavernFX = false, 
+  cavernFXParams, 
+  seedOverride, 
+  showGhost = false, 
+  ghostLevel, 
+  isDemo = false,
+  onRetryLevel,
+  onContinueLevel
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
@@ -159,6 +178,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
     isNewGlobalRecord: boolean;
     level: number;
   } | null>(null);
+
   const pendingSubmissionRef = useRef<{
     level: number;
     difficulty: Difficulty;
@@ -2866,33 +2886,54 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               )}
             </div>
             
-            <div className="flex gap-4 justify-center">
-              <Button
-                onClick={() => {
-                  setTimeTrialLevelComplete(false);
-                  setTimeTrialCompletionData(null);
-                  // Keep sessionInitials - just return to menu to select level again
-                  onExit();
-                }}
-                variant="neon"
-                size="lg"
-              >
-                Try Again
-              </Button>
-              
-              <Button
-                onClick={() => {
-                  setTimeTrialLevelComplete(false);
-                  setTimeTrialCompletionData(null);
-                  setSessionInitials(null); // Reset session when going back to menu
-                  onExit();
-                }}
-                variant="outline"
-                size="lg"
-              >
-                Level Select
-              </Button>
-            </div>
+      <div className="flex gap-3 justify-center flex-wrap">
+        <Button
+          onClick={() => {
+            setTimeTrialLevelComplete(false);
+            setTimeTrialCompletionData(null);
+            // Keep sessionInitials for retry
+            if (onRetryLevel) {
+              onRetryLevel();
+            } else {
+              onExit();
+            }
+          }}
+          variant="neon"
+          size="lg"
+        >
+          Try Again
+        </Button>
+        
+        <Button
+          onClick={() => {
+            setTimeTrialLevelComplete(false);
+            setTimeTrialCompletionData(null);
+            // Keep sessionInitials for next level
+            if (onContinueLevel && timeTrialCompletionData) {
+              onContinueLevel(timeTrialCompletionData.level + 1);
+            } else {
+              onExit();
+            }
+          }}
+          variant="default"
+          size="lg"
+        >
+          Continue
+        </Button>
+        
+        <Button
+          onClick={() => {
+            setTimeTrialLevelComplete(false);
+            setTimeTrialCompletionData(null);
+            setSessionInitials(null); // Reset session
+            onExit();
+          }}
+          variant="outline"
+          size="lg"
+        >
+          Main Menu
+        </Button>
+      </div>
           </div>
         </div>
       )}
@@ -2946,21 +2987,22 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
               const isNewGlobalRecord = isRecord;
               
-              // Handle initials entry
-              if (isNewLocalRecord || isNewGlobalRecord) {
-                if (!sessionInitials) {
-                  // Need to collect initials
-                  setPendingInitialsEntry(true);
-                  pendingSubmissionRef.current = {
-                    level,
-                    difficulty,
-                    completionTime,
-                    ghostFrames: [...timeTrialGhostFrames.current],
-                    isLocalRecord: isNewLocalRecord,
-                    isGlobalRecord: isNewGlobalRecord
-                  };
-                  console.log('📝 Waiting for initials entry...');
-                  return; // Show initials modal, don't continue yet
+    // Handle initials entry
+    if (isNewLocalRecord || isNewGlobalRecord) {
+      if (!sessionInitials) {
+        // Need to collect initials
+        setShowFireworks(false); // Hide fireworks overlay
+        setPendingInitialsEntry(true);
+        pendingSubmissionRef.current = {
+          level,
+          difficulty,
+          completionTime,
+          ghostFrames: [...timeTrialGhostFrames.current],
+          isLocalRecord: isNewLocalRecord,
+          isGlobalRecord: isNewGlobalRecord
+        };
+        console.log('📝 Waiting for initials entry...');
+        return; // Show initials modal, don't continue yet
                 } else {
                   // Use existing session initials - auto submit
                   await submitTimeTrialRecord(
@@ -2976,16 +3018,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                 }
               }
               
-              // Show level complete modal (not game over)
-              setTimeTrialCompletionData({
-                completionTime,
-                isNewLocalRecord,
-                isNewGlobalRecord,
-                level
-              });
-              setTimeTrialLevelComplete(true);
-              console.log('🏁 Time Trial level complete - showing completion modal');
-              return; // Don't call onGameOver - level complete, not game over
+    // Show level complete modal (not game over)
+    setShowFireworks(false); // Make sure fireworks are hidden
+    setTimeTrialCompletionData({
+      completionTime,
+      isNewLocalRecord,
+      isNewGlobalRecord,
+      level
+    });
+    setTimeTrialLevelComplete(true);
+    console.log('🏁 Time Trial level complete - showing completion modal');
+    return; // Don't call onGameOver - level complete, not game over
             } catch (error) {
               console.error('💥 Error handling Time Trial completion:', error);
             }
