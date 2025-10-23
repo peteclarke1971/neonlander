@@ -152,6 +152,13 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
   // Session initials for Time Trial
   const [sessionInitials, setSessionInitials] = useState<string | null>(null);
   const [pendingInitialsEntry, setPendingInitialsEntry] = useState(false);
+  const [timeTrialLevelComplete, setTimeTrialLevelComplete] = useState(false);
+  const [timeTrialCompletionData, setTimeTrialCompletionData] = useState<{
+    completionTime: number;
+    isNewLocalRecord: boolean;
+    isNewGlobalRecord: boolean;
+    level: number;
+  } | null>(null);
   const pendingSubmissionRef = useRef<{
     level: number;
     difficulty: Difficulty;
@@ -243,21 +250,17 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         pending.isLocalRecord,
         pending.isGlobalRecord
       );
-      pendingSubmissionRef.current = null;
       
-      onGameOver({
-        score: 0,
-        landings: currentLandings,
-        cause: "success",
-        difficulty: pending.difficulty,
-        elapsed: hud.time,
-        levelSeed: hud.levelSeed,
-        level: pending.level,
-        timeTrialCompletionTime: pending.completionTime,
-        completedSequence: timeTrialStateRef.current.completedSequence,
-        totalPadsRequired: timeTrialStateRef.current.totalPadsRequired,
-        isNewBestTime: pending.isLocalRecord
+      // Show level complete modal (don't call onGameOver)
+      setTimeTrialCompletionData({
+        completionTime: pending.completionTime,
+        isNewLocalRecord: pending.isLocalRecord,
+        isNewGlobalRecord: pending.isGlobalRecord,
+        level: pending.level
       });
+      setTimeTrialLevelComplete(true);
+      
+      pendingSubmissionRef.current = null;
     }
   };
   
@@ -575,7 +578,7 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       
       
       
-      if (mode === "fixed") {
+      if (mode === "fixed" || mode === "timetrial") {
         const cx = WORLD_WIDTH / 2;
         const gy = terrain.getHeightAt(cx);
         const sy = gy - 520; // fixed safe altitude above ground
@@ -2835,6 +2838,65 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         </div>
       )}
       
+      {/* Time Trial Level Complete Modal */}
+      {timeTrialLevelComplete && timeTrialCompletionData && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-50">
+          <div className="bg-card border-2 border-accent rounded-lg p-8 max-w-md text-center space-y-6 animate-enter">
+            <h2 className="text-3xl font-bold text-accent">
+              LEVEL COMPLETE!
+            </h2>
+            
+            <div className="space-y-2">
+              <div className="text-xl">
+                Time: <span className="text-accent font-mono">
+                  {(timeTrialCompletionData.completionTime / 1000).toFixed(2)}s
+                </span>
+              </div>
+              
+              {timeTrialCompletionData.isNewLocalRecord && (
+                <div className="text-lg text-green-400 font-semibold">
+                  🏆 New Personal Best!
+                </div>
+              )}
+              
+              {timeTrialCompletionData.isNewGlobalRecord && (
+                <div className="text-lg text-yellow-400 font-semibold">
+                  🌍 New World Record!
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={() => {
+                  setTimeTrialLevelComplete(false);
+                  setTimeTrialCompletionData(null);
+                  // Keep sessionInitials - just return to menu to select level again
+                  onExit();
+                }}
+                variant="neon"
+                size="lg"
+              >
+                Try Again
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  setTimeTrialLevelComplete(false);
+                  setTimeTrialCompletionData(null);
+                  setSessionInitials(null); // Reset session when going back to menu
+                  onExit();
+                }}
+                variant="outline"
+                size="lg"
+              >
+                Level Select
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Countdown Overlay */}
       <CountdownOverlay 
         state={introState} 
@@ -2898,9 +2960,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                     isGlobalRecord: isNewGlobalRecord
                   };
                   console.log('📝 Waiting for initials entry...');
-                  return; // Don't call onGameOver yet
+                  return; // Show initials modal, don't continue yet
                 } else {
-                  // Use existing session initials
+                  // Use existing session initials - auto submit
                   await submitTimeTrialRecord(
                     sessionInitials,
                     level,
@@ -2910,24 +2972,20 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                     isNewLocalRecord,
                     isNewGlobalRecord
                   );
+                  console.log('✅ Record auto-submitted with session initials:', sessionInitials);
                 }
               }
               
-              // Pass completion data to game over
-              onGameOver({
-                score: 0,
-                landings: currentLandings,
-                cause: "success",
-                difficulty,
-                elapsed: hud.time,
-                levelSeed: hud.levelSeed,
-                level,
-                timeTrialCompletionTime: completionTime,
-                completedSequence: timeTrialStateRef.current.completedSequence,
-                totalPadsRequired: timeTrialStateRef.current.totalPadsRequired,
-                isNewBestTime: isNewLocalRecord
+              // Show level complete modal (not game over)
+              setTimeTrialCompletionData({
+                completionTime,
+                isNewLocalRecord,
+                isNewGlobalRecord,
+                level
               });
-              return;
+              setTimeTrialLevelComplete(true);
+              console.log('🏁 Time Trial level complete - showing completion modal');
+              return; // Don't call onGameOver - level complete, not game over
             } catch (error) {
               console.error('💥 Error handling Time Trial completion:', error);
             }

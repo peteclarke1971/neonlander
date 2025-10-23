@@ -84,23 +84,21 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
         </div>
       </div>
       
-      {/* Records display - only show when race hasn't started */}
-      {!timeTrialRaceActive && (
-        <div className="mt-3 space-y-1 text-xs font-mono">
-          {localRecord && (
-            <div className="flex justify-between gap-4">
-              <span className="text-accent">Best: {(localRecord.time / 1000).toFixed(2)}s</span>
-              <span className="text-muted-foreground">Pilot: {localRecord.initials}</span>
-            </div>
-          )}
-          {globalRecord && (
-            <div className="flex justify-between gap-4">
-              <span className="text-yellow-400">World: {(globalRecord.time / 1000).toFixed(2)}s</span>
-              <span className="text-muted-foreground">Pilot: {globalRecord.initials}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Records display - always visible */}
+      <div className="mt-3 space-y-1 text-xs font-mono">
+        {localRecord && (
+          <div className="flex justify-between gap-4">
+            <span className="text-accent">Best: {(localRecord.time / 1000).toFixed(2)}s</span>
+            <span className="text-muted-foreground">Pilot: {localRecord.initials}</span>
+          </div>
+        )}
+        {globalRecord && (
+          <div className="flex justify-between gap-4">
+            <span className="text-yellow-400">World: {(globalRecord.time / 1000).toFixed(2)}s</span>
+            <span className="text-muted-foreground">Pilot: {globalRecord.initials}</span>
+          </div>
+        )}
+      </div>
     </>
   ) : (
           // Regular game HUD
