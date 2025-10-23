@@ -621,14 +621,45 @@ export const GameEngine: React.FC<Props> = ({
       // Also load global ghost if challenge mode enabled
       if (challengeGlobal) {
         try {
-          const { record } = await fetchGlobalGhost(level, difficulty, 'timetrial');
+          console.log("🔍 Attempting to fetch global ghost for:", { level, difficulty, mode: 'timetrial' });
+          const { record, error } = await fetchGlobalGhost(level, difficulty, 'timetrial');
+          
+          console.log("🔍 Fetch result:", { 
+            hasRecord: !!record, 
+            hasGhostData: !!record?.ghost_data,
+            ghostDataType: typeof record?.ghost_data,
+            ghostDataKeys: record?.ghost_data ? Object.keys(record.ghost_data) : [],
+            error 
+          });
+          
+          if (error) {
+            console.error("❌ Error fetching global ghost:", error);
+          }
+          
           if (record && record.ghost_data) {
-            timeTrialLoadedGhost.current = record.ghost_data; // This is the global ghost
-            timeTrialGhostType.current = 'global';
-            console.log("🌍 Global Time Trial ghost loaded for level", level, "- time to beat:", (record.completion_time / 1000).toFixed(3) + "s");
+            // Check if ghost_data has frames property
+            const ghostData = record.ghost_data;
+            const hasFrames = Array.isArray(ghostData.frames) && ghostData.frames.length > 0;
+            
+            console.log("🔍 Ghost data structure:", {
+              hasFrames,
+              frameCount: ghostData.frames?.length,
+              completionTime: ghostData.completionTime,
+              hasCompletionTime: !!record.completion_time
+            });
+            
+            if (hasFrames) {
+              timeTrialLoadedGhost.current = record.ghost_data;
+              timeTrialGhostType.current = 'global';
+              console.log("🌍 Global Time Trial ghost loaded for level", level, "- time to beat:", (record.completion_time / 1000).toFixed(3) + "s");
+            } else {
+              console.warn("⚠️ Global ghost record exists but has no frames");
+            }
+          } else {
+            console.log("ℹ️ No global ghost record found for this level");
           }
         } catch (err) {
-          console.error("Failed to load global Time Trial ghost:", err);
+          console.error("❌ Failed to load global Time Trial ghost:", err);
         }
       }
     }

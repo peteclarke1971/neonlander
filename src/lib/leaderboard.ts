@@ -237,7 +237,12 @@ export async function fetchGlobalGhost(
       .limit(1)
       .maybeSingle();
 
-    console.log('📦 Fetch result:', { hasData: !!data, error: error?.message });
+    console.log('📦 Fetch result:', { 
+      hasData: !!data, 
+      hasGhostData: !!data?.ghost_data,
+      ghostDataType: typeof data?.ghost_data,
+      error: error?.message 
+    });
 
     if (error) {
       console.error('Error fetching global ghost:', error);
