@@ -107,6 +107,7 @@ export interface GameOverData {
   completedSequence?: number[];
   totalPadsRequired?: number;
   timeTrialCompletionTime?: number;
+  timeTrialGhostFrames?: any[];
 }
 
 export interface HighScore {

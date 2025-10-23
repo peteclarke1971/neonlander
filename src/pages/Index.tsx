@@ -157,6 +157,14 @@ const Index = () => {
   }, []);
 
   const [showGhost, setShowGhost] = useState(false);
+  const [timeTrialRecordPending, setTimeTrialRecordPending] = useState<{
+    completionTime: number;
+    level: number;
+    difficulty: Difficulty;
+    ghostFrames: any[];
+    isNewLocalRecord: boolean;
+    isNewGlobalRecord: boolean;
+  } | null>(null);
   // Global ghost loading now handled dynamically inside GameEngine
   
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
@@ -298,6 +306,21 @@ const Index = () => {
     // Generate a fresh starfield/effect config for this screen
     setSfConfig(genSfConfig());
     if (data.cause === "success") {
+      // Time Trial: Check if we need initials
+      if (mode === "timetrial" && (data.isNewBestTime || data.isWorldRecord)) {
+        setNeedsInitials(true);
+        setTimeTrialRecordPending({
+          completionTime: data.timeTrialCompletionTime!,
+          level: data.level!,
+          difficulty: data.difficulty,
+          ghostFrames: data.timeTrialGhostFrames!,
+          isNewLocalRecord: data.isNewBestTime!,
+          isNewGlobalRecord: data.isWorldRecord!
+        });
+      } else {
+        setNeedsInitials(false);
+      }
+      
       // Choose background for this success and advance cursor for next time
       const total = 2; // Wormhole (0), Gravity Wave (1)
       const current = successBgCursorRef.current % total;
@@ -306,7 +329,6 @@ const Index = () => {
 
       setCarry({ score: data.score, landings: data.landings, level: successCount + 1 });
       setSuccessCount((c) => c + 1);
-      setNeedsInitials(false);
       setView("gameover");
       return;
     }
@@ -878,17 +900,60 @@ const retryGame = () => {
               />
             )}
 
+            {/* Time Trial initials entry for new records */}
+            {lastResult.cause === "success" && mode === "timetrial" && needsInitials && timeTrialRecordPending && (
+              <InitialsEntry
+                score={0}
+                onSubmit={async (initials) => {
+                  try {
+                    const { submitTimeTrialScore } = await import('@/lib/leaderboard');
+                    await submitTimeTrialScore(
+                      timeTrialRecordPending.level,
+                      timeTrialRecordPending.difficulty,
+                      timeTrialRecordPending.completionTime,
+                      initials
+                    );
+                    console.log('✅ Time Trial record submitted');
+                  } catch (error) {
+                    console.error('Error submitting Time Trial record:', error);
+                  }
+                  
+                  setNeedsInitials(false);
+                  setTimeTrialRecordPending(null);
+                }}
+              />
+            )}
+
             {/* GameTransition moved to root level for all views */}
 
             <div className="mt-6 flex gap-3 justify-center">
               {lastResult.cause === "success" ? (
-                <Button
-                  ref={contRef}
-                  variant="neon"
-                  onClick={continueGame}
-                >
-                  Continue
-                </Button>
+                mode === "timetrial" ? (
+                  // Time Trial: Show three buttons
+                  <>
+                    <Button variant="neon" onClick={handleRetryLevel} disabled={needsInitials}>
+                      Try Again
+                    </Button>
+                    <Button variant="default" onClick={() => handleContinueLevel((lastResult.level ?? 0) + 1)} disabled={needsInitials}>
+                      Continue
+                    </Button>
+                    <Button variant="outline" onClick={() => {
+                      setView("home");
+                      resetTimers();
+                    }} disabled={needsInitials}>
+                      Main Menu
+                    </Button>
+                  </>
+                ) : (
+                  // Fixed/Classic: Single Continue button
+                  <Button
+                    ref={contRef}
+                    variant="neon"
+                    onClick={continueGame}
+                  >
+                    Continue
+                  </Button>
+                )
               ) : (
                 <>
                   <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {

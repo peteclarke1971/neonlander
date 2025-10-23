@@ -168,32 +168,11 @@ export const GameEngine: React.FC<Props> = ({
   const timeTrialLoadedGhost = useRef<any>(null);
   const timeTrialGhostType = useRef<'local' | 'global'>('local');
   
-  // Session initials for Time Trial
-  const [sessionInitials, setSessionInitials] = useState<string | null>(null);
-  const [pendingInitialsEntry, setPendingInitialsEntry] = useState(false);
-  const [timeTrialLevelComplete, setTimeTrialLevelComplete] = useState(false);
-  const [timeTrialCompletionData, setTimeTrialCompletionData] = useState<{
-    completionTime: number;
-    isNewLocalRecord: boolean;
-    isNewGlobalRecord: boolean;
-    level: number;
-  } | null>(null);
-  const [timeTrialReadyToFinalize, setTimeTrialReadyToFinalize] = useState(false);
   const timeTrialCompletionDataRef = useRef<{
     completionTime: number;
     level: number;
     difficulty: Difficulty;
     ghostFrames: any[];
-  } | null>(null);
-
-
-  const pendingSubmissionRef = useRef<{
-    level: number;
-    difficulty: Difficulty;
-    completionTime: number;
-    ghostFrames: LunarLanderGhostFrame[];
-    isLocalRecord: boolean;
-    isGlobalRecord: boolean;
   } | null>(null);
 
   // Controls state
@@ -228,69 +207,6 @@ export const GameEngine: React.FC<Props> = ({
   const demoAI = useRef<DemoAIState | null>(null);
   const [demoStartTime, setDemoStartTime] = useState<number>(0);
   
-  // Time Trial record submission helpers (component level)
-  const submitTimeTrialRecord = async (
-    initials: string,
-    levelNum: number,
-    diff: Difficulty,
-    completionTime: number,
-    frames: LunarLanderGhostFrame[],
-    isLocalRecord: boolean,
-    isGlobalRecord: boolean
-  ) => {
-    if (isLocalRecord) {
-      localStorage.setItem(`time-trial-initials-${diff}-${levelNum}`, initials);
-    }
-    
-    // Submit to global leaderboard if it's a global record OR a new local record
-    if (isGlobalRecord || isLocalRecord) {
-      try {
-        await submitTimeTrialScore(levelNum, diff, completionTime, initials);
-        
-        const recording = {
-          frames,
-          completionTime,
-          level: levelNum,
-          date: Date.now(),
-          gameType: "lunar-lander" as const
-        };
-        
-        await submitGlobalGhost(levelNum, diff, completionTime, recording, initials);
-        console.log('🌍 Time Trial record submitted to global leaderboard!');
-      } catch (err) {
-        console.error('Failed to submit Time Trial record:', err);
-      }
-    }
-  };
-  
-  const handleInitialsSubmit = async (initials: string) => {
-    setSessionInitials(initials);
-    setPendingInitialsEntry(false);
-    
-    const pending = pendingSubmissionRef.current;
-    if (pending) {
-      await submitTimeTrialRecord(
-        initials,
-        pending.level,
-        pending.difficulty,
-        pending.completionTime,
-        pending.ghostFrames,
-        pending.isLocalRecord,
-        pending.isGlobalRecord
-      );
-      
-      // Show level complete modal (don't call onGameOver)
-      setTimeTrialCompletionData({
-        completionTime: pending.completionTime,
-        isNewLocalRecord: pending.isLocalRecord,
-        isNewGlobalRecord: pending.isGlobalRecord,
-        level: pending.level
-      });
-      setTimeTrialLevelComplete(true);
-      
-      pendingSubmissionRef.current = null;
-    }
-  };
   
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
@@ -1824,14 +1740,12 @@ export const GameEngine: React.FC<Props> = ({
                       level
                     });
                     
-                    // Store completion data for processing after fireworks
                     timeTrialCompletionDataRef.current = {
                       completionTime,
                       level,
                       difficulty,
                       ghostFrames: [...timeTrialGhostFrames.current]
                     };
-                    setTimeTrialReadyToFinalize(true);
                     
                     cameraShake = 6;
                     audio.current.success();
@@ -2746,88 +2660,6 @@ export const GameEngine: React.FC<Props> = ({
     return () => { cancelAnimationFrame(raf); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
 
-  // Handle Time Trial completion after fireworks are done
-  useEffect(() => {
-    if (!showFireworks && timeTrialReadyToFinalize && timeTrialCompletionDataRef.current) {
-      const processCompletion = async () => {
-        const { completionTime, level, difficulty, ghostFrames } = timeTrialCompletionDataRef.current!;
-        console.log('🎆 Fireworks complete, processing Time Trial completion...');
-        
-        // Save ghost locally
-        ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
-        console.log('👻 Ghost saved locally');
-        
-        // Check if new local record
-        const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
-        const isNewLocalRecord = !previousBest || completionTime < previousBest;
-        
-        // Always check global record status
-        let isNewGlobalRecord = false;
-        try {
-          const { checkGlobalRecord } = await import('@/lib/leaderboard');
-          const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
-          isNewGlobalRecord = isRecord;
-        } catch (error) {
-          console.error('Error checking global record:', error);
-        }
-        
-        console.log('📊 Record status:', { 
-          isNewLocalRecord, 
-          isNewGlobalRecord, 
-          previousBest,
-          currentTime: completionTime
-        });
-        
-        // Handle initials entry
-        if (isNewLocalRecord || isNewGlobalRecord) {
-          if (!sessionInitials) {
-            // Need to collect initials
-            setPendingInitialsEntry(true);
-            pendingSubmissionRef.current = {
-              level,
-              difficulty,
-              completionTime,
-              ghostFrames,
-              isLocalRecord: isNewLocalRecord,
-              isGlobalRecord: isNewGlobalRecord
-            };
-            console.log('📝 Waiting for initials entry...');
-            setTimeTrialReadyToFinalize(false);
-            timeTrialCompletionDataRef.current = null;
-            return; // Show initials modal, don't continue yet
-          } else {
-            // Use existing session initials - auto submit
-            await submitTimeTrialRecord(
-              sessionInitials,
-              level,
-              difficulty,
-              completionTime,
-              ghostFrames,
-              isNewLocalRecord,
-              isNewGlobalRecord
-            );
-            console.log('✅ Record auto-submitted with session initials:', sessionInitials);
-          }
-        }
-        
-        // Show level complete modal
-        setTimeTrialCompletionData({
-          completionTime,
-          isNewLocalRecord,
-          isNewGlobalRecord,
-          level
-        });
-        setTimeTrialLevelComplete(true);
-        console.log('🏁 Time Trial level complete - showing completion modal');
-        
-        // Reset flags
-        setTimeTrialReadyToFinalize(false);
-        timeTrialCompletionDataRef.current = null;
-      };
-      
-      processCompletion();
-    }
-  }, [showFireworks, timeTrialReadyToFinalize, sessionInitials, level, difficulty]);
 
   return (
     <section className="relative h-[calc(100vh-0px)] w-full select-none">
@@ -2942,101 +2774,9 @@ export const GameEngine: React.FC<Props> = ({
       {/* Top controls */}
       <div className="absolute top-4 right-4 z-20 flex gap-2 select-none">
         <Button variant="hero" className="select-none" onClick={() => setPaused((p) => !p)}><span className="select-none">{paused ? "Resume" : "Pause"}</span></Button>
-        <Button variant="outline" className="select-none" onClick={() => {
-          setSessionInitials(null); // Reset session initials
-          onExit();
-        }}><span className="select-none">Exit</span></Button>
+        <Button variant="outline" className="select-none" onClick={onExit}><span className="select-none">Exit</span></Button>
       </div>
       
-      {/* Initials Entry Modal */}
-      {pendingInitialsEntry && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50">
-          <InitialsEntry
-            score={0}
-            onSubmit={handleInitialsSubmit}
-          />
-        </div>
-      )}
-      
-      {/* Time Trial Level Complete Modal */}
-      {timeTrialLevelComplete && timeTrialCompletionData && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-50">
-          <div className="bg-card border-2 border-accent rounded-lg p-8 max-w-md text-center space-y-6 animate-enter">
-            <h2 className="text-3xl font-bold text-accent">
-              LEVEL COMPLETE!
-            </h2>
-            
-            <div className="space-y-2">
-              <div className="text-xl">
-                Time: <span className="text-accent font-mono">
-                  {(timeTrialCompletionData.completionTime / 1000).toFixed(2)}s
-                </span>
-              </div>
-              
-              {timeTrialCompletionData.isNewLocalRecord && (
-                <div className="text-lg text-green-400 font-semibold">
-                  🏆 New Personal Best!
-                </div>
-              )}
-              
-              {timeTrialCompletionData.isNewGlobalRecord && (
-                <div className="text-lg text-yellow-400 font-semibold">
-                  🌍 New World Record!
-                </div>
-              )}
-            </div>
-            
-      <div className="flex gap-3 justify-center flex-wrap">
-        <Button
-          onClick={() => {
-            setTimeTrialLevelComplete(false);
-            setTimeTrialCompletionData(null);
-            // Keep sessionInitials for retry
-            if (onRetryLevel) {
-              onRetryLevel();
-            } else {
-              onExit();
-            }
-          }}
-          variant="neon"
-          size="lg"
-        >
-          Try Again
-        </Button>
-        
-        <Button
-          onClick={() => {
-            setTimeTrialLevelComplete(false);
-            setTimeTrialCompletionData(null);
-            // Keep sessionInitials for next level
-            if (onContinueLevel && timeTrialCompletionData) {
-              onContinueLevel(timeTrialCompletionData.level + 1);
-            } else {
-              onExit();
-            }
-          }}
-          variant="default"
-          size="lg"
-        >
-          Continue
-        </Button>
-        
-        <Button
-          onClick={() => {
-            setTimeTrialLevelComplete(false);
-            setTimeTrialCompletionData(null);
-            setSessionInitials(null); // Reset session
-            onExit();
-          }}
-          variant="outline"
-          size="lg"
-        >
-          Main Menu
-        </Button>
-      </div>
-          </div>
-        </div>
-      )}
       
       {/* Countdown Overlay */}
       <CountdownOverlay 
@@ -3053,11 +2793,49 @@ export const GameEngine: React.FC<Props> = ({
           neonColor={neonColor}
           isWorldRecord={isWorldRecord}
         onComplete={async () => {
-          // Just hide fireworks, completion logic for Time Trial happens in useEffect
           setShowFireworks(false);
           
-          // Skip Time Trial processing here - it's now handled in useEffect
-          if (mode === "timetrial") {
+          // Handle Time Trial completion
+          if (mode === "timetrial" && timeTrialCompletionDataRef.current) {
+            const { completionTime, level, difficulty, ghostFrames } = timeTrialCompletionDataRef.current;
+            
+            // Save ghost locally
+            ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
+            
+            // Check local record
+            const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
+            const isNewLocalRecord = !previousBest || completionTime < previousBest;
+            
+            // Check global record
+            let isNewGlobalRecord = false;
+            try {
+              const { checkGlobalRecord } = await import('@/lib/leaderboard');
+              const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
+              isNewGlobalRecord = isRecord;
+            } catch (error) {
+              console.error('Error checking global record:', error);
+            }
+            
+            // Call onGameOver to show Mission Successful screen
+            onGameOver({
+              score: hud.score,
+              landings: currentLandings,
+              cause: "success",
+              difficulty,
+              elapsed: completionTime / 1000,
+              levelSeed: hud.levelSeed,
+              level,
+              isNewBestTime: isNewLocalRecord,
+              isWorldRecord: isNewGlobalRecord,
+              timeTrialCompletionTime: completionTime,
+              timeTrialGhostFrames: ghostFrames,
+              lastEarned: lastLandingBonuses.lastEarned,
+              padBonus2x: lastLandingBonuses.padBonus2x,
+              bullseye: lastLandingBonuses.bullseye,
+              speedBonus: lastLandingBonuses.speedBonus
+            });
+            
+            timeTrialCompletionDataRef.current = null;
             return;
           }
           
