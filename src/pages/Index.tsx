@@ -950,6 +950,12 @@ const retryGame = () => {
                     console.log('✅ Time Trial record submitted to database');
                     
                     // Update local ghost with initials
+                    console.log('🎯 About to update ghost with initials:', {
+                      difficulty: timeTrialRecordPending.difficulty,
+                      level: timeTrialRecordPending.level,
+                      initials: initials
+                    });
+                    
                     const { GhostManager } = await import('@/components/game/GhostManager');
                     const ghostManager = new GhostManager();
                     ghostManager.updateTimeTrialGhostInitials(
@@ -957,6 +963,8 @@ const retryGame = () => {
                       timeTrialRecordPending.level,
                       initials
                     );
+                    
+                    console.log('🎯 Ghost update method called');
                   } catch (error) {
                     console.error('Error submitting Time Trial record:', error);
                   }

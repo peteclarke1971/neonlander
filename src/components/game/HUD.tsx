@@ -21,10 +21,17 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
       const ghostManager = new GhostManager();
       
       // Local record
-      const localTime = ghostManager.getTimeTrialBestTime(difficulty, timeTrialLevel);
-      if (localTime) {
-        const localInitials = localStorage.getItem(`time-trial-initials-${difficulty}-${timeTrialLevel}`) || '???';
-        setLocalRecord({ time: localTime, initials: localInitials });
+      const localGhost = ghostManager.loadTimeTrialGhost(difficulty, timeTrialLevel);
+      if (localGhost) {
+        console.log('📊 HUD: Loaded local ghost:', { 
+          time: localGhost.completionTime, 
+          initials: localGhost.initials || '???',
+          hasInitials: !!localGhost.initials 
+        });
+        setLocalRecord({ 
+          time: localGhost.completionTime, 
+          initials: localGhost.initials || '???' 
+        });
       }
       
       // Global record

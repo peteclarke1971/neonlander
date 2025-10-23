@@ -644,18 +644,36 @@ export class GhostManager {
    */
   updateTimeTrialGhostInitials(difficulty: string, level: number, initials: string): void {
     try {
+      const key = `time-trial-ghost-${difficulty}-level-${level}`;
+      console.log('🔍 Attempting to update ghost initials:', { difficulty, level, initials, key });
+      
       const recording = this.loadTimeTrialGhost(difficulty, level);
       if (!recording) {
-        console.warn('No ghost found to update initials');
+        console.error('❌ No ghost found to update initials for:', { difficulty, level, key });
         return;
       }
       
+      console.log('📝 Ghost found, updating initials:', { 
+        oldInitials: recording.initials, 
+        newInitials: initials,
+        completionTime: recording.completionTime 
+      });
+      
       recording.initials = initials.toUpperCase().slice(0, 3);
-      const key = `time-trial-ghost-${difficulty}-level-${level}`;
       localStorage.setItem(key, JSON.stringify(recording));
-      console.log('✅ Updated ghost initials:', { difficulty, level, initials: recording.initials });
+      
+      // Verify the save
+      const verification = localStorage.getItem(key);
+      const parsed = verification ? JSON.parse(verification) : null;
+      console.log('✅ Ghost initials updated and verified:', { 
+        difficulty, 
+        level, 
+        initials: recording.initials,
+        verifiedInitials: parsed?.initials,
+        saveSuccessful: parsed?.initials === recording.initials
+      });
     } catch (error) {
-      console.error('Failed to update ghost initials:', error);
+      console.error('❌ Failed to update ghost initials:', error);
     }
   }
 }
