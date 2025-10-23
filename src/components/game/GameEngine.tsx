@@ -609,7 +609,7 @@ export const GameEngine: React.FC<Props> = ({
     
     // Load Time Trial ghost if in time trial mode
     if (isTimeTrial && showGhost) {
-      const challengeGlobal = localStorage.getItem('challenge-global-ghosts') === 'true';
+      const challengeGlobal = JSON.parse(localStorage.getItem('ll-global-ghosts-enabled') || 'false');
       
       // ALWAYS load local ghost first
       const localGhost = ghostManager.current.loadTimeTrialGhost(difficulty, level);
