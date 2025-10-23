@@ -261,7 +261,7 @@ export async function submitTimeTrialScore(
         difficulty,
         mode: 'timetrial' as Mode,
         level,
-        completion_time: completionTime
+        completion_time: Math.round(completionTime)
       } as any);
 
     if (error) {
