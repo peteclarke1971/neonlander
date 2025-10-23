@@ -2799,24 +2799,24 @@ export const GameEngine: React.FC<Props> = ({
               if (mode === "timetrial" && timeTrialCompletionDataRef.current) {
                 const { completionTime, level, difficulty, ghostFrames } = timeTrialCompletionDataRef.current;
                 
-                console.log('⏱️ Time Trial completion check:', {
-                  completionTime,
-                  level,
-                  difficulty
-                });
-                
-                // Save ghost locally
-                ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
-                
-                // Check local record
-                const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
-                const isNewLocalRecord = !previousBest || completionTime < previousBest;
-                
-                console.log('📊 Local record check:', {
-                  previousBest,
-                  completionTime,
-                  isNewLocalRecord
-                });
+      console.log('⏱️ Time Trial completion check:', {
+        completionTime,
+        level,
+        difficulty
+      });
+      
+      // Check local record BEFORE saving (critical: compare against OLD best time)
+      const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
+      const isNewLocalRecord = !previousBest || completionTime < previousBest;
+      
+      console.log('📊 Local record check:', {
+        previousBest,
+        completionTime,
+        isNewLocalRecord
+      });
+      
+      // Now save ghost locally (after we've checked the old record)
+      ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
                 
                 // Check global record
                 let isNewGlobalRecord = false;
