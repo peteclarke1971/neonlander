@@ -207,7 +207,8 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
       localStorage.setItem(`time-trial-initials-${diff}-${levelNum}`, initials);
     }
     
-    if (isGlobalRecord) {
+    // Submit to global leaderboard if it's a global record OR a new local record
+    if (isGlobalRecord || isLocalRecord) {
       try {
         await submitTimeTrialScore(levelNum, diff, completionTime, initials);
         
@@ -220,9 +221,9 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
         };
         
         await submitGlobalGhost(levelNum, diff, completionTime, recording, initials);
-        console.log('🌍 Global Time Trial record submitted!');
+        console.log('🌍 Time Trial record submitted to global leaderboard!');
       } catch (err) {
-        console.error('Failed to submit global Time Trial record:', err);
+        console.error('Failed to submit Time Trial record:', err);
       }
     }
   };
@@ -955,6 +956,19 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
           setWorldPaused(false); worldPausedRef.current = false;
           setPlayerLocked(false); playerLockedRef.current = false;
           invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+          
+          // Start Time Trial timer immediately after countdown
+          if (mode === "timetrial") {
+            setTimeTrialState(prev => ({
+              ...prev,
+              raceStartTime: performance.now(),
+              raceActive: true
+            }));
+            // Initialize ghost recording from the start
+            timeTrialGhostFrames.current = [];
+            console.log("🏁 Time Trial timer & ghost recording started at countdown end");
+          }
+          
           // Start timer fallback - if no movement within 2 seconds after GO, start timer anyway
           timerStartTimeoutRef.current = setTimeout(() => {
             setTimerActive(true);
@@ -1744,18 +1758,6 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
                   // Award fuel bonus for successful landing
                   fuel += 25;
                   fuel = Math.min(fuel, fuelCap); // Don't exceed fuel cap
-                  
-                  // Start timer on first landing
-                  if (!ttState.raceActive) {
-                    setTimeTrialState(prev => ({
-                      ...prev,
-                      raceStartTime: performance.now(),
-                      raceActive: true
-                    }));
-                    // Start ghost recording
-                    timeTrialGhostFrames.current = [];
-                    console.log("🔴 Time Trial ghost recording started");
-                  }
                   
                   // Mark pad as completed and advance target
                   const updatedPads = ttState.sequencedPads.map(p =>
@@ -2877,13 +2879,10 @@ export const GameEngine: React.FC<Props> = ({ difficulty, onExit, onGameOver, in
               const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
               const isNewLocalRecord = !previousBest || completionTime < previousBest;
               
-              // Check if potential global record
-              let isNewGlobalRecord = false;
-              if (isNewLocalRecord) {
-                const { checkGlobalRecord } = await import('@/lib/leaderboard');
-                const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
-                isNewGlobalRecord = isRecord;
-              }
+              // Always check global record status
+              const { checkGlobalRecord } = await import('@/lib/leaderboard');
+              const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
+              const isNewGlobalRecord = isRecord;
               
               // Handle initials entry
               if (isNewLocalRecord || isNewGlobalRecord) {
