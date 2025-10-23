@@ -285,6 +285,15 @@ const Index = () => {
   };
 
   const handleGameOver = (data: GameOverData) => {
+    console.log('🎮 handleGameOver called:', {
+      mode,
+      cause: data.cause,
+      isNewBestTime: data.isNewBestTime,
+      isWorldRecord: data.isWorldRecord,
+      level: data.level,
+      timeTrialCompletionTime: data.timeTrialCompletionTime
+    });
+    
     setLastResult(data);
     setLastPlayedSeed(data.levelSeed ?? null);
     setLastPlayedLevel(data.level ?? 0);
@@ -308,6 +317,7 @@ const Index = () => {
     if (data.cause === "success") {
       // Time Trial: Check if we need initials
       if (mode === "timetrial" && (data.isNewBestTime || data.isWorldRecord)) {
+        console.log('🏆 New Time Trial record detected, setting needsInitials=true');
         setNeedsInitials(true);
         setTimeTrialRecordPending({
           completionTime: data.timeTrialCompletionTime!,
@@ -317,7 +327,18 @@ const Index = () => {
           isNewLocalRecord: data.isNewBestTime!,
           isNewGlobalRecord: data.isWorldRecord!
         });
+        console.log('📝 timeTrialRecordPending set:', {
+          completionTime: data.timeTrialCompletionTime,
+          level: data.level,
+          isNewLocalRecord: data.isNewBestTime,
+          isNewGlobalRecord: data.isWorldRecord
+        });
       } else {
+        console.log('⏭️ Not a new record, skipping initials', {
+          mode,
+          isNewBestTime: data.isNewBestTime,
+          isWorldRecord: data.isWorldRecord
+        });
         setNeedsInitials(false);
       }
       
@@ -385,10 +406,13 @@ const retryGame = () => {
   };
 
   const handleRetryLevel = () => {
-    setGameKey(prev => prev + 1); // Force GameEngine remount with same level
+    console.log('🔄 Retrying level:', lastResult.level);
+    setGameKey(prev => prev + 1);
+    setView("game");
   };
 
   const handleContinueLevel = (nextLevel: number) => {
+    console.log('➡️ Continuing to level:', nextLevel);
     // Update carry/successCount to reflect the next level
     setCarry({ score: 0, landings: 0, level: nextLevel });
     setSuccessCount(nextLevel);
@@ -401,7 +425,8 @@ const retryGame = () => {
     const root = document.documentElement;
     root.style.setProperty("--neon", colors[idx]);
     root.style.setProperty("--neon-2", colors[idx]);
-    setGameKey(prev => prev + 1); // Force GameEngine remount with new level
+    setGameKey(prev => prev + 1);
+    setView("game");
   };
 
   // Focus initial gameover button on entering the view
@@ -900,11 +925,20 @@ const retryGame = () => {
               />
             )}
 
-            {/* Time Trial initials entry for new records */}
-            {lastResult.cause === "success" && mode === "timetrial" && needsInitials && timeTrialRecordPending && (
-              <InitialsEntry
-                score={0}
-                onSubmit={async (initials) => {
+              {/* Time Trial initials entry for new records */}
+              {(() => {
+                const shouldShow = lastResult.cause === "success" && mode === "timetrial" && needsInitials && timeTrialRecordPending;
+                console.log('🔍 InitialsEntry render check:', {
+                  lastResultCause: lastResult.cause,
+                  mode,
+                  needsInitials,
+                  hasTimeTrialRecordPending: !!timeTrialRecordPending,
+                  shouldShow
+                });
+                return shouldShow ? (
+                  <InitialsEntry
+                    score={0}
+                    onSubmit={async (initials) => {
                   try {
                     const { submitTimeTrialScore } = await import('@/lib/leaderboard');
                     await submitTimeTrialScore(
@@ -918,11 +952,12 @@ const retryGame = () => {
                     console.error('Error submitting Time Trial record:', error);
                   }
                   
-                  setNeedsInitials(false);
-                  setTimeTrialRecordPending(null);
-                }}
-              />
-            )}
+                    setNeedsInitials(false);
+                    setTimeTrialRecordPending(null);
+                  }}
+                />
+                ) : null;
+              })()}
 
             {/* GameTransition moved to root level for all views */}
 

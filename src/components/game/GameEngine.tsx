@@ -2795,29 +2795,51 @@ export const GameEngine: React.FC<Props> = ({
         onComplete={async () => {
           setShowFireworks(false);
           
-          // Handle Time Trial completion
-          if (mode === "timetrial" && timeTrialCompletionDataRef.current) {
-            const { completionTime, level, difficulty, ghostFrames } = timeTrialCompletionDataRef.current;
-            
-            // Save ghost locally
-            ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
-            
-            // Check local record
-            const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
-            const isNewLocalRecord = !previousBest || completionTime < previousBest;
-            
-            // Check global record
-            let isNewGlobalRecord = false;
-            try {
-              const { checkGlobalRecord } = await import('@/lib/leaderboard');
-              const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
-              isNewGlobalRecord = isRecord;
-            } catch (error) {
-              console.error('Error checking global record:', error);
-            }
-            
-            // Call onGameOver to show Mission Successful screen
-            onGameOver({
+              // Handle Time Trial completion
+              if (mode === "timetrial" && timeTrialCompletionDataRef.current) {
+                const { completionTime, level, difficulty, ghostFrames } = timeTrialCompletionDataRef.current;
+                
+                console.log('⏱️ Time Trial completion check:', {
+                  completionTime,
+                  level,
+                  difficulty
+                });
+                
+                // Save ghost locally
+                ghostManager.current.saveTimeTrialGhost(difficulty, level, ghostFrames, completionTime);
+                
+                // Check local record
+                const previousBest = ghostManager.current.getTimeTrialBestTime(difficulty, level);
+                const isNewLocalRecord = !previousBest || completionTime < previousBest;
+                
+                console.log('📊 Local record check:', {
+                  previousBest,
+                  completionTime,
+                  isNewLocalRecord
+                });
+                
+                // Check global record
+                let isNewGlobalRecord = false;
+                try {
+                  const { checkGlobalRecord } = await import('@/lib/leaderboard');
+                  const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
+                  isNewGlobalRecord = isRecord;
+                  console.log('🌍 Global record check:', {
+                    isNewGlobalRecord
+                  });
+                } catch (error) {
+                  console.error('Error checking global record:', error);
+                }
+                
+                console.log('🎯 Calling onGameOver with:', {
+                  isNewBestTime: isNewLocalRecord,
+                  isWorldRecord: isNewGlobalRecord,
+                  completionTime,
+                  level
+                });
+                
+                // Call onGameOver to show Mission Successful screen
+                onGameOver({
               score: hud.score,
               landings: currentLandings,
               cause: "success",
