@@ -107,6 +107,7 @@ export interface GlobalGhostRecord {
   id?: string;
   level: number;
   difficulty: Difficulty;
+  mode: Mode;
   completion_time: number;
   ghost_data: any; // GhostRecording
   initials: string;
@@ -119,16 +120,18 @@ export interface GlobalGhostRecord {
 export async function checkGlobalRecord(
   level: number,
   difficulty: Difficulty,
+  mode: Mode,
   completionTime: number
 ): Promise<{ isRecord: boolean; currentRecord: GlobalGhostRecord | null; error?: string }> {
   try {
-    console.log('🔍 Checking global record...', { level, difficulty, completionTime });
+    console.log('🔍 Checking global record...', { level, difficulty, mode, completionTime });
     
     const { data, error } = await supabase
       .from('ghost_records')
       .select('*')
       .eq('level', level)
       .eq('difficulty', difficulty)
+      .eq('mode', mode)
       .single();
 
     console.log('🔍 Supabase query result:', { data, error, errorCode: error?.code });
@@ -166,6 +169,7 @@ export async function checkGlobalRecord(
 export async function submitGlobalGhost(
   level: number,
   difficulty: Difficulty,
+  mode: Mode,
   completionTime: number,
   ghostData: any,
   initials: string = ""
@@ -174,6 +178,7 @@ export async function submitGlobalGhost(
     console.log('📤 Submitting global ghost...', {
       level,
       difficulty,
+      mode,
       completionTime,
       initials: initials || "(none)",
       dataSize: JSON.stringify(ghostData).length
@@ -184,11 +189,12 @@ export async function submitGlobalGhost(
       .upsert({
         level,
         difficulty,
+        mode,
         completion_time: completionTime,
         ghost_data: ghostData,
         initials: initials ? initials.toUpperCase().slice(0, 3) : null
       }, {
-        onConflict: 'level,difficulty'
+        onConflict: 'level,difficulty,mode'
       });
 
     if (error) {
@@ -215,16 +221,18 @@ export async function submitGlobalGhost(
  */
 export async function fetchGlobalGhost(
   level: number,
-  difficulty: Difficulty
+  difficulty: Difficulty,
+  mode: Mode
 ): Promise<{ record: GlobalGhostRecord | null; error?: string }> {
   try {
-    console.log('📥 Fetching global ghost:', { level, difficulty });
+    console.log('📥 Fetching global ghost:', { level, difficulty, mode });
     
     const { data, error } = await supabase
       .from('ghost_records')
       .select('*')
       .eq('level', level)
       .eq('difficulty', difficulty)
+      .eq('mode', mode)
       .order('completion_time', { ascending: true })
       .limit(1)
       .maybeSingle();

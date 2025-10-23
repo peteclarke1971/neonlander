@@ -23,6 +23,7 @@ export type Database = {
           id: string
           initials: string | null
           level: number
+          mode: string
         }
         Insert: {
           completion_time: number
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           initials?: string | null
           level: number
+          mode?: string
         }
         Update: {
           completion_time?: number
@@ -41,34 +43,44 @@ export type Database = {
           id?: string
           initials?: string | null
           level?: number
+          mode?: string
         }
         Relationships: []
       }
       scores: {
         Row: {
+          completion_time: number | null
           created_at: string | null
           difficulty: string
           id: string
           initials: string
+          level: number | null
           mode: string
+          mode_type: string | null
           score: number
           user_id: string | null
         }
         Insert: {
+          completion_time?: number | null
           created_at?: string | null
           difficulty: string
           id?: string
           initials: string
+          level?: number | null
           mode: string
+          mode_type?: string | null
           score: number
           user_id?: string | null
         }
         Update: {
+          completion_time?: number | null
           created_at?: string | null
           difficulty?: string
           id?: string
           initials?: string
+          level?: number | null
           mode?: string
+          mode_type?: string | null
           score?: number
           user_id?: string | null
         }

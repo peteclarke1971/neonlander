@@ -1,7 +1,7 @@
 import { HUDSnapshot, CollectiblesData, Difficulty } from "./types";
 import { useEffect, useState } from "react";
 import { GhostManager } from "./GhostManager";
-import { fetchTimeTrialLeaderboard } from "@/lib/leaderboard";
+import { fetchGlobalGhost } from "@/lib/leaderboard";
 
 interface Props extends HUDSnapshot {
   collectibles?: CollectiblesData;
@@ -34,14 +34,18 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
         });
       }
       
-      // Global record
+      // Global record - fetch from ghost_records table for timetrial mode
       try {
-        const { rows } = await fetchTimeTrialLeaderboard(timeTrialLevel, difficulty, 1);
-        if (rows && rows.length > 0 && rows[0].completion_time) {
-          setGlobalRecord({ time: rows[0].completion_time, initials: rows[0].initials });
+        const { record } = await fetchGlobalGhost(timeTrialLevel, difficulty, 'timetrial');
+        if (record && record.completion_time) {
+          console.log('🌍 HUD: Loaded global ghost:', { 
+            time: record.completion_time, 
+            initials: record.initials 
+          });
+          setGlobalRecord({ time: record.completion_time, initials: record.initials });
         }
       } catch (err) {
-        console.error("Failed to fetch Time Trial leaderboard:", err);
+        console.error("Failed to fetch global ghost:", err);
       }
     };
     

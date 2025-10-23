@@ -380,7 +380,7 @@ export class GhostManager {
       const { checkGlobalRecord, submitGlobalGhost } = await import('@/lib/leaderboard');
       console.log('✅ Leaderboard functions imported');
       
-      const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, completionTime);
+      const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, 'timetrial', completionTime);
       console.log('📊 Check global record result:', { isRecord, checkError });
       
       if (checkError) {
@@ -413,6 +413,7 @@ export class GhostManager {
       const { ok, error: submitError } = await submitGlobalGhost(
         level,
         difficulty,
+        'timetrial',
         completionTime,
         recording,
         initials
@@ -442,7 +443,7 @@ export class GhostManager {
   ): Promise<GhostRecording | null> {
     try {
       const { fetchGlobalGhost } = await import('@/lib/leaderboard');
-      const { record, error } = await fetchGlobalGhost(level, difficulty);
+      const { record, error } = await fetchGlobalGhost(level, difficulty, 'timetrial');
       
       if (error) {
         console.error('Error loading global ghost:', error);

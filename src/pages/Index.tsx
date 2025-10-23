@@ -973,6 +973,7 @@ const retryGame = () => {
                     const { isRecord, currentRecord, error } = await checkGlobalRecord(
                       timeTrialRecordPending.level,
                       timeTrialRecordPending.difficulty,
+                      'timetrial',
                       timeTrialRecordPending.completionTime
                     );
                     
@@ -997,6 +998,7 @@ const retryGame = () => {
                         const uploadResult = await submitGlobalGhost(
                           timeTrialRecordPending.level,
                           timeTrialRecordPending.difficulty,
+                          'timetrial',
                           timeTrialRecordPending.completionTime,
                           localGhost,
                           initials

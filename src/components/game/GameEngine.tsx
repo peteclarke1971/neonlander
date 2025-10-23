@@ -613,7 +613,7 @@ export const GameEngine: React.FC<Props> = ({
       if (challengeGlobal) {
         // Try global ghost first
         try {
-          const { record } = await fetchGlobalGhost(level, difficulty);
+          const { record } = await fetchGlobalGhost(level, difficulty, 'timetrial');
           if (record && record.ghost_data) {
             timeTrialLoadedGhost.current = record.ghost_data;
             timeTrialGhostType.current = 'global';
@@ -2822,7 +2822,7 @@ export const GameEngine: React.FC<Props> = ({
                 let isNewGlobalRecord = false;
                 try {
                   const { checkGlobalRecord } = await import('@/lib/leaderboard');
-                  const { isRecord } = await checkGlobalRecord(level, difficulty, completionTime);
+                  const { isRecord } = await checkGlobalRecord(level, difficulty, 'timetrial', completionTime);
                   isNewGlobalRecord = isRecord;
                   console.log('🌍 Global record check:', {
                     isNewGlobalRecord
