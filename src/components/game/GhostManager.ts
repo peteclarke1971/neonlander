@@ -26,6 +26,7 @@ export interface GhostRecording {
   level: number;
   date: number;
   gameType: "neon-docking" | "lunar-lander";
+  initials?: string;
 }
 
 export interface NeonDockingGhostState {
@@ -635,6 +636,26 @@ export class GhostManager {
       localStorage.removeItem(key);
     } catch (error) {
       console.warn('Failed to clear time trial ghost recording:', error);
+    }
+  }
+
+  /**
+   * Update initials for an existing Time Trial ghost
+   */
+  updateTimeTrialGhostInitials(difficulty: string, level: number, initials: string): void {
+    try {
+      const recording = this.loadTimeTrialGhost(difficulty, level);
+      if (!recording) {
+        console.warn('No ghost found to update initials');
+        return;
+      }
+      
+      recording.initials = initials.toUpperCase().slice(0, 3);
+      const key = `time-trial-ghost-${difficulty}-level-${level}`;
+      localStorage.setItem(key, JSON.stringify(recording));
+      console.log('✅ Updated ghost initials:', { difficulty, level, initials: recording.initials });
+    } catch (error) {
+      console.error('Failed to update ghost initials:', error);
     }
   }
 }

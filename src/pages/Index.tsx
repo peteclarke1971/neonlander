@@ -947,7 +947,16 @@ const retryGame = () => {
                       timeTrialRecordPending.completionTime,
                       initials
                     );
-                    console.log('✅ Time Trial record submitted');
+                    console.log('✅ Time Trial record submitted to database');
+                    
+                    // Update local ghost with initials
+                    const { GhostManager } = await import('@/components/game/GhostManager');
+                    const ghostManager = new GhostManager();
+                    ghostManager.updateTimeTrialGhostInitials(
+                      timeTrialRecordPending.difficulty,
+                      timeTrialRecordPending.level,
+                      initials
+                    );
                   } catch (error) {
                     console.error('Error submitting Time Trial record:', error);
                   }
