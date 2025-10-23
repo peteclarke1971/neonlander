@@ -99,12 +99,15 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
             <span className="text-muted-foreground">Pilot: {localRecord.initials}</span>
           </div>
         )}
-        {globalRecord && (
-          <div className="flex justify-between gap-4">
-            <span className="text-yellow-400">World: {(globalRecord.time / 1000).toFixed(2)}s</span>
-            <span className="text-muted-foreground">Pilot: {globalRecord.initials}</span>
-          </div>
-        )}
+        {/* World record - always visible with placeholder when no record */}
+        <div className="flex justify-between gap-4">
+          <span className="text-yellow-400">
+            World: {globalRecord ? (globalRecord.time / 1000).toFixed(2) + 's' : '----'}
+          </span>
+          <span className="text-muted-foreground">
+            Pilot: {globalRecord?.initials || '???'}
+          </span>
+        </div>
       </div>
     </>
   ) : (

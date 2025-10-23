@@ -965,6 +965,58 @@ const retryGame = () => {
                     );
                     
                     console.log('🎯 Ghost update method called');
+                    
+                    // Check if this should be uploaded as world record
+                    console.log('🌍 Checking if local record should be uploaded as world record...');
+                    const { checkGlobalRecord, submitGlobalGhost } = await import('@/lib/leaderboard');
+                    
+                    const { isRecord, currentRecord, error } = await checkGlobalRecord(
+                      timeTrialRecordPending.level,
+                      timeTrialRecordPending.difficulty,
+                      timeTrialRecordPending.completionTime
+                    );
+                    
+                    if (error) {
+                      console.error('❌ Failed to check global record:', error);
+                    } else if (isRecord) {
+                      console.log('🏆 Local record beats world record! Uploading...', {
+                        level: timeTrialRecordPending.level,
+                        difficulty: timeTrialRecordPending.difficulty,
+                        time: timeTrialRecordPending.completionTime,
+                        initials,
+                        beatsExisting: currentRecord ? 'Yes' : 'New record'
+                      });
+                      
+                      // Load the ghost data to upload
+                      const localGhost = ghostManager.loadTimeTrialGhost(
+                        timeTrialRecordPending.difficulty,
+                        timeTrialRecordPending.level
+                      );
+                      
+                      if (localGhost) {
+                        const uploadResult = await submitGlobalGhost(
+                          timeTrialRecordPending.level,
+                          timeTrialRecordPending.difficulty,
+                          timeTrialRecordPending.completionTime,
+                          localGhost,
+                          initials
+                        );
+                        
+                        if (uploadResult.ok) {
+                          console.log('✅ World record uploaded successfully!');
+                        } else {
+                          console.error('❌ Failed to upload world record:', uploadResult.error);
+                        }
+                      } else {
+                        console.error('❌ No local ghost found to upload');
+                      }
+                    } else {
+                      console.log('📊 Local record does not beat world record', {
+                        localTime: timeTrialRecordPending.completionTime,
+                        worldTime: currentRecord?.completion_time,
+                        worldPilot: currentRecord?.initials
+                      });
+                    }
                   } catch (error) {
                     console.error('Error submitting Time Trial record:', error);
                   }
