@@ -165,7 +165,8 @@ export const GameEngine: React.FC<Props> = ({
   
   // Time Trial ghost recording refs
   const timeTrialGhostFrames = useRef<LunarLanderGhostFrame[]>([]);
-  const timeTrialLoadedGhost = useRef<any>(null);
+  const timeTrialLoadedGhost = useRef<any>(null); // Global ghost
+  const timeTrialLocalGhost = useRef<any>(null); // Local ghost
   const timeTrialGhostType = useRef<'local' | 'global'>('local');
   
   const timeTrialCompletionDataRef = useRef<{
@@ -610,27 +611,24 @@ export const GameEngine: React.FC<Props> = ({
     if (isTimeTrial && showGhost) {
       const challengeGlobal = localStorage.getItem('challenge-global-ghosts') === 'true';
       
+      // ALWAYS load local ghost first
+      const localGhost = ghostManager.current.loadTimeTrialGhost(difficulty, level);
+      if (localGhost) {
+        timeTrialLocalGhost.current = localGhost;
+        console.log("👻 Local Time Trial ghost loaded for level", level, "- time to beat:", (localGhost.completionTime / 1000).toFixed(3) + "s");
+      }
+      
+      // Also load global ghost if challenge mode enabled
       if (challengeGlobal) {
-        // Try global ghost first
         try {
           const { record } = await fetchGlobalGhost(level, difficulty, 'timetrial');
           if (record && record.ghost_data) {
-            timeTrialLoadedGhost.current = record.ghost_data;
+            timeTrialLoadedGhost.current = record.ghost_data; // This is the global ghost
             timeTrialGhostType.current = 'global';
-            console.log("👻 Global Time Trial ghost loaded for level", level, "- time to beat:", (record.completion_time / 1000).toFixed(3) + "s");
+            console.log("🌍 Global Time Trial ghost loaded for level", level, "- time to beat:", (record.completion_time / 1000).toFixed(3) + "s");
           }
         } catch (err) {
           console.error("Failed to load global Time Trial ghost:", err);
-        }
-      }
-      
-      // Fallback to local ghost if no global or if disabled
-      if (!timeTrialLoadedGhost.current) {
-        const localGhost = ghostManager.current.loadTimeTrialGhost(difficulty, level);
-        if (localGhost) {
-          timeTrialLoadedGhost.current = localGhost;
-          timeTrialGhostType.current = 'local';
-          console.log("👻 Local Time Trial ghost loaded for level", level, "- time to beat:", (localGhost.completionTime / 1000).toFixed(3) + "s");
         }
       }
     }
@@ -2441,32 +2439,61 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // Time Trial ghost rendering
-      if (mode === "timetrial" && timeTrialLoadedGhost.current && timeTrialStateRef.current.raceActive) {
+      // Time Trial ghost rendering - render BOTH local and global ghosts
+      if (mode === "timetrial" && timeTrialStateRef.current.raceActive) {
         const raceTime = performance.now() - timeTrialStateRef.current.raceStartTime;
-        const ttGhostState = timeTrialGhostType.current === 'global'
-          ? ghostManager.current.getGlobalGhostState(timeTrialLoadedGhost.current, raceTime)
-          : ghostManager.current.getTimeTrialGhostState(difficulty, level, raceTime);
         
-        if (ttGhostState && ttGhostState.visible) {
-          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
-            ctx.save();
-            ctx.translate(ttGhostState.x + offset, ttGhostState.y);
-            ctx.rotate(ttGhostState.angle);
-            ctx.globalAlpha = 0.4;
-            ctx.beginPath();
-            ctx.moveTo(0, -10);
-            ctx.lineTo(8, 10);
-            ctx.lineTo(-8, 10);
-            ctx.closePath();
-            ctx.strokeStyle = timeTrialGhostType.current === 'global' ? '#FFD700' : '#00ff80';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
-            ctx.moveTo(6, 8); ctx.lineTo(12, 12);
-            ctx.stroke();
-            ctx.restore();
+        // Render LOCAL ghost (green) if available
+        if (timeTrialLocalGhost.current) {
+          const localGhostState = ghostManager.current.getTimeTrialGhostState(difficulty, level, raceTime);
+          
+          if (localGhostState && localGhostState.visible) {
+            for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+              ctx.save();
+              ctx.translate(localGhostState.x + offset, localGhostState.y);
+              ctx.rotate(localGhostState.angle);
+              ctx.globalAlpha = 0.4;
+              ctx.beginPath();
+              ctx.moveTo(0, -10);
+              ctx.lineTo(8, 10);
+              ctx.lineTo(-8, 10);
+              ctx.closePath();
+              ctx.strokeStyle = '#00ff80'; // Green for local ghost
+              ctx.lineWidth = 2;
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+              ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+        }
+        
+        // Render GLOBAL ghost (yellow/gold) if available
+        if (timeTrialLoadedGhost.current) {
+          const globalGhostState = ghostManager.current.getGlobalGhostState(timeTrialLoadedGhost.current, raceTime);
+          
+          if (globalGhostState && globalGhostState.visible) {
+            for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+              ctx.save();
+              ctx.translate(globalGhostState.x + offset, globalGhostState.y);
+              ctx.rotate(globalGhostState.angle);
+              ctx.globalAlpha = 0.4;
+              ctx.beginPath();
+              ctx.moveTo(0, -10);
+              ctx.lineTo(8, 10);
+              ctx.lineTo(-8, 10);
+              ctx.closePath();
+              ctx.strokeStyle = '#FFD700'; // Gold for global ghost
+              ctx.lineWidth = 2;
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+              ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+              ctx.stroke();
+              ctx.restore();
+            }
           }
         }
       }
