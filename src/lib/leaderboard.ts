@@ -31,6 +31,8 @@ export async function submitScore(row: ScoreRow): Promise<{ ok: boolean; error?:
         score: row.score,
         difficulty: row.difficulty,
         mode: row.mode,
+        level: row.level,
+        completion_time: row.completion_time,
       });
 
     if (error) {
