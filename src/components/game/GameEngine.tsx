@@ -2968,6 +2968,22 @@ export const GameEngine: React.FC<Props> = ({
                     console.log('🏆 NEW GLOBAL RECORD SET!');
                     setIsWorldRecord(true); // Set flag for UI to display message
                   }
+                  
+                  // Submit score to leaderboard
+                  try {
+                    const { submitScore } = await import('@/lib/leaderboard');
+                    await submitScore({
+                      initials,
+                      score: hud.score,
+                      difficulty,
+                      mode: 'fixed',
+                      level,
+                      completion_time: currentTimeMs
+                    });
+                    console.log('✅ Fixed mode score submitted to leaderboard');
+                  } catch (scoreError) {
+                    console.error('❌ Error submitting fixed mode score:', scoreError);
+                  }
                 } catch (uploadError) {
                   console.error('💥 Exception during global ghost upload:', uploadError);
                 }
@@ -3062,6 +3078,22 @@ export const GameEngine: React.FC<Props> = ({
                     
                     if (uploadResult.uploaded && uploadResult.wasRecord) {
                       console.log('🏆 NEW GLOBAL RECORD SET (skip)!');
+                    }
+                    
+                    // Submit score to leaderboard
+                    try {
+                      const { submitScore } = await import('@/lib/leaderboard');
+                      await submitScore({
+                        initials,
+                        score: hud.score,
+                        difficulty,
+                        mode: 'fixed',
+                        level,
+                        completion_time: currentTimeMs
+                      });
+                      console.log('✅ Fixed mode score submitted to leaderboard (skip)');
+                    } catch (scoreError) {
+                      console.error('❌ Error submitting fixed mode score (skip):', scoreError);
                     }
                   } catch (uploadError) {
                     console.error('💥 Exception during global ghost upload (skip):', uploadError);
