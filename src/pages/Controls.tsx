@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepad, saveProfile, setLastDeviceId } from "@/hooks/use-gamepad";
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 
 export default function ControlsSettings() {
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
@@ -14,6 +16,7 @@ export default function ControlsSettings() {
   const [profile, setProfile] = useState(() => loadProfile(deviceId || undefined));
   const [listening, setListening] = useState<{ field: keyof typeof profile.map | null; type: "button" | "axis" | null }>({ field: null, type: null });
   const [cursorConfig, setCursorConfig] = useState<CursorConfig>(loadCursorConfig);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   
   // Save cursor config when it changes
   useEffect(() => {
@@ -157,6 +160,47 @@ export default function ControlsSettings() {
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => { containerRef.current?.focus(); }, []);
 
+
+  const clearAllLocalData = () => {
+    const keysToRemove: string[] = [];
+    
+    // Iterate through all localStorage keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      
+      // Match ghost keys
+      if (key.startsWith('neon-docking-ghost-') ||
+          key.startsWith('lunar-lander-ghost-') ||
+          key.startsWith('time-trial-ghost-')) {
+        keysToRemove.push(key);
+      }
+      
+      // Match high score keys
+      if (key === 'll-highscores-classic' ||
+          key === 'll-highscores-fixed' ||
+          key === 'asteroids-high-scores' ||
+          key === 'asteroids_color_high_scores' ||
+          key === 'asteroids-remix-high-scores' ||
+          key === 'lightcycles-high-scores' ||
+          key === 'neon-docking-high-scores' ||
+          key === 'neon-racing-high-scores' ||
+          key === 'survival-mode-high-scores') {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Remove all identified keys
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Show success notification
+    toast({
+      title: "Local data cleared",
+      description: `Removed ${keysToRemove.length} ghost recordings and high scores. Your settings have been preserved.`,
+    });
+    
+    setClearDialogOpen(false);
+  };
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLElement> = (e) => {
     const key = e.key;
@@ -320,6 +364,48 @@ export default function ControlsSettings() {
             <FieldRow label="dpadDown" value={profile.map.dpadDown} type="button" onRebind={() => startListen("dpadDown", "button")} />
             <FieldRow label="dpadLeft" value={profile.map.dpadLeft} type="button" onRebind={() => startListen("dpadLeft", "button")} />
             <FieldRow label="dpadRight" value={profile.map.dpadRight} type="button" onRebind={() => startListen("dpadRight", "button")} />
+          </div>
+        </div>
+
+        <div className="mt-6 border rounded-lg border-destructive/60 p-4 bg-destructive/5">
+          <h2 className="text-sm uppercase tracking-wider text-destructive mb-2">⚠️ Clear Local Data</h2>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>All ghost recordings (all game modes)</li>
+              <li>All high scores (all game modes)</li>
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              Your settings will be preserved (controls, graphics, etc.)
+            </p>
+            
+            <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full mt-2">
+                  Clear All Local Data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear All Local Data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all ghost recordings and high scores from all game modes.
+                    <br /><br />
+                    <strong>This action cannot be undone.</strong>
+                    <br /><br />
+                    Your settings will be preserved.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={clearAllLocalData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Clear All Data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </section>
