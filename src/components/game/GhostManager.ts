@@ -372,7 +372,8 @@ export class GhostManager {
     level: number,
     completionTime: number,
     frames: LunarLanderGhostFrame[],
-    initials: string
+    initials: string,
+    mode: 'fixed' | 'timetrial'
   ): Promise<{ uploaded: boolean; wasRecord: boolean; error?: string }> {
     try {
       console.log('📊 checkAndUploadGlobalGhost called', { difficulty, level, completionTime, initials, framesCount: frames.length });
@@ -380,7 +381,7 @@ export class GhostManager {
       const { checkGlobalRecord, submitGlobalGhost } = await import('@/lib/leaderboard');
       console.log('✅ Leaderboard functions imported');
       
-      const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, 'timetrial', completionTime);
+      const { isRecord, error: checkError } = await checkGlobalRecord(level, difficulty, mode, completionTime);
       console.log('📊 Check global record result:', { isRecord, checkError });
       
       if (checkError) {
@@ -413,7 +414,7 @@ export class GhostManager {
       const { ok, error: submitError } = await submitGlobalGhost(
         level,
         difficulty,
-        'timetrial',
+        mode,
         completionTime,
         recording,
         initials

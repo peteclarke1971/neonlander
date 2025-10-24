@@ -2954,7 +2954,8 @@ export const GameEngine: React.FC<Props> = ({
                     level,
                     currentTimeMs,
                     ghostRecording,
-                    initials
+                    initials,
+                    'fixed'
                   );
                   
                   console.log('🌍 Upload result:', uploadResult);
@@ -3049,7 +3050,8 @@ export const GameEngine: React.FC<Props> = ({
                       level,
                       currentTimeMs,
                       ghostRecording,
-                      initials
+                      initials,
+                      'fixed'
                     );
                     
                     console.log('🌍 Upload result (skip):', uploadResult);
