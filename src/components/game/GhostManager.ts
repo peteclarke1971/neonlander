@@ -456,7 +456,9 @@ export class GhostManager {
         return null;
       }
       
-      return record.ghost_data as GhostRecording;
+      // Deep clone to normalize JSONB structure from Supabase
+      // This creates native JS objects/arrays identical to localStorage data
+      return JSON.parse(JSON.stringify(record.ghost_data)) as GhostRecording;
     } catch (e: any) {
       console.error('Error loading global ghost:', e);
       return null;
