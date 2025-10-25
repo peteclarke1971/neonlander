@@ -581,7 +581,7 @@ export const GameEngine: React.FC<Props> = ({
       
       // Try to load global ghost first if enabled
       if (globalGhostsEnabled) {
-        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, ghostLevel);
+        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, ghostLevel, 'fixed');
         if (globalRecording) {
           activeGhostRecording = globalRecording;
           isUsingGlobalGhost = true;

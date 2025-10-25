@@ -440,11 +440,12 @@ export class GhostManager {
    */
   async loadGlobalGhost(
     difficulty: 'easy' | 'hard',
-    level: number
+    level: number,
+    mode: 'fixed' | 'timetrial'
   ): Promise<GhostRecording | null> {
     try {
       const { fetchGlobalGhost } = await import('@/lib/leaderboard');
-      const { record, error } = await fetchGlobalGhost(level, difficulty, 'timetrial');
+      const { record, error } = await fetchGlobalGhost(level, difficulty, mode);
       
       if (error) {
         console.error('Error loading global ghost:', error);
