@@ -971,6 +971,10 @@ export const GameEngine: React.FC<Props> = ({
     }
 
     const loop = () => {
+      // Don't schedule next frame if component unmounted
+      if (!mountedRef.current) {
+        return;
+      }
       rafRef.current = requestAnimationFrame(loop);
       const now = performance.now();
       const dt = Math.min(0.033, (now - last) / 1000); // clamp dt
