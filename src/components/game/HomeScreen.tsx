@@ -9,6 +9,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fetchTop, submitScore } from "@/lib/leaderboard";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, setLastDeviceId, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 import { useNavigate } from "react-router-dom";
+import { useFullscreen } from "@/hooks/use-fullscreen";
+import { shouldShowFullscreenButton } from "@/lib/deviceDetection";
 const difficulties: { key: Difficulty; label: string; desc: string }[] = [
   { key: "easy", label: "Easy", desc: "Lower gravity, more fuel, rotation friction" },
   { key: "hard", label: "Hard", desc: "Higher gravity, minimal fuel, free spin" },
@@ -201,6 +203,14 @@ const levelRefs = useRef<Record<Difficulty, HTMLButtonElement[]>>({ easy: [], ha
 const modeClassicRef = useRef<HTMLButtonElement>(null);
 const modeFixedRef = useRef<HTMLButtonElement>(null);
 const lastModeFocus = useRef<Mode | null>(null);
+const fullscreenBtnRef = useRef<HTMLButtonElement>(null);
+
+const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreen();
+const [showFullscreenBtn, setShowFullscreenBtn] = useState(false);
+
+useEffect(() => {
+  setShowFullscreenBtn(shouldShowFullscreenButton());
+}, []);
 
 const startLevels = [5, 10, 15, 20, 30, 50] as const;
 
@@ -210,6 +220,12 @@ const startLevels = [5, 10, 15, 20, 30, 50] as const;
   }, []);
 
 const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Handle ESC for fullscreen exit
+  if (e.key === "Escape" && isFullscreen) {
+    exitFullscreen();
+    return;
+  }
+  
   const key = e.key;
   if (!(key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight")) return;
   e.preventDefault();
@@ -229,7 +245,7 @@ const handleKeyDown = (e: React.KeyboardEvent) => {
       return void focus(target || modeClassicRef.current);
     }
     if (key === "ArrowRight") return void focus(lowGfxBtnRef.current);
-    if (key === "ArrowLeft") return void focus(settingsBtnRef.current); // wrap around
+    if (key === "ArrowLeft") return void focus(showFullscreenBtn ? fullscreenBtnRef.current : settingsBtnRef.current); // wrap around
     return;
   }
 
@@ -258,8 +274,18 @@ const handleKeyDown = (e: React.KeyboardEvent) => {
       const target = lastModeFocus.current === "fixed" ? modeFixedRef.current : modeClassicRef.current;
       return void focus(target || modeClassicRef.current);
     }
-    if (key === "ArrowRight") return void focus(musicBtnRef.current); // wrap around
+    if (key === "ArrowRight") return void focus(showFullscreenBtn ? fullscreenBtnRef.current : musicBtnRef.current);
     if (key === "ArrowLeft") return void focus(asteroidsBtnRef.current);
+    return;
+  }
+
+  if (active === fullscreenBtnRef.current) {
+    if (key === "ArrowDown") {
+      const target = lastModeFocus.current === "fixed" ? modeFixedRef.current : modeClassicRef.current;
+      return void focus(target || modeClassicRef.current);
+    }
+    if (key === "ArrowRight") return void focus(musicBtnRef.current); // wrap around
+    if (key === "ArrowLeft") return void focus(settingsBtnRef.current);
     return;
   }
 
@@ -460,6 +486,18 @@ useEffect(() => {
           <a href="/settings/controls" className="inline-block">
             <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
           </a>
+          {showFullscreenBtn && (
+            <Button
+              ref={fullscreenBtnRef}
+              variant="outline"
+              size="sm"
+              onClick={toggleFullscreen}
+              title="Toggle fullscreen mode (F11)"
+              className="text-xs"
+            >
+              {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+            </Button>
+          )}
         </div>
 
         <div className="mt-4">
