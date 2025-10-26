@@ -2464,7 +2464,7 @@ export const GameEngine: React.FC<Props> = ({
           ctx.lineTo(8, 10);
           ctx.lineTo(-8, 10);
           ctx.closePath();
-          ctx.strokeStyle = '#00ff80'; // Ghost green
+          ctx.strokeStyle = isUsingGlobalGhost ? '#FFD700' : '#00ff80'; // Gold for global, green for local
           ctx.lineWidth = 2;
           ctx.stroke();
 
