@@ -121,6 +121,7 @@ export const GameEngine: React.FC<Props> = ({
   
   // Animation frame ref for proper cleanup
   const rafRef = useRef<number>(0);
+  const mountedRef = useRef<boolean>(true);
   
   // Landing bonus tracking state
   const [lastLandingBonuses, setLastLandingBonuses] = useState<{
@@ -314,6 +315,7 @@ export const GameEngine: React.FC<Props> = ({
 
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
+    mountedRef.current = true; // Reset on mount
     
     const initializeGame = async () => {
       const c = canvasRef.current!;
@@ -2711,12 +2713,21 @@ export const GameEngine: React.FC<Props> = ({
     // HUD update timer integrated into main loop
     let hudUpdateTimer = 0;
     
-    rafRef.current = requestAnimationFrame(loop);
+    // Only start game loop if component is still mounted
+    if (mountedRef.current) {
+      rafRef.current = requestAnimationFrame(loop);
+    }
     }; // End of initializeGame async function
     
     initializeGame();
 
-    return () => { cancelAnimationFrame(rafRef.current); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
+    return () => { 
+      mountedRef.current = false; // Prevent initializeGame from starting loop
+      cancelAnimationFrame(rafRef.current); 
+      audio.current.stopThruster(); 
+      try { audio.current.stopFuelAlarm(); } catch {} 
+      try { audio.current.stopLevelMusic(); } catch {} 
+    };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
 
 
