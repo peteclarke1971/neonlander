@@ -119,6 +119,9 @@ export const GameEngine: React.FC<Props> = ({
   const timerActiveRef = useRef(false);
   const timerStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Animation frame ref for proper cleanup
+  const rafRef = useRef<number>(0);
+  
   // Landing bonus tracking state
   const [lastLandingBonuses, setLastLandingBonuses] = useState<{
     bullseye: boolean;
@@ -311,8 +314,6 @@ export const GameEngine: React.FC<Props> = ({
 
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
-    
-    let raf = 0; // Declare at useEffect level so cleanup can access it
     
     const initializeGame = async () => {
       const c = canvasRef.current!;
@@ -968,7 +969,7 @@ export const GameEngine: React.FC<Props> = ({
     }
 
     const loop = () => {
-      raf = requestAnimationFrame(loop);
+      rafRef.current = requestAnimationFrame(loop);
       const now = performance.now();
       const dt = Math.min(0.033, (now - last) / 1000); // clamp dt
       lastDtForCam = dt;
@@ -2080,7 +2081,7 @@ export const GameEngine: React.FC<Props> = ({
       }
       updateHud();
       render();
-      if (!running && !crashed) cancelAnimationFrame(raf);
+      if (!running && !crashed) cancelAnimationFrame(rafRef.current);
     };
 
     const render = () => {
@@ -2710,12 +2711,12 @@ export const GameEngine: React.FC<Props> = ({
     // HUD update timer integrated into main loop
     let hudUpdateTimer = 0;
     
-    raf = requestAnimationFrame(loop);
+    rafRef.current = requestAnimationFrame(loop);
     }; // End of initializeGame async function
     
     initializeGame();
 
-    return () => { cancelAnimationFrame(raf); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
+    return () => { cancelAnimationFrame(rafRef.current); audio.current.stopThruster(); try { audio.current.stopFuelAlarm(); } catch {} try { audio.current.stopLevelMusic(); } catch {} };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
 
 
