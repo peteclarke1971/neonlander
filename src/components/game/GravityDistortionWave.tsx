@@ -422,7 +422,9 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     ctx.restore();
   };
   
-  // Center vortex glow effect
+  // Center vortex glow effect (cached gradient optimization)
+  const vortexGradientCache = useRef<{ gradient: CanvasGradient; radius: number; cx: number; cy: number } | null>(null);
+  
   const drawCenterVortex = (ctx: CanvasRenderingContext2D, tSec: number) => {
     const p = paramsRef.current;
     if (p.centerVortex === false) return;
@@ -441,7 +443,20 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const intensity = 0.3 + 0.2 * (1 - trailIntensityRef.current / 0.25);
     
     const colors = colorForMode(1, 1);
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    
+    // Cache gradient if radius changed significantly or cache is empty
+    const cache = vortexGradientCache.current;
+    const needsRecreate = !cache || Math.abs(cache.radius - radius) > 5 || cache.cx !== cx || cache.cy !== cy;
+    
+    let gradient: CanvasGradient;
+    if (needsRecreate) {
+      gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      vortexGradientCache.current = { gradient, radius, cx, cy };
+    } else {
+      gradient = cache.gradient;
+    }
+    
+    // Always update color stops (cheap operation)
     gradient.addColorStop(0, colors.core.replace(/[\d.]+\)$/, `${intensity})`));
     gradient.addColorStop(0.5, colors.glow.replace(/[\d.]+\)$/, `${intensity * 0.5})`));
     gradient.addColorStop(1, 'transparent');
@@ -453,7 +468,9 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     ctx.restore();
   };
   
-  // Energy burst particle system
+  // Energy burst particle system (30 FPS update optimization)
+  const burstLastUpdateRef = useRef<number>(0);
+  
   const drawEnergyBursts = (ctx: CanvasRenderingContext2D, tSec: number, now: number) => {
     const p = paramsRef.current;
     if (p.energyBursts === false) return;
@@ -463,38 +480,47 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const cx = (p.cx ?? 0.5) * w;
     const cy = (p.cy ?? 0.5) * h;
     
-    // Update existing bursts
-    energyBurstsRef.current = energyBurstsRef.current.filter(burst => {
-      const elapsed = now - burst.createdAt;
-      return elapsed < burst.duration;
-    });
+    // Throttle updates to 30 FPS (every 33ms)
+    const shouldUpdate = now - burstLastUpdateRef.current >= 33;
     
-    // Spawn new burst
-    if (now >= nextBurstAtRef.current) {
-      const numStreaks = 3 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < numStreaks; i++) {
-        energyBurstsRef.current.push({
-          angle: Math.random() * Math.PI * 2,
-          distance: 0,
-          speed: 300 + Math.random() * 200,
-          createdAt: now,
-          duration: 800 + Math.random() * 400,
-          hueOffset: -20 + Math.random() * 40
-        });
+    if (shouldUpdate) {
+      burstLastUpdateRef.current = now;
+      
+      // Update existing bursts
+      energyBurstsRef.current = energyBurstsRef.current.filter(burst => {
+        const elapsed = now - burst.createdAt;
+        return elapsed < burst.duration;
+      });
+      
+      // Spawn new burst
+      if (now >= nextBurstAtRef.current) {
+        const numStreaks = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < numStreaks; i++) {
+          energyBurstsRef.current.push({
+            angle: Math.random() * Math.PI * 2,
+            distance: 0,
+            speed: 300 + Math.random() * 200,
+            createdAt: now,
+            duration: 800 + Math.random() * 400,
+            hueOffset: -20 + Math.random() * 40
+          });
+        }
+        nextBurstAtRef.current = now + 8000 + Math.random() * 4000;
       }
-      nextBurstAtRef.current = now + 8000 + Math.random() * 4000;
+      
+      // Update distances for all bursts
+      energyBurstsRef.current.forEach(burst => {
+        burst.distance += (burst.speed / 1000) * 33; // 33ms dt
+      });
     }
     
-    // Draw bursts
+    // Draw bursts every frame using cached positions
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     
     energyBurstsRef.current.forEach(burst => {
       const elapsed = now - burst.createdAt;
       const progress = elapsed / burst.duration;
-      
-      // Update distance
-      burst.distance += (burst.speed / 1000) * 16; // approximate dt
       
       // Fade out as it travels
       const alpha = 1 - progress;
@@ -652,7 +678,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     
-    // Chromatic aberration during pulses
+    // Chromatic aberration during pulses (edge-only optimization)
     const chromatic = pDyn.chromaticPulse !== false && pulseRef.current;
     if (chromatic) {
       const { t0, dur } = pulseRef.current!;
@@ -661,24 +687,56 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const inPeak = tt > 0.25 && tt < 0.75;
       
       if (inPeak) {
-        // Draw grid 3 times with RGB separation
+        // Optimized: Only apply chromatic aberration to outer 30% of screen
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+        const edgeThreshold = maxDist * 0.7; // Inner 70% normal, outer 30% chromatic
+        
         ctx.save();
         
         try {
-          // Red channel
-          ctx.globalCompositeOperation = "screen";
+          // Create a radial mask for edge-only effect
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const tempCtx = tempCanvas.getContext('2d')!;
+          
+          // Draw normal warp to temp canvas
+          warpBackground(tempCtx, bg, tSec);
+          
+          // Draw center region (70%) with normal warp
           ctx.save();
-          ctx.translate(-2, 0);
-          warpBackground(ctx, bg, tSec);
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, edgeThreshold, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(tempCanvas, 0, 0);
           ctx.restore();
           
-          // Green channel (no offset)
-          warpBackground(ctx, bg, tSec);
+          // Draw outer region (30%) with chromatic aberration
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, maxDist * 1.5, 0, Math.PI * 2);
+          ctx.arc(centerX, centerY, edgeThreshold, 0, Math.PI * 2, true); // Inverted clip
+          ctx.clip();
+          
+          ctx.globalCompositeOperation = "screen";
+          
+          // Red channel
+          ctx.save();
+          ctx.translate(-2, 0);
+          ctx.drawImage(tempCanvas, 0, 0);
+          ctx.restore();
+          
+          // Green channel
+          ctx.drawImage(tempCanvas, 0, 0);
           
           // Blue channel
           ctx.save();
           ctx.translate(2, 0);
-          warpBackground(ctx, bg, tSec);
+          ctx.drawImage(tempCanvas, 0, 0);
+          ctx.restore();
+          
           ctx.restore();
         } catch {
           failSoftRef.current.warpOff = true;
