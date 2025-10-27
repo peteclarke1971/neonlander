@@ -142,58 +142,24 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
   const firstBgDrawRef = useRef<boolean>(true);
   const trailUntilRef = useRef<number>(0);
   const nextTrailAtRef = useRef<number>(performance.now() + 3000 + (randRef.current() * 7000));
-  // Starfield state (very light-weight)
-  const starsRef = useRef<Float32Array | null>(null); // x,y,z triplets in NDC-ish space
-  const starCountRef = useRef<number>(1200);
-  const starfieldBuiltRef = useRef<boolean>(false);
 
   // Grid cache (polar lattice positions)
   const gridRef = useRef<{ rings: number; spokes: number; maxR: number; ringRs: Float32Array; spokeAngles: Float32Array } | null>(null);
 
-  // Build/Rebuild grid and starfield on size/params change
+  // Build/Rebuild grid on size/params change
   const buildScene = () => {
     const canvas = canvasRef.current!;
     const w = canvas.width = canvas.clientWidth;
     const h = canvas.height = canvas.clientHeight;
-    const minDim = Math.min(w, h);
     const bg = bgRef.current!;
 
-    // Rebuild static starfield ONLY if not built or dimensions changed
-    if (!starfieldBuiltRef.current || bg.width !== w || bg.height !== h) {
+    // Simple black background - no starfield needed (obscured by grid/warp)
+    if (bg.width !== w || bg.height !== h) {
       bg.width = w;
       bg.height = h;
-      
-      // Render static starfield once
       const bgCtx = bg.getContext("2d", { alpha: false })!;
       bgCtx.fillStyle = "#000000";
       bgCtx.fillRect(0, 0, w, h);
-      
-      // Generate and draw all stars once
-      const p = paramsRef.current;
-      const numStars = motionReduce ? 400 : 1200;
-      const rng = randRef.current;
-      
-      const cx = (p.cx ?? 0.5) * w;
-      const cy = (p.cy ?? 0.5) * h;
-      
-      for (let i = 0; i < numStars; i++) {
-        const a = rng() * Math.PI * 2;
-        const r = Math.sqrt(rng()) * 1.0;
-        const z = 0.2 + rng() * 0.8;
-        
-        const x = Math.cos(a) * r;
-        const y = Math.sin(a) * r;
-        const px = cx + x * (0.45 + 0.55 * z) * (w * 0.5);
-        const py = cy + y * (0.45 + 0.55 * z) * (h * 0.5);
-        
-        const brightness = 0.3 + rng() * 0.7;
-        const size = rng() < 0.95 ? 1 : 2;
-        
-        bgCtx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
-        bgCtx.fillRect(px, py, size, size);
-      }
-      
-      starfieldBuiltRef.current = true;
     }
 
     // Grid
@@ -249,16 +215,9 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
   };
 
   const drawStars = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const bg = bgRef.current!;
-    
-    // Simply copy the static starfield from background canvas
-    if (starfieldBuiltRef.current && bg.width === w && bg.height === h) {
-      ctx.drawImage(bg, 0, 0);
-    } else {
-      // Fallback: solid black if starfield not ready
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, w, h);
-    }
+    // Simple black background - grid and warp provide all visual content
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, w, h);
   };
 
   const computePhase = (rPx: number, tSec: number) => {
@@ -543,7 +502,6 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       // 50% chance to enable rainbow; otherwise stick to theme color
       if (rng() < 0.5) p.colorMode = "rainbow";
 
-      starfieldBuiltRef.current = false; // Force starfield rebuild with new seed
       buildScene();
       requestAnimationFrame(step);
     },
@@ -566,7 +524,6 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const v = typeof seed === "number" ? seed : mixSeed(String(seed));
       seedRef.current = v >>> 0;
       randRef.current = mulberry32(seedRef.current);
-      starfieldBuiltRef.current = false; // Force starfield rebuild
       buildScene();
     },
     PulseNow() {
@@ -594,7 +551,6 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
       gridBuiltRef.current = false;
-      starfieldBuiltRef.current = false; // Force starfield rebuild on resize
     };
     onResize();
     window.addEventListener("resize", onResize);
