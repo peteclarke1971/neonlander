@@ -9,6 +9,7 @@ import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepa
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
+import { AudioManager } from "@/components/game/AudioManager";
 
 export default function ControlsSettings() {
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
@@ -17,6 +18,22 @@ export default function ControlsSettings() {
   const [listening, setListening] = useState<{ field: keyof typeof profile.map | null; type: "button" | "axis" | null }>({ field: null, type: null });
   const [cursorConfig, setCursorConfig] = useState<CursorConfig>(loadCursorConfig);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  
+  // Audio testing state
+  const audioManagerRef = useRef<AudioManager | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<string>("title.mp3");
+  const [selectedSFX, setSelectedSFX] = useState<string>("thruster.mp3");
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+  const loopingSFXRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Initialize AudioManager
+  useEffect(() => {
+    if (!audioManagerRef.current) {
+      audioManagerRef.current = new AudioManager();
+      audioManagerRef.current.resume();
+      audioManagerRef.current.preloadSFX();
+    }
+  }, []);
   
   // Save cursor config when it changes
   useEffect(() => {
@@ -200,6 +217,92 @@ export default function ControlsSettings() {
     });
     
     setClearDialogOpen(false);
+  };
+
+  // Audio testing handlers
+  const playTestMusic = async (trackName: string) => {
+    const audio = audioManagerRef.current;
+    if (!audio) return;
+    
+    audio.resume();
+    stopTestMusic();
+    
+    if (trackName === "title.mp3") {
+      await audio.playTitleMusic();
+    } else if (trackName === "mission_success.mp3") {
+      audio.playMissionSuccess();
+    } else {
+      const levelIndex = parseInt(trackName.replace("level", "").replace(".mp3", "")) - 1;
+      audio.playLevelTrackByIndex(levelIndex);
+    }
+    
+    setIsPlayingMusic(true);
+  };
+  
+  const stopTestMusic = () => {
+    const audio = audioManagerRef.current;
+    if (!audio) return;
+    
+    audio.stopTitleMusic();
+    audio.stopLevelMusic();
+    setIsPlayingMusic(false);
+  };
+  
+  const playTestSFX = async (effectName: string) => {
+    const audio = audioManagerRef.current;
+    if (!audio) return;
+    
+    audio.resume();
+    
+    // Stop any looping SFX
+    if (loopingSFXRef.current) {
+      clearTimeout(loopingSFXRef.current);
+      loopingSFXRef.current = null;
+    }
+    
+    // File-based sound effects
+    if (effectName === "thruster.mp3") {
+      await audio.setThruster(1.0);
+      loopingSFXRef.current = setTimeout(() => audio.setThruster(0), 2000);
+    } else if (effectName === "crash1.mp3") {
+      audio.explosion();
+    } else if (effectName === "crash2.mp3") {
+      audio.explosion();
+    } else if (effectName === "landing_on_pad.mp3") {
+      audio.landing();
+    } else if (effectName === "fuel_10_percent_loop.mp3") {
+      await audio.startFuelAlarm();
+      loopingSFXRef.current = setTimeout(() => audio.stopFuelAlarm(), 2500);
+    } else if (effectName === "intro_tick.mp3") {
+      audio.playIntroTick();
+    } else if (effectName === "intro_go.mp3") {
+      audio.playIntroGo();
+    } else if (effectName === "intro_warp.mp3") {
+      audio.playIntroWarp();
+    }
+    // Synthesized sound effects
+    else if (effectName === "abort_whoosh") {
+      audio.abort();
+    } else if (effectName === "click") {
+      audio.click();
+    } else if (effectName === "shield_pickup") {
+      audio.shieldPickup();
+    } else if (effectName === "shield_break") {
+      audio.shieldBreak();
+    } else if (effectName === "collectible_noise") {
+      audio.junkPickup();
+    } else if (effectName === "set_completion") {
+      audio.junkSetComplete();
+    } else if (effectName === "wormhole_open") {
+      audio.wormholeOpen();
+    } else if (effectName === "wormhole_enter") {
+      audio.wormholeEnter();
+    } else if (effectName === "lightning_crack") {
+      audio.playLightningCrack();
+    } else if (effectName === "weather_ambient") {
+      audio.startWeatherAmbient("rain");
+      loopingSFXRef.current = setTimeout(() => audio.stopWeatherAmbient(), 2500);
+    }
   };
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLElement> = (e) => {
@@ -406,6 +509,98 @@ export default function ControlsSettings() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </div>
+        </div>
+
+        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🎵 Music Testing</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Preview all music tracks by their code names
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label htmlFor="music-select">Select Track</Label>
+              <Select value={selectedMusic} onValueChange={setSelectedMusic}>
+                <SelectTrigger id="music-select" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card z-50">
+                  <SelectItem value="title.mp3">title.mp3</SelectItem>
+                  <SelectItem value="level1.mp3">level1.mp3</SelectItem>
+                  <SelectItem value="level2.mp3">level2.mp3</SelectItem>
+                  <SelectItem value="level3.mp3">level3.mp3</SelectItem>
+                  <SelectItem value="level4.mp3">level4.mp3</SelectItem>
+                  <SelectItem value="level5.mp3">level5.mp3</SelectItem>
+                  <SelectItem value="level6.mp3">level6.mp3</SelectItem>
+                  <SelectItem value="level7.mp3">level7.mp3</SelectItem>
+                  <SelectItem value="level8.mp3">level8.mp3</SelectItem>
+                  <SelectItem value="mission_success.mp3">mission_success.mp3</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                className="flex-1"
+                onClick={() => playTestMusic(selectedMusic)}
+              >
+                Play
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={stopTestMusic}
+                disabled={!isPlayingMusic}
+              >
+                Stop
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🔊 Sound Effects Testing</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Preview all sound effects by their code names
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label htmlFor="sfx-select">Select Sound Effect</Label>
+              <Select value={selectedSFX} onValueChange={setSelectedSFX}>
+                <SelectTrigger id="sfx-select" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card z-50">
+                  <SelectItem value="thruster.mp3">thruster.mp3</SelectItem>
+                  <SelectItem value="crash1.mp3">crash1.mp3</SelectItem>
+                  <SelectItem value="crash2.mp3">crash2.mp3</SelectItem>
+                  <SelectItem value="landing_on_pad.mp3">landing_on_pad.mp3</SelectItem>
+                  <SelectItem value="fuel_10_percent_loop.mp3">fuel_10_percent_loop.mp3</SelectItem>
+                  <SelectItem value="intro_tick.mp3">intro_tick.mp3</SelectItem>
+                  <SelectItem value="intro_go.mp3">intro_go.mp3</SelectItem>
+                  <SelectItem value="intro_warp.mp3">intro_warp.mp3</SelectItem>
+                  <SelectItem value="abort_whoosh" className="text-muted-foreground italic">abort_whoosh (synthesized)</SelectItem>
+                  <SelectItem value="click" className="text-muted-foreground italic">click (synthesized)</SelectItem>
+                  <SelectItem value="shield_pickup" className="text-muted-foreground italic">shield_pickup (synthesized)</SelectItem>
+                  <SelectItem value="shield_break" className="text-muted-foreground italic">shield_break (synthesized)</SelectItem>
+                  <SelectItem value="collectible_noise" className="text-muted-foreground italic">collectible_noise (synthesized)</SelectItem>
+                  <SelectItem value="set_completion" className="text-muted-foreground italic">set_completion (synthesized)</SelectItem>
+                  <SelectItem value="wormhole_open" className="text-muted-foreground italic">wormhole_open (synthesized)</SelectItem>
+                  <SelectItem value="wormhole_enter" className="text-muted-foreground italic">wormhole_enter (synthesized)</SelectItem>
+                  <SelectItem value="lightning_crack" className="text-muted-foreground italic">lightning_crack (synthesized)</SelectItem>
+                  <SelectItem value="weather_ambient" className="text-muted-foreground italic">weather_ambient (synthesized)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Button 
+                variant="default" 
+                className="w-full"
+                onClick={() => playTestSFX(selectedSFX)}
+              >
+                Play
+              </Button>
+            </div>
           </div>
         </div>
       </section>
