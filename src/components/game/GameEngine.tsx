@@ -1843,7 +1843,7 @@ export const GameEngine: React.FC<Props> = ({
                   } else {
                     // More pads to go - play landing sound once and continue
                     if (!hasPlayedLandingSoundRef.current) {
-                      audio.current.landing();
+                      audio.current.success();
                       hasPlayedLandingSoundRef.current = true;
                       cameraShake = 3;
                     }
@@ -1870,7 +1870,7 @@ export const GameEngine: React.FC<Props> = ({
                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   if (!hasPlayedLandingSoundRef.current) {
-                    audio.current.landing();
+                    audio.current.success();
                     hasPlayedLandingSoundRef.current = true;
                     cameraShake = 2;
                   }
