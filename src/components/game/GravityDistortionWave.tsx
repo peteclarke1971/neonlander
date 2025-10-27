@@ -10,7 +10,7 @@ export interface GravityWaveParams {
   warpStrength: number; // 0-1
   gridDensity: number; // divisions along radial/azimuth
   noiseAmount: number; // 0-1
-  colorMode: "cyan" | "green" | "amber" | "two-tone" | "theme" | "rainbow";
+  colorMode: "cyan" | "green" | "amber" | "two-tone" | "theme" | "rainbow" | "dual-rainbow";
   glow: number; // 0-1
   affectGameplay: boolean;
   // Motion extras (optional)
@@ -27,6 +27,12 @@ export interface GravityWaveParams {
   levelIndex?: number;
   instanceId?: number;
   seedOverride?: number | string;
+  // Enhanced effects
+  energyBursts?: boolean; // default true
+  centerVortex?: boolean; // default true
+  chromaticPulse?: boolean; // default true
+  spokeTwinkle?: boolean; // default true
+  trailColorMode?: 'black' | 'hue-tinted'; // default 'hue-tinted'
 }
 
 export interface GravityWaveHandle {
@@ -141,7 +147,19 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
   const tunnelOffsetRef = useRef<number>(0);
   const firstBgDrawRef = useRef<boolean>(true);
   const trailUntilRef = useRef<number>(0);
-  const nextTrailAtRef = useRef<number>(performance.now() + 3000 + (randRef.current() * 7000));
+  const trailIntensityRef = useRef<number>(0.18); // Pulsing trail alpha
+  const nextTrailAtRef = useRef<number>(performance.now() + 3000 + (randRef.current() * 2000));
+  const saturationPhaseRef = useRef<number>(85); // Pulsing saturation 85-100%
+  
+  // Energy burst system
+  const energyBurstsRef = useRef<Array<{ angle: number; distance: number; speed: number; createdAt: number; duration: number; hueOffset: number }>>([]);
+  const nextBurstAtRef = useRef<number>(performance.now() + 8000 + (randRef.current() * 4000));
+  
+  // Spoke twinkle system
+  const spokeTwinkleRef = useRef<Map<number, { startTime: number; duration: number }>>(new Map());
+  
+  // Asymmetric wave direction
+  const waveDirRef = useRef<{ x: number; y: number; rotation: number }>({ x: 1, y: 0, rotation: 0 });
 
   // Grid cache (polar lattice positions)
   const gridRef = useRef<{ rings: number; spokes: number; maxR: number; ringRs: Float32Array; spokeAngles: Float32Array } | null>(null);
@@ -180,23 +198,41 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     gridBuiltRef.current = true;
   };
 
-  const colorForMode = (alphaCore: number, alphaGlow: number) => {
+  const colorForMode = (alphaCore: number, alphaGlow: number, ringOrSpoke?: 'ring' | 'spoke') => {
     const p = paramsRef.current;
     const css = getComputedStyle(document.documentElement);
     const neon = css.getPropertyValue("--neon").trim() || "180 100% 55%"; // fallback cyan
     const neon2 = css.getPropertyValue("--neon-2").trim() || neon;
 
-    if (p.colorMode === "rainbow") {
+    if (p.colorMode === "rainbow" || p.colorMode === "dual-rainbow") {
       // Parse H S% L% from CSS var to keep S/L anchored to theme
       const parts = neon.split(/\s+/);
       const baseH = parseFloat(parts[0] || "180");
-      const s = parts[1] || "100%";
+      const baseS = parseFloat(parts[1] || "100");
       const l = parts[2] || "55%";
-      const h = (baseH + huePhaseRef.current) % 360;
-      const h2 = (h + 35) % 360;
+      
+      // Pulsing saturation for breathing effect
+      const sat = saturationPhaseRef.current;
+      const s = `${sat}%`;
+      
+      let h = (baseH + huePhaseRef.current) % 360;
+      let h2 = (h + 35) % 360;
+      
+      // Dual-rainbow mode: rings and spokes have offset hues
+      if (p.colorMode === "dual-rainbow" && ringOrSpoke) {
+        if (ringOrSpoke === 'ring') {
+          h = (baseH + huePhaseRef.current) % 360;
+          h2 = (h + 35) % 360;
+        } else {
+          h = (baseH + huePhaseRef.current + 120) % 360;
+          h2 = (h + 35) % 360;
+        }
+      }
+      
       return {
         core: `hsl(${h} ${s} ${l} / ${alphaCore})`,
         glow: `hsl(${h2} ${s} ${l} / ${alphaGlow})`,
+        hue: h,
       };
     }
 
@@ -208,9 +244,12 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       theme: neon,
     };
     const hsl = map[p.colorMode] || neon;
+    const parts = hsl.split(/\s+/);
+    const h = parseFloat(parts[0] || "180");
     return {
       core: `hsl(${hsl} / ${alphaCore})`,
       glow: `hsl(${hsl} / ${alphaGlow})`,
+      hue: h,
     };
   };
 
@@ -220,21 +259,32 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     ctx.fillRect(0, 0, w, h);
   };
 
-  const computePhase = (rPx: number, tSec: number) => {
+  const computePhase = (rPx: number, tSec: number, angle?: number) => {
     const p = paramsRef.current;
     const minDim = Math.min(canvasRef.current!.width, canvasRef.current!.height);
     const lambdaPx = Math.max(8, p.wavelength * minDim);
     const A = p.amplitude * (motionReduce ? 0.7 : 1);
 
+    // Asymmetric wave: directional bias based on angle
+    let effectiveR = rPx;
+    if (angle !== undefined) {
+      const waveDir = waveDirRef.current;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const directionality = dx * waveDir.x + dy * waveDir.y;
+      // Elliptical propagation: stronger in wave direction
+      effectiveR = rPx * (1 + 0.15 * directionality);
+    }
+
     // Base traveling wave outward
-    const phase = 2 * Math.PI * (rPx / lambdaPx - (p.speed * tSec));
+    const phase = 2 * Math.PI * (effectiveR / lambdaPx - (p.speed * tSec));
 
     // Seeded phase offset, tiny
     const phi = (seedRef.current % 360) * (Math.PI / 180);
 
     // Small band-limited radial noise
     const pr = randRef.current();
-    const noise = p.noiseAmount * (Math.sin(0.0009 * rPx + 2.3 * pr) + Math.sin(0.0013 * rPx + 1.7 * pr + phi)) * 0.5;
+    const noise = p.noiseAmount * (Math.sin(0.0009 * effectiveR + 2.3 * pr) + Math.sin(0.0013 * effectiveR + 1.7 * pr + phi)) * 0.5;
 
     return A * Math.sin(phase + phi) + noise;
   };
@@ -260,7 +310,6 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const h = ctx.canvas.height;
     const cx = (p.cx ?? 0.5) * w;
     const cy = (p.cy ?? 0.5) * h;
-    const { core, glow } = colorForMode(0.95, 0.28 * p.glow);
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -268,37 +317,45 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     // slow spin
     const ang = rotPhaseRef.current || 0;
     if (ang) ctx.rotate(ang);
-    // subtle neon glow trails
-    ctx.shadowColor = core as any;
-    ctx.shadowBlur = 8 * p.glow;
 
     // tunnel outward offset (wrap by ring spacing)
     const step = grid.rings > 1 ? grid.ringRs[1] - grid.ringRs[0] : grid.maxR;
     const off = ((tunnelOffsetRef.current || 0) % (step || 1));
 
-    // Rings
+    // Rings with variable glow intensity
     for (let i = 0; i < grid.rings; i++) {
       const r0 = grid.ringRs[i] + off;
       const hgt = computePhase(r0, tSec);
       const wob = 1 + 0.15 * Math.sin(0.6 * tSec + r0 * 0.003 + (seedRef.current % 100) * 0.11);
       const rr = Math.max(1, (r0 + hgt * 22) * wob);
+      
+      // Variable glow: breathing wave of brightness through rings
+      const glowPhase = Math.sin(tSec * 0.7 + i * 0.3);
+      const glowMult = 0.8 + 0.4 * glowPhase;
+      const ringColors = colorForMode(0.95, (0.28 * p.glow * glowMult), 'ring');
+      
+      ctx.shadowColor = ringColors.core as any;
+      ctx.shadowBlur = 8 * p.glow * glowMult;
 
       // Glow ring
       ctx.beginPath();
       ctx.arc(0, 0, rr, 0, Math.PI * 2);
-      ctx.strokeStyle = glow;
+      ctx.strokeStyle = ringColors.glow;
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // Core ring
       ctx.beginPath();
       ctx.arc(0, 0, rr, 0, Math.PI * 2);
-      ctx.strokeStyle = core;
+      ctx.strokeStyle = ringColors.core;
       ctx.lineWidth = 1;
       ctx.stroke();
     }
 
-    // Spokes
+    // Spokes with twinkle effect
+    const now = performance.now();
+    const spokeTwinkle = p.spokeTwinkle !== false;
+    
     for (let i = 0; i < grid.spokes; i++) {
       const ang0 = grid.spokeAngles[i];
       const dx = Math.cos(ang0), dy = Math.sin(ang0);
@@ -307,25 +364,166 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
 
       // Apply displacement along the spoke for slight curvature + optional twist
       const mid = (r1 - r0) * 0.6 + off * 0.25;
-      const hgt = computePhase(mid, tSec);
+      const hgt = computePhase(mid, tSec, ang0);
       const twist = (p.twistStrength ?? 0) * 40; // px
       const bend = hgt * 28 + twist * Math.sin(ang0 * 2 + tSec * 0.7);
+      
+      const spokeColors = colorForMode(0.95, 0.28 * p.glow, 'spoke');
+      ctx.shadowColor = spokeColors.core as any;
+      ctx.shadowBlur = 8 * p.glow;
+      
+      // Twinkle effect
+      let lineWidthGlow = 2;
+      let lineWidthCore = 1;
+      let extraGlow = 1;
+      
+      if (spokeTwinkle) {
+        // Random chance to start twinkle
+        if (!spokeTwinkleRef.current.has(i) && Math.random() < 0.03) {
+          spokeTwinkleRef.current.set(i, {
+            startTime: now,
+            duration: 200 + Math.random() * 200
+          });
+        }
+        
+        // Check if currently twinkling
+        const twinkle = spokeTwinkleRef.current.get(i);
+        if (twinkle) {
+          const elapsed = now - twinkle.startTime;
+          if (elapsed < twinkle.duration) {
+            const progress = elapsed / twinkle.duration;
+            // Pulse: 0 → 1 → 0
+            const intensity = Math.sin(progress * Math.PI);
+            lineWidthGlow = 2 + intensity * 1;
+            lineWidthCore = 1 + intensity * 2;
+            extraGlow = 1 + intensity;
+            ctx.shadowBlur = 8 * p.glow * (1 + intensity);
+          } else {
+            spokeTwinkleRef.current.delete(i);
+          }
+        }
+      }
 
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dx * mid + (-dy) * bend, dy * mid + (dx) * bend, dx * r1, dy * r1);
-      ctx.strokeStyle = glow;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = spokeColors.glow;
+      ctx.lineWidth = lineWidthGlow;
       ctx.stroke();
 
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(dx * mid + (-dy) * bend, dy * mid + (dx) * bend, dx * r1, dy * r1);
-      ctx.strokeStyle = core;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = spokeColors.core;
+      ctx.lineWidth = lineWidthCore;
       ctx.stroke();
     }
 
+    ctx.restore();
+  };
+  
+  // Center vortex glow effect
+  const drawCenterVortex = (ctx: CanvasRenderingContext2D, tSec: number) => {
+    const p = paramsRef.current;
+    if (p.centerVortex === false) return;
+    
+    const w = ctx.canvas.width;
+    const h = ctx.canvas.height;
+    const cx = (p.cx ?? 0.5) * w;
+    const cy = (p.cy ?? 0.5) * h;
+    
+    // Pulsing radius synced to wave phase
+    const baseRadius = 60;
+    const radiusPulse = 40 * Math.sin(tSec * 3);
+    const radius = baseRadius + radiusPulse;
+    
+    // Intensity syncs with trail effect
+    const intensity = 0.3 + 0.2 * (1 - trailIntensityRef.current / 0.25);
+    
+    const colors = colorForMode(1, 1);
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    gradient.addColorStop(0, colors.core.replace(/[\d.]+\)$/, `${intensity})`));
+    gradient.addColorStop(0.5, colors.glow.replace(/[\d.]+\)$/, `${intensity * 0.5})`));
+    gradient.addColorStop(1, 'transparent');
+    
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.restore();
+  };
+  
+  // Energy burst particle system
+  const drawEnergyBursts = (ctx: CanvasRenderingContext2D, tSec: number, now: number) => {
+    const p = paramsRef.current;
+    if (p.energyBursts === false) return;
+    
+    const w = ctx.canvas.width;
+    const h = ctx.canvas.height;
+    const cx = (p.cx ?? 0.5) * w;
+    const cy = (p.cy ?? 0.5) * h;
+    
+    // Update existing bursts
+    energyBurstsRef.current = energyBurstsRef.current.filter(burst => {
+      const elapsed = now - burst.createdAt;
+      return elapsed < burst.duration;
+    });
+    
+    // Spawn new burst
+    if (now >= nextBurstAtRef.current) {
+      const numStreaks = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < numStreaks; i++) {
+        energyBurstsRef.current.push({
+          angle: Math.random() * Math.PI * 2,
+          distance: 0,
+          speed: 300 + Math.random() * 200,
+          createdAt: now,
+          duration: 800 + Math.random() * 400,
+          hueOffset: -20 + Math.random() * 40
+        });
+      }
+      nextBurstAtRef.current = now + 8000 + Math.random() * 4000;
+    }
+    
+    // Draw bursts
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    
+    energyBurstsRef.current.forEach(burst => {
+      const elapsed = now - burst.createdAt;
+      const progress = elapsed / burst.duration;
+      
+      // Update distance
+      burst.distance += (burst.speed / 1000) * 16; // approximate dt
+      
+      // Fade out as it travels
+      const alpha = 1 - progress;
+      
+      const x = cx + Math.cos(burst.angle) * burst.distance;
+      const y = cy + Math.sin(burst.angle) * burst.distance;
+      
+      const colors = colorForMode(1, 1);
+      const hue = (colors.hue || 180) + burst.hueOffset;
+      
+      // Gradient streak
+      const gradient = ctx.createLinearGradient(
+        cx + Math.cos(burst.angle) * (burst.distance - 30),
+        cy + Math.sin(burst.angle) * (burst.distance - 30),
+        x, y
+      );
+      gradient.addColorStop(0, 'transparent');
+      gradient.addColorStop(0.5, `hsl(${hue} 100% 60% / ${alpha * 0.8})`);
+      gradient.addColorStop(1, `hsl(${hue} 100% 70% / ${alpha})`);
+      
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 2 + alpha * 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(burst.angle) * (burst.distance - 30), cy + Math.sin(burst.angle) * (burst.distance - 30));
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    });
+    
     ctx.restore();
   };
 
@@ -409,9 +607,27 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const dtSec = Math.min(0.05, (now - lastT) / 1000);
     lastTRef.current = now;
 
-    // Update rainbow hue, rotation and tunnel
+    // Update rainbow hue, rotation, tunnel, and dynamic effects
     const pDyn = paramsRef.current;
-    huePhaseRef.current = (huePhaseRef.current + dtSec * (motionReduce ? 25 : 45)) % 360;
+    const isPulsing = pulseRef.current !== null;
+    
+    // Speed up hue cycling during pulses
+    const hueSpeed = isPulsing ? 90 : 45;
+    huePhaseRef.current = (huePhaseRef.current + dtSec * (motionReduce ? hueSpeed * 0.5 : hueSpeed)) % 360;
+    
+    // Pulsing saturation: 85% → 100% → 85%
+    const satTarget = 85 + 15 * Math.sin(tSec * 1.5);
+    saturationPhaseRef.current += (satTarget - saturationPhaseRef.current) * 0.1;
+    
+    // Wave-based trail intensity: Strong (0.08) → Weak (0.25) → Strong
+    const trailWave = 0.08 + 0.17 * (0.5 + 0.5 * Math.sin(tSec * 2));
+    trailIntensityRef.current += (trailWave - trailIntensityRef.current) * 0.15;
+    
+    // Asymmetric wave direction rotation
+    waveDirRef.current.rotation += dtSec * 0.1; // Full rotation every ~60 seconds
+    waveDirRef.current.x = Math.cos(waveDirRef.current.rotation);
+    waveDirRef.current.y = Math.sin(waveDirRef.current.rotation);
+    
     const rotSpd = pDyn.rotateSpeed ?? 0;
     if (rotSpd) rotPhaseRef.current = (rotPhaseRef.current + dtSec * rotSpd) % (Math.PI * 2);
     const minDim = Math.min(canvas.width, canvas.height);
@@ -420,22 +636,81 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
 
     drawStars(bgCtx, canvas.width, canvas.height);
 
-    // Warp pass with optional afterimage trails
+    // Warp pass with wave-based trail effect
     if (now < trailUntilRef.current) {
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      // Trail color mode: hue-tinted or black
+      const trailMode = pDyn.trailColorMode ?? 'hue-tinted';
+      if (trailMode === 'hue-tinted') {
+        const colors = colorForMode(1, 1);
+        const hue = colors.hue || 180;
+        ctx.fillStyle = `hsla(${hue}, 80%, 5%, ${trailIntensityRef.current})`;
+      } else {
+        ctx.fillStyle = `rgba(0,0,0,${trailIntensityRef.current})`;
+      }
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    try {
-      warpBackground(ctx, bg, tSec);
-    } catch {
-      failSoftRef.current.warpOff = true;
-      ctx.drawImage(bg, 0, 0);
+    
+    // Chromatic aberration during pulses
+    const chromatic = pDyn.chromaticPulse !== false && pulseRef.current;
+    if (chromatic) {
+      const { t0, dur } = pulseRef.current!;
+      const tt = Math.min(1, Math.max(0, (now - t0) / dur));
+      // Only active during middle 50% of pulse
+      const inPeak = tt > 0.25 && tt < 0.75;
+      
+      if (inPeak) {
+        // Draw grid 3 times with RGB separation
+        ctx.save();
+        
+        try {
+          // Red channel
+          ctx.globalCompositeOperation = "screen";
+          ctx.save();
+          ctx.translate(-2, 0);
+          warpBackground(ctx, bg, tSec);
+          ctx.restore();
+          
+          // Green channel (no offset)
+          warpBackground(ctx, bg, tSec);
+          
+          // Blue channel
+          ctx.save();
+          ctx.translate(2, 0);
+          warpBackground(ctx, bg, tSec);
+          ctx.restore();
+        } catch {
+          failSoftRef.current.warpOff = true;
+          ctx.drawImage(bg, 0, 0);
+        }
+        
+        ctx.restore();
+      } else {
+        try {
+          warpBackground(ctx, bg, tSec);
+        } catch {
+          failSoftRef.current.warpOff = true;
+          ctx.drawImage(bg, 0, 0);
+        }
+      }
+    } else {
+      try {
+        warpBackground(ctx, bg, tSec);
+      } catch {
+        failSoftRef.current.warpOff = true;
+        ctx.drawImage(bg, 0, 0);
+      }
     }
 
     // Grid pass
     drawGrid(ctx, tSec);
+    
+    // Center vortex glow
+    drawCenterVortex(ctx, tSec);
+    
+    // Energy burst particles
+    drawEnergyBursts(ctx, tSec, now);
 
     // Pulses
     if (now >= nextPulseAtRef.current) {
@@ -459,10 +734,10 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       if (tt >= 1) pulseRef.current = null;
     }
 
-    // Occasional neon trail mode
+    // Wave-based trail mode (increased frequency: 3-5 seconds)
     if (now >= nextTrailAtRef.current) {
-      nextTrailAtRef.current = now + 6000 + randRef.current() * 9000;
-      trailUntilRef.current = now + 1000 + randRef.current() * 1500;
+      nextTrailAtRef.current = now + 3000 + randRef.current() * 2000;
+      trailUntilRef.current = now + 2000 + randRef.current() * 1000;
     }
 
     autoGovernor(now);
@@ -498,9 +773,23 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       p.twistStrength = (rng() < 0.7) ? (0.2 + rng() * 0.6) : 0;
       p.rotateSpeed = (rng() < 0.8) ? (rng() * 0.6) : 0; // rad/s
       p.tunnelSpeed = 1.4 + rng() * 2.4; // relative speed
-      // Alternate rainbow vs single neon (theme)
-      // 50% chance to enable rainbow; otherwise stick to theme color
-      if (rng() < 0.5) p.colorMode = "rainbow";
+      
+      // Enhanced color modes: 75% rainbow, 15% dual-rainbow, 10% theme
+      const colorRoll = rng();
+      if (colorRoll < 0.75) {
+        p.colorMode = "rainbow";
+      } else if (colorRoll < 0.9) {
+        p.colorMode = "dual-rainbow";
+      } else {
+        p.colorMode = "theme";
+      }
+      
+      // Enable enhanced effects by default
+      p.energyBursts = p.energyBursts !== false;
+      p.centerVortex = p.centerVortex !== false;
+      p.chromaticPulse = p.chromaticPulse !== false;
+      p.spokeTwinkle = p.spokeTwinkle !== false;
+      p.trailColorMode = p.trailColorMode ?? 'hue-tinted';
 
       buildScene();
       requestAnimationFrame(step);
