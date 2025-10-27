@@ -737,6 +737,7 @@ export const GameEngine: React.FC<Props> = ({
     let fuelDepletedTime = -1; // track when fuel first hits 0
     let anomaliesDisabled = false; // flag to disable gravity wells
     let landerFrozen = false; // flag to freeze lander while keeping loop active
+    let hasLandedSuccessfully = false; // Prevents repeated landing detection
     let messageQueue: string[] = [];
     let currentMessageIndex = 0;
     let messageTimer = 0;
@@ -1728,10 +1729,11 @@ export const GameEngine: React.FC<Props> = ({
                   // Do not lock vx, av, or angle — allow immediate takeoff with light thrust
                 }
                 // Do NOT end the run here; simply rest on the start pad
-            } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
-              // successful landing ONLY on cavern end pad
-              y = pad.y - 10;
-              vy = 0; vx = 0; av = 0; angle = 0;
+        } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
+          // successful landing ONLY on cavern end pad (ONE TIME)
+          hasLandedSuccessfully = true; // Set flag immediately
+          y = pad.y - 10;
+          vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
               const applied2x = !!pad.bonus2x;
@@ -1815,8 +1817,9 @@ export const GameEngine: React.FC<Props> = ({
                 onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
               }, 700);
             }
-          } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
-            // MEGA! Moving pad landing
+          } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
+            // MEGA! Moving pad landing (ONE TIME)
+            hasLandedSuccessfully = true; // Set flag immediately
             const landedPad = movingPadLanding;
             y = landedPad.currentPos.y - 8;
             vy = landedPad.currentVelocity.y; 
@@ -1889,8 +1892,9 @@ export const GameEngine: React.FC<Props> = ({
               setLandingType('moving');
               setShowFireworks(true);
             }, delayBeforeFireworks);
-          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
-            // Time Trial Mode: Check for sequenced landing
+          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
+            // Time Trial Mode: Check for sequenced landing (ONE TIME)
+            hasLandedSuccessfully = true; // Set flag immediately
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
