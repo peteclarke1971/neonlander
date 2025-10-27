@@ -1691,7 +1691,7 @@ export const GameEngine: React.FC<Props> = ({
               });
               
               cameraShake = 6;
-              audio.current.success();
+              audio.current.landing();
               audio.current.stopThruster();
               try { audio.current.stopFuelAlarm(); } catch {}
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
@@ -1752,7 +1752,7 @@ export const GameEngine: React.FC<Props> = ({
             });
             
             cameraShake = 8; // Extra camera shake for MEGA landing
-            audio.current.success();
+            audio.current.landing();
             audio.current.stopThruster();
             try { audio.current.stopFuelAlarm(); } catch {}
             if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
@@ -1825,7 +1825,7 @@ export const GameEngine: React.FC<Props> = ({
                     };
                     
                     cameraShake = 6;
-                    audio.current.success();
+                    audio.current.landing();
                     audio.current.stopThruster();
                     try { audio.current.stopFuelAlarm(); } catch {}
                     running = false;
@@ -1836,13 +1836,22 @@ export const GameEngine: React.FC<Props> = ({
                     }, 500);
                   } else {
                     // More pads to go - play landing sound and continue
-                    audio.current.success();
+                    audio.current.landing();
                     cameraShake = 3;
                     
-                    // Brief pause (can take off immediately)
-                    setTimeout(() => {
-                      // Auto-resume (ship is on pad, can thrust immediately)
+                    // Track last velocity to detect takeoff
+                    const lastVy = vy;
+                    const lastVx = vx;
+                    const checkInterval = setInterval(() => {
+                      // Detect takeoff from pad
+                      if (Math.abs(vy - lastVy) > 0.1 || Math.abs(vx - lastVx) > 0.1) {
+                        audio.current.fadeLandingSound(2.0);
+                        clearInterval(checkInterval);
+                      }
                     }, 100);
+                    
+                    // Clear interval after 5 seconds
+                    setTimeout(() => clearInterval(checkInterval), 5000);
                   }
                 } else {
                   // Wrong pad - currently just warning, no penalty
@@ -1850,7 +1859,7 @@ export const GameEngine: React.FC<Props> = ({
                   // For now, allow takeoff without penalty - could add penalty later
                   y = landedPad.y - 8;
                   vy = 0; vx = 0; av = 0; angle = 0;
-                  audio.current.success();
+                  audio.current.landing();
                   cameraShake = 2;
                   
                   setTimeout(() => {
@@ -1890,7 +1899,7 @@ export const GameEngine: React.FC<Props> = ({
               });
               
               cameraShake = 6;
-              audio.current.success();
+              audio.current.landing();
               audio.current.stopThruster();
               try { audio.current.stopFuelAlarm(); } catch {}
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }

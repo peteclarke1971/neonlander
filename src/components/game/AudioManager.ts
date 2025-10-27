@@ -25,6 +25,10 @@ export class AudioManager {
   private fuelSource?: AudioBufferSourceNode | null;
   private fuelAlarmOn = false;
   private crashToggle = false;
+  
+  // Landing sound tracking for fade-out
+  private landingSoundSource: AudioBufferSourceNode | null = null;
+  private landingSoundGain: GainNode | null = null;
 
   // Preloading state
   private isPreloaded = false;
@@ -367,6 +371,55 @@ export class AudioManager {
     const useFirst = (this.crashToggle = !this.crashToggle);
     const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
     if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
+  }
+
+  landing() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Stop any previous landing sound
+    if (this.landingSoundSource) {
+      try { this.landingSoundSource.stop(); } catch {}
+      this.landingSoundSource = null;
+    }
+    
+    if (!this.sfxGain) {
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 1;
+      this.sfxGain.connect(this.master);
+    }
+    
+    if (this.landingBuffer) {
+      // Create dedicated gain node for fading
+      this.landingSoundGain = this.ctx.createGain();
+      this.landingSoundGain.gain.value = 0.9;
+      
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.landingBuffer;
+      src.connect(this.landingSoundGain);
+      this.landingSoundGain.connect(this.sfxGain);
+      src.start(0);
+      
+      this.landingSoundSource = src;
+      
+      // Auto-cleanup when sound finishes
+      src.onended = () => {
+        this.landingSoundSource = null;
+        this.landingSoundGain = null;
+      };
+    } else {
+      // Fallback to noise if buffer not loaded
+      this.playNoise(0.2, 0.4);
+    }
+  }
+
+  fadeLandingSound(duration = 2.0) {
+    if (!this.landingSoundGain || !this.ctx) return;
+    
+    const now = this.ctx.currentTime;
+    this.landingSoundGain.gain.cancelScheduledValues(now);
+    this.landingSoundGain.gain.setValueAtTime(this.landingSoundGain.gain.value, now);
+    this.landingSoundGain.gain.linearRampToValueAtTime(0, now + duration);
   }
 
   // ===== Click sound (menu/UI feedback) =====
