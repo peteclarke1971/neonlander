@@ -145,6 +145,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
   // Starfield state (very light-weight)
   const starsRef = useRef<Float32Array | null>(null); // x,y,z triplets in NDC-ish space
   const starCountRef = useRef<number>(1200);
+  const starfieldBuiltRef = useRef<boolean>(false);
 
   // Grid cache (polar lattice positions)
   const gridRef = useRef<{ rings: number; spokes: number; maxR: number; ringRs: Float32Array; spokeAngles: Float32Array } | null>(null);
@@ -155,20 +156,45 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const w = canvas.width = canvas.clientWidth;
     const h = canvas.height = canvas.clientHeight;
     const minDim = Math.min(w, h);
+    const bg = bgRef.current!;
 
-    // Stars
-    const starCount = Math.round(starCountRef.current * (minDim / 900));
-    starCountRef.current = Math.max(600, starCount);
-    const arr = new Float32Array(starCountRef.current * 3);
-    const prng = randRef.current;
-    for (let i = 0; i < starCountRef.current; i++) {
-      const a = prng() * Math.PI * 2;
-      const r = Math.sqrt(prng()) * 1.0; // radial distribution
-      arr[i * 3 + 0] = Math.cos(a) * r;
-      arr[i * 3 + 1] = Math.sin(a) * r;
-      arr[i * 3 + 2] = 0.2 + prng() * 0.8; // z depth 0.2-1.0
+    // Rebuild static starfield ONLY if not built or dimensions changed
+    if (!starfieldBuiltRef.current || bg.width !== w || bg.height !== h) {
+      bg.width = w;
+      bg.height = h;
+      
+      // Render static starfield once
+      const bgCtx = bg.getContext("2d", { alpha: false })!;
+      bgCtx.fillStyle = "#000000";
+      bgCtx.fillRect(0, 0, w, h);
+      
+      // Generate and draw all stars once
+      const p = paramsRef.current;
+      const numStars = motionReduce ? 400 : 1200;
+      const rng = randRef.current;
+      
+      const cx = (p.cx ?? 0.5) * w;
+      const cy = (p.cy ?? 0.5) * h;
+      
+      for (let i = 0; i < numStars; i++) {
+        const a = rng() * Math.PI * 2;
+        const r = Math.sqrt(rng()) * 1.0;
+        const z = 0.2 + rng() * 0.8;
+        
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        const px = cx + x * (0.45 + 0.55 * z) * (w * 0.5);
+        const py = cy + y * (0.45 + 0.55 * z) * (h * 0.5);
+        
+        const brightness = 0.3 + rng() * 0.7;
+        const size = rng() < 0.95 ? 1 : 2;
+        
+        bgCtx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+        bgCtx.fillRect(px, py, size, size);
+      }
+      
+      starfieldBuiltRef.current = true;
     }
-    starsRef.current = arr;
 
     // Grid
     const gd = Math.max(12, Math.floor(paramsRef.current.gridDensity));
@@ -184,11 +210,6 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       spokeAngles[i] = (i / spokes) * Math.PI * 2;
     }
     gridRef.current = { rings, spokes, maxR, ringRs, spokeAngles };
-
-    // Background buffer
-    const bg = bgRef.current!;
-    bg.width = w;
-    bg.height = h;
 
     gridBuiltRef.current = true;
   };
@@ -227,45 +248,16 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     };
   };
 
-  const drawStars = (ctx: CanvasRenderingContext2D, dt: number) => {
-    const p = paramsRef.current;
-    const stars = starsRef.current!;
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
-
-    // Clear with trail; on first frame use opaque fill to avoid transparent edges
-    ctx.fillStyle = firstBgDrawRef.current ? "rgba(0,0,0,1.0)" : "rgba(0,0,0,0.5)";
-    ctx.fillRect(0, 0, w, h);
-    if (firstBgDrawRef.current) firstBgDrawRef.current = false;
-
-    const cx = (p.cx ?? 0.5) * w;
-    const cy = (p.cy ?? 0.5) * h;
-    const speed = (motionReduce ? Math.min(0.22, p.speed) : p.speed) * dt;
-
-    for (let i = 0; i < stars.length; i += 3) {
-      let x = stars[i + 0];
-      let y = stars[i + 1];
-      let z = stars[i + 2];
-
-      // Move outward radially
-      const angle = Math.atan2(y, x);
-      const r = Math.hypot(x, y) + speed * (0.15 + 0.5 * z);
-      const nr = r > 1.2 ? (randRef.current() * 0.2) : r;
-      x = Math.cos(angle) * nr;
-      y = Math.sin(angle) * nr;
-      if (nr !== r) z = 0.2 + randRef.current() * 0.8;
-
-      // Project to screen
-      const px = cx + x * (0.45 + 0.55 * z) * (w * 0.5);
-      const py = cy + y * (0.45 + 0.55 * z) * (h * 0.5);
-
-      const b = (0.7 + 0.3 * z);
-      ctx.fillStyle = `rgba(255,255,255,${0.9 * b})`;
-      ctx.fillRect(px, py, 1, 1);
-
-      stars[i + 0] = x;
-      stars[i + 1] = y;
-      stars[i + 2] = z;
+  const drawStars = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const bg = bgRef.current!;
+    
+    // Simply copy the static starfield from background canvas
+    if (starfieldBuiltRef.current && bg.width === w && bg.height === h) {
+      ctx.drawImage(bg, 0, 0);
+    } else {
+      // Fallback: solid black if starfield not ready
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
     }
   };
 
@@ -467,7 +459,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const tSpd = pDyn.tunnelSpeed ?? 0;
     if (tSpd) tunnelOffsetRef.current = (tunnelOffsetRef.current + dtSec * tSpd * (minDim * 0.25)) % (gridRef.current?.maxR || (minDim * 0.45));
 
-    drawStars(bgCtx, dtSec);
+    drawStars(bgCtx, canvas.width, canvas.height);
 
     // Warp pass with optional afterimage trails
     if (now < trailUntilRef.current) {
@@ -551,6 +543,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       // 50% chance to enable rainbow; otherwise stick to theme color
       if (rng() < 0.5) p.colorMode = "rainbow";
 
+      starfieldBuiltRef.current = false; // Force starfield rebuild with new seed
       buildScene();
       requestAnimationFrame(step);
     },
@@ -573,6 +566,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const v = typeof seed === "number" ? seed : mixSeed(String(seed));
       seedRef.current = v >>> 0;
       randRef.current = mulberry32(seedRef.current);
+      starfieldBuiltRef.current = false; // Force starfield rebuild
       buildScene();
     },
     PulseNow() {
@@ -600,6 +594,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
       gridBuiltRef.current = false;
+      starfieldBuiltRef.current = false; // Force starfield rebuild on resize
     };
     onResize();
     window.addEventListener("resize", onResize);
