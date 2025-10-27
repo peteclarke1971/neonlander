@@ -377,13 +377,41 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
+    // Stop any previous landing sound
+    if (this.landingSoundSource) {
+      try { this.landingSoundSource.stop(); } catch {}
+      this.landingSoundSource = null;
+    }
+    
+    if (!this.sfxGain) {
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 1;
+      this.sfxGain.connect(this.master);
+    }
+    
     // Always play crash1 for consistent Time Trial landing sound
     if (!this.crash1Buffer) {
       this.crash1Buffer = await this.loadBuffer("/audio/crash1.mp3");
     }
     
     if (this.crash1Buffer) {
-      this.playOneShot(this.crash1Buffer, 0.7);
+      // Create dedicated gain node for fading
+      this.landingSoundGain = this.ctx.createGain();
+      this.landingSoundGain.gain.value = 0.7;
+      
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.crash1Buffer;
+      src.connect(this.landingSoundGain);
+      this.landingSoundGain.connect(this.sfxGain);
+      src.start(0);
+      
+      this.landingSoundSource = src;
+      
+      // Auto-cleanup when sound finishes
+      src.onended = () => {
+        this.landingSoundSource = null;
+        this.landingSoundGain = null;
+      };
     } else {
       this.playNoise(0.2, 0.4);
     }
