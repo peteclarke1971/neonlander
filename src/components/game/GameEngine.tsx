@@ -1831,7 +1831,7 @@ export const GameEngine: React.FC<Props> = ({
                     };
                     
                     cameraShake = 6;
-                    audio.current.landing();
+                    audio.current.landingCrash();
                     audio.current.stopThruster();
                     try { audio.current.stopFuelAlarm(); } catch {}
                     running = false;
