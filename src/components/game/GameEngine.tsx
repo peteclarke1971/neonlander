@@ -43,6 +43,7 @@ import { GhostManager, LunarLanderGhostFrame, LunarLanderGhostState } from "./Gh
 import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
+import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
 
 interface Props {
   difficulty: Difficulty;
@@ -90,6 +91,10 @@ export const GameEngine: React.FC<Props> = ({
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
+    // Check localStorage first, then check if desktop device
+    return hasPCControlsPreference() || isDesktopDevice();
+  });
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showFireworks, setShowFireworks] = useState(false);
@@ -251,11 +256,42 @@ export const GameEngine: React.FC<Props> = ({
       if (isDemo) return;
       
       const k = e.key.toLowerCase();
-      if (["a", "arrowleft"].includes(k)) keys.current.left = down;
-      if (["d", "arrowright"].includes(k)) keys.current.right = down;
-      if (["w", "arrowup"].includes(k)) keys.current.thrust = down;
-      if (k === " " || k === "arrowdown") { keys.current.abort = down; if (down) abortAssist.current = true; }
-      if (["shift"].includes(k)) keys.current.rotateBoost = down; // Either shift key
+      if (["a", "arrowleft"].includes(k)) {
+        keys.current.left = down;
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
+      if (["d", "arrowright"].includes(k)) {
+        keys.current.right = down;
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
+      if (["w", "arrowup"].includes(k)) {
+        keys.current.thrust = down;
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
+      if (k === " " || k === "arrowdown") {
+        keys.current.abort = down;
+        if (down) {
+          abortAssist.current = true;
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
+      if (["shift"].includes(k)) {
+        keys.current.rotateBoost = down;
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
       if (down) audio.current.resume();
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
@@ -1099,6 +1135,11 @@ export const GameEngine: React.FC<Props> = ({
       {
         const gp = anyGamepad?.();
         if (gp && gp.connected) {
+          // Detect gamepad usage for PC controls
+          if (!isUsingPCControls) {
+            setIsUsingPCControls(true);
+            setPCControlsPreference(true);
+          }
           if (gpDeviceIdRef.current !== gp.id) {
             gpDeviceIdRef.current = gp.id;
             setLastDeviceId(gp.id);
@@ -2781,60 +2822,62 @@ export const GameEngine: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Controls overlay */}
-      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none">
-        <div className="flex gap-2">
-          <Button 
-            variant="neon" 
-            className="select-none"
-            onMouseDown={() => (keys.current.left = true)} 
-            onMouseUp={() => (keys.current.left = false)} 
-            onMouseLeave={() => (keys.current.left = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.left = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
-          >
-            <span className="select-none">Rotate ◄</span>
-          </Button>
-          <Button 
-            variant="neon" 
-            className="select-none"
-            onMouseDown={() => (keys.current.right = true)} 
-            onMouseUp={() => (keys.current.right = false)} 
-            onMouseLeave={() => (keys.current.right = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.right = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
-          >
-            <span className="select-none">Rotate ►</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="select-none min-w-0 px-2"
-            onMouseDown={() => (keys.current.rotateBoost = true)} 
-            onMouseUp={() => (keys.current.rotateBoost = false)} 
-            onMouseLeave={() => (keys.current.rotateBoost = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.rotateBoost = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
-          >
-            <span className="select-none text-xs">2× ROT</span>
-          </Button>
-          <Button 
-            variant="destructive" 
-            className="select-none"
-            onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
-            onMouseUp={() => (keys.current.abort = false)} 
-            onMouseLeave={() => (keys.current.abort = false)}
-            onTouchStart={(e) => { e.preventDefault(); keys.current.abort = true; abortAssist.current = true; }} 
-            onTouchEnd={(e) => { e.preventDefault(); keys.current.abort = false; }}
-            onTouchCancel={(e) => { e.preventDefault(); keys.current.abort = false; }}
-          >
-            <span className="select-none">Abort</span>
-          </Button>
+      {/* Controls overlay - Only show if not using PC controls */}
+      {!isUsingPCControls && (
+        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none">
+          <div className="flex gap-2">
+            <Button 
+              variant="neon" 
+              className="select-none"
+              onMouseDown={() => (keys.current.left = true)} 
+              onMouseUp={() => (keys.current.left = false)} 
+              onMouseLeave={() => (keys.current.left = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.left = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
+            >
+              <span className="select-none">Rotate ◄</span>
+            </Button>
+            <Button 
+              variant="neon" 
+              className="select-none"
+              onMouseDown={() => (keys.current.right = true)} 
+              onMouseUp={() => (keys.current.right = false)} 
+              onMouseLeave={() => (keys.current.right = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.right = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
+            >
+              <span className="select-none">Rotate ►</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="select-none min-w-0 px-2"
+              onMouseDown={() => (keys.current.rotateBoost = true)} 
+              onMouseUp={() => (keys.current.rotateBoost = false)} 
+              onMouseLeave={() => (keys.current.rotateBoost = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.rotateBoost = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
+            >
+              <span className="select-none text-xs">2× ROT</span>
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="select-none"
+              onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
+              onMouseUp={() => (keys.current.abort = false)} 
+              onMouseLeave={() => (keys.current.abort = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.abort = true; abortAssist.current = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.abort = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.abort = false; }}
+            >
+              <span className="select-none">Abort</span>
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Rotation boost hint */}
       {showRotBoostHint && (

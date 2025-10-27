@@ -45,3 +45,25 @@ export function shouldShowFullscreenButton(): boolean {
   
   return isDesktopDevice() && !isPWA() && isSupported;
 }
+
+const PC_CONTROLS_KEY = 'll-pc-controls-detected';
+
+/**
+ * Check if user has previously used PC controls (keyboard/gamepad)
+ */
+export function hasPCControlsPreference(): boolean {
+  try {
+    return localStorage.getItem(PC_CONTROLS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Save user's PC controls preference for future sessions
+ */
+export function setPCControlsPreference(value: boolean): void {
+  try {
+    localStorage.setItem(PC_CONTROLS_KEY, value ? 'true' : 'false');
+  } catch {}
+}
