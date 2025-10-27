@@ -1360,7 +1360,7 @@ export const GameEngine: React.FC<Props> = ({
           
           // Rapidly dampen velocities to stabilize (not launch!)
           vx *= 0.75; // More aggressive horizontal dampening
-          vy *= 0.85; // Slow vertical movement quickly
+          vy *= 0.70; // Very aggressive vertical dampening (2x more than before)
           
           // Start smooth rotation animation
           abortRotationActive.current = true;

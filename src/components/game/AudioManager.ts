@@ -510,7 +510,46 @@ export class AudioManager {
   }
 
   abort() {
-    this.playNoise(0.2, 0.7);
+    // Smooth whoosh sound instead of jarring white noise
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    const now = this.ctx.currentTime;
+    const duration = 0.4;
+    
+    // Create filtered noise for whoosh effect
+    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    
+    // Bandpass filter for smoother whoosh
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 800;
+    filter.Q.value = 2;
+    
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0;
+    
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.master);
+    
+    // Sweep filter frequency down for whoosh effect
+    filter.frequency.setValueAtTime(2000, now);
+    filter.frequency.exponentialRampToValueAtTime(400, now + duration);
+    
+    // Quick fade in and gradual fade out
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.4, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    src.start(now);
+    src.stop(now + duration);
   }
 
   // ===== Fuel alarm loop =====
