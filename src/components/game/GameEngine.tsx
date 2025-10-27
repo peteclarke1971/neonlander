@@ -68,6 +68,12 @@ const WORLD_WIDTH = 4000;
 const BASE_HEIGHT = 360; // base ground height
 const AMPLITUDE = 180;
 
+// Abort system configuration
+const ABORT_ROTATION_DURATION = 0.4; // seconds to smoothly rotate to level
+const ABORT_BOOST_VELOCITY = -180; // instant upward velocity change
+const ABORT_FUEL_COST = 50; // fixed fuel cost per abort activation
+const ABORT_CAMERA_SHAKE = 12; // visual impact intensity
+
 export const GameEngine: React.FC<Props> = ({ 
   difficulty, 
   onExit, 
@@ -199,6 +205,12 @@ export const GameEngine: React.FC<Props> = ({
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const lastPauseDown = useRef(false);
   const lastAbortDown = useRef(false);
+  
+  // Abort animation state
+  const abortRotationActive = useRef(false);
+  const abortStartAngle = useRef(0);
+  const abortRotationProgress = useRef(0);
+  const abortPenaltyCharged = useRef(false);
   
   // Rotation modifier state
   const [rotModConfig] = useState<RotationModConfig>(DEFAULT_ROTATION_MOD_CONFIG);
@@ -1338,25 +1350,64 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
 
-      // Abort assist: latch until stabilized, then auto-disengage (but not during countdown)
+      // Enhanced abort assist: smooth rotation, instant boost, fixed fuel penalty
       if (running && (keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
-        // Upright and hover assist
-        angle = 0; av = 0; // recenter rotation
+        // On first activation frame: charge fuel penalty and apply instant boost
+        if (keys.current.abort && !abortPenaltyCharged.current) {
+          // Charge fixed fuel penalty once per activation
+          fuel -= ABORT_FUEL_COST;
+          fuel = Math.max(0, fuel); // Don't go negative
+          
+          // Apply instant upward boost for immediate escape
+          vy += ABORT_BOOST_VELOCITY;
+          
+          // Start smooth rotation animation
+          abortRotationActive.current = true;
+          abortStartAngle.current = angle;
+          abortRotationProgress.current = 0;
+          abortPenaltyCharged.current = true;
+          
+          cameraShake = Math.max(cameraShake, ABORT_CAMERA_SHAKE);
+          audio.current.abort();
+        }
+        
+        // Animate rotation smoothly with cubic ease-out
+        if (abortRotationActive.current) {
+          abortRotationProgress.current += dt / ABORT_ROTATION_DURATION;
+          const t = Math.min(1, abortRotationProgress.current);
+          const eased = 1 - Math.pow(1 - t, 3); // cubic ease-out curve
+          angle = abortStartAngle.current * (1 - eased);
+          av = 0; // Lock angular velocity during rotation
+          
+          if (t >= 1) {
+            angle = 0; // Ensure exactly level at end
+            abortRotationActive.current = false;
+          }
+        } else {
+          // If not animating, keep level
+          angle = 0;
+          av = 0;
+        }
+        
+        // Apply hover thrust to maintain altitude
         const THRUST_ACCEL = 9.8;
         const hoverThrust = Math.min(1, (gravity * 60) / THRUST_ACCEL);
         thrustAnalog.current = Math.max(thrustAnalog.current, hoverThrust);
-        // Apply upward impulse to counter descent quickly
-        if (vy > 0) vy -= Math.min(vy, 180 * dt);
-        fuel -= 25 * dt;
-        cameraShake = Math.max(cameraShake, 8);
-        audio.current.abort();
+        fuel -= 25 * dt; // Hover fuel cost
+        
         // Auto turn off when stabilized
         const stabilized = Math.abs(angle) < 0.08 && Math.abs(av) < 0.05 && Math.abs(vx) < 8 && vy < 8;
         if (stabilized) {
           abortAssist.current = false;
           keys.current.abort = false;
           thrustAnalog.current = 0;
+          abortRotationActive.current = false;
         }
+      }
+      
+      // Reset penalty flag when abort button released
+      if (!keys.current.abort) {
+        abortPenaltyCharged.current = false;
       }
 
       if (running) {
