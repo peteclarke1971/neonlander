@@ -159,6 +159,9 @@ export const GameEngine: React.FC<Props> = ({
   const collectiblesRef = useRef<CollectiblesData | null>(null);
   const sparklesRef = useRef<Map<string, any>>(new Map());
   
+  // Track if landing sound has been played for current landing
+  const hasPlayedLandingSoundRef = useRef(false);
+  
   // Time Trial state
   const [timeTrialState, setTimeTrialState] = useState({
     sequencedPads: [] as SequencedPad[],
@@ -1234,6 +1237,9 @@ export const GameEngine: React.FC<Props> = ({
 
       if (running && thrust > 0) {
         if (fuel > 0) {
+          // Reset landing sound flag when taking off
+          hasPlayedLandingSoundRef.current = false;
+          
           // Lift-off assist: when first thrusting from a static start-pad rest in caverns
           if (isCavernLevel) {
             const cav = terrain as CavernData;
@@ -1835,9 +1841,12 @@ export const GameEngine: React.FC<Props> = ({
                       setShowFireworks(true);
                     }, 500);
                   } else {
-                    // More pads to go - play landing sound and continue
-                    audio.current.landing();
-                    cameraShake = 3;
+                    // More pads to go - play landing sound once and continue
+                    if (!hasPlayedLandingSoundRef.current) {
+                      audio.current.landing();
+                      hasPlayedLandingSoundRef.current = true;
+                      cameraShake = 3;
+                    }
                     
                     // Track last velocity to detect takeoff
                     const lastVy = vy;
@@ -1859,8 +1868,12 @@ export const GameEngine: React.FC<Props> = ({
                   // For now, allow takeoff without penalty - could add penalty later
                   y = landedPad.y - 8;
                   vy = 0; vx = 0; av = 0; angle = 0;
-                  audio.current.landing();
-                  cameraShake = 2;
+                  
+                  if (!hasPlayedLandingSoundRef.current) {
+                    audio.current.landing();
+                    hasPlayedLandingSoundRef.current = true;
+                    cameraShake = 2;
+                  }
                   
                   setTimeout(() => {
                     // Resume
