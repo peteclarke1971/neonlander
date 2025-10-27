@@ -1358,8 +1358,8 @@ export const GameEngine: React.FC<Props> = ({
           fuel -= ABORT_FUEL_COST;
           fuel = Math.max(0, fuel); // Don't go negative
           
-          // Apply instant upward boost for immediate escape
-          vy += ABORT_BOOST_VELOCITY;
+          // Apply instant upward boost for immediate escape - cap to prevent over-acceleration
+          vy = Math.max(vy - 180, -200);
           
           // Start smooth rotation animation
           abortRotationActive.current = true;
