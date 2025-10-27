@@ -373,6 +373,22 @@ export class AudioManager {
     if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
   }
 
+  async landingCrash() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Always play crash1 for consistent Time Trial landing sound
+    if (!this.crash1Buffer) {
+      this.crash1Buffer = await this.loadBuffer("/audio/crash1.mp3");
+    }
+    
+    if (this.crash1Buffer) {
+      this.playOneShot(this.crash1Buffer, 0.7);
+    } else {
+      this.playNoise(0.2, 0.4);
+    }
+  }
+
   landing() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
