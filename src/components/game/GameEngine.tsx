@@ -1731,7 +1731,6 @@ export const GameEngine: React.FC<Props> = ({
                 // Do NOT end the run here; simply rest on the start pad
         } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
           // successful landing ONLY on cavern end pad (ONE TIME)
-          hasLandedSuccessfully = true; // Set flag immediately
           y = pad.y - 10;
           vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
@@ -1801,6 +1800,7 @@ export const GameEngine: React.FC<Props> = ({
                  const padType = applied2x ? '2x' : 'regular';
                  setLandingType(padType);
                  setShowFireworks(true);
+                 hasLandedSuccessfully = true; // Set flag after all actions complete
                }, delayBeforeFireworks);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -1819,7 +1819,6 @@ export const GameEngine: React.FC<Props> = ({
             }
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
             // MEGA! Moving pad landing (ONE TIME)
-            hasLandedSuccessfully = true; // Set flag immediately
             const landedPad = movingPadLanding;
             y = landedPad.currentPos.y - 8;
             vy = landedPad.currentVelocity.y; 
@@ -1891,10 +1890,10 @@ export const GameEngine: React.FC<Props> = ({
               running = false;
               setLandingType('moving');
               setShowFireworks(true);
+              hasLandedSuccessfully = true; // Set flag after all actions complete
             }, delayBeforeFireworks);
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
             // Time Trial Mode: Check for sequenced landing (ONE TIME)
-            hasLandedSuccessfully = true; // Set flag immediately
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
@@ -1965,6 +1964,7 @@ export const GameEngine: React.FC<Props> = ({
                     setTimeout(() => {
                       setLandingType('regular');
                       setShowFireworks(true);
+                      hasLandedSuccessfully = true; // Set flag after time trial completion
                     }, 500);
                   } else {
                     // More pads to go - play landing sound once and continue
@@ -2083,6 +2083,7 @@ export const GameEngine: React.FC<Props> = ({
                 
                 setLandingType(padType);
                 setShowFireworks(true);
+                hasLandedSuccessfully = true; // Set flag after all actions complete
               }, delayBeforeFireworks);
             }
           } else {
