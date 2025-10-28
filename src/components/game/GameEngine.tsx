@@ -142,6 +142,12 @@ export const GameEngine: React.FC<Props> = ({
     lastEarned: number;
   }>({ bullseye: false, speedBonus: false, padBonus2x: false, lastEarned: 0 });
   
+  // Message queue for displaying multiple bonuses sequentially
+  const messageQueueRef = useRef<string[]>([]);
+  const currentMessageIndexRef = useRef(0);
+  const messageTimerRef = useRef(0);
+  const bonusTextRef = useRef("");
+  
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
@@ -1733,9 +1739,23 @@ export const GameEngine: React.FC<Props> = ({
                 : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
               let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
               const bullseye = Math.abs(dx) <= pWidth * 0.03;
-              if (bullseye) { earned += 500; bullseyeT = 0; }
               const speedBonus = elapsed < 10;
+              if (bullseye) { earned += 500; }
               if (speedBonus) { earned += 500; }
+
+              // Build message queue
+              const messages: string[] = [];
+              if (speedBonus) messages.push("500 POINT SPEED BONUS");
+              if (bullseye) messages.push("500 POINT BULLSEYE");
+
+              // Queue messages for display
+              if (messages.length > 0) {
+                messageQueueRef.current = messages;
+                currentMessageIndexRef.current = 0;
+                messageTimerRef.current = 0;
+                bullseyeT = 0;
+                bonusTextRef.current = messages[0];
+              }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -1793,9 +1813,23 @@ export const GameEngine: React.FC<Props> = ({
             
             const pWidth = landedPad.width ?? 32;
             const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
-            if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); bullseyeT = 0; }
             const speedBonus = elapsed < 10;
+            if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); }
             if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
+
+            // Build message queue
+            const messages: string[] = [];
+            if (speedBonus) messages.push("500 POINT SPEED BONUS");
+            if (bullseye) messages.push("500 POINT BULLSEYE");
+
+            // Queue messages for display
+            if (messages.length > 0) {
+              messageQueueRef.current = messages;
+              currentMessageIndexRef.current = 0;
+              messageTimerRef.current = 0;
+              bullseyeT = 0;
+              bonusTextRef.current = messages[0];
+            }
             
             score += earned;
             landings += 1;
@@ -1948,9 +1982,23 @@ export const GameEngine: React.FC<Props> = ({
                 : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
               let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
               const bullseye = Math.abs(dx) <= pWidth * 0.03;
-              if (bullseye) { earned += 500; bullseyeT = 0; }
               const speedBonus = elapsed < 10;
+              if (bullseye) { earned += 500; }
               if (speedBonus) { earned += 500; }
+
+              // Build message queue
+              const messages: string[] = [];
+              if (speedBonus) messages.push("500 POINT SPEED BONUS");
+              if (bullseye) messages.push("500 POINT BULLSEYE");
+
+              // Queue messages for display
+              if (messages.length > 0) {
+                messageQueueRef.current = messages;
+                currentMessageIndexRef.current = 0;
+                messageTimerRef.current = 0;
+                bullseyeT = 0;
+                bonusTextRef.current = messages[0];
+              }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -2195,10 +2243,31 @@ export const GameEngine: React.FC<Props> = ({
         sw.life += dt;
         if (sw.life > sw.max) shockwaves.splice(i, 1);
       }
-      // Bullseye overlay timer
+      // Bullseye/Speed bonus overlay timer with message queue
       if (bullseyeT >= 0) {
         bullseyeT += dt;
         if (bullseyeT > 2.2) bullseyeT = -1;
+      }
+
+      // Update message queue display
+      if (messageQueueRef.current.length > 0 && currentMessageIndexRef.current < messageQueueRef.current.length) {
+        messageTimerRef.current += dt;
+        
+        // Display current message for 2 seconds
+        if (messageTimerRef.current >= 2.0) {
+          if (currentMessageIndexRef.current < messageQueueRef.current.length - 1) {
+            // Move to next message
+            currentMessageIndexRef.current++;
+            messageTimerRef.current = 0;
+            bullseyeT = 0; // Reset animation timer for next message
+            bonusTextRef.current = messageQueueRef.current[currentMessageIndexRef.current];
+          } else {
+            // All messages shown, clear queue
+            messageQueueRef.current = [];
+            currentMessageIndexRef.current = 0;
+            messageTimerRef.current = 0;
+          }
+        }
       }
       updateHud();
       render();
@@ -2747,8 +2816,8 @@ export const GameEngine: React.FC<Props> = ({
         ctx.restore();
       }
 
-      // Screen-space overlays
-      if (bullseyeT >= 0) {
+      // Screen-space overlays (bonus popups)
+      if (bullseyeT >= 0 && bonusTextRef.current && messageQueueRef.current.length > 0) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const T = 2.0;
         const t = Math.min(1, bullseyeT / T);
@@ -2766,7 +2835,7 @@ export const GameEngine: React.FC<Props> = ({
         ctx.globalAlpha = 0.85 * alpha;
         ctx.strokeStyle = neonColor as any;
         ctx.lineWidth = 4 * dpr;
-        ctx.strokeText("500 POINT BULLSEYE", 0, 0);
+        ctx.strokeText(bonusTextRef.current, 0, 0);
         ctx.globalAlpha = 1;
         ctx.restore();
       }
