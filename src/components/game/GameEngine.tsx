@@ -2101,6 +2101,8 @@ export const GameEngine: React.FC<Props> = ({
               
               setTimeout(() => {
                 running = false;
+                timerActiveRef.current = false;
+                setTimerActive(false);
                 // Ghost-beating check: prioritize active global ghost, then check local storage
                 let currentBestTime: number | null = null;
                 if (isGhostMode) {
