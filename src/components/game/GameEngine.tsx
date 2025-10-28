@@ -736,14 +736,6 @@ export const GameEngine: React.FC<Props> = ({
     let fuelAlarmLatched = false;
     let fuelDepletedTime = -1; // track when fuel first hits 0
     let anomaliesDisabled = false; // flag to disable gravity wells
-    let landerFrozen = false; // flag to freeze lander while keeping loop active
-    let hasLandedSuccessfully = false; // Prevents repeated landing detection
-    let timeTrialLandingHandled = false; // Prevents crash after Time Trial landing
-    let messageQueue: string[] = [];
-    let currentMessageIndex = 0;
-    let messageTimer = 0;
-    let bonusText = "";
-    let messageAnimationComplete = false;
     // Camera smoothing state
     let smoothedAnchor = 0;
     let lastDtForCam = 0;
@@ -1152,8 +1144,7 @@ export const GameEngine: React.FC<Props> = ({
         keys.current.rotateBoost = false; // Demo doesn't use rotation boost
       }
 
-      // Controls - ONLY process if lander is not frozen
-      if (!landerFrozen) {
+      // Controls
       // Gamepad hot-swap + read UI/analog
       let gpLeft = false, gpRight = false, gpThrust = 0, gpRotateBoost = false, gpAbort = false;
       {
@@ -1359,10 +1350,8 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
 
-      } // End of !landerFrozen input check
-
       // Enhanced abort assist: smooth rotation, instant boost, fixed fuel penalty
-      if (!landerFrozen && running && (keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
+      if (running && (keys.current.abort || abortAssist.current) && fuel > 0 && !worldPausedRef.current && !playerLockedRef.current) {
         // On first activation frame: charge fuel penalty and apply instant boost
         if (keys.current.abort && !abortPenaltyCharged.current) {
           // Charge fixed fuel penalty once per activation
@@ -1595,12 +1584,6 @@ export const GameEngine: React.FC<Props> = ({
         }, 700);
       }
       
-      // Reset Time Trial landing flag each frame
-      timeTrialLandingHandled = false;
-      if (mode === "timetrial" && !landerFrozen) {
-        hasLandedSuccessfully = false; // Allow continuous landing detection in Time Trial
-      }
-      
       // Check collectible pickups
       if (running && collectiblesRef.current && !crashed) {
         for (const junk of collectiblesRef.current.spaceJunk) {
@@ -1736,12 +1719,10 @@ export const GameEngine: React.FC<Props> = ({
                   // Do not lock vx, av, or angle — allow immediate takeoff with light thrust
                 }
                 // Do NOT end the run here; simply rest on the start pad
-        } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
-          // successful landing ONLY on cavern end pad (ONE TIME)
-          hasLandedSuccessfully = true; // Set flag IMMEDIATELY to prevent re-triggering
-          playerLockedRef.current = true; // Disable collision detection
-          y = pad.y - 10;
-          vy = 0; vx = 0; av = 0; angle = 0;
+            } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
+              // successful landing ONLY on cavern end pad
+              y = pad.y - 10;
+              vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
               const applied2x = !!pad.bonus2x;
@@ -1752,19 +1733,9 @@ export const GameEngine: React.FC<Props> = ({
                 : ((pad.xStart + (pad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
               let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
               const bullseye = Math.abs(dx) <= pWidth * 0.03;
+              if (bullseye) { earned += 500; bullseyeT = 0; }
               const speedBonus = elapsed < 10;
-              
-              // Build message queue
-              const messages: string[] = [];
-              if (bullseye) { 
-                earned += 500;
-                messages.push("500 POINT BULLSEYE");
-              }
-              if (speedBonus) { 
-                earned += 500;
-                messages.push("500 POINT SPEED BONUS");
-              }
-              
+              if (speedBonus) { earned += 500; }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -1777,39 +1748,18 @@ export const GameEngine: React.FC<Props> = ({
                 lastEarned: earned
               });
               
-              // Freeze lander but keep game loop running
-              landerFrozen = true;
-              vy = 0; vx = 0; av = 0;
-              
-              // Initialize message animation
-              if (messages.length > 0) {
-                messageQueue = messages;
-                currentMessageIndex = 0;
-                messageTimer = 0;
-                bullseyeT = 0;
-                bonusText = messages[0];
-                messageAnimationComplete = false;
-              } else {
-                messageAnimationComplete = true;
-              }
-              
               cameraShake = 6;
               audio.current.landing();
               audio.current.stopThruster();
               try { audio.current.stopFuelAlarm(); } catch {}
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
-              
-              // Set up delayed fireworks trigger
-              const messageDisplayTime = messages.length * 2000;
-              const delayBeforeFireworks = Math.max(500, messageDisplayTime + 500);
-              
+              running = false;
                setTimeout(() => {
-                 running = false;
                  // For cavern mode, don't check ghost beating (ghosts are only in fixed mode)
                  const padType = applied2x ? '2x' : 'regular';
                  setLandingType(padType);
                  setShowFireworks(true);
-               }, delayBeforeFireworks);
+               }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
               running = false;
@@ -1825,10 +1775,8 @@ export const GameEngine: React.FC<Props> = ({
                 onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
               }, 700);
             }
-          } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
-            // MEGA! Moving pad landing (ONE TIME)
-            hasLandedSuccessfully = true; // Set flag IMMEDIATELY to prevent re-triggering
-            playerLockedRef.current = true; // Disable collision detection
+          } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
+            // MEGA! Moving pad landing
             const landedPad = movingPadLanding;
             y = landedPad.currentPos.y - 8;
             vy = landedPad.currentVelocity.y; 
@@ -1845,18 +1793,9 @@ export const GameEngine: React.FC<Props> = ({
             
             const pWidth = landedPad.width ?? 32;
             const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
+            if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); bullseyeT = 0; }
             const speedBonus = elapsed < 10;
-            
-            // Build message queue
-            const messages: string[] = [];
-            if (bullseye) { 
-              earned += Math.floor(500 * landedPad.scoreMult);
-              messages.push("500 POINT BULLSEYE");
-            }
-            if (speedBonus) { 
-              earned += Math.floor(500 * landedPad.scoreMult);
-              messages.push("500 POINT SPEED BONUS");
-            }
+            if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
             
             score += earned;
             landings += 1;
@@ -1870,39 +1809,18 @@ export const GameEngine: React.FC<Props> = ({
               lastEarned: earned
             });
             
-            // Freeze lander but keep game loop running
-            landerFrozen = true;
-            vy = 0; vx = 0; av = 0;
-            
-            // Initialize message animation
-            if (messages.length > 0) {
-              messageQueue = messages;
-              currentMessageIndex = 0;
-              messageTimer = 0;
-              bullseyeT = 0;
-              bonusText = messages[0];
-              messageAnimationComplete = false;
-            } else {
-              messageAnimationComplete = true;
-            }
-            
             cameraShake = 8; // Extra camera shake for MEGA landing
             audio.current.landing();
             audio.current.stopThruster();
             try { audio.current.stopFuelAlarm(); } catch {}
             if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
-            
-            // Set up delayed fireworks trigger
-            const messageDisplayTime = messages.length * 2000;
-            const delayBeforeFireworks = Math.max(500, messageDisplayTime + 500);
-            
+            running = false;
             setTimeout(() => {
-              running = false;
               setLandingType('moving');
               setShowFireworks(true);
-            }, delayBeforeFireworks);
-          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
-            // Time Trial Mode: Check for sequenced landing (ONE TIME)
+            }, 500);
+          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
+            // Time Trial Mode: Check for sequenced landing
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
@@ -1974,8 +1892,6 @@ export const GameEngine: React.FC<Props> = ({
                       setLandingType('regular');
                       setShowFireworks(true);
                     }, 500);
-                    hasLandedSuccessfully = true; // ✅ Set at end
-                    timeTrialLandingHandled = true; // Mark as handled
                   } else {
                     // More pads to go - play landing sound once and continue
                     if (!hasPlayedLandingSoundRef.current) {
@@ -1997,8 +1913,6 @@ export const GameEngine: React.FC<Props> = ({
                     
                     // Clear interval after 5 seconds
                     setTimeout(() => clearInterval(checkInterval), 5000);
-                    hasLandedSuccessfully = true; // ✅ Set at end
-                    timeTrialLandingHandled = true; // Mark as handled
                   }
                 } else {
                   // Wrong pad - currently just warning, no penalty
@@ -2016,26 +1930,12 @@ export const GameEngine: React.FC<Props> = ({
                   setTimeout(() => {
                     // Resume
                   }, 100);
-                  hasLandedSuccessfully = true; // ✅ Set at end
-                  timeTrialLandingHandled = true; // Mark as handled
                 }
-              } else {
-                // Non-sequenced pad in Time Trial - safe landing but no progress
-                y = landedPad.y - 8;
-                vy = 0; vx = 0; av = 0; angle = 0;
-                
-                if (!hasPlayedLandingSoundRef.current) {
-                  audio.current.landingCrash();
-                  hasPlayedLandingSoundRef.current = true;
-                  cameraShake = 2;
-                }
-                hasLandedSuccessfully = true; // ✅ Set at end
-                timeTrialLandingHandled = true; // Mark as handled
               }
             } else {
               // Regular landing logic (non-time-trial)
-              playerLockedRef.current = true; // Lock player only for final successful landings
-              const landedPad = (pad || nearPad)!
+              // Regular landing logic (non-time-trial)
+              const landedPad = (pad || nearPad)!;
               y = landedPad.y - 8;
               vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
@@ -2048,19 +1948,9 @@ export const GameEngine: React.FC<Props> = ({
                 : ((landedPad.xStart + (landedPad.xEnd + terrain.worldWidth)) / 2) % terrain.worldWidth;
               let dx = (x - pCenter + terrain.worldWidth / 2) % terrain.worldWidth; dx -= terrain.worldWidth / 2;
               const bullseye = Math.abs(dx) <= pWidth * 0.03;
+              if (bullseye) { earned += 500; bullseyeT = 0; }
               const speedBonus = elapsed < 10;
-              
-              // Build message queue
-              const messages: string[] = [];
-              if (bullseye) { 
-                earned += 500;
-                messages.push("500 POINT BULLSEYE");
-              }
-              if (speedBonus) { 
-                earned += 500;
-                messages.push("500 POINT SPEED BONUS");
-              }
-              
+              if (speedBonus) { earned += 500; }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -2073,57 +1963,25 @@ export const GameEngine: React.FC<Props> = ({
                 lastEarned: earned
               });
               
-              // Freeze lander but keep game loop running
-              landerFrozen = true;
-              running = false;
-              timerActiveRef.current = false;
-              setTimerActive(false);
-              vy = 0; vx = 0; av = 0;
-              
-              // Initialize message animation
-              if (messages.length > 0) {
-                messageQueue = messages;
-                currentMessageIndex = 0;
-                messageTimer = 0;
-                bullseyeT = 0;
-                bonusText = messages[0];
-                messageAnimationComplete = false;
-              } else {
-                messageAnimationComplete = true;
-              }
-              
               cameraShake = 6;
               audio.current.landing();
               audio.current.stopThruster();
               try { audio.current.stopFuelAlarm(); } catch {}
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
-              
-              // Set up delayed fireworks trigger
-              const messageDisplayTime = messages.length * 2000;
-              const delayBeforeFireworks = Math.max(500, messageDisplayTime + 500);
-              
+              running = false;
               setTimeout(() => {
-                // Ghost-beating check: prioritize active global ghost, then check local storage
-                let currentBestTime: number | null = null;
-                if (isGhostMode) {
-                  // If using global ghost, get time from activeGhostRecording
-                  if (isUsingGlobalGhost && activeGhostRecording) {
-                    currentBestTime = activeGhostRecording.completionTime / 1000; // Convert ms to seconds
-                  } else {
-                    // Fall back to local ghost
-                    currentBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
-                  }
-                }
+                // Ghost-beating check: get the current best time and compare
+                const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
                 const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
                 
                 const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
                 
                 setLandingType(padType);
                 setShowFireworks(true);
-              }, delayBeforeFireworks);
+              }, 500);
             }
-          } else if (!timeTrialLandingHandled) {
-            // crash - only if Time Trial didn't already handle the landing
+          } else {
+            // crash
             running = false;
             crashed = true;
             spawnExplosion();
@@ -2337,27 +2195,8 @@ export const GameEngine: React.FC<Props> = ({
         sw.life += dt;
         if (sw.life > sw.max) shockwaves.splice(i, 1);
       }
-      // Message queue animation system
-      if (messageQueue.length > 0 && !messageAnimationComplete) {
-        bullseyeT += dt; // Continue animation timer
-        messageTimer += dt;
-        
-        // Each message displays for 2 seconds
-        if (messageTimer >= 2.0) {
-          if (currentMessageIndex < messageQueue.length - 1) {
-            // Move to next message
-            currentMessageIndex++;
-            messageTimer = 0;
-            bullseyeT = 0; // Reset animation for next message
-            bonusText = messageQueue[currentMessageIndex];
-          } else {
-            // All messages shown
-            messageAnimationComplete = true;
-            bullseyeT = -1; // Hide message
-          }
-        }
-      } else if (bullseyeT >= 0 && messageQueue.length === 0) {
-        // Fallback for old single-message behavior (survival mode compatibility)
+      // Bullseye overlay timer
+      if (bullseyeT >= 0) {
         bullseyeT += dt;
         if (bullseyeT > 2.2) bullseyeT = -1;
       }
@@ -2909,7 +2748,7 @@ export const GameEngine: React.FC<Props> = ({
       }
 
       // Screen-space overlays
-      if (bullseyeT >= 0 && (bonusText || messageQueue.length === 0)) {
+      if (bullseyeT >= 0) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const T = 2.0;
         const t = Math.min(1, bullseyeT / T);
@@ -2927,8 +2766,7 @@ export const GameEngine: React.FC<Props> = ({
         ctx.globalAlpha = 0.85 * alpha;
         ctx.strokeStyle = neonColor as any;
         ctx.lineWidth = 4 * dpr;
-        const displayText = bonusText || "500 POINT BULLSEYE";
-        ctx.strokeText(displayText, 0, 0);
+        ctx.strokeText("500 POINT BULLSEYE", 0, 0);
         ctx.globalAlpha = 1;
         ctx.restore();
       }
