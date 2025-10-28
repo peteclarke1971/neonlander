@@ -291,6 +291,8 @@ export default function ControlsSettings() {
       audio.shieldBreak();
     } else if (effectName === "collectible_noise") {
       audio.junkPickup();
+    } else if (effectName === "landingCrash") {
+      audio.landingCrash();
     } else if (effectName === "set_completion") {
       audio.junkSetComplete();
     } else if (effectName === "wormhole_open") {
@@ -575,6 +577,7 @@ export default function ControlsSettings() {
                   <SelectItem value="crash1.mp3">crash1.mp3</SelectItem>
                   <SelectItem value="crash2.mp3">crash2.mp3</SelectItem>
                   <SelectItem value="landing_on_pad.mp3">landing_on_pad.mp3</SelectItem>
+                  <SelectItem value="landingCrash" className="text-muted-foreground italic">landingCrash (method)</SelectItem>
                   <SelectItem value="fuel_10_percent_loop.mp3">fuel_10_percent_loop.mp3</SelectItem>
                   <SelectItem value="intro_tick.mp3">intro_tick.mp3</SelectItem>
                   <SelectItem value="intro_go.mp3">intro_go.mp3</SelectItem>
