@@ -1597,6 +1597,9 @@ export const GameEngine: React.FC<Props> = ({
       
       // Reset Time Trial landing flag each frame
       timeTrialLandingHandled = false;
+      if (mode === "timetrial" && !landerFrozen) {
+        hasLandedSuccessfully = false; // Allow continuous landing detection in Time Trial
+      }
       
       // Check collectible pickups
       if (running && collectiblesRef.current && !crashed) {
