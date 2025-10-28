@@ -14,6 +14,7 @@ import { renderSpaceJunk, renderWormholeDoor, generateSparkles, updateSparkles, 
 import { generateTerrain } from "./terrain";
 import { movingPadSystem } from "./systems/movingPads";
 import FireworksDisplay from './FireworksDisplay';
+import { BonusMessageDisplay } from './BonusMessageDisplay';
 import { getTimeTrialLevelConfig } from "./systems/timeTrialLevels";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
@@ -121,6 +122,10 @@ export const GameEngine: React.FC<Props> = ({
   const [introState, setIntroState] = useState<any>({ phase: "inactive" });
   const [worldPaused, setWorldPaused] = useState(false);
   const [playerLocked, setPlayerLocked] = useState(false);
+  
+  // Bonus message display state (separate from game loop)
+  const [bonusMessages, setBonusMessages] = useState<string[]>([]);
+  const [showBonusMessages, setShowBonusMessages] = useState(false);
   const worldPausedRef = useRef(false);
   const playerLockedRef = useRef(false);
   const invulnerabilityTimer = useRef(0);
@@ -141,12 +146,6 @@ export const GameEngine: React.FC<Props> = ({
     padBonus2x: boolean;
     lastEarned: number;
   }>({ bullseye: false, speedBonus: false, padBonus2x: false, lastEarned: 0 });
-  
-  // Message queue for displaying multiple bonuses sequentially
-  const messageQueueRef = useRef<string[]>([]);
-  const currentMessageIndexRef = useRef(0);
-  const messageTimerRef = useRef(0);
-  const bonusTextRef = useRef("");
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -1755,6 +1754,14 @@ export const GameEngine: React.FC<Props> = ({
                 lastEarned: earned
               });
               
+              // Build message queue for display
+              const messages: string[] = [];
+              if (speedBonus) messages.push("500 POINT SPEED BONUS");
+              if (bullseye) messages.push("500 POINT BULLSEYE");
+              if (messages.length > 0) {
+                setBonusMessages(messages);
+              }
+              
               cameraShake = 6;
               audio.current.landing();
               audio.current.stopThruster();
@@ -1767,20 +1774,10 @@ export const GameEngine: React.FC<Props> = ({
                  setLandingType(padType);
                  setShowFireworks(true);
                  
-                 // START MESSAGES 1 second after fireworks begin
-                 setTimeout(() => {
-                   const messages: string[] = [];
-                   if (speedBonus) messages.push("500 POINT SPEED BONUS");
-                   if (bullseye) messages.push("500 POINT BULLSEYE");
-                   
-                   if (messages.length > 0) {
-                     messageQueueRef.current = messages;
-                     currentMessageIndexRef.current = 0;
-                     messageTimerRef.current = 0;
-                     bullseyeT = 0;
-                     bonusTextRef.current = messages[0];
-                   }
-                 }, 1000);
+                 // Trigger bonus message display
+                 if (messages.length > 0) {
+                   setShowBonusMessages(true);
+                 }
                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -1831,6 +1828,14 @@ export const GameEngine: React.FC<Props> = ({
               lastEarned: earned
             });
             
+            // Build message queue for display
+            const messages: string[] = [];
+            if (speedBonus) messages.push("500 POINT SPEED BONUS");
+            if (bullseye) messages.push("500 POINT BULLSEYE");
+            if (messages.length > 0) {
+              setBonusMessages(messages);
+            }
+            
             cameraShake = 8; // Extra camera shake for MEGA landing
             audio.current.landing();
             audio.current.stopThruster();
@@ -1841,20 +1846,10 @@ export const GameEngine: React.FC<Props> = ({
               setLandingType('moving');
               setShowFireworks(true);
               
-              // START MESSAGES 1 second after fireworks begin
-              setTimeout(() => {
-                const messages: string[] = [];
-                if (speedBonus) messages.push("500 POINT SPEED BONUS");
-                if (bullseye) messages.push("500 POINT BULLSEYE");
-                
-                if (messages.length > 0) {
-                  messageQueueRef.current = messages;
-                  currentMessageIndexRef.current = 0;
-                  messageTimerRef.current = 0;
-                  bullseyeT = 0;
-                  bonusTextRef.current = messages[0];
-                }
-              }, 1000);
+              // Trigger bonus message display
+              if (messages.length > 0) {
+                setShowBonusMessages(true);
+              }
             }, 500);
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
@@ -2001,6 +1996,14 @@ export const GameEngine: React.FC<Props> = ({
                 lastEarned: earned
               });
               
+              // Build message queue for display
+              const messages: string[] = [];
+              if (speedBonus) messages.push("500 POINT SPEED BONUS");
+              if (bullseye) messages.push("500 POINT BULLSEYE");
+              if (messages.length > 0) {
+                setBonusMessages(messages);
+              }
+              
               cameraShake = 6;
               audio.current.landing();
               audio.current.stopThruster();
@@ -2017,20 +2020,10 @@ export const GameEngine: React.FC<Props> = ({
                 setLandingType(padType);
                 setShowFireworks(true);
                 
-                // START MESSAGES 1 second after fireworks begin
-                setTimeout(() => {
-                  const messages: string[] = [];
-                  if (speedBonus) messages.push("500 POINT SPEED BONUS");
-                  if (bullseye) messages.push("500 POINT BULLSEYE");
-                  
-                  if (messages.length > 0) {
-                    messageQueueRef.current = messages;
-                    currentMessageIndexRef.current = 0;
-                    messageTimerRef.current = 0;
-                    bullseyeT = 0;
-                    bonusTextRef.current = messages[0];
-                  }
-                }, 1000);
+                // Trigger bonus message display
+                if (messages.length > 0) {
+                  setShowBonusMessages(true);
+                }
               }, 500);
             }
           } else {
@@ -2248,32 +2241,12 @@ export const GameEngine: React.FC<Props> = ({
         sw.life += dt;
         if (sw.life > sw.max) shockwaves.splice(i, 1);
       }
-      // Bullseye/Speed bonus overlay timer with message queue
+      // Bullseye/Speed bonus overlay timer (no longer needed - handled by BonusMessageDisplay)
       if (bullseyeT >= 0) {
         bullseyeT += dt;
         if (bullseyeT > 2.2) bullseyeT = -1;
       }
 
-      // Update message queue display
-      if (messageQueueRef.current.length > 0 && currentMessageIndexRef.current < messageQueueRef.current.length) {
-        messageTimerRef.current += dt;
-        
-        // Display current message for 2 seconds
-        if (messageTimerRef.current >= 2.0) {
-          if (currentMessageIndexRef.current < messageQueueRef.current.length - 1) {
-            // Move to next message
-            currentMessageIndexRef.current++;
-            messageTimerRef.current = 0;
-            bullseyeT = 0; // Reset animation timer for next message
-            bonusTextRef.current = messageQueueRef.current[currentMessageIndexRef.current];
-          } else {
-            // All messages shown, clear queue
-            messageQueueRef.current = [];
-            currentMessageIndexRef.current = 0;
-            messageTimerRef.current = 0;
-          }
-        }
-      }
       updateHud();
       render();
       if (!running && !crashed) cancelAnimationFrame(rafRef.current);
@@ -2821,29 +2794,7 @@ export const GameEngine: React.FC<Props> = ({
         ctx.restore();
       }
 
-      // Screen-space overlays (bonus popups)
-      if (bullseyeT >= 0 && bonusTextRef.current && messageQueueRef.current.length > 0) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        const T = 2.0;
-        const t = Math.min(1, bullseyeT / T);
-        const scaleAmt = 0.85 + Math.sin(Math.PI * t) * 0.6;
-        const alpha = 1 - Math.abs(2 * t - 1);
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.translate(w / 2, h / 2);
-        ctx.scale(scaleAmt, scaleAmt);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = `900 42px \"Orbitron\", sans-serif`;
-        ctx.shadowColor = neonColor as any;
-        ctx.shadowBlur = 28;
-        ctx.globalAlpha = 0.85 * alpha;
-        ctx.strokeStyle = neonColor as any;
-        ctx.lineWidth = 4 * dpr;
-        ctx.strokeText(bonusTextRef.current, 0, 0);
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
+      // Screen-space overlays removed - now handled by BonusMessageDisplay component
 
       ctx.restore();
     };
@@ -3340,6 +3291,19 @@ export const GameEngine: React.FC<Props> = ({
               speedBonus: lastLandingBonuses.speedBonus
             });
             setIsWorldRecord(false); // Reset for next level
+          }}
+        />
+      )}
+      
+      {/* Bonus message overlay */}
+      {showBonusMessages && bonusMessages.length > 0 && (
+        <BonusMessageDisplay
+          messages={bonusMessages}
+          neonColor={neonColor}
+          delayMs={1000}
+          onComplete={() => {
+            setShowBonusMessages(false);
+            setBonusMessages([]);
           }}
         />
       )}
