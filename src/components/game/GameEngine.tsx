@@ -3300,7 +3300,7 @@ export const GameEngine: React.FC<Props> = ({
         <BonusMessageDisplay
           messages={bonusMessages}
           neonColor={neonColor}
-          delayMs={1000}
+          delayMs={0}
           onComplete={() => {
             setShowBonusMessages(false);
             setBonusMessages([]);
