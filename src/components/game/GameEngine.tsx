@@ -1897,7 +1897,6 @@ export const GameEngine: React.FC<Props> = ({
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
             // Time Trial Mode: Check for sequenced landing (ONE TIME)
             hasLandedSuccessfully = true; // Set flag IMMEDIATELY to prevent re-triggering
-            playerLockedRef.current = true; // Disable collision detection
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
@@ -2011,8 +2010,8 @@ export const GameEngine: React.FC<Props> = ({
               }
             } else {
               // Regular landing logic (non-time-trial)
-              // Regular landing logic (non-time-trial)
-              const landedPad = (pad || nearPad)!;
+              playerLockedRef.current = true; // Lock player only for final successful landings
+              const landedPad = (pad || nearPad)!
               y = landedPad.y - 8;
               vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
