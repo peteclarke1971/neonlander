@@ -1743,19 +1743,6 @@ export const GameEngine: React.FC<Props> = ({
               if (bullseye) { earned += 500; }
               if (speedBonus) { earned += 500; }
 
-              // Build message queue
-              const messages: string[] = [];
-              if (speedBonus) messages.push("500 POINT SPEED BONUS");
-              if (bullseye) messages.push("500 POINT BULLSEYE");
-
-              // Queue messages for display
-              if (messages.length > 0) {
-                messageQueueRef.current = messages;
-                currentMessageIndexRef.current = 0;
-                messageTimerRef.current = 0;
-                bullseyeT = 0;
-                bonusTextRef.current = messages[0];
-              }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -1779,6 +1766,21 @@ export const GameEngine: React.FC<Props> = ({
                  const padType = applied2x ? '2x' : 'regular';
                  setLandingType(padType);
                  setShowFireworks(true);
+                 
+                 // START MESSAGES 1 second after fireworks begin
+                 setTimeout(() => {
+                   const messages: string[] = [];
+                   if (speedBonus) messages.push("500 POINT SPEED BONUS");
+                   if (bullseye) messages.push("500 POINT BULLSEYE");
+                   
+                   if (messages.length > 0) {
+                     messageQueueRef.current = messages;
+                     currentMessageIndexRef.current = 0;
+                     messageTimerRef.current = 0;
+                     bullseyeT = 0;
+                     bonusTextRef.current = messages[0];
+                   }
+                 }, 1000);
                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -1816,20 +1818,6 @@ export const GameEngine: React.FC<Props> = ({
             const speedBonus = elapsed < 10;
             if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); }
             if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
-
-            // Build message queue
-            const messages: string[] = [];
-            if (speedBonus) messages.push("500 POINT SPEED BONUS");
-            if (bullseye) messages.push("500 POINT BULLSEYE");
-
-            // Queue messages for display
-            if (messages.length > 0) {
-              messageQueueRef.current = messages;
-              currentMessageIndexRef.current = 0;
-              messageTimerRef.current = 0;
-              bullseyeT = 0;
-              bonusTextRef.current = messages[0];
-            }
             
             score += earned;
             landings += 1;
@@ -1852,6 +1840,21 @@ export const GameEngine: React.FC<Props> = ({
             setTimeout(() => {
               setLandingType('moving');
               setShowFireworks(true);
+              
+              // START MESSAGES 1 second after fireworks begin
+              setTimeout(() => {
+                const messages: string[] = [];
+                if (speedBonus) messages.push("500 POINT SPEED BONUS");
+                if (bullseye) messages.push("500 POINT BULLSEYE");
+                
+                if (messages.length > 0) {
+                  messageQueueRef.current = messages;
+                  currentMessageIndexRef.current = 0;
+                  messageTimerRef.current = 0;
+                  bullseyeT = 0;
+                  bonusTextRef.current = messages[0];
+                }
+              }, 1000);
             }, 500);
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
@@ -1986,19 +1989,6 @@ export const GameEngine: React.FC<Props> = ({
               if (bullseye) { earned += 500; }
               if (speedBonus) { earned += 500; }
 
-              // Build message queue
-              const messages: string[] = [];
-              if (speedBonus) messages.push("500 POINT SPEED BONUS");
-              if (bullseye) messages.push("500 POINT BULLSEYE");
-
-              // Queue messages for display
-              if (messages.length > 0) {
-                messageQueueRef.current = messages;
-                currentMessageIndexRef.current = 0;
-                messageTimerRef.current = 0;
-                bullseyeT = 0;
-                bonusTextRef.current = messages[0];
-              }
               score += earned;
               landings += 1;
               setCurrentLandings(landings);
@@ -2026,6 +2016,21 @@ export const GameEngine: React.FC<Props> = ({
                 
                 setLandingType(padType);
                 setShowFireworks(true);
+                
+                // START MESSAGES 1 second after fireworks begin
+                setTimeout(() => {
+                  const messages: string[] = [];
+                  if (speedBonus) messages.push("500 POINT SPEED BONUS");
+                  if (bullseye) messages.push("500 POINT BULLSEYE");
+                  
+                  if (messages.length > 0) {
+                    messageQueueRef.current = messages;
+                    currentMessageIndexRef.current = 0;
+                    messageTimerRef.current = 0;
+                    bullseyeT = 0;
+                    bonusTextRef.current = messages[0];
+                  }
+                }, 1000);
               }, 500);
             }
           } else {
