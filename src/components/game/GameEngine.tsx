@@ -1900,7 +1900,6 @@ export const GameEngine: React.FC<Props> = ({
             }, delayBeforeFireworks);
           } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0 && !hasLandedSuccessfully) {
             // Time Trial Mode: Check for sequenced landing (ONE TIME)
-            hasLandedSuccessfully = true; // Set flag IMMEDIATELY to prevent re-triggering
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
@@ -1972,6 +1971,7 @@ export const GameEngine: React.FC<Props> = ({
                       setLandingType('regular');
                       setShowFireworks(true);
                     }, 500);
+                    hasLandedSuccessfully = true; // ✅ Set at end
                     timeTrialLandingHandled = true; // Mark as handled
                   } else {
                     // More pads to go - play landing sound once and continue
@@ -1994,6 +1994,7 @@ export const GameEngine: React.FC<Props> = ({
                     
                     // Clear interval after 5 seconds
                     setTimeout(() => clearInterval(checkInterval), 5000);
+                    hasLandedSuccessfully = true; // ✅ Set at end
                     timeTrialLandingHandled = true; // Mark as handled
                   }
                 } else {
@@ -2012,6 +2013,7 @@ export const GameEngine: React.FC<Props> = ({
                   setTimeout(() => {
                     // Resume
                   }, 100);
+                  hasLandedSuccessfully = true; // ✅ Set at end
                   timeTrialLandingHandled = true; // Mark as handled
                 }
               } else {
@@ -2024,6 +2026,7 @@ export const GameEngine: React.FC<Props> = ({
                   hasPlayedLandingSoundRef.current = true;
                   cameraShake = 2;
                 }
+                hasLandedSuccessfully = true; // ✅ Set at end
                 timeTrialLandingHandled = true; // Mark as handled
               }
             } else {
