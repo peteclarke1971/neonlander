@@ -13,7 +13,7 @@ export const BonusMessageDisplay = ({
   delayMs,
   onComplete 
 }: BonusMessageDisplayProps) => {
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [animationTime, setAnimationTime] = useState(0);
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -39,7 +39,6 @@ export const BonusMessageDisplay = ({
       if (!animationStarted && elapsed >= delayMs) {
         animationStarted = true;
         messageStartTimeRef.current = timestamp;
-        setCurrentIndex(0);
       }
 
       if (animationStarted) {
@@ -75,7 +74,7 @@ export const BonusMessageDisplay = ({
     };
   }, [messages, delayMs, onComplete]);
 
-  if (currentIndex < 0 || currentIndex >= messages.length) {
+  if (currentIndex >= messages.length) {
     return null;
   }
 
