@@ -738,6 +738,7 @@ export const GameEngine: React.FC<Props> = ({
     let anomaliesDisabled = false; // flag to disable gravity wells
     let landerFrozen = false; // flag to freeze lander while keeping loop active
     let hasLandedSuccessfully = false; // Prevents repeated landing detection
+    let timeTrialLandingHandled = false; // Prevents crash after Time Trial landing
     let messageQueue: string[] = [];
     let currentMessageIndex = 0;
     let messageTimer = 0;
@@ -1594,6 +1595,9 @@ export const GameEngine: React.FC<Props> = ({
         }, 700);
       }
       
+      // Reset Time Trial landing flag each frame
+      timeTrialLandingHandled = false;
+      
       // Check collectible pickups
       if (running && collectiblesRef.current && !crashed) {
         for (const junk of collectiblesRef.current.spaceJunk) {
@@ -1968,6 +1972,7 @@ export const GameEngine: React.FC<Props> = ({
                       setLandingType('regular');
                       setShowFireworks(true);
                     }, 500);
+                    timeTrialLandingHandled = true; // Mark as handled
                   } else {
                     // More pads to go - play landing sound once and continue
                     if (!hasPlayedLandingSoundRef.current) {
@@ -1989,6 +1994,7 @@ export const GameEngine: React.FC<Props> = ({
                     
                     // Clear interval after 5 seconds
                     setTimeout(() => clearInterval(checkInterval), 5000);
+                    timeTrialLandingHandled = true; // Mark as handled
                   }
                 } else {
                   // Wrong pad - currently just warning, no penalty
@@ -2006,6 +2012,7 @@ export const GameEngine: React.FC<Props> = ({
                   setTimeout(() => {
                     // Resume
                   }, 100);
+                  timeTrialLandingHandled = true; // Mark as handled
                 }
               } else {
                 // Non-sequenced pad in Time Trial - safe landing but no progress
@@ -2017,6 +2024,7 @@ export const GameEngine: React.FC<Props> = ({
                   hasPlayedLandingSoundRef.current = true;
                   cameraShake = 2;
                 }
+                timeTrialLandingHandled = true; // Mark as handled
               }
             } else {
               // Regular landing logic (non-time-trial)
@@ -2097,8 +2105,8 @@ export const GameEngine: React.FC<Props> = ({
                 setShowFireworks(true);
               }, delayBeforeFireworks);
             }
-          } else {
-            // crash
+          } else if (!timeTrialLandingHandled) {
+            // crash - only if Time Trial didn't already handle the landing
             running = false;
             crashed = true;
             spawnExplosion();
