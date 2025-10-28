@@ -2075,6 +2075,9 @@ export const GameEngine: React.FC<Props> = ({
               
               // Freeze lander but keep game loop running
               landerFrozen = true;
+              running = false;
+              timerActiveRef.current = false;
+              setTimerActive(false);
               vy = 0; vx = 0; av = 0;
               
               // Initialize message animation
@@ -2100,9 +2103,6 @@ export const GameEngine: React.FC<Props> = ({
               const delayBeforeFireworks = Math.max(500, messageDisplayTime + 500);
               
               setTimeout(() => {
-                running = false;
-                timerActiveRef.current = false;
-                setTimerActive(false);
                 // Ghost-beating check: prioritize active global ghost, then check local storage
                 let currentBestTime: number | null = null;
                 if (isGhostMode) {
