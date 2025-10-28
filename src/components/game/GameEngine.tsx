@@ -2007,6 +2007,16 @@ export const GameEngine: React.FC<Props> = ({
                     // Resume
                   }, 100);
                 }
+              } else {
+                // Non-sequenced pad in Time Trial - safe landing but no progress
+                y = landedPad.y - 8;
+                vy = 0; vx = 0; av = 0; angle = 0;
+                
+                if (!hasPlayedLandingSoundRef.current) {
+                  audio.current.landingCrash();
+                  hasPlayedLandingSoundRef.current = true;
+                  cameraShake = 2;
+                }
               }
             } else {
               // Regular landing logic (non-time-trial)
