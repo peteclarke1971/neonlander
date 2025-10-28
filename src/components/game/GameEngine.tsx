@@ -2101,8 +2101,17 @@ export const GameEngine: React.FC<Props> = ({
               
               setTimeout(() => {
                 running = false;
-                // Ghost-beating check: get the current best time and compare
-                const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
+                // Ghost-beating check: prioritize active global ghost, then check local storage
+                let currentBestTime: number | null = null;
+                if (isGhostMode) {
+                  // If using global ghost, get time from activeGhostRecording
+                  if (isUsingGlobalGhost && activeGhostRecording) {
+                    currentBestTime = activeGhostRecording.completionTime / 1000; // Convert ms to seconds
+                  } else {
+                    // Fall back to local ghost
+                    currentBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+                  }
+                }
                 const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
                 
                 const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
