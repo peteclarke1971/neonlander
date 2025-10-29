@@ -57,10 +57,10 @@ const createExplosion = (
   
   switch (type) {
     case 'starburst': {
-      const count = 12 + Math.floor(Math.random() * 5);
+      const count = 24 + Math.floor(Math.random() * 7);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count;
-        const speed = 2 + Math.random() * 2;
+        const speed = 3 + Math.random() * 3;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -68,7 +68,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: Math.random() > 0.3 ? neonColor : '#ffffff',
-          size: 2 + Math.random() * 2,
+          size: 3 + Math.random() * 3,
           gravity: true,
           shape: 'circle',
           rotation: 0,
@@ -78,10 +78,10 @@ const createExplosion = (
       break;
     }
     case 'spiral': {
-      const count = 10;
+      const count = 20;
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-        const speed = 1.5 + Math.random() * 1.5;
+        const speed = 2.5 + Math.random() * 2.5;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -89,7 +89,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: neonColor,
-          size: 2 + Math.random(),
+          size: 3 + Math.random() * 2,
           gravity: true,
           shape: 'diamond',
           rotation: angle,
@@ -99,10 +99,10 @@ const createExplosion = (
       break;
     }
     case 'willow': {
-      const count = 8;
+      const count = 16;
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
-        const speed = 3 + Math.random() * 2;
+        const speed = 4 + Math.random() * 3;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -110,7 +110,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: neonColor,
-          size: 2 + Math.random() * 2,
+          size: 3 + Math.random() * 3,
           gravity: true,
           shape: 'streak',
           rotation: angle,
@@ -121,11 +121,11 @@ const createExplosion = (
     }
     case 'chrysanthemum': {
       // Multi-layer burst
-      [0.6, 1.0, 1.4].forEach((layer) => {
-        const count = 8;
+      [0.6, 1.0, 1.4, 1.8].forEach((layer) => {
+        const count = 12;
         for (let i = 0; i < count; i++) {
           const angle = (Math.PI * 2 * i) / count;
-          const speed = 1.5 * layer;
+          const speed = 2 * layer;
           particles.push({
             x, y,
             vx: Math.cos(angle) * speed,
@@ -133,7 +133,7 @@ const createExplosion = (
             life: 1,
             maxLife: 1,
             color: neonColor,
-            size: 2,
+            size: 3,
             gravity: true,
             shape: Math.random() > 0.5 ? 'circle' : 'diamond',
             rotation: 0,
@@ -144,10 +144,10 @@ const createExplosion = (
       break;
     }
     case 'sparkle': {
-      const count = 6;
+      const count = 12;
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count;
-        const speed = 1 + Math.random();
+        const speed = 2 + Math.random() * 1.5;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -155,7 +155,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: Math.random() > 0.5 ? neonColor : '#ffffff',
-          size: 1.5 + Math.random(),
+          size: 2.5 + Math.random() * 1.5,
           gravity: false,
           shape: 'star',
           rotation: 0,
@@ -227,7 +227,7 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
     canvas.height = height;
 
     // Calculate target positions for letters
-    const dotSize = Math.max(8, Math.min(16, width / 80)); // Responsive dot size
+    const dotSize = Math.max(16, Math.min(32, width / 40)); // 2x larger letters // Responsive dot size
     const letterSpacing = dotSize * 2;
     const targets = getInitialsPositions(initials, width / 2, height / 2, dotSize, letterSpacing);
 
