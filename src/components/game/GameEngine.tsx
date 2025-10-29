@@ -371,6 +371,20 @@ export const GameEngine: React.FC<Props> = ({
     }
   }, []);
 
+  // Force unmount bonus messages after calculated duration
+  useEffect(() => {
+    if (showBonusMessages && bonusMessages.length > 0) {
+      const totalDuration = bonusMessages.length * 2000; // 2 seconds per message
+      const timer = setTimeout(() => {
+        setShowBonusMessages(false);
+        setBonusMessages([]);
+        hasShownBonusThisLanding.current = false;
+      }, totalDuration);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showBonusMessages, bonusMessages]);
+
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     mountedRef.current = true; // Reset on mount
