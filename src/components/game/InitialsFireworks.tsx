@@ -473,11 +473,11 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
 
       const elapsed = currentTime - startTimeRef.current;
       const quality = qualityRef.current;
-      const duration = 8000; // Total duration in ms (+2 seconds)
+      const duration = 6000; // Total duration in ms
       const launchDuration = 800; // Launch phase
       const holdDuration = 400; // Hold in formation
       const explosionStart = launchDuration + holdDuration; // 1200ms
-      const explosionDuration = 6300; // Explosion phase (+2 seconds)
+      const explosionDuration = 4300; // Explosion phase
 
       ctx.clearRect(0, 0, width, height);
 
