@@ -48,6 +48,9 @@ const Survival: React.FC = () => {
     return seed;
   });
 
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
@@ -209,6 +212,8 @@ const Survival: React.FC = () => {
             <InitialsEntry 
               score={lastResult.score}
               onSubmit={handleInitialsSubmit}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           )}
         </div>
