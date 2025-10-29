@@ -288,10 +288,6 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       };
 
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === "S" || e.key === "s") {
-          // cycle style (disabled for now)
-          e.preventDefault();
-        }
         if (e.key === "Shift" || e.key === "b" || e.key === "B") {
           // Limit boost to small nudge only; prevent spikes
           const peak = Math.min(0.22, Math.max(0.05, opts.current.speed + 0.02));
