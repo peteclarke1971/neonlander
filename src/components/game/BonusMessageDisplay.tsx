@@ -5,19 +5,33 @@ interface BonusMessageDisplayProps {
   neonColor: string;
   delayMs: number;
   onComplete: () => void;
+  skipRequested?: boolean;
 }
 
 export const BonusMessageDisplay = ({ 
   messages, 
   neonColor, 
   delayMs,
-  onComplete 
+  onComplete,
+  skipRequested = false
 }: BonusMessageDisplayProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationTime, setAnimationTime] = useState(0);
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const messageStartTimeRef = useRef<number>(0);
+
+  // Handle skip request
+  useEffect(() => {
+    if (skipRequested) {
+      onComplete();
+    }
+  }, [skipRequested, onComplete]);
+
+  // Early exit if skip requested
+  if (skipRequested) {
+    return null;
+  }
 
   useEffect(() => {
     if (messages.length === 0) {

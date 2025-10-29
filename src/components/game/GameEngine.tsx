@@ -126,6 +126,7 @@ export const GameEngine: React.FC<Props> = ({
   // Bonus message display state (separate from game loop)
   const [bonusMessages, setBonusMessages] = useState<string[]>([]);
   const [showBonusMessages, setShowBonusMessages] = useState(false);
+  const [skipCelebration, setSkipCelebration] = useState(false);
   const worldPausedRef = useRef(false);
   const playerLockedRef = useRef(false);
   const invulnerabilityTimer = useRef(0);
@@ -3008,6 +3009,7 @@ export const GameEngine: React.FC<Props> = ({
           landingType={landingType}
           neonColor={neonColor}
           isWorldRecord={isWorldRecord}
+          lowGraphics={lowGraphics}
         onComplete={async () => {
           setShowFireworks(false);
           
@@ -3189,6 +3191,12 @@ export const GameEngine: React.FC<Props> = ({
               level
             });
             
+            // Immediately hide all celebration components
+            setShowFireworks(false);
+            setShowBonusMessages(false);
+            setBonusMessages([]);
+            setSkipCelebration(true);
+            
             // Check if this is a new best time and save ghost
             let isNewBestTime = false;
             let ghostTimeDiff: number | undefined;
@@ -3301,6 +3309,7 @@ export const GameEngine: React.FC<Props> = ({
           messages={bonusMessages}
           neonColor={neonColor}
           delayMs={0}
+          skipRequested={skipCelebration}
           onComplete={() => {
             setShowBonusMessages(false);
             setBonusMessages([]);
