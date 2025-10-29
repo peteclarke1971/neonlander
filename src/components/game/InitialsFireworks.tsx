@@ -19,6 +19,7 @@ interface Particle {
   vy: number;
   life: number;
   inPosition: boolean;
+  trail: Array<{x: number, y: number}>;
 }
 
 interface ExplosionParticle {
@@ -37,6 +38,10 @@ interface ExplosionParticle {
   isRocket: boolean;
   rocketExplodeTime: number;
   hasExploded: boolean;
+  canReExplode: boolean;
+  reExplodeCount: number;
+  reExplodeThreshold: number;
+  generation: number;
 }
 
 type ExplosionType = 'starburst' | 'spiral' | 'willow' | 'chrysanthemum' | 'sparkle';
@@ -47,6 +52,8 @@ interface FireworksQuality {
   enableTrails: boolean;
   enableSecondaryExplosions: boolean;
   lifeDecayMultiplier: number;
+  enableInitialTrails: boolean;
+  initialTrailLength: number;
 }
 
 const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
@@ -56,6 +63,8 @@ const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
     enableTrails: true,
     enableSecondaryExplosions: true,
     lifeDecayMultiplier: 1.2,
+    enableInitialTrails: true,
+    initialTrailLength: 8,
   },
   medium: {
     particleMultiplier: 0.45,
@@ -63,6 +72,8 @@ const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
     enableTrails: false,
     enableSecondaryExplosions: true,
     lifeDecayMultiplier: 1.4,
+    enableInitialTrails: true,
+    initialTrailLength: 5,
   },
   low: {
     particleMultiplier: 0.25,
@@ -70,6 +81,8 @@ const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
     enableTrails: false,
     enableSecondaryExplosions: false,
     lifeDecayMultiplier: 2.0,
+    enableInitialTrails: false,
+    initialTrailLength: 0,
   },
 };
 
@@ -91,6 +104,44 @@ const getRandomFireworkColor = (baseColor: string): string => {
   if (rand < 0.7) return '#ffffff';
   if (rand < 0.85) return '#ffaa00';
   return '#ff00ff';
+};
+
+const createSparkleExplosion = (
+  x: number, 
+  y: number, 
+  neonColor: string, 
+  generation: number
+): ExplosionParticle[] => {
+  const particles: ExplosionParticle[] = [];
+  const count = Math.max(8, 15 - generation * 3);
+  
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.8;
+    const speed = (2 + Math.random() * 2) * (1 - generation * 0.2);
+    
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.6 - generation * 0.15,
+      maxLife: 0.6 - generation * 0.15,
+      color: getRandomFireworkColor(neonColor),
+      size: 0.8 + Math.random() * 0.7,
+      gravity: true,
+      shape: Math.random() > 0.5 ? 'circle' : 'star',
+      rotation: 0,
+      rotationSpeed: 0.3,
+      isRocket: false,
+      rocketExplodeTime: 0,
+      hasExploded: false,
+      canReExplode: generation < 2,
+      reExplodeCount: 2 - generation,
+      reExplodeThreshold: 0.3 + Math.random() * 0.2,
+      generation: generation,
+    });
+  }
+  
+  return particles;
 };
 
 const createExplosion = (
@@ -128,6 +179,10 @@ const createExplosion = (
           isRocket,
           rocketExplodeTime: 0.4 + Math.random() * 0.3,
           hasExploded: false,
+          canReExplode: Math.random() < 0.15,
+          reExplodeCount: Math.random() < 0.5 ? 1 : 2,
+          reExplodeThreshold: 0.4 + Math.random() * 0.2,
+          generation: 0,
         });
       }
       break;
@@ -153,6 +208,10 @@ const createExplosion = (
           isRocket: false,
           rocketExplodeTime: 0,
           hasExploded: false,
+          canReExplode: Math.random() < 0.15,
+          reExplodeCount: Math.random() < 0.5 ? 1 : 2,
+          reExplodeThreshold: 0.4 + Math.random() * 0.2,
+          generation: 0,
         });
       }
       break;
@@ -178,6 +237,10 @@ const createExplosion = (
           isRocket: false,
           rocketExplodeTime: 0,
           hasExploded: false,
+          canReExplode: Math.random() < 0.15,
+          reExplodeCount: Math.random() < 0.5 ? 1 : 2,
+          reExplodeThreshold: 0.4 + Math.random() * 0.2,
+          generation: 0,
         });
       }
       break;
@@ -206,6 +269,10 @@ const createExplosion = (
             isRocket,
             rocketExplodeTime: 0.5 + Math.random() * 0.2,
             hasExploded: false,
+            canReExplode: Math.random() < 0.15,
+            reExplodeCount: Math.random() < 0.5 ? 1 : 2,
+            reExplodeThreshold: 0.4 + Math.random() * 0.2,
+            generation: 0,
           });
         }
       });
@@ -232,6 +299,10 @@ const createExplosion = (
           isRocket: false,
           rocketExplodeTime: 0,
           hasExploded: false,
+          canReExplode: Math.random() < 0.15,
+          reExplodeCount: Math.random() < 0.5 ? 1 : 2,
+          reExplodeThreshold: 0.4 + Math.random() * 0.2,
+          generation: 0,
         });
       }
       break;
@@ -264,6 +335,10 @@ const createSecondaryExplosion = (x: number, y: number, type: 'mini-starburst' |
       isRocket: false,
       rocketExplodeTime: 0,
       hasExploded: false,
+      canReExplode: false,
+      reExplodeCount: 0,
+      reExplodeThreshold: 0,
+      generation: 1,
     });
   }
   
@@ -351,7 +426,8 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
         vx: 0,
         vy: 0,
         life: 1.0,
-        inPosition: false
+        inPosition: false,
+        trail: []
       };
     });
 
@@ -397,11 +473,11 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
 
       const elapsed = currentTime - startTimeRef.current;
       const quality = qualityRef.current;
-      const duration = 6000; // Total duration in ms
+      const duration = 8000; // Total duration in ms (+2 seconds)
       const launchDuration = 800; // Launch phase
       const holdDuration = 400; // Hold in formation
       const explosionStart = launchDuration + holdDuration; // 1200ms
-      const explosionDuration = 4300; // Explosion phase
+      const explosionDuration = 6300; // Explosion phase (+2 seconds)
 
       ctx.clearRect(0, 0, width, height);
 
@@ -414,6 +490,12 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
           // Move toward target
           p.x = p.x + (p.targetX - p.x) * easeProgress * 0.15;
           p.y = p.y + (p.targetY - p.y) * easeProgress * 0.15;
+
+          // Record trail position
+          if (quality.enableInitialTrails) {
+            p.trail.push({x: p.x, y: p.y});
+            if (p.trail.length > quality.initialTrailLength) p.trail.shift();
+          }
 
           // Check if in position
           const dx = p.targetX - p.x;
@@ -466,6 +548,15 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
             explosionParticlesRef.current.push(...secondaryParticles);
           }
           
+          // Check for multi-stage sparkle explosions
+          if (quality.enableSecondaryExplosions && p.canReExplode && p.reExplodeCount > 0 && p.life < p.reExplodeThreshold && !p.hasExploded) {
+            p.hasExploded = true;
+            p.canReExplode = false;
+            const sparkles = createSparkleExplosion(p.x, p.y, neonColor, p.generation + 1);
+            explosionParticlesRef.current.push(...sparkles);
+            p.life = 0;
+          }
+          
           // Optimized physics - combined operations
           p.x += p.vx;
           p.y += p.vy;
@@ -494,6 +585,19 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
 
       particles.forEach(p => {
         if (p.life <= 0) return;
+        
+        // Render trail first (behind particle)
+        if (elapsed < launchDuration && quality.enableInitialTrails && p.trail.length > 0) {
+          p.trail.forEach((pos, i) => {
+            const trailAlpha = (i / p.trail.length) * 0.6 * p.life;
+            const trailSize = 3 * (i / p.trail.length);
+            ctx.globalAlpha = trailAlpha;
+            ctx.fillStyle = neonColor;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, trailSize, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
         
         // Pulsing effect during hold phase
         let pulseOpacity = p.life;
