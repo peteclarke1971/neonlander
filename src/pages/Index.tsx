@@ -93,6 +93,9 @@ const Index = () => {
   const [lastPlayedLevel, setLastPlayedLevel] = useState<number>(0);
   const [gameKey, setGameKey] = useState(0); // Force GameEngine remount
 
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
+
   // Refs for gameover navigation
   const contRef = useRef<HTMLButtonElement>(null);
   const homeRef = useRef<HTMLButtonElement>(null);
@@ -897,7 +900,8 @@ const retryGame = () => {
             {lastResult.cause !== "success" && needsInitials && (
               <InitialsEntry
                 score={lastResult.score}
-                onSubmit={(initials) => {
+                neonColor={neonColor}
+                onInitialsConfirmed={(initials) => {
                   const hs: HighScore = { initials, score: lastResult.score, difficulty: lastResult.difficulty, date: Date.now() };
                   if (mode === "fixed") {
                     const list = [...fixedScores, hs].sort((a, b) => b.score - a.score).slice(0, 5);
@@ -922,6 +926,7 @@ const retryGame = () => {
                   setNeedsInitials(false);
                   setTimeout(() => { setGoIndex(0); homeRef.current?.focus(); }, 0);
                 }}
+                onSubmit={(initials) => {}}
               />
             )}
 
@@ -938,7 +943,8 @@ const retryGame = () => {
                 return shouldShow ? (
                   <InitialsEntry
                     score={0}
-                    onSubmit={async (initials) => {
+                    neonColor={neonColor}
+                    onInitialsConfirmed={async (initials) => {
                   try {
                     const { submitTimeTrialScore } = await import('@/lib/leaderboard');
                     await submitTimeTrialScore(
@@ -1026,6 +1032,7 @@ const retryGame = () => {
                     setNeedsInitials(false);
                     setTimeTrialRecordPending(null);
                   }}
+                  onSubmit={async (initials) => {}}
                 />
                 ) : null;
               })()}

@@ -22,6 +22,9 @@ export default function AsteroidsColor() {
   const [view, setView] = useState<View>("home");
   const [difficulty, setDifficulty] = useState<string>("Normal");
   const [lastResult, setLastResult] = useState<ColorOrderGameOverData | null>(null);
+  
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
   const [swapButtons, setSwapButtons] = useState(() => {
     return localStorage.getItem("asteroids_swap_buttons") === "true";
   });
@@ -275,6 +278,8 @@ export default function AsteroidsColor() {
             <InitialsEntry
               score={lastResult.score}
               onSubmit={handleInitialsSubmit}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           ) : (
             <div className="space-y-4">

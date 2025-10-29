@@ -21,6 +21,9 @@ const NeonDocking: React.FC = () => {
   const [startLevel, setStartLevel] = useState<number>(1);
   const [showGhost, setShowGhost] = useState<boolean>(false);
   const [lastResult, setLastResult] = useState<OrbitalDockingGameOverData | null>(null);
+  
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
   const ghostManager = useRef(new GhostManager());
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
@@ -417,6 +420,8 @@ const NeonDocking: React.FC = () => {
             <InitialsEntry
               onSubmit={handleInitialsSubmit}
               score={lastResult.score}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           </div>
         ) : lastResult?.cause === "crash" ? (

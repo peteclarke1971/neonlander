@@ -21,6 +21,9 @@ const Asteroids: React.FC = () => {
   const [view, setView] = useState<View>("home");
   const [difficulty, setDifficulty] = useState<string>("normal");
   const [lastResult, setLastResult] = useState<AsteroidsGameOverData | null>(null);
+  
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
   const [swapButtons, setSwapButtons] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem("asteroids-swap-buttons");
@@ -269,6 +272,8 @@ const Asteroids: React.FC = () => {
             <InitialsEntry
               onSubmit={handleInitialsSubmit}
               score={lastResult.score}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           </div>
         ) : (

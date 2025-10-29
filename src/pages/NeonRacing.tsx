@@ -23,6 +23,9 @@ const NeonRacing: React.FC = () => {
   const [mode, setMode] = useState<"time-trial" | "grand-prix" | "endless">("time-trial");
   const [startTrack, setStartTrack] = useState<number>(1);
   const [lastResult, setLastResult] = useState<SpaceRaceGameOverData | null>(null);
+  
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -425,6 +428,8 @@ const NeonRacing: React.FC = () => {
             <InitialsEntry
               onSubmit={handleInitialsSubmit}
               score={lastResult.score}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           </div>
         ) : (

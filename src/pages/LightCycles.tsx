@@ -22,6 +22,9 @@ const LightCycles: React.FC = () => {
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [startLevel, setStartLevel] = useState<number>(1);
   const [lastResult, setLastResult] = useState<LightCyclesGameOverData | null>(null);
+  
+  // Get neon color from CSS
+  const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
@@ -396,6 +399,8 @@ const LightCycles: React.FC = () => {
             <InitialsEntry
               onSubmit={handleInitialsSubmit}
               score={lastResult.score}
+              neonColor={neonColor}
+              onInitialsConfirmed={handleInitialsSubmit}
             />
           </div>
         ) : (
