@@ -20,10 +20,12 @@ export const BonusMessageDisplay = ({
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const messageStartTimeRef = useRef<number>(0);
+  const isAnimatingRef = useRef<boolean>(false);
 
   // Handle skip request
   useEffect(() => {
     if (skipRequested) {
+      isAnimatingRef.current = false;
       onComplete();
     }
   }, [skipRequested, onComplete]);
@@ -34,10 +36,18 @@ export const BonusMessageDisplay = ({
   }
 
   useEffect(() => {
+    // If already animating, don't restart
+    if (isAnimatingRef.current) {
+      return;
+    }
+
     if (messages.length === 0) {
       onComplete();
       return;
     }
+
+    // Mark as animating
+    isAnimatingRef.current = true;
 
     const MESSAGE_DURATION = 2000; // 2 seconds per message
     let animationStarted = false;
@@ -71,6 +81,7 @@ export const BonusMessageDisplay = ({
 
         // Check if all messages shown
         if (messageIndex >= messages.length) {
+          isAnimatingRef.current = false;
           onComplete();
           return;
         }
@@ -85,6 +96,7 @@ export const BonusMessageDisplay = ({
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
+      isAnimatingRef.current = false;
     };
   }, [messages, delayMs]);
 
