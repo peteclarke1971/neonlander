@@ -33,17 +33,28 @@ interface ExplosionParticle {
   shape: 'circle' | 'star' | 'diamond' | 'streak';
   rotation: number;
   rotationSpeed: number;
+  isRocket: boolean;
+  rocketExplodeTime: number;
+  hasExploded: boolean;
 }
 
 type ExplosionType = 'starburst' | 'spiral' | 'willow' | 'chrysanthemum' | 'sparkle';
 
 const selectExplosionType = (): ExplosionType => {
   const rand = Math.random();
-  if (rand < 0.4) return 'starburst';
-  if (rand < 0.6) return 'spiral';
-  if (rand < 0.8) return 'willow';
-  if (rand < 0.9) return 'chrysanthemum';
+  if (rand < 0.25) return 'starburst';
+  if (rand < 0.45) return 'spiral';
+  if (rand < 0.65) return 'willow';
+  if (rand < 0.85) return 'chrysanthemum';
   return 'sparkle';
+};
+
+const getRandomFireworkColor = (baseColor: string): string => {
+  const rand = Math.random();
+  if (rand < 0.5) return baseColor;
+  if (rand < 0.7) return '#ffffff';
+  if (rand < 0.85) return '#ffaa00';
+  return '#ff00ff';
 };
 
 const createExplosion = (
@@ -53,68 +64,77 @@ const createExplosion = (
   neonColor: string
 ): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
-  const shapes: ExplosionParticle['shape'][] = ['circle', 'star', 'diamond', 'streak'];
   
   switch (type) {
     case 'starburst': {
-      const count = 24 + Math.floor(Math.random() * 7);
+      const count = 48 + Math.floor(Math.random() * 13);
       for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count;
-        const speed = 3 + Math.random() * 3;
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+        const speed = (4 + Math.random() * 4) * (0.8 + Math.random() * 0.4);
+        const isRocket = Math.random() < 0.25;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
           maxLife: 1,
-          color: Math.random() > 0.3 ? neonColor : '#ffffff',
-          size: 3 + Math.random() * 3,
+          color: getRandomFireworkColor(neonColor),
+          size: 4.5 + Math.random() * 4.5,
           gravity: true,
           shape: 'circle',
           rotation: 0,
-          rotationSpeed: 0
+          rotationSpeed: 0,
+          isRocket,
+          rocketExplodeTime: 0.4 + Math.random() * 0.3,
+          hasExploded: false,
         });
       }
       break;
     }
     case 'spiral': {
-      const count = 20;
+      const count = 40;
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-        const speed = 2.5 + Math.random() * 2.5;
+        const speed = (3.5 + Math.random() * 3.5) * (0.8 + Math.random() * 0.4);
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
           maxLife: 1,
-          color: neonColor,
-          size: 3 + Math.random() * 2,
+          color: getRandomFireworkColor(neonColor),
+          size: 4.5 + Math.random() * 3,
           gravity: true,
           shape: 'diamond',
           rotation: angle,
-          rotationSpeed: 0.1
+          rotationSpeed: 0.1,
+          isRocket: false,
+          rocketExplodeTime: 0,
+          hasExploded: false,
         });
       }
       break;
     }
     case 'willow': {
-      const count = 16;
+      const count = 32;
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
-        const speed = 4 + Math.random() * 3;
+        const speed = (5 + Math.random() * 4) * (0.8 + Math.random() * 0.4);
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
           maxLife: 1,
-          color: neonColor,
-          size: 3 + Math.random() * 3,
+          color: getRandomFireworkColor(neonColor),
+          size: 4.5 + Math.random() * 4.5,
           gravity: true,
           shape: 'streak',
           rotation: angle,
-          rotationSpeed: 0.05
+          rotationSpeed: 0,
+          isRocket: false,
+          rocketExplodeTime: 0,
+          hasExploded: false,
         });
       }
       break;
@@ -122,48 +142,84 @@ const createExplosion = (
     case 'chrysanthemum': {
       // Multi-layer burst
       [0.6, 1.0, 1.4, 1.8].forEach((layer) => {
-        const count = 12;
+        const count = 24;
         for (let i = 0; i < count; i++) {
-          const angle = (Math.PI * 2 * i) / count;
-          const speed = 2 * layer;
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+          const speed = (3 * layer) * (0.8 + Math.random() * 0.4);
+          const isRocket = Math.random() < 0.2;
           particles.push({
             x, y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             life: 1,
             maxLife: 1,
-            color: neonColor,
-            size: 3,
+            color: getRandomFireworkColor(neonColor),
+            size: 4.5,
             gravity: true,
             shape: Math.random() > 0.5 ? 'circle' : 'diamond',
             rotation: 0,
-            rotationSpeed: 0.05
+            rotationSpeed: 0.05,
+            isRocket,
+            rocketExplodeTime: 0.5 + Math.random() * 0.2,
+            hasExploded: false,
           });
         }
       });
       break;
     }
     case 'sparkle': {
-      const count = 12;
+      const count = 24;
       for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count;
-        const speed = 2 + Math.random() * 1.5;
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+        const speed = (3 + Math.random() * 2) * (0.8 + Math.random() * 0.4);
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
           maxLife: 1,
-          color: Math.random() > 0.5 ? neonColor : '#ffffff',
-          size: 2.5 + Math.random() * 1.5,
+          color: getRandomFireworkColor(neonColor),
+          size: 3.75 + Math.random() * 2.25,
           gravity: false,
           shape: 'star',
           rotation: 0,
-          rotationSpeed: 0.15
+          rotationSpeed: 0.2,
+          isRocket: false,
+          rocketExplodeTime: 0,
+          hasExploded: false,
         });
       }
       break;
     }
+  }
+  
+  return particles;
+};
+
+const createSecondaryExplosion = (x: number, y: number, type: 'mini-starburst' | 'mini-sparkle', neonColor: string): ExplosionParticle[] => {
+  const particles: ExplosionParticle[] = [];
+  const count = 5 + Math.floor(Math.random() * 6);
+  
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const speed = (2 + Math.random() * 3) * 1.5;
+    
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.8,
+      maxLife: 0.8,
+      color: getRandomFireworkColor(neonColor),
+      size: 2 + Math.random() * 2,
+      gravity: type === 'mini-starburst',
+      shape: type === 'mini-starburst' ? 'circle' : 'star',
+      rotation: 0,
+      rotationSpeed: type === 'mini-sparkle' ? 0.3 : 0,
+      isRocket: false,
+      rocketExplodeTime: 0,
+      hasExploded: false,
+    });
   }
   
   return particles;
@@ -258,11 +314,11 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
       if (skipped) return;
 
       const elapsed = currentTime - startTimeRef.current;
-      const duration = 4000; // Total duration in ms
+      const duration = 6000; // Total duration in ms
       const launchDuration = 800; // Launch phase
       const holdDuration = 400; // Hold in formation
       const explosionStart = launchDuration + holdDuration; // 1200ms
-      const explosionDuration = 2300; // Explosion phase
+      const explosionDuration = 4300; // Explosion phase
 
       ctx.clearRect(0, 0, width, height);
 
@@ -314,6 +370,14 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
         for (let i = explosionParticles.length - 1; i >= 0; i--) {
           const p = explosionParticles[i];
           
+          // Check for secondary explosions
+          if (p.isRocket && !p.hasExploded && p.life < p.rocketExplodeTime) {
+            p.hasExploded = true;
+            const secondaryType = Math.random() > 0.5 ? 'mini-starburst' : 'mini-sparkle';
+            const secondaryParticles = createSecondaryExplosion(p.x, p.y, secondaryType, neonColor);
+            explosionParticlesRef.current.push(...secondaryParticles);
+          }
+          
           // Physics
           p.x += p.vx;
           p.y += p.vy;
@@ -325,7 +389,7 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
           p.rotation += p.rotationSpeed;
           
           // Life decay
-          p.life -= 0.015;
+          p.life -= 0.01;
           
           // Remove dead particles
           if (p.life <= 0) {
@@ -364,11 +428,36 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
       // Render explosion particles
       const explosionParticles = explosionParticlesRef.current;
       explosionParticles.forEach(p => {
+        const alpha = Math.max(0, p.life);
+        
+        // Add trail effects for streak particles
+        if (p.shape === 'streak') {
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = p.color;
+          
+          const trailLength = 3;
+          for (let t = 0; t < trailLength; t++) {
+            const trailAlpha = (1 - t / trailLength) * 0.3;
+            ctx.globalAlpha = alpha * trailAlpha;
+            const trailX = p.x - p.vx * t * 2;
+            const trailY = p.y - p.vy * t * 2;
+            ctx.save();
+            ctx.translate(trailX, trailY);
+            ctx.rotate(p.rotation);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          ctx.shadowBlur = 0;
+        }
+        
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.shadowBlur = 10;
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = p.shape === 'streak' ? 20 : 10;
         ctx.shadowColor = p.color;
         ctx.fillStyle = p.color;
         
