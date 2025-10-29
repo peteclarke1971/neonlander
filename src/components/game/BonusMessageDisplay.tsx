@@ -86,7 +86,7 @@ export const BonusMessageDisplay = ({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [messages, delayMs, onComplete]);
+  }, [messages, delayMs]);
 
   if (currentIndex >= messages.length) {
     return null;
