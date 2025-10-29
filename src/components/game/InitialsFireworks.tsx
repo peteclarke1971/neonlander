@@ -51,25 +51,25 @@ interface FireworksQuality {
 
 const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
   high: {
-    particleMultiplier: 1.0,
-    shadowBlur: 15,
+    particleMultiplier: 0.7,
+    shadowBlur: 10,
     enableTrails: true,
     enableSecondaryExplosions: true,
-    lifeDecayMultiplier: 1.0,
+    lifeDecayMultiplier: 1.2,
   },
   medium: {
-    particleMultiplier: 0.6,
-    shadowBlur: 8,
+    particleMultiplier: 0.45,
+    shadowBlur: 6,
     enableTrails: false,
     enableSecondaryExplosions: true,
-    lifeDecayMultiplier: 1.0,
+    lifeDecayMultiplier: 1.4,
   },
   low: {
-    particleMultiplier: 0.35,
-    shadowBlur: 4,
+    particleMultiplier: 0.25,
+    shadowBlur: 3,
     enableTrails: false,
     enableSecondaryExplosions: false,
-    lifeDecayMultiplier: 1.5,
+    lifeDecayMultiplier: 2.0,
   },
 };
 
@@ -102,14 +102,17 @@ const createExplosion = (
 ): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
   
+  // Add size variance to entire explosion
+  const explosionScale = 0.6 + Math.random() * 0.8; // 0.6x to 1.4x
+  
   switch (type) {
     case 'starburst': {
       const baseCount = 48 + Math.floor(Math.random() * 13);
-      const count = Math.floor(baseCount * quality.particleMultiplier);
+      const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const speed = (4 + Math.random() * 4) * (0.8 + Math.random() * 0.4);
-        const isRocket = Math.random() < 0.25;
+        const speed = (4 + Math.random() * 4) * (0.8 + Math.random() * 0.4) * explosionScale;
+        const isRocket = Math.random() < 0.15; // Reduced from 0.25
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -117,7 +120,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
-          size: 4.5 + Math.random() * 4.5,
+          size: (1.8 + Math.random() * 1.8) * explosionScale, // 60% smaller
           gravity: true,
           shape: 'circle',
           rotation: 0,
@@ -131,10 +134,10 @@ const createExplosion = (
     }
     case 'spiral': {
       const baseCount = 40;
-      const count = Math.floor(baseCount * quality.particleMultiplier);
+      const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-        const speed = (3.5 + Math.random() * 3.5) * (0.8 + Math.random() * 0.4);
+        const speed = (3.5 + Math.random() * 3.5) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -142,7 +145,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
-          size: 4.5 + Math.random() * 3,
+          size: (1.8 + Math.random() * 1.2) * explosionScale, // 60% smaller
           gravity: true,
           shape: 'diamond',
           rotation: angle,
@@ -156,10 +159,10 @@ const createExplosion = (
     }
     case 'willow': {
       const baseCount = 32;
-      const count = Math.floor(baseCount * quality.particleMultiplier);
+      const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
-        const speed = (5 + Math.random() * 4) * (0.8 + Math.random() * 0.4);
+        const speed = (5 + Math.random() * 4) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -167,7 +170,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
-          size: 4.5 + Math.random() * 4.5,
+          size: (1.8 + Math.random() * 1.8) * explosionScale, // 60% smaller
           gravity: true,
           shape: 'streak',
           rotation: angle,
@@ -183,11 +186,11 @@ const createExplosion = (
       // Multi-layer burst
       [0.6, 1.0, 1.4, 1.8].forEach((layer) => {
         const baseCount = 24;
-        const count = Math.floor(baseCount * quality.particleMultiplier);
+        const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
         for (let i = 0; i < count; i++) {
           const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-          const speed = (3 * layer) * (0.8 + Math.random() * 0.4);
-          const isRocket = Math.random() < 0.2;
+          const speed = (3 * layer) * (0.8 + Math.random() * 0.4) * explosionScale;
+          const isRocket = Math.random() < 0.1; // Reduced from 0.2
           particles.push({
             x, y,
             vx: Math.cos(angle) * speed,
@@ -195,7 +198,7 @@ const createExplosion = (
             life: 1,
             maxLife: 1,
             color: getRandomFireworkColor(neonColor),
-            size: 4.5,
+            size: (1.8 + Math.random() * 0.9) * explosionScale, // 60% smaller
             gravity: true,
             shape: Math.random() > 0.5 ? 'circle' : 'diamond',
             rotation: 0,
@@ -210,10 +213,10 @@ const createExplosion = (
     }
     case 'sparkle': {
       const baseCount = 24;
-      const count = Math.floor(baseCount * quality.particleMultiplier);
+      const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const speed = (3 + Math.random() * 2) * (0.8 + Math.random() * 0.4);
+        const speed = (3 + Math.random() * 2) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
@@ -221,7 +224,7 @@ const createExplosion = (
           life: 1,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
-          size: 3.75 + Math.random() * 2.25,
+          size: (1.5 + Math.random() * 0.9) * explosionScale, // 60% smaller
           gravity: false,
           shape: 'star',
           rotation: 0,
@@ -253,7 +256,7 @@ const createSecondaryExplosion = (x: number, y: number, type: 'mini-starburst' |
       life: 0.8,
       maxLife: 0.8,
       color: getRandomFireworkColor(neonColor),
-      size: 2 + Math.random() * 2,
+      size: 1.2 + Math.random() * 0.8, // 60% smaller
       gravity: type === 'mini-starburst',
       shape: type === 'mini-starburst' ? 'circle' : 'star',
       rotation: 0,
@@ -283,7 +286,7 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
   const lastFrameTimeRef = useRef<number>(0);
   const frameSkipCountRef = useRef<number>(0);
   const qualityRef = useRef<FireworksQuality>(
-    isDesktopDevice() ? QUALITY_TIERS.high : QUALITY_TIERS.medium
+    QUALITY_TIERS.medium // Start with medium quality for all devices
   );
   const [skipped, setSkipped] = useState(false);
 
@@ -449,8 +452,11 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
         const explosionParticles = explosionParticlesRef.current;
         const lifeDecay = 0.01 * quality.lifeDecayMultiplier;
         
-        for (let i = explosionParticles.length - 1; i >= 0; i--) {
+        // Mark-and-sweep instead of splice
+        for (let i = 0; i < explosionParticles.length; i++) {
           const p = explosionParticles[i];
+          
+          if (p.life <= 0) continue; // Skip dead particles
           
           // Check for secondary explosions (quality-gated)
           if (quality.enableSecondaryExplosions && p.isRocket && !p.hasExploded && p.life < p.rocketExplodeTime) {
@@ -467,11 +473,12 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
           p.vy = p.gravity ? (p.vy + GRAVITY) * AIR_RESISTANCE : p.vy * AIR_RESISTANCE;
           p.rotation += p.rotationSpeed;
           p.life -= lifeDecay;
-          
-          // Remove dead particles
-          if (p.life <= 0) {
-            explosionParticles.splice(i, 1);
-          }
+        }
+        
+        // Periodic cleanup (every 3 frames)
+        const frameCount = Math.floor(elapsed / 16);
+        if (frameCount % 3 === 0) {
+          explosionParticlesRef.current = explosionParticlesRef.current.filter(p => p.life > 0);
         }
       }
       // Complete
@@ -505,85 +512,92 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
       // Render explosion particles with batch rendering
       const explosionParticles = explosionParticlesRef.current;
       
-      // Group particles by shape for batch rendering
-      const particlesByShape: Record<string, ExplosionParticle[]> = {
-        circle: [],
-        star: [],
-        diamond: [],
-        streak: []
-      };
-      
       // Viewport culling margin
       const margin = 100;
       
-      explosionParticles.forEach(p => {
-        // Cull particles outside viewport
-        if (p.x < -margin || p.x > width + margin || p.y < -margin || p.y > height + margin) {
-          return;
-        }
-        particlesByShape[p.shape].push(p);
-      });
-      
-      // Render each shape group with shared state
-      Object.entries(particlesByShape).forEach(([shape, shapeParticles]) => {
-        if (shapeParticles.length === 0) return;
+      // Low quality: batch-fill all circles
+      if (quality.particleMultiplier < 0.5) {
+        ctx.shadowBlur = quality.shadowBlur;
+        ctx.shadowColor = neonColor;
+        ctx.fillStyle = neonColor;
         
-        // Set shadow state once per shape group
-        ctx.shadowBlur = shape === 'streak' ? quality.shadowBlur * 1.3 : quality.shadowBlur * 0.7;
-        
-        shapeParticles.forEach(p => {
-          const alpha = Math.max(0, p.life);
-          
-          // Render trails only on high quality for streak particles
-          if (p.shape === 'streak' && quality.enableTrails) {
-            ctx.shadowColor = p.color;
-            const trailLength = 3;
-            for (let t = 0; t < trailLength; t++) {
-              const trailAlpha = (1 - t / trailLength) * 0.3;
-              ctx.globalAlpha = alpha * trailAlpha;
-              const trailX = p.x - p.vx * t * 2;
-              const trailY = p.y - p.vy * t * 2;
-              ctx.save();
-              ctx.translate(trailX, trailY);
-              ctx.rotate(p.rotation);
-              ctx.fillStyle = p.color;
-              ctx.beginPath();
-              ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.8, 0, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.restore();
-            }
-          }
-          
-          // Main particle rendering
-          ctx.globalAlpha = alpha;
-          ctx.shadowColor = p.color;
-          ctx.fillStyle = p.color;
-          
-          // Simplified rendering on low quality
-          if (quality.particleMultiplier < 0.5) {
-            // Render all as circles for better performance
-            ctx.beginPath();
+        // Batch-render all particles as circles in one path
+        ctx.beginPath();
+        explosionParticles.forEach(p => {
+          if (p.life > 0 && p.x >= -margin && p.x <= width + margin && p.y >= -margin && p.y <= height + margin) {
+            ctx.globalAlpha = Math.max(0, p.life);
+            ctx.moveTo(p.x + p.size, p.y);
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            // Full rendering with shapes
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rotation);
+          }
+        });
+        ctx.fill();
+      } else {
+        // Medium/High quality: full shape rendering with optimizations
+        
+        // Group particles by shape for batch rendering
+        const particlesByShape: Record<string, ExplosionParticle[]> = {
+          circle: [],
+          star: [],
+          diamond: [],
+          streak: []
+        };
+        
+        explosionParticles.forEach(p => {
+          // Cull particles outside viewport
+          if (p.life <= 0 || p.x < -margin || p.x > width + margin || p.y < -margin || p.y > height + margin) {
+            return;
+          }
+          particlesByShape[p.shape].push(p);
+        });
+        
+        // Render each shape group with shared state
+        Object.entries(particlesByShape).forEach(([shape, shapeParticles]) => {
+          if (shapeParticles.length === 0) return;
+          
+          // Set shadow state once per shape group (fixed leak)
+          ctx.shadowBlur = shape === 'streak' ? quality.shadowBlur * 1.3 : quality.shadowBlur * 0.7;
+          ctx.shadowColor = neonColor; // Single color, not per-particle
+          
+          shapeParticles.forEach(p => {
+            const alpha = Math.max(0, p.life);
+            
+            // Render trails only on high quality for streak particles (reduced to 2 segments)
+            if (p.shape === 'streak' && quality.enableTrails) {
+              const trailLength = 2; // Reduced from 3
+              for (let t = 0; t < trailLength; t++) {
+                const trailAlpha = (1 - t / trailLength) * 0.3;
+                ctx.globalAlpha = alpha * trailAlpha;
+                const trailX = p.x - p.vx * t * 2;
+                const trailY = p.y - p.vy * t * 2;
+                ctx.save();
+                ctx.translate(trailX, trailY);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+              }
+            }
+            
+            // Main particle rendering - NO save/restore for shapes
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
             
             switch (p.shape) {
               case 'circle':
                 ctx.beginPath();
-                ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fill();
                 break;
               case 'star':
+                // Render star without save/restore
                 ctx.beginPath();
                 for (let i = 0; i < 5; i++) {
-                  const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                  const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2 + p.rotation;
                   const r = i % 2 === 0 ? p.size : p.size / 2;
-                  const x = Math.cos(angle) * r;
-                  const y = Math.sin(angle) * r;
+                  const x = p.x + Math.cos(angle) * r;
+                  const y = p.y + Math.sin(angle) * r;
                   if (i === 0) ctx.moveTo(x, y);
                   else ctx.lineTo(x, y);
                 }
@@ -591,25 +605,25 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
                 ctx.fill();
                 break;
               case 'diamond':
+                // Render diamond without save/restore
                 ctx.beginPath();
-                ctx.moveTo(0, -p.size);
-                ctx.lineTo(p.size, 0);
-                ctx.lineTo(0, p.size);
-                ctx.lineTo(-p.size, 0);
+                ctx.moveTo(p.x, p.y - p.size);
+                ctx.lineTo(p.x + p.size, p.y);
+                ctx.lineTo(p.x, p.y + p.size);
+                ctx.lineTo(p.x - p.size, p.y);
                 ctx.closePath();
                 ctx.fill();
                 break;
               case 'streak':
+                // Render streak as simple ellipse without save/restore
                 ctx.beginPath();
-                ctx.ellipse(0, 0, p.size * 2, p.size, 0, 0, Math.PI * 2);
+                ctx.ellipse(p.x, p.y, p.size * 2, p.size, p.rotation, 0, Math.PI * 2);
                 ctx.fill();
                 break;
             }
-            
-            ctx.restore();
-          }
+          });
         });
-      });
+      }
 
       ctx.globalAlpha = 1.0;
       animationRef.current = requestAnimationFrame(animate);
