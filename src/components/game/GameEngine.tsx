@@ -1778,10 +1778,10 @@ export const GameEngine: React.FC<Props> = ({
                  setLandingType(padType);
                  setShowFireworks(true);
                  
-                  // Trigger bonus message display
-                  if (bonusMessages.length > 0) {
-                    setShowBonusMessages(true);
-                  }
+                 // Trigger bonus message display
+                 if (messages.length > 0) {
+                   setShowBonusMessages(true);
+                 }
                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -1852,7 +1852,7 @@ export const GameEngine: React.FC<Props> = ({
               setShowFireworks(true);
               
               // Trigger bonus message display
-              if (bonusMessages.length > 0) {
+              if (messages.length > 0) {
                 setShowBonusMessages(true);
               }
             }, 500);
@@ -2027,7 +2027,7 @@ export const GameEngine: React.FC<Props> = ({
                 setShowFireworks(true);
                 
                 // Trigger bonus message display
-                if (bonusMessages.length > 0) {
+                if (messages.length > 0) {
                   setShowBonusMessages(true);
                 }
               }, 500);
