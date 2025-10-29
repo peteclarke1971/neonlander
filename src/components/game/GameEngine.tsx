@@ -130,6 +130,7 @@ export const GameEngine: React.FC<Props> = ({
   const worldPausedRef = useRef(false);
   const playerLockedRef = useRef(false);
   const invulnerabilityTimer = useRef(0);
+  const hasShownBonusThisLanding = useRef(false);
   
   // Timer state for speed bonus calculation
   const [timerActive, setTimerActive] = useState(false);
@@ -623,6 +624,7 @@ export const GameEngine: React.FC<Props> = ({
     let elapsed = 0;
     let running = true;
     let crashed = false;
+    hasShownBonusThisLanding.current = false; // Reset flag at level start
 
     // Ghost recording and playback initialization
     let gameTime = 0;
@@ -1759,8 +1761,9 @@ export const GameEngine: React.FC<Props> = ({
               const messages: string[] = [];
               if (speedBonus) messages.push("500 POINT SPEED BONUS");
               if (bullseye) messages.push("500 POINT BULLSEYE");
-              if (messages.length > 0) {
+              if (messages.length > 0 && !hasShownBonusThisLanding.current) {
                 setBonusMessages(messages);
+                hasShownBonusThisLanding.current = true;
               }
               
               cameraShake = 6;
@@ -1775,10 +1778,10 @@ export const GameEngine: React.FC<Props> = ({
                  setLandingType(padType);
                  setShowFireworks(true);
                  
-                 // Trigger bonus message display
-                 if (messages.length > 0) {
-                   setShowBonusMessages(true);
-                 }
+                  // Trigger bonus message display
+                  if (bonusMessages.length > 0) {
+                    setShowBonusMessages(true);
+                  }
                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -1833,8 +1836,9 @@ export const GameEngine: React.FC<Props> = ({
             const messages: string[] = [];
             if (speedBonus) messages.push("500 POINT SPEED BONUS");
             if (bullseye) messages.push("500 POINT BULLSEYE");
-            if (messages.length > 0) {
+            if (messages.length > 0 && !hasShownBonusThisLanding.current) {
               setBonusMessages(messages);
+              hasShownBonusThisLanding.current = true;
             }
             
             cameraShake = 8; // Extra camera shake for MEGA landing
@@ -1848,7 +1852,7 @@ export const GameEngine: React.FC<Props> = ({
               setShowFireworks(true);
               
               // Trigger bonus message display
-              if (messages.length > 0) {
+              if (bonusMessages.length > 0) {
                 setShowBonusMessages(true);
               }
             }, 500);
@@ -2001,8 +2005,9 @@ export const GameEngine: React.FC<Props> = ({
               const messages: string[] = [];
               if (speedBonus) messages.push("500 POINT SPEED BONUS");
               if (bullseye) messages.push("500 POINT BULLSEYE");
-              if (messages.length > 0) {
+              if (messages.length > 0 && !hasShownBonusThisLanding.current) {
                 setBonusMessages(messages);
+                hasShownBonusThisLanding.current = true;
               }
               
               cameraShake = 6;
@@ -2022,7 +2027,7 @@ export const GameEngine: React.FC<Props> = ({
                 setShowFireworks(true);
                 
                 // Trigger bonus message display
-                if (messages.length > 0) {
+                if (bonusMessages.length > 0) {
                   setShowBonusMessages(true);
                 }
               }, 500);
@@ -3313,6 +3318,7 @@ export const GameEngine: React.FC<Props> = ({
           onComplete={() => {
             setShowBonusMessages(false);
             setBonusMessages([]);
+            hasShownBonusThisLanding.current = false;
           }}
         />
       )}
