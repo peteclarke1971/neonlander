@@ -580,10 +580,12 @@ export const GameEngine: React.FC<Props> = ({
 
     // Anomalies (gravity wells) — appear from level 3, start at 1, +1 every 3 levels, capped at 5.
     const anomalyCount = levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 3), 5) : 0;
+    // Create seeded RNG for anomaly radius scaling
+    const anomalySizeRng = mulberry32(levelSeed + 777); // Different offset from spawn RNG
     let anomalies = generateAnomalies(seed, terrain.worldWidth, BASE_HEIGHT).slice(0, anomalyCount).map((a, _i, arr) => ({
       ...a,
       // Start much smaller (25% of previous). If multiple wells, allow 1x-4x of that starting size.
-      radius: a.radius * 0.25 * (arr.length > 1 ? (1 + Math.random() * 3) : 1),
+      radius: a.radius * 0.25 * (arr.length > 1 ? (1 + anomalySizeRng() * 3) : 1),
     }));
 
     // Moving hazards — appear from level 3, start at 1, +1 every 5 levels, capped at 4. Disabled in caverns.
