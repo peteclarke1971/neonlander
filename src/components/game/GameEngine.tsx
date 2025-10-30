@@ -108,7 +108,6 @@ export const GameEngine: React.FC<Props> = ({
   const [fps, setFps] = useState(0);
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showFireworks, setShowFireworks] = useState(false);
-  const [classicretryseednumber, setClassicretryseednumber] = useState<number | null>(null);
   
   // Fireworks system state
   const [fireworksActive, setFireworksActive] = useState(false);
@@ -433,17 +432,10 @@ export const GameEngine: React.FC<Props> = ({
       timeTrialConfig = getTimeTrialLevelConfig(level);
       seed = timeTrialConfig.seed;
       console.log("⏱️ Using Time Trial seed:", seed, "for level", level, "with", timeTrialConfig.padCount, "pads");
-    } else {
-      // For classic mode (non-caverns), use stored retry seed or generate new one
-      if (classicretryseednumber !== null) {
-        seed = classicretryseednumber;
-        console.log("🔄 Using classic retry seed:", seed, "for level", level);
-      } else {
-        seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
-        console.log("🎲 Using", mode, "mode seed:", seed, "for level", level);
-        // Store this seed for potential retry
-        setClassicretryseednumber(seed);
-      }
+    } else if (typeof seedOverride !== "number" || !Number.isFinite(seedOverride)) {
+      // For classic mode (non-caverns), generate new seed ONLY if no override exists
+      seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
+      console.log("🎲 Using", mode, "mode seed:", seed, "for level", level);
     }
     let levelSeed = seed >>> 0;
     console.log("✅ Final levelSeed:", levelSeed);

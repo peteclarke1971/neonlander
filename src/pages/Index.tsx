@@ -411,6 +411,8 @@ const retryGame = () => {
   const retryCurrentLevel = () => {
     // Keep current level but reset score and landings
     setCarry((prev) => ({ score: 0, landings: 0, level: prev?.level ?? successCount }));
+    setSeedOverride(lastPlayedSeed);
+    setGameKey(prev => prev + 1);
     setView("game");
   };
 
