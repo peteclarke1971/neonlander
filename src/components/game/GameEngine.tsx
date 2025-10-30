@@ -434,7 +434,7 @@ export const GameEngine: React.FC<Props> = ({
       console.log("⏱️ Using Time Trial seed:", seed, "for level", level, "with", timeTrialConfig.padCount, "pads");
     } else {
       // For classic mode (non-caverns), always use random generation
-      seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
+      seed = seedOverride ?? (mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0));
       console.log("🎲 Using", mode, "mode seed:", seed, "for level", level);
     }
     let levelSeed = seed >>> 0;
