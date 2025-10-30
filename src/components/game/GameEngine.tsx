@@ -63,6 +63,7 @@ interface Props {
   isDemo?: boolean;
   onRetryLevel?: () => void;
   onContinueLevel?: (nextLevel: number) => void;
+  spawnOverride?: { x: number; y: number };
 }
 
 const WORLD_WIDTH = 4000;
@@ -91,13 +92,15 @@ export const GameEngine: React.FC<Props> = ({
   ghostLevel, 
   isDemo = false,
   onRetryLevel,
-  onContinueLevel
+  onContinueLevel,
+  spawnOverride
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<HUDSnapshot>({ altitude: 0, vx: 0, vy: 0, fuel: 100, score: initialScore ?? 0, time: 0, difficulty });
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const initialSpawnRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
     // Check localStorage first, then check if desktop device
     return hasPCControlsPreference() || isDesktopDevice();
@@ -617,6 +620,7 @@ export const GameEngine: React.FC<Props> = ({
     };
 
     const spawn = pickSpawn();
+    initialSpawnRef.current = { x: spawn.x, y: spawn.y };
     let x = spawn.x;
     let y = spawn.y;
     let vx = 0, vy = 0;
@@ -1585,9 +1589,9 @@ export const GameEngine: React.FC<Props> = ({
         try { audio.current.stopFuelAlarm(); } catch {}
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-        setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
-        }, 700);
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+              }, 700);
       }
       
       // Volcano particle collisions (airborne)
@@ -1601,9 +1605,9 @@ export const GameEngine: React.FC<Props> = ({
         try { audio.current.stopFuelAlarm(); } catch {}
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-        setTimeout(() => {
-          onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level });
-        }, 700);
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+              }, 700);
       }
       
       // Check collectible pickups
@@ -1809,7 +1813,7 @@ export const GameEngine: React.FC<Props> = ({
               cameraShake = 24;
               if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
-                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
+                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
               }, 700);
             }
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
@@ -2057,9 +2061,9 @@ export const GameEngine: React.FC<Props> = ({
             try { audio.current.stopFuelAlarm(); } catch {}
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-            setTimeout(() => {
-              onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level });
-            }, 700);
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+              }, 700);
           }
         }
       }
@@ -3084,6 +3088,8 @@ export const GameEngine: React.FC<Props> = ({
               elapsed: completionTime / 1000,
               levelSeed: hud.levelSeed,
               level,
+              initialSpawnX: initialSpawnRef.current.x,
+              initialSpawnY: initialSpawnRef.current.y,
               isNewBestTime: isNewLocalRecord,
               isWorldRecord: isNewGlobalRecord,
               timeTrialCompletionTime: completionTime,
@@ -3192,6 +3198,8 @@ export const GameEngine: React.FC<Props> = ({
             elapsed: hud.time,
             levelSeed: hud.levelSeed,
             level,
+            initialSpawnX: initialSpawnRef.current.x,
+            initialSpawnY: initialSpawnRef.current.y,
             isNewBestTime,
             ghostTimeDiff,
             isWorldRecord,
@@ -3309,6 +3317,8 @@ export const GameEngine: React.FC<Props> = ({
               elapsed: hud.time, 
               levelSeed: hud.levelSeed,
               level,
+              initialSpawnX: initialSpawnRef.current.x,
+              initialSpawnY: initialSpawnRef.current.y,
               isNewBestTime,
               ghostTimeDiff,
               isWorldRecord,

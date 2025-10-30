@@ -91,6 +91,7 @@ const Index = () => {
   const [seedOverride, setSeedOverride] = useState<number | null>(null);
   const [lastPlayedSeed, setLastPlayedSeed] = useState<number | null>(null);
   const [lastPlayedLevel, setLastPlayedLevel] = useState<number>(0);
+  const [lastPlayedSpawn, setLastPlayedSpawn] = useState<{ x: number; y: number } | null>(null);
   const [gameKey, setGameKey] = useState(0); // Force GameEngine remount
 
   // Get neon color from CSS
@@ -300,6 +301,9 @@ const Index = () => {
     setLastResult(data);
     setLastPlayedSeed(data.levelSeed ?? null);
     setLastPlayedLevel(data.level ?? 0);
+    if (data.initialSpawnX !== undefined && data.initialSpawnY !== undefined) {
+      setLastPlayedSpawn({ x: data.initialSpawnX, y: data.initialSpawnY });
+    }
     
     // Handle demo crashes - advance sequence and exit after 1 second
     if (view === "demo" && (data.cause === "crash" || data.cause === "fuel")) {
@@ -400,6 +404,8 @@ const retryGame = () => {
   root.style.removeProperty("--neon-2");
   setCarry({ score: 0, landings: 0, level: 0 });
   setSuccessCount(0);
+  setSeedOverride(lastPlayedSeed);
+  setGameKey(prev => prev + 1);
   setView("game");
 };
   const retryCurrentLevel = () => {
@@ -730,6 +736,7 @@ const retryGame = () => {
           ghostLevel={carry?.level ?? successCount}
           onRetryLevel={mode === "timetrial" ? handleRetryLevel : undefined}
           onContinueLevel={mode === "timetrial" ? handleContinueLevel : undefined}
+          spawnOverride={lastPlayedSpawn ?? undefined}
         />
       )}
       {view === "demo" && (

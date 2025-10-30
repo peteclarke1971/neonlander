@@ -108,6 +108,9 @@ export interface GameOverData {
   totalPadsRequired?: number;
   timeTrialCompletionTime?: number;
   timeTrialGhostFrames?: any[];
+  // Spawn position for retry
+  initialSpawnX?: number;
+  initialSpawnY?: number;
 }
 
 export interface HighScore {
