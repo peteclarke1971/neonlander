@@ -607,8 +607,11 @@ export const GameEngine: React.FC<Props> = ({
         const sy = gy - 520; // fixed safe altitude above ground
         return { x: cx, y: sy };
       }
+      // Classic mode: random safe spawn, but SEEDED for consistent retry
+      const spawnRng = mulberry32(levelSeed + 999); // Seeded RNG for spawn position
+      
       for (let attempt = 0; attempt < 60; attempt++) {
-        const cx = Math.random() * WORLD_WIDTH;
+        const cx = spawnRng() * WORLD_WIDTH; // Use seeded RNG instead of Math.random()
         if (!terrain.getPadAt(cx)) {
           const gy = terrain.getHeightAt(cx);
           const sy = gy - 520; // safe altitude above ground
