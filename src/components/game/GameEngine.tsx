@@ -16,6 +16,7 @@ import { movingPadSystem } from "./systems/movingPads";
 import FireworksDisplay from './FireworksDisplay';
 import { BonusMessageDisplay } from './BonusMessageDisplay';
 import { getTimeTrialLevelConfig } from "./systems/timeTrialLevels";
+import { getDecorationsForLevel, preloadDecorationImages, renderDecorations, BackgroundDecoration } from "./systems/backgroundDecorations";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -177,6 +178,10 @@ export const GameEngine: React.FC<Props> = ({
   
   // Track if landing sound has been played for current landing
   const hasPlayedLandingSoundRef = useRef(false);
+  
+  // Background decorations system
+  const bgDecorationsRef = useRef<BackgroundDecoration[]>([]);
+  const bgDecorationImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   
   // Time Trial state
   const [timeTrialState, setTimeTrialState] = useState({
@@ -824,6 +829,19 @@ export const GameEngine: React.FC<Props> = ({
       const sy = Math.random() * pxH;
       const bright = Math.random() < 0.15;
       stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: bright ? 0.95 : 0.6, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
+    }
+
+    // Background decorations system - load for classic mode only
+    if (mode !== "caverns") {
+      const decorations = getDecorationsForLevel(levelVar, levelSeed);
+      bgDecorationsRef.current = decorations;
+      
+      // Pre-load decoration images asynchronously
+      preloadDecorationImages(decorations).then(imageMap => {
+        bgDecorationImagesRef.current = imageMap;
+      }).catch(err => {
+        console.warn("Failed to load some decoration images:", err);
+      });
     }
 
     const wrapX = (xx: number) => {
@@ -2289,6 +2307,16 @@ export const GameEngine: React.FC<Props> = ({
 
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, w, h);
+
+      // Render background decorations (planets, nebulas, etc.) in screen-space
+      if (!isCavernLevel && bgDecorationsRef.current.length > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        const screenWidth = w / dpr;
+        const screenHeight = h / dpr;
+        renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight);
+        ctx.restore();
+      }
 
       const shakeX = (Math.random() - 0.5) * cameraShake;
       const shakeY = (Math.random() - 0.5) * cameraShake;
