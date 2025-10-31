@@ -248,40 +248,39 @@ export function renderDecorations(
     let x = decoration.position.x * screenWidth;
     let y = decoration.position.y * screenHeight;
 
+    // Calculate size first (needed for bounds checking)
+    const scale = typeof decoration.scale === 'number' ? decoration.scale : 0.4;
+    const size = screenHeight * scale;
+    const drawWidth = size;
+    const drawHeight = size;
+
     // Apply movement if configured
     if (decoration.movement) {
       const { direction, speed } = decoration.movement;
       const screenPerSecond = speed / 100; // Speed scale conversion
       
       switch (direction) {
-        case 'left': {
-          const offsetX = (currentTime * screenPerSecond * screenWidth) % screenWidth;
-          x = (x - offsetX + screenWidth) % screenWidth;
+        case 'left':
+          x -= currentTime * screenPerSecond * screenWidth;
           break;
-        }
-        case 'right': {
-          const offsetX = (currentTime * screenPerSecond * screenWidth) % screenWidth;
-          x = (x + offsetX) % screenWidth;
+        case 'right':
+          x += currentTime * screenPerSecond * screenWidth;
           break;
-        }
-        case 'up': {
-          const offsetY = (currentTime * screenPerSecond * screenHeight) % screenHeight;
-          y = (y - offsetY + screenHeight) % screenHeight;
+        case 'up':
+          y -= currentTime * screenPerSecond * screenHeight;
           break;
-        }
-        case 'down': {
-          const offsetY = (currentTime * screenPerSecond * screenHeight) % screenHeight;
-          y = (y + offsetY) % screenHeight;
+        case 'down':
+          y += currentTime * screenPerSecond * screenHeight;
           break;
-        }
       }
     }
 
-    // Calculate size based on screen height
-    const scale = typeof decoration.scale === 'number' ? decoration.scale : 0.4;
-    const size = screenHeight * scale;
-    const drawWidth = size;
-    const drawHeight = size;
+    // Skip rendering if decoration is off screen
+    const margin = Math.max(drawWidth, drawHeight) / 2;
+    if (x < -margin || x > screenWidth + margin || 
+        y < -margin || y > screenHeight + margin) {
+      continue;
+    }
 
     // Apply opacity
     ctx.globalAlpha = decoration.opacity ?? 1.0;
