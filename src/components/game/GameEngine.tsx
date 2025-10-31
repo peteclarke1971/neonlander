@@ -2314,8 +2314,8 @@ export const GameEngine: React.FC<Props> = ({
       if (!isCavernLevel && bgDecorationsRef.current.length > 0) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        const screenWidth = w / dpr;
-        const screenHeight = h / dpr;
+        const screenWidth = w;
+        const screenHeight = h;
         const currentTime = (performance.now() / 1000) - bgDecorationStartTimeRef.current;
         renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight, currentTime);
         ctx.restore();
