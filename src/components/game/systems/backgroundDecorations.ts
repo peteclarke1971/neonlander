@@ -84,7 +84,7 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
     rotationSpeed: 360 / 69, // One full rotation every 69 seconds
     movement: {
       direction: 'left',
-      speed: 2 // Gentle movement, crosses screen in 50 seconds
+      speed: 0.5 // Very gentle movement, crosses screen in 200 seconds
     }
   },
   'test-transparency': {
