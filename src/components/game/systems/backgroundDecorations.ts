@@ -93,9 +93,79 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
     scale: boxScale(0.5), // Half of box size
     opacity: 1.0,
   },
-  // Future additions:
-  // 'nebula-purple': { ... },
-  // 'blackhole-01': { ... },
+  'planet-green-rings': {
+    imagePath: '/images/bg-decorations/planet-green-rings.png',
+    position: boxToPosition(20), // Box 20 (row 3, column 4)
+    scale: boxScale(0.5),
+    opacity: 0.85,
+    glow: { color: '#00ff88', blur: 20 }
+  },
+  'nebula-blue-cyan': {
+    imagePath: '/images/bg-decorations/nebula-blue-cyan.png',
+    position: boxToPosition(6), // Box 6 (row 1, column 6)
+    scale: boxScale(0.4),
+    opacity: 0.75,
+    glow: { color: '#00d4ff', blur: 30 }
+  },
+  'planet-green-wireframe-rings': {
+    imagePath: '/images/bg-decorations/planet-green-wireframe-rings.png',
+    position: boxToPosition(14), // Box 14 (row 2, column 6)
+    scale: boxScale(0.45),
+    opacity: 0.8,
+    glow: { color: '#88ff00', blur: 15 }
+  },
+  'galaxy-spiral-orange': {
+    imagePath: '/images/bg-decorations/galaxy-spiral-orange.png',
+    position: boxToPosition(28), // Box 28 (row 4, column 4)
+    scale: boxScale(0.35),
+    opacity: 0.9,
+    glow: { color: '#ff6600', blur: 25 },
+    rotationSpeed: 360 / 120 // Slow rotation
+  },
+  'planet-green-swirled': {
+    imagePath: '/images/bg-decorations/planet-green-swirled.png',
+    position: boxToPosition(3), // Box 3 (row 1, column 3)
+    scale: boxScale(0.4),
+    opacity: 0.85,
+    glow: { color: '#00ff44', blur: 18 },
+    rotationSpeed: 360 / 90
+  },
+  'planet-green-rings-alt': {
+    imagePath: '/images/bg-decorations/planet-green-rings-alt.png',
+    position: boxToPosition(22), // Box 22 (row 3, column 6)
+    scale: boxScale(0.5),
+    opacity: 0.85,
+    glow: { color: '#00ff66', blur: 20 }
+  },
+  'planet-green-gas-giant': {
+    imagePath: '/images/bg-decorations/planet-green-gas-giant.png',
+    position: boxToPosition(11), // Box 11 (row 2, column 3)
+    scale: boxScale(0.45),
+    opacity: 0.8,
+    glow: { color: '#00aa44', blur: 22 },
+    rotationSpeed: 360 / 100
+  },
+  'planet-green-wireframe-outline': {
+    imagePath: '/images/bg-decorations/planet-green-wireframe-outline.png',
+    position: boxToPosition(26), // Box 26 (row 4, column 2)
+    scale: boxScale(0.35),
+    opacity: 0.7,
+    glow: { color: '#66ff00', blur: 12 }
+  },
+  'planet-green-rings-starfield': {
+    imagePath: '/images/bg-decorations/planet-green-rings-starfield.png',
+    position: boxToPosition(7), // Box 7 (row 1, column 7)
+    scale: boxScale(0.5),
+    opacity: 0.85,
+    glow: { color: '#00ff77', blur: 20 }
+  },
+  'planet-green-asteroids': {
+    imagePath: '/images/bg-decorations/planet-green-asteroids.png',
+    position: boxToPosition(30), // Box 30 (row 4, column 6)
+    scale: boxScale(0.4),
+    opacity: 0.8,
+    glow: { color: '#44ff66', blur: 15 }
+  },
 };
 
 // Level configuration map
