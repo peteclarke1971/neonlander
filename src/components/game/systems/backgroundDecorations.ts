@@ -33,17 +33,16 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
 
 // Level configuration map
 const levelConfigurations: LevelDecorationConfig[] = [
-  {
-    // Classic mode levels 0-5: Pink planet
-    levelRange: { min: 0, max: 5 },
-    decorations: [
-      {
-        id: 'planet-pink-neon',
-        ...decorationLibrary['planet-pink-neon']
-      }
-    ]
-  },
   // Future level configs:
+  // {
+  //   levelRange: { min: 0, max: 5 },
+  //   decorations: [
+  //     {
+  //       id: 'planet-pink-neon',
+  //       ...decorationLibrary['planet-pink-neon']
+  //     }
+  //   ]
+  // },
   // {
   //   levelRange: { min: 6, max: 10 },
   //   decorations: [],
