@@ -65,6 +65,7 @@ interface Props {
   onRetryLevel?: () => void;
   onContinueLevel?: (nextLevel: number) => void;
   spawnOverride?: { x: number; y: number };
+  nebulaFxEnabled?: boolean;
 }
 
 const WORLD_WIDTH = 4000;
@@ -94,7 +95,8 @@ export const GameEngine: React.FC<Props> = ({
   isDemo = false,
   onRetryLevel,
   onContinueLevel,
-  spawnOverride
+  spawnOverride,
+  nebulaFxEnabled = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -832,8 +834,8 @@ export const GameEngine: React.FC<Props> = ({
       stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: bright ? 0.95 : 0.6, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
     }
 
-    // Background decorations system - load for classic mode only
-    if (mode !== "caverns") {
+    // Background decorations system - load for classic mode only if Nebula FX is enabled
+    if (mode !== "caverns" && nebulaFxEnabled) {
       const decorations = getDecorationsForLevel(levelVar, levelSeed);
       bgDecorationsRef.current = decorations;
       

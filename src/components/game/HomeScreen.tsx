@@ -22,6 +22,7 @@ interface GameSettings {
   photosensitive: boolean;
   lowGraphics: boolean;
   showGhost?: boolean;
+  nebulaFxEnabled?: boolean;
 }
 
 interface Props {
@@ -95,6 +96,14 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
       return false;
     }
   });
+  const [nebulaFxEnabled, setNebulaFxEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-nebula-fx-enabled');
+      return saved ? JSON.parse(saved) : true; // Default ON
+    } catch {
+      return true;
+    }
+  });
   const [leaderboardView, setLeaderboardView] = useState<
     | "local-classic"
     | "local-fixed"
@@ -140,6 +149,12 @@ const navigate = useNavigate();
       localStorage.setItem("ll-photosensitive", photosensitive.toString());
     } catch {}
   }, [photosensitive]);
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-nebula-fx-enabled', JSON.stringify(nebulaFxEnabled));
+    } catch {}
+  }, [nebulaFxEnabled]);
 
   // Gamepad UI navigation: mirror D-pad/LS to arrow/enter/escape
   useEffect(() => {
@@ -567,6 +582,21 @@ useEffect(() => {
           </div>
         )}
 
+        {/* Nebula FX toggle (visible for all modes) */}
+        <div className="mt-4">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Visual Effects</div>
+          <button
+            className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+              nebulaFxEnabled
+                ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+            }`}
+            onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}
+          >
+            🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
+          </button>
+        </div>
+
         {/* Play by Seed */}
         <div className="mt-4 flex items-center justify-center gap-2">
           <Input
@@ -596,7 +626,8 @@ useEffect(() => {
                 skipCountdowns,
                 photosensitive,
                 lowGraphics,
-                showGhost: false
+                showGhost: false,
+                nebulaFxEnabled
               });
             }}
           >
@@ -617,7 +648,8 @@ useEffect(() => {
                     skipCountdowns,
                     photosensitive,
                     lowGraphics,
-                    showGhost
+                    showGhost,
+                    nebulaFxEnabled
                   })}>
                   Start
                 </Button>
@@ -635,7 +667,8 @@ useEffect(() => {
                         skipCountdowns,
                         photosensitive,
                         lowGraphics,
-                        showGhost
+                        showGhost,
+                        nebulaFxEnabled
                       })}
                     >
                       {L}
@@ -670,7 +703,8 @@ useEffect(() => {
                       skipCountdowns,
                       photosensitive,
                       lowGraphics,
-                      showGhost: false
+                      showGhost: false,
+                      nebulaFxEnabled
                     })}
                   >
                     {L}

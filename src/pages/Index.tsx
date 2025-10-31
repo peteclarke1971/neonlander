@@ -169,9 +169,10 @@ const Index = () => {
     isNewLocalRecord: boolean;
     isNewGlobalRecord: boolean;
   } | null>(null);
+  const [nebulaFxEnabled, setNebulaFxEnabled] = useState(true);
   // Global ghost loading now handled dynamically inside GameEngine
   
-  const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean }) => {
+  const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
     if (isTransitioning) {
@@ -194,6 +195,7 @@ const Index = () => {
       setLowGraphics(finalLowGfx);
       setSeedOverride(seedOverrideParam ?? null);
       setShowGhost(gameSettings?.showGhost ?? false);
+      setNebulaFxEnabled(gameSettings?.nebulaFxEnabled ?? true);
       setGameKey(prev => prev + 1);
       
       try {
@@ -739,6 +741,7 @@ const retryGame = () => {
           onRetryLevel={mode === "timetrial" ? handleRetryLevel : undefined}
           onContinueLevel={mode === "timetrial" ? handleContinueLevel : undefined}
           spawnOverride={lastPlayedSpawn ?? undefined}
+          nebulaFxEnabled={nebulaFxEnabled}
         />
       )}
       {view === "demo" && (
@@ -787,6 +790,7 @@ const retryGame = () => {
                 seedOverride={demoLevel * 1000}
                 showGhost={false}
                 isDemo={true}
+                nebulaFxEnabled={false}
               />
             </div>
           </div>

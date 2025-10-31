@@ -184,21 +184,116 @@ const levelConfigurations: LevelDecorationConfig[] = [
       }
     ]
   },
-  // Future level configs:
-  // {
-  //   levelRange: { min: 0, max: 5 },
-  //   decorations: [
-  //     {
-  //       id: 'planet-pink-neon',
-  //       ...decorationLibrary['planet-pink-neon']
-  //     }
-  //   ]
-  // },
-  // {
-  //   levelRange: { min: 6, max: 10 },
-  //   decorations: [],
-  //   randomPool: ['nebula-purple', 'planet-pink-neon'] // Random selection
-  // }
+  {
+    // Level 1: Planet with green rings
+    specificLevels: [1],
+    decorations: [
+      {
+        id: 'planet-green-rings',
+        ...decorationLibrary['planet-green-rings']
+      }
+    ]
+  },
+  {
+    // Level 2: Blue-cyan nebula
+    specificLevels: [2],
+    decorations: [
+      {
+        id: 'nebula-blue-cyan',
+        ...decorationLibrary['nebula-blue-cyan']
+      }
+    ]
+  },
+  {
+    // Level 3: Green wireframe planet with rings
+    specificLevels: [3],
+    decorations: [
+      {
+        id: 'planet-green-wireframe-rings',
+        ...decorationLibrary['planet-green-wireframe-rings']
+      }
+    ]
+  },
+  {
+    // Level 4: Orange spiral galaxy
+    specificLevels: [4],
+    decorations: [
+      {
+        id: 'galaxy-spiral-orange',
+        ...decorationLibrary['galaxy-spiral-orange']
+      }
+    ]
+  },
+  {
+    // Level 5: Green swirled planet
+    specificLevels: [5],
+    decorations: [
+      {
+        id: 'planet-green-swirled',
+        ...decorationLibrary['planet-green-swirled']
+      }
+    ]
+  },
+  {
+    // Level 6: Green planet with rings (alternate)
+    specificLevels: [6],
+    decorations: [
+      {
+        id: 'planet-green-rings-alt',
+        ...decorationLibrary['planet-green-rings-alt']
+      }
+    ]
+  },
+  {
+    // Level 7: Green gas giant
+    specificLevels: [7],
+    decorations: [
+      {
+        id: 'planet-green-gas-giant',
+        ...decorationLibrary['planet-green-gas-giant']
+      }
+    ]
+  },
+  {
+    // Level 8: Green wireframe planet outline
+    specificLevels: [8],
+    decorations: [
+      {
+        id: 'planet-green-wireframe-outline',
+        ...decorationLibrary['planet-green-wireframe-outline']
+      }
+    ]
+  },
+  {
+    // Level 9: Green planet with rings and starfield
+    specificLevels: [9],
+    decorations: [
+      {
+        id: 'planet-green-rings-starfield',
+        ...decorationLibrary['planet-green-rings-starfield']
+      }
+    ]
+  },
+  {
+    // Level 10: Green planet with asteroids
+    specificLevels: [10],
+    decorations: [
+      {
+        id: 'planet-green-asteroids',
+        ...decorationLibrary['planet-green-asteroids']
+      }
+    ]
+  },
+  {
+    // Level 11: Pink neon planet (reuse from library)
+    specificLevels: [11],
+    decorations: [
+      {
+        id: 'planet-pink-neon',
+        ...decorationLibrary['planet-pink-neon']
+      }
+    ]
+  }
 ];
 
 // Seeded random number generator (same as used elsewhere in the game)
