@@ -79,6 +79,12 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
     glow: { color: '#ff006e', blur: 25 },
     rotationSpeed: 360 / 69 // One full rotation every 69 seconds
   },
+  'test-transparency': {
+    imagePath: '/images/bg-decorations/test-transparency.png',
+    position: boxToPosition(10), // Box 10 (row 2, column 2)
+    scale: boxScale(0.5), // Half of box size
+    opacity: 1.0,
+  },
   // Future additions:
   // 'nebula-purple': { ... },
   // 'blackhole-01': { ... },
@@ -87,12 +93,16 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
 // Level configuration map
 const levelConfigurations: LevelDecorationConfig[] = [
   {
-    // Level 0: Pink-purple gas giant
+    // Level 0: Pink-purple gas giant + test transparency
     specificLevels: [0],
     decorations: [
       {
         id: 'planet-pink-purple',
         ...decorationLibrary['planet-pink-purple']
+      },
+      {
+        id: 'test-transparency',
+        ...decorationLibrary['test-transparency']
       }
     ]
   },
