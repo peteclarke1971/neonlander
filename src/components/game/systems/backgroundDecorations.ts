@@ -1,6 +1,50 @@
 // Background Decoration System for Lunar Lander
 // Place atmospheric images (planets, nebulas, black holes) on specific levels
 
+/**
+ * Grid-based positioning system:
+ * - Screen divided into 4 rows × 8 columns = 32 boxes
+ * - Box numbering: 1 (top-left) to 32 (bottom-right)
+ * - Example: Box 15 = row 2, column 7 (middle-right area)
+ * 
+ * Box Layout:
+ * Row 1: [1][2][3][4][5][6][7][8]
+ * Row 2: [9][10][11][12][13][14][15][16]
+ * Row 3: [17][18][19][20][21][22][23][24]
+ * Row 4: [25][26][27][28][29][30][31][32]
+ */
+
+/**
+ * Convert grid box number to screen position
+ * @param boxNumber - Box number (1-32)
+ * @returns Position object with x, y coordinates (0-1)
+ */
+export function boxToPosition(boxNumber: number): { x: number; y: number } {
+  if (boxNumber < 1 || boxNumber > 32) {
+    console.warn(`Invalid box number: ${boxNumber}. Must be 1-32.`);
+    return { x: 0.5, y: 0.5 };
+  }
+  
+  const row = Math.floor((boxNumber - 1) / 8);
+  const col = (boxNumber - 1) % 8;
+  
+  // Center of box
+  const x = (col + 0.5) / 8;
+  const y = (row + 0.5) / 4;
+  
+  return { x, y };
+}
+
+/**
+ * Calculate scale based on box fraction
+ * @param boxFraction - Fraction of box size (e.g., 0.25 = quarter, 0.5 = half, 1.0 = full box)
+ * @returns Scale value relative to screen height
+ */
+export function boxScale(boxFraction: number): number {
+  const boxHeight = 0.25; // Each box is 1/4 of screen height
+  return boxHeight * boxFraction;
+}
+
 export interface BackgroundDecoration {
   id: string;
   imagePath: string;
@@ -29,8 +73,8 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
   },
   'planet-pink-purple': {
     imagePath: '/images/bg-decorations/planet-pink-purple.png',
-    position: { x: 0.85, y: 0.25 }, // Further right
-    scale: 0.175, // Half the original size
+    position: boxToPosition(15), // Box 15 (row 2, column 7)
+    scale: boxScale(0.25), // Quarter of box size
     opacity: 0.85,
     glow: { color: '#ff006e', blur: 25 },
     rotationSpeed: 360 / 69 // One full rotation every 69 seconds
