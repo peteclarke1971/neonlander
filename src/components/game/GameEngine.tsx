@@ -182,6 +182,7 @@ export const GameEngine: React.FC<Props> = ({
   // Background decorations system
   const bgDecorationsRef = useRef<BackgroundDecoration[]>([]);
   const bgDecorationImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const bgDecorationStartTimeRef = useRef<number>(0);
   
   // Time Trial state
   const [timeTrialState, setTimeTrialState] = useState({
@@ -839,6 +840,7 @@ export const GameEngine: React.FC<Props> = ({
       // Pre-load decoration images asynchronously
       preloadDecorationImages(decorations).then(imageMap => {
         bgDecorationImagesRef.current = imageMap;
+        bgDecorationStartTimeRef.current = performance.now() / 1000; // Track start time for rotation
       }).catch(err => {
         console.warn("Failed to load some decoration images:", err);
       });
@@ -2314,7 +2316,8 @@ export const GameEngine: React.FC<Props> = ({
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         const screenWidth = w / dpr;
         const screenHeight = h / dpr;
-        renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight);
+        const currentTime = (performance.now() / 1000) - bgDecorationStartTimeRef.current;
+        renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight, currentTime);
         ctx.restore();
       }
 

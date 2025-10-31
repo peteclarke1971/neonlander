@@ -8,6 +8,7 @@ export interface BackgroundDecoration {
   scale: number | { min: number; max: number }; // Relative to screen height
   opacity?: number; // 0-1
   glow?: { color: string; blur: number }; // CSS color and blur radius
+  rotationSpeed?: number; // Degrees per second (positive = clockwise, negative = counter-clockwise)
 }
 
 export interface LevelDecorationConfig {
@@ -28,10 +29,11 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
   },
   'planet-pink-purple': {
     imagePath: '/images/bg-decorations/planet-pink-purple.png',
-    position: { x: 0.75, y: 0.25 }, // Top-right
-    scale: 0.35,
+    position: { x: 0.85, y: 0.25 }, // Further right
+    scale: 0.175, // Half the original size
     opacity: 0.85,
-    glow: { color: '#ff006e', blur: 25 }
+    glow: { color: '#ff006e', blur: 25 },
+    rotationSpeed: 360 / 69 // One full rotation every 69 seconds
   },
   // Future additions:
   // 'nebula-purple': { ... },
@@ -164,13 +166,15 @@ export function preloadDecorationImages(decorations: BackgroundDecoration[]): Pr
  * @param imageMap - Map of loaded images
  * @param screenWidth - Screen width in CSS pixels
  * @param screenHeight - Screen height in CSS pixels
+ * @param currentTime - Current time in seconds (for rotation)
  */
 export function renderDecorations(
   ctx: CanvasRenderingContext2D,
   decorations: BackgroundDecoration[],
   imageMap: Map<string, HTMLImageElement>,
   screenWidth: number,
-  screenHeight: number
+  screenHeight: number,
+  currentTime: number = 0
 ): void {
   ctx.save();
   
@@ -197,14 +201,29 @@ export function renderDecorations(
       ctx.shadowBlur = decoration.glow.blur;
     }
 
-    // Draw image centered at position
-    ctx.drawImage(
-      img,
-      x - drawWidth / 2,
-      y - drawHeight / 2,
-      drawWidth,
-      drawHeight
-    );
+    // Handle rotation if specified
+    if (decoration.rotationSpeed) {
+      const rotationAngle = (currentTime * decoration.rotationSpeed * Math.PI) / 180;
+      ctx.translate(x, y);
+      ctx.rotate(rotationAngle);
+      ctx.drawImage(
+        img,
+        -drawWidth / 2,
+        -drawHeight / 2,
+        drawWidth,
+        drawHeight
+      );
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+    } else {
+      // Draw image centered at position (non-rotating)
+      ctx.drawImage(
+        img,
+        x - drawWidth / 2,
+        y - drawHeight / 2,
+        drawWidth,
+        drawHeight
+      );
+    }
 
     // Reset effects
     ctx.shadowBlur = 0;
