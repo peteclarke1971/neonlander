@@ -26,6 +26,13 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
     opacity: 0.9,
     glow: { color: '#ff006e', blur: 20 }
   },
+  'planet-pink-purple': {
+    imagePath: '/images/bg-decorations/planet-pink-purple.png',
+    position: { x: 0.75, y: 0.25 }, // Top-right
+    scale: 0.35,
+    opacity: 0.85,
+    glow: { color: '#ff006e', blur: 25 }
+  },
   // Future additions:
   // 'nebula-purple': { ... },
   // 'blackhole-01': { ... },
@@ -33,6 +40,16 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
 
 // Level configuration map
 const levelConfigurations: LevelDecorationConfig[] = [
+  {
+    // Level 0: Pink-purple gas giant
+    specificLevels: [0],
+    decorations: [
+      {
+        id: 'planet-pink-purple',
+        ...decorationLibrary['planet-pink-purple']
+      }
+    ]
+  },
   // Future level configs:
   // {
   //   levelRange: { min: 0, max: 5 },
