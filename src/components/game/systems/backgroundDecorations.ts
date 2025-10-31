@@ -53,6 +53,10 @@ export interface BackgroundDecoration {
   opacity?: number; // 0-1
   glow?: { color: string; blur: number }; // CSS color and blur radius
   rotationSpeed?: number; // Degrees per second (positive = clockwise, negative = counter-clockwise)
+  movement?: {
+    direction: 'left' | 'right' | 'up' | 'down';
+    speed: number; // 1-10 scale (1=very gentle, 10=crosses screen in 10s)
+  };
 }
 
 export interface LevelDecorationConfig {
@@ -77,7 +81,11 @@ const decorationLibrary: Record<string, Omit<BackgroundDecoration, 'id'>> = {
     scale: boxScale(0.25), // Quarter of box size
     opacity: 0.85,
     glow: { color: '#ff006e', blur: 25 },
-    rotationSpeed: 360 / 69 // One full rotation every 69 seconds
+    rotationSpeed: 360 / 69, // One full rotation every 69 seconds
+    movement: {
+      direction: 'left',
+      speed: 2 // Gentle movement, crosses screen in 50 seconds
+    }
   },
   'test-transparency': {
     imagePath: '/images/bg-decorations/test-transparency.png',
@@ -236,9 +244,38 @@ export function renderDecorations(
     const img = imageMap.get(decoration.id);
     if (!img || !img.complete) continue;
 
-    // Calculate position in screen-space
-    const x = decoration.position.x * screenWidth;
-    const y = decoration.position.y * screenHeight;
+    // Calculate base position in screen-space
+    let x = decoration.position.x * screenWidth;
+    let y = decoration.position.y * screenHeight;
+
+    // Apply movement if configured
+    if (decoration.movement) {
+      const { direction, speed } = decoration.movement;
+      const screenPerSecond = speed / 100; // Speed scale conversion
+      
+      switch (direction) {
+        case 'left': {
+          const offsetX = (currentTime * screenPerSecond * screenWidth) % screenWidth;
+          x = (x - offsetX + screenWidth) % screenWidth;
+          break;
+        }
+        case 'right': {
+          const offsetX = (currentTime * screenPerSecond * screenWidth) % screenWidth;
+          x = (x + offsetX) % screenWidth;
+          break;
+        }
+        case 'up': {
+          const offsetY = (currentTime * screenPerSecond * screenHeight) % screenHeight;
+          y = (y - offsetY + screenHeight) % screenHeight;
+          break;
+        }
+        case 'down': {
+          const offsetY = (currentTime * screenPerSecond * screenHeight) % screenHeight;
+          y = (y + offsetY) % screenHeight;
+          break;
+        }
+      }
+    }
 
     // Calculate size based on screen height
     const scale = typeof decoration.scale === 'number' ? decoration.scale : 0.4;
