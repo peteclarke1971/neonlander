@@ -2382,22 +2382,49 @@ export const GameEngine: React.FC<Props> = ({
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         
-        // Apply terrain clipping for stars
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(w, 0);
-        const segs = 96;
-        for (let i = segs; i >= 0; i--) {
-          const sx = (i / segs) * w;
-          const worldX = cameraX + (sx - (w / 2 + shakeX)) / (zoom * dpr);
-          const worldY = terrain.getHeightAt(worldX);
-          const sy = (h / 2 + shakeY) + (worldY + anchor) * (zoom * dpr);
-          ctx.lineTo(sx, sy);
-        }
-        ctx.closePath();
-        ctx.clip();
-        
+        // Draw stars WITHOUT clipping (they'll be masked by terrain fill)
         drawStars(ctx, 0, 0, 0);
+        
+        // Fill terrain shape with black to mask stars behind it
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        
+        // Apply same camera transform used for terrain
+        ctx.translate(w / (2 * dpr), h / (2 * dpr));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shakeX, anchor + shakeY);
+        
+        // Fill terrain shape with solid black
+        ctx.fillStyle = '#000000';
+        
+        // Sample terrain points across viewport width
+        const numSamples = 120;
+        const viewWidth = w / (zoom * dpr);
+        const startX = cameraX - viewWidth / 2;
+        const endX = cameraX + viewWidth / 2;
+        
+        ctx.beginPath();
+        // Start from far below terrain (left side)
+        ctx.moveTo(startX, 2000);
+        
+        // Trace along terrain surface
+        for (let i = 0; i <= numSamples; i++) {
+          const worldX = startX + (i / numSamples) * (endX - startX);
+          const worldY = terrain.getHeightAt(worldX);
+          if (i === 0) {
+            ctx.lineTo(worldX, worldY);
+          } else {
+            ctx.lineTo(worldX, worldY);
+          }
+        }
+        
+        // Close back down (right side)
+        ctx.lineTo(endX, 2000);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
         ctx.restore();
       }
 
