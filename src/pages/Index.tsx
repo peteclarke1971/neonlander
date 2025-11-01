@@ -357,6 +357,11 @@ const Index = () => {
       setCurrentSuccessBg(current);
       successBgCursorRef.current = (current + 1) % total;
 
+      // Clear seed override for classic mode to ensure new random seed for next level
+      if (mode === "classic") {
+        setSeedOverride(null);
+      }
+
       setCarry({ score: data.score, landings: data.landings, level: successCount + 1 });
       setSuccessCount((c) => c + 1);
       setView("gameover");
@@ -379,6 +384,12 @@ const Index = () => {
     if (isTransitioning) return;
     
     try { audioRef.current.stopMissionSuccess(); } catch {}
+    
+    // Clear seed override for classic mode to ensure new random seed for next level
+    if (mode === "classic") {
+      setSeedOverride(null);
+      setGameKey(prev => prev + 1); // Force GameEngine remount for clean state
+    }
     
     setIsTransitioning(true);
     
