@@ -2312,17 +2312,6 @@ export const GameEngine: React.FC<Props> = ({
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, w, h);
 
-      // Render background decorations (planets, nebulas, etc.) in screen-space
-      if (!isCavernLevel && bgDecorationsRef.current.length > 0) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        const screenWidth = w;
-        const screenHeight = h;
-        const currentTime = (performance.now() / 1000) - bgDecorationStartTimeRef.current;
-        renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight, currentTime);
-        ctx.restore();
-      }
-
       const shakeX = (Math.random() - 0.5) * cameraShake;
       const shakeY = (Math.random() - 0.5) * cameraShake;
 
@@ -2385,7 +2374,15 @@ export const GameEngine: React.FC<Props> = ({
         // Draw stars WITHOUT clipping (they'll be masked by terrain fill)
         drawStars(ctx, 0, 0, 0);
         
-        // Fill terrain shape with black to mask stars behind it
+        // Render background decorations (planets, nebulas, etc.) in screen-space
+        if (bgDecorationsRef.current.length > 0) {
+          const screenWidth = w;
+          const screenHeight = h;
+          const currentTime = (performance.now() / 1000) - bgDecorationStartTimeRef.current;
+          renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight, currentTime);
+        }
+        
+        // Fill terrain shape with black to mask stars and decorations behind it
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
