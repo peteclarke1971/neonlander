@@ -200,7 +200,11 @@ const levelConfigurations: LevelDecorationConfig[] = [
     decorations: [
       {
         id: 'nebula-blue-cyan',
-        ...decorationLibrary['nebula-blue-cyan']
+        imagePath: '/images/bg-decorations/nebula-blue-cyan.png',
+        position: boxToPosition(10), // Box 10 (row 2, column 2)
+        scale: boxScale(3.2), // 8x bigger than original 0.4
+        opacity: 0.75,
+        glow: { color: '#00d4ff', blur: 30 }
       }
     ]
   },
