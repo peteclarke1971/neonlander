@@ -54,7 +54,8 @@ export function generateAnomalies(
   worldWidth: number, 
   baseHeight: number,
   pads: Pad[] = [],
-  challengeMultiplier: number = 1.0
+  challengeMultiplier: number = 1.0,
+  levelVar: number = 1
 ): Anomaly[] {
   const rng = mulberry32(seed ^ 0xBEEF);
   const count = 2 + Math.floor(rng() * 3);
@@ -62,8 +63,51 @@ export function generateAnomalies(
   for (let i = 0; i < count; i++) {
     const x = rng() * worldWidth;
     const y = baseHeight - (200 + rng() * 250); // in the sky above ground baseline
-    const radius = 140 + rng() * 160;
-    const strength = 10 + rng() * 14; // gentle but noticeable
+    
+    // === SIZE GENERATION (level-dependent) ===
+    // Size categories: Tiny (35-60px), Small (60-90px), Medium (90-120px), Large (120-150px), Huge (150-180px)
+    let sizeWeights: number[];
+    if (levelVar < 10) {
+      // Early levels: favor small, no huge
+      sizeWeights = [0.4, 0.35, 0.2, 0.05, 0.0]; // [tiny, small, med, large, huge]
+    } else if (levelVar < 25) {
+      // Mid levels: balanced variety
+      sizeWeights = [0.15, 0.25, 0.3, 0.2, 0.1];
+    } else {
+      // Hard levels: favor large, still some small
+      sizeWeights = [0.05, 0.15, 0.25, 0.35, 0.2];
+    }
+    
+    // Weighted random selection
+    const roll = rng();
+    let cumulative = 0;
+    let sizeCategory = 0;
+    for (let w = 0; w < sizeWeights.length; w++) {
+      cumulative += sizeWeights[w];
+      if (roll < cumulative) {
+        sizeCategory = w;
+        break;
+      }
+    }
+    
+    // Generate base radius for category (pre-scaling)
+    const sizeRanges = [
+      [140, 240],  // Tiny → 35-60px after 0.25x scale
+      [240, 360],  // Small → 60-90px
+      [360, 480],  // Medium → 90-120px
+      [480, 600],  // Large → 120-150px
+      [600, 720],  // Huge → 150-180px
+    ];
+    const [minR, maxR] = sizeRanges[sizeCategory];
+    const radius = minR + rng() * (maxR - minR);
+    
+    // === STRENGTH DERIVED FROM SIZE ===
+    // Strength scales with size for visual consistency
+    const strengthMin = 10 + (sizeCategory * 3.5);
+    const strengthMax = 14 + (sizeCategory * 3.5);
+    const highLevelBoost = levelVar >= 25 ? 1.15 : 1.0;
+    const strength = (strengthMin + rng() * (strengthMax - strengthMin)) * highLevelBoost;
+    
     const falloff = 1.6 + rng() * 0.8;
     const kind: Anomaly["kind"] = rng() < 0.5 ? "attract" : "repel";
     
