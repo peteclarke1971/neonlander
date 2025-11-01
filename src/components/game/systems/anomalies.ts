@@ -7,6 +7,13 @@ export type Anomaly = {
   kind: "attract" | "repel";
 };
 
+export type Pad = {
+  xStart: number;
+  xEnd: number;
+  y: number;
+  width?: number;
+};
+
 // Simple seeded RNG (mulberry32)
 function mulberry32(seed: number) {
   let t = seed >>> 0;
@@ -18,7 +25,37 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateAnomalies(seed: number, worldWidth: number, baseHeight: number): Anomaly[] {
+// Calculate safe distance from pads based on anomaly physics
+function calculateSafeDistance(
+  anomaly: Anomaly, 
+  pad: Pad, 
+  challengeMultiplier: number = 1.0
+): number {
+  // Base safety: wells should be outside their primary influence radius
+  const baseDistance = anomaly.radius * 2;
+  
+  // Strength multiplier: stronger wells need more distance
+  // strength ranges 10-24, normalize to 1.0-2.4x
+  const strengthFactor = 1 + (anomaly.strength - 10) / 14;
+  
+  // Pad size factor: smaller pads need more protection
+  const padWidth = pad.width || (pad.xEnd - pad.xStart);
+  // Small pad (24-32px): 1.5x, Medium (40-80px): 1.2x, Large (80+px): 1.0x
+  const padSizeFactor = padWidth < 35 ? 1.5 : padWidth < 80 ? 1.2 : 1.0;
+  
+  // Kind factor: attraction is ~1.3x more dangerous than repulsion
+  const kindFactor = anomaly.kind === "attract" ? 1.3 : 1.0;
+  
+  return baseDistance * strengthFactor * padSizeFactor * kindFactor * challengeMultiplier;
+}
+
+export function generateAnomalies(
+  seed: number, 
+  worldWidth: number, 
+  baseHeight: number,
+  pads: Pad[] = [],
+  challengeMultiplier: number = 1.0
+): Anomaly[] {
   const rng = mulberry32(seed ^ 0xBEEF);
   const count = 2 + Math.floor(rng() * 3);
   const arr: Anomaly[] = [];
@@ -29,7 +66,32 @@ export function generateAnomalies(seed: number, worldWidth: number, baseHeight: 
     const strength = 10 + rng() * 14; // gentle but noticeable
     const falloff = 1.6 + rng() * 0.8;
     const kind: Anomaly["kind"] = rng() < 0.5 ? "attract" : "repel";
-    arr.push({ x, y, radius, strength, falloff, kind });
+    
+    const anomaly: Anomaly = { x, y, radius, strength, falloff, kind };
+    
+    // Check distance to all pads and reposition if too close
+    for (const pad of pads) {
+      const padCenterX = (pad.xStart + pad.xEnd) / 2;
+      const dx = anomaly.x - padCenterX;
+      const dy = anomaly.y - pad.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      const safeDistance = calculateSafeDistance(anomaly, pad, challengeMultiplier);
+      
+      if (distance < safeDistance) {
+        // Reposition: push anomaly away from pad along the line connecting them
+        const angle = Math.atan2(dy, dx);
+        anomaly.x = padCenterX + Math.cos(angle) * (safeDistance + 20);
+        anomaly.y = pad.y + Math.sin(angle) * (safeDistance + 20);
+        
+        // Handle world wrap
+        anomaly.x = ((anomaly.x % worldWidth) + worldWidth) % worldWidth;
+        // Keep Y in valid sky range
+        anomaly.y = Math.max(baseHeight - 450, Math.min(baseHeight - 200, anomaly.y));
+      }
+    }
+    
+    arr.push(anomaly);
   }
   return arr;
 }

@@ -590,7 +590,9 @@ export const GameEngine: React.FC<Props> = ({
     const anomalyCount = levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 3), 5) : 0;
     // Create seeded RNG for anomaly radius scaling
     const anomalySizeRng = mulberry32(levelSeed + 777); // Different offset from spawn RNG
-    let anomalies = generateAnomalies(seed, terrain.worldWidth, BASE_HEIGHT).slice(0, anomalyCount).map((a, _i, arr) => ({
+    // Challenge multiplier: Level 1: 1.0x safety, Level 10: 0.85x, Level 20: 0.7x (minimum)
+    const challengeMultiplier = Math.max(0.7, 1 - (levelVar * 0.015));
+    let anomalies = generateAnomalies(seed, terrain.worldWidth, BASE_HEIGHT, terrain.pads, challengeMultiplier).slice(0, anomalyCount).map((a, _i, arr) => ({
       ...a,
       // Start much smaller (25% of previous). If multiple wells, allow 1x-4x of that starting size.
       radius: a.radius * 0.25 * (arr.length > 1 ? (1 + anomalySizeRng() * 3) : 1),
