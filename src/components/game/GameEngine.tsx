@@ -2634,11 +2634,11 @@ export const GameEngine: React.FC<Props> = ({
       // Wind vectors and anomaly hints
       if (WIND_ENABLED) drawWindVectors(ctx, windZones, terrain.worldWidth, elapsed, neonColor);
       drawAnomaliesField(ctx, anomalies, elapsed, neonColor);
-      // Moving hazards with viewport culling
+      // Moving hazards with viewport culling (generous margin for smooth scroll-in)
       const visibleHazards = hazards.filter(h => {
         const dx = Math.abs(h.x - cameraX);
         const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
-        return wrappedDx < viewWCull / 2 + 100;
+        return wrappedDx < viewWCull / 2 + 400;
       });
       drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
       
