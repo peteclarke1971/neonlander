@@ -93,6 +93,13 @@ const Index = () => {
   const [lastPlayedLevel, setLastPlayedLevel] = useState<number>(0);
   const [lastPlayedSpawn, setLastPlayedSpawn] = useState<{ x: number; y: number } | null>(null);
   const [gameKey, setGameKey] = useState(0); // Force GameEngine remount
+  const [recentlySubmittedScore, setRecentlySubmittedScore] = useState<{
+    score: number;
+    initials: string;
+    mode: Mode;
+    difficulty: Difficulty;
+    timestamp: number;
+  } | null>(null);
 
   // Get neon color from CSS
   const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
@@ -174,6 +181,9 @@ const Index = () => {
   
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
+    
+    // Clear recently submitted score when starting a new game
+    setRecentlySubmittedScore(null);
     
     if (isTransitioning) {
       console.log("⚠️ Already transitioning, ignoring start request");
@@ -730,6 +740,7 @@ const retryGame = () => {
             lastPlayedSeed={lastPlayedSeed ?? undefined}
             lastPlayedLevel={lastPlayedLevel}
             onInteraction={() => setLastInteractionTime(Date.now())}
+            recentlySubmittedScore={recentlySubmittedScore}
           />
         </DemoTransition>
       )}
@@ -946,6 +957,18 @@ const retryGame = () => {
                       const qualifies = rows.length < 5 || hs.score > Math.min(...rows.map(r => r.score));
                       if (qualifies) {
                         await submitScore({ initials, score: hs.score, difficulty: hs.difficulty, mode });
+                        
+                        // Track recently submitted score for highlighting
+                        setRecentlySubmittedScore({
+                          score: hs.score,
+                          initials: initials.toUpperCase(),
+                          mode,
+                          difficulty: hs.difficulty,
+                          timestamp: Date.now(),
+                        });
+                        
+                        // Auto-clear highlight after 60 seconds
+                        setTimeout(() => setRecentlySubmittedScore(null), 60000);
                       }
                     } catch {}
                   })();

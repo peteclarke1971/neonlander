@@ -6,9 +6,16 @@ import { InitialsBadge } from "./InitialsBadge";
 interface Props { 
   mode: Mode;
   difficulty?: Difficulty;
+  highlightScore?: {
+    score: number;
+    initials: string;
+    mode: Mode;
+    difficulty: Difficulty;
+    timestamp: number;
+  } | null;
 }
 
-export const OnlineLeaderboard: React.FC<Props> = ({ mode, difficulty }) => {
+export const OnlineLeaderboard: React.FC<Props> = ({ mode, difficulty, highlightScore }) => {
   const [rows, setRows] = useState<{ initials: string; score: number; difficulty: string; created_at?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,18 +58,34 @@ export const OnlineLeaderboard: React.FC<Props> = ({ mode, difficulty }) => {
           <div className="text-sm text-muted-foreground">No scores yet. Be the first!</div>
         ) : (
           <ol className="space-y-2">
-            {rows.map((r, i) => (
-              <li key={`${r.initials}-${i}`} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
-                  <InitialsBadge initials={r.initials} />
-                </div>
-                <span className="text-accent font-semibold">{r.score.toLocaleString()}</span>
-                <span className="text-muted-foreground hidden sm:block">
-                  {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
-                </span>
-              </li>
-            ))}
+            {rows.map((r, i) => {
+              // Check if this row matches the highlighted score
+              const isHighlighted = highlightScore &&
+                highlightScore.mode === mode &&
+                highlightScore.score === r.score &&
+                highlightScore.initials.toUpperCase() === r.initials.toUpperCase() &&
+                (Date.now() - highlightScore.timestamp < 120000); // Within 2 minutes
+
+              return (
+                <li 
+                  key={`${r.initials}-${i}`} 
+                  className={`flex items-center justify-between text-sm ${
+                    isHighlighted 
+                      ? 'bg-accent/20 border-l-4 border-accent pl-2 -ml-2 rounded-r animate-pulse-subtle shadow-[0_0_20px_hsl(var(--accent)/0.3)]' 
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
+                    <InitialsBadge initials={r.initials} />
+                  </div>
+                  <span className="text-accent font-semibold">{r.score.toLocaleString()}</span>
+                  <span className="text-muted-foreground hidden sm:block">
+                    {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         )}
       </div>

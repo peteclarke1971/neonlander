@@ -32,9 +32,16 @@ interface Props {
   lastPlayedSeed?: number;
   lastPlayedLevel?: number;
   onInteraction?: () => void;
+  recentlySubmittedScore?: {
+    score: number;
+    initials: string;
+    mode: Mode;
+    difficulty: Difficulty;
+    timestamp: number;
+  } | null;
 }
 
-export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel, onInteraction }) => {
+export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel, onInteraction, recentlySubmittedScore }) => {
   const audioRef = useRef(new AudioManager());
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
@@ -723,6 +730,29 @@ useEffect(() => {
       ? `Global Leaderboard · ${isClassic ? "Classic" : "Fixed"}`
       : `High Scores · ${isClassic ? "Classic" : "Fixed"}`;
     const containerTheme = isOnline ? "neon-online-theme" : (!isClassic ? "neon-fixed-theme" : "");
+    const currentMode = isClassic ? "classic" : "fixed";
+
+    // Check if a row matches the recently submitted score
+    const isRecentScore = (row: any) => {
+      if (!recentlySubmittedScore) return false;
+      if (recentlySubmittedScore.mode !== currentMode) return false;
+      
+      // For online leaderboard, also check timestamp is recent (within 2 minutes)
+      if (isOnline) {
+        const isRecent = Date.now() - recentlySubmittedScore.timestamp < 120000;
+        return (
+          isRecent &&
+          row.score === recentlySubmittedScore.score &&
+          row.initials.toUpperCase() === recentlySubmittedScore.initials.toUpperCase()
+        );
+      }
+      
+      // For local leaderboard, match by score and initials
+      return (
+        row.score === recentlySubmittedScore.score &&
+        row.initials.toUpperCase() === recentlySubmittedScore.initials.toUpperCase()
+      );
+    };
 
     return (
       <div className={`mt-6 text-left bg-card/60 border border-border/60 rounded-lg p-4 w-[min(90vw,720px)] ${containerTheme}`}>
@@ -731,20 +761,30 @@ useEffect(() => {
         </div>
         <div key={leaderboardView} className="mt-2 space-y-2 animate-enter-slow">
           <ol>
-            {(isOnline ? listOnline : listLocal).slice(0, 5).map((row: any, i: number) => (
-              <li key={`${row.initials}-${i}`} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
-                  <InitialsBadge initials={row.initials} />
-                </div>
-                <span className="text-accent font-semibold">{row.score}</span>
-                <span className="text-muted-foreground hidden sm:block">
-                  {isOnline
-                    ? (row.created_at ? new Date(row.created_at).toLocaleDateString() : "")
-                    : (row.date ? new Date(row.date).toLocaleDateString() : "")}
-                </span>
-              </li>
-            ))}
+            {(isOnline ? listOnline : listLocal).slice(0, 5).map((row: any, i: number) => {
+              const highlight = isRecentScore(row);
+              return (
+                <li 
+                  key={`${row.initials}-${i}`} 
+                  className={`flex items-center justify-between text-sm ${
+                    highlight 
+                      ? 'bg-accent/20 border-l-4 border-accent pl-2 -ml-2 rounded-r animate-pulse-subtle shadow-[0_0_20px_hsl(var(--accent)/0.3)]' 
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-foreground/90 w-5 text-right">{i + 1}.</span>
+                    <InitialsBadge initials={row.initials} />
+                  </div>
+                  <span className="text-accent font-semibold">{row.score}</span>
+                  <span className="text-muted-foreground hidden sm:block">
+                    {isOnline
+                      ? (row.created_at ? new Date(row.created_at).toLocaleDateString() : "")
+                      : (row.date ? new Date(row.date).toLocaleDateString() : "")}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </div>
       </div>

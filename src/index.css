@@ -140,8 +140,15 @@ All colors MUST be HSL.
     0%, 100% { filter: drop-shadow(0 0 12px hsl(var(--neon) / 0.5)); }
     50% { filter: drop-shadow(0 0 20px hsl(var(--neon) / 0.8)); }
   }
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
   .neon-title {
     animation: neonCycle 18s linear infinite, neonPulseSoft 2.6s ease-in-out infinite;
+  }
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
   }
 
 /* Alternate neon palette for Fixed mode sections */
