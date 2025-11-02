@@ -954,6 +954,18 @@ const retryGame = () => {
                     setClassicScores(list);
                     localStorage.setItem(HS_CLASSIC_KEY, JSON.stringify(list));
                   }
+                  // Track recently submitted score for highlighting immediately
+                  setRecentlySubmittedScore({
+                    score: hs.score,
+                    initials: initials.toUpperCase(),
+                    mode,
+                    difficulty: hs.difficulty,
+                    timestamp: Date.now(),
+                  });
+                  
+                  // Auto-clear highlight after 60 seconds
+                  setTimeout(() => setRecentlySubmittedScore(null), 60000);
+                  
                   // Online submission rule: until 5 exist, accept any; then only submit new highs
                   void (async () => {
                     try {
@@ -962,18 +974,6 @@ const retryGame = () => {
                       const qualifies = rows.length < 5 || hs.score > Math.min(...rows.map(r => r.score));
                       if (qualifies) {
                         await submitScore({ initials, score: hs.score, difficulty: hs.difficulty, mode });
-                        
-                        // Track recently submitted score for highlighting
-                        setRecentlySubmittedScore({
-                          score: hs.score,
-                          initials: initials.toUpperCase(),
-                          mode,
-                          difficulty: hs.difficulty,
-                          timestamp: Date.now(),
-                        });
-                        
-                        // Auto-clear highlight after 60 seconds
-                        setTimeout(() => setRecentlySubmittedScore(null), 60000);
                       }
                   } catch {}
                 })();
