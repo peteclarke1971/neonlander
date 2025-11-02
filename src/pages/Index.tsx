@@ -385,10 +385,12 @@ const Index = () => {
     
     try { audioRef.current.stopMissionSuccess(); } catch {}
     
-    // Clear seed override for classic mode to ensure new random seed for next level
+    // Clear seed override to ensure proper seed calculation for next level
+    setSeedOverride(null);
+    
+    // Force GameEngine remount for classic mode to ensure clean random seed generation
     if (mode === "classic") {
-      setSeedOverride(null);
-      setGameKey(prev => prev + 1); // Force GameEngine remount for clean state
+      setGameKey(prev => prev + 1);
     }
     
     setIsTransitioning(true);
