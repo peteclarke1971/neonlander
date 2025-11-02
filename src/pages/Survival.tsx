@@ -22,6 +22,13 @@ const Survival: React.FC = () => {
   const [lastResult, setLastResult] = useState<SurvivalGameOverData | null>(null);
   const [isHighScore, setIsHighScore] = useState(false);
   const [needsInitials, setNeedsInitials] = useState(false);
+  const [recentlySubmittedScore, setRecentlySubmittedScore] = useState<{
+    score: number;
+    initials: string;
+    mode: "survival";
+    difficulty: "easy";
+    timestamp: number;
+  } | null>(null);
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
@@ -88,12 +95,26 @@ const Survival: React.FC = () => {
       setHighScores(updatedScores);
       localStorage.setItem("survival-mode-high-scores", JSON.stringify(updatedScores));
       
-      // Submit to online leaderboard
+      // Submit to online leaderboard and track for highlighting
       void submitScore({
         initials,
         score: lastResult.score,
         difficulty: "easy",
         mode: "survival"
+      }).then(() => {
+        // Track recently submitted score for highlighting
+        setRecentlySubmittedScore({
+          score: lastResult.score,
+          initials: initials.toUpperCase(),
+          mode: "survival",
+          difficulty: "easy",
+          timestamp: Date.now(),
+        });
+        
+        // Auto-clear highlight after 60 seconds
+        setTimeout(() => {
+          setRecentlySubmittedScore(null);
+        }, 60000);
       });
     }
     
@@ -114,6 +135,7 @@ const Survival: React.FC = () => {
   };
 
   const startGame = () => {
+    setRecentlySubmittedScore(null); // Clear highlight when starting new game
     setView("game");
   };
 
@@ -151,27 +173,39 @@ const Survival: React.FC = () => {
               <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6">
                 <h2 className="text-2xl font-bold text-accent mb-4">LOCAL HIGH SCORES</h2>
                 <div className="space-y-2">
-                  {highScores.map((score, idx) => (
-                    <div 
-                      key={idx}
-                      className="flex items-center justify-between text-lg py-2 px-4 bg-background/40 rounded"
-                    >
-                      <span className="font-mono text-muted-foreground w-8">{idx + 1}.</span>
-                      <span className="font-bold text-accent w-16">{score.initials}</span>
-                      <span className="font-mono flex-1 text-right">{score.score.toLocaleString()}</span>
-                      <span className="text-muted-foreground text-sm ml-4 w-24 text-right">
-                        {score.distance.toFixed(0)}m
-                      </span>
-                      <span className="text-muted-foreground text-sm ml-2 w-16 text-right">
-                        {score.time.toFixed(1)}s
-                      </span>
-                    </div>
-                  ))}
+                  {highScores.map((score, idx) => {
+                    // Check if this is the recently submitted score
+                    const isHighlighted = recentlySubmittedScore &&
+                      recentlySubmittedScore.score === score.score &&
+                      recentlySubmittedScore.initials.toUpperCase() === score.initials.toUpperCase() &&
+                      (Date.now() - recentlySubmittedScore.timestamp < 120000); // Within 2 minutes
+                    
+                    return (
+                      <div 
+                        key={idx}
+                        className={`flex items-center justify-between text-lg py-2 px-4 rounded ${
+                          isHighlighted 
+                            ? 'bg-accent/20 border-l-4 border-accent pl-2 -ml-2 rounded-r animate-pulse-subtle shadow-[0_0_20px_hsl(var(--accent)/0.3)]' 
+                            : 'bg-background/40'
+                        }`}
+                      >
+                        <span className="font-mono text-muted-foreground w-8">{idx + 1}.</span>
+                        <span className="font-bold text-accent w-16">{score.initials}</span>
+                        <span className="font-mono flex-1 text-right">{score.score.toLocaleString()}</span>
+                        <span className="text-muted-foreground text-sm ml-4 w-24 text-right">
+                          {score.distance.toFixed(0)}m
+                        </span>
+                        <span className="text-muted-foreground text-sm ml-2 w-16 text-right">
+                          {score.time.toFixed(1)}s
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <OnlineLeaderboard mode="survival" />
+            <OnlineLeaderboard mode="survival" highlightScore={recentlySubmittedScore} />
 
             <Button onClick={backToMainMenu} variant="ghost">
               Back to Main Menu
