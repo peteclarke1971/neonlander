@@ -4,6 +4,7 @@ import { GameEngine } from "@/components/game/GameEngine";
 import { HomeScreen } from "@/components/game/HomeScreen";
 import { Difficulty, GameOverData, HighScore, Mode } from "@/components/game/types";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { OnlineLeaderboard } from "@/components/game/OnlineLeaderboard";
 import { submitScore, fetchTop } from "@/lib/leaderboard";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
@@ -100,6 +101,7 @@ const Index = () => {
     difficulty: Difficulty;
     timestamp: number;
   } | null>(null);
+  const [showLeaderboardsAfterInitials, setShowLeaderboardsAfterInitials] = useState(false);
 
   // Get neon color from CSS
   const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
@@ -182,8 +184,9 @@ const Index = () => {
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
-    // Clear recently submitted score when starting a new game
+    // Clear recently submitted score and leaderboard display when starting a new game
     setRecentlySubmittedScore(null);
+    setShowLeaderboardsAfterInitials(false);
     
     if (isTransitioning) {
       console.log("⚠️ Already transitioning, ignoring start request");
@@ -430,6 +433,7 @@ const retryGame = () => {
   setCarry({ score: 0, landings: 0, level: 0 });
   setSuccessCount(0);
   setSeedOverride(lastPlayedSeed);
+  setShowLeaderboardsAfterInitials(false);
   setGameKey(prev => prev + 1);
   setView("game");
 };
@@ -437,6 +441,7 @@ const retryGame = () => {
     // Keep current level but reset score and landings
     setCarry((prev) => ({ score: 0, landings: 0, level: prev?.level ?? successCount }));
     setSeedOverride(lastPlayedSeed);
+    setShowLeaderboardsAfterInitials(false);
     setGameKey(prev => prev + 1);
     setView("game");
   };
@@ -970,14 +975,93 @@ const retryGame = () => {
                         // Auto-clear highlight after 60 seconds
                         setTimeout(() => setRecentlySubmittedScore(null), 60000);
                       }
-                    } catch {}
-                  })();
-                  setNeedsInitials(false);
-                  setTimeout(() => { setGoIndex(0); homeRef.current?.focus(); }, 0);
-                }}
-                onSubmit={(initials) => {}}
+                  } catch {}
+                })();
+                setNeedsInitials(false);
+                setShowLeaderboardsAfterInitials(true);
+                setTimeout(() => { setGoIndex(0); homeRef.current?.focus(); }, 0);
+              }}
+              onSubmit={(initials) => {}}
+            />
+          )}
+
+          {/* Show leaderboards after initials are entered for Classic/Fixed modes */}
+          {!needsInitials && showLeaderboardsAfterInitials && lastResult.cause !== "success" && (
+            <div className="mt-8 space-y-6">
+              {/* Local Leaderboard */}
+              {mode === "classic" && classicScores.length > 0 && (
+                <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6">
+                  <h2 className="text-2xl font-bold text-accent mb-4">LOCAL HIGH SCORES - CLASSIC</h2>
+                  <div className="space-y-2">
+                    {classicScores.map((score, idx) => {
+                      const isHighlighted = recentlySubmittedScore &&
+                        recentlySubmittedScore.mode === "classic" &&
+                        recentlySubmittedScore.score === score.score &&
+                        recentlySubmittedScore.initials.toUpperCase() === score.initials.toUpperCase() &&
+                        (Date.now() - recentlySubmittedScore.timestamp < 120000);
+                      
+                      return (
+                        <div 
+                          key={idx}
+                          className={`flex items-center justify-between text-lg py-2 px-4 rounded ${
+                            isHighlighted 
+                              ? 'bg-accent/20 border-l-4 border-accent pl-2 -ml-2 rounded-r animate-pulse-subtle shadow-[0_0_20px_hsl(var(--accent)/0.3)]' 
+                              : 'bg-background/40'
+                          }`}
+                        >
+                          <span className="font-mono text-muted-foreground w-8">{idx + 1}.</span>
+                          <span className="font-bold text-accent w-16">{score.initials}</span>
+                          <span className="font-mono flex-1 text-right">{score.score.toLocaleString()}</span>
+                          <span className="text-muted-foreground text-sm ml-4 w-32 text-right">
+                            {score.difficulty === "easy" ? "Easy" : score.difficulty === "hard" ? "Hard" : "Medium"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {mode === "fixed" && fixedScores.length > 0 && (
+                <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6">
+                  <h2 className="text-2xl font-bold text-accent mb-4">LOCAL HIGH SCORES - FIXED</h2>
+                  <div className="space-y-2">
+                    {fixedScores.map((score, idx) => {
+                      const isHighlighted = recentlySubmittedScore &&
+                        recentlySubmittedScore.mode === "fixed" &&
+                        recentlySubmittedScore.score === score.score &&
+                        recentlySubmittedScore.initials.toUpperCase() === score.initials.toUpperCase() &&
+                        (Date.now() - recentlySubmittedScore.timestamp < 120000);
+                      
+                      return (
+                        <div 
+                          key={idx}
+                          className={`flex items-center justify-between text-lg py-2 px-4 rounded ${
+                            isHighlighted 
+                              ? 'bg-accent/20 border-l-4 border-accent pl-2 -ml-2 rounded-r animate-pulse-subtle shadow-[0_0_20px_hsl(var(--accent)/0.3)]' 
+                              : 'bg-background/40'
+                          }`}
+                        >
+                          <span className="font-mono text-muted-foreground w-8">{idx + 1}.</span>
+                          <span className="font-bold text-accent w-16">{score.initials}</span>
+                          <span className="font-mono flex-1 text-right">{score.score.toLocaleString()}</span>
+                          <span className="text-muted-foreground text-sm ml-4 w-32 text-right">
+                            {score.difficulty === "easy" ? "Easy" : score.difficulty === "hard" ? "Hard" : "Medium"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Global Leaderboard */}
+              <OnlineLeaderboard 
+                mode={mode as "classic" | "fixed"} 
+                highlightScore={recentlySubmittedScore} 
               />
-            )}
+            </div>
+          )}
 
               {/* Time Trial initials entry for new records */}
               {(() => {
@@ -1120,6 +1204,7 @@ const retryGame = () => {
                 <>
                   <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
                     console.log("🏠 Home button clicked from gameover");
+                    setShowLeaderboardsAfterInitials(false);
                     setView("home");
                     resetTimers();
                   }} disabled={needsInitials}>Home</Button>
