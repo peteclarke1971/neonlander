@@ -139,7 +139,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Light Storm constants
   const LIGHT_STORM_DURATION = 15; // 15 seconds per storm
   const LIGHT_STORM_SWEEP_INTERVAL = 2.0; // 2 seconds between sweeps
-  const LIGHT_STORM_SWEEP_SPEED = 6.0; // seconds to cross screen (half speed)
+  const LIGHT_STORM_SWEEP_SPEED = 3.0; // seconds to cross screen (reduced by 50%)
   const LIGHT_STORM_INITIAL_BEAM_WIDTH = 300; // Start at 0.75x width
   const LIGHT_STORM_MIN_BEAM_WIDTH = 75; // End narrow (1/4 of initial)
   const LIGHT_STORM_FADE_OUT = 2.0; // 2 second fade out at end

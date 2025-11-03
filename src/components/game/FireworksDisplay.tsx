@@ -1085,6 +1085,17 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return () => clearInterval(interval);
   }, [onSkip]);
 
+  // Touch screen input for skipping
+  useEffect(() => {
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      onSkip();
+    };
+
+    window.addEventListener('touchstart', handleTouch);
+    return () => window.removeEventListener('touchstart', handleTouch);
+  }, [onSkip]);
+
   // Performance-optimized rendering with shapes, glow, and trails
   useEffect(() => {
     const canvas = canvasRef.current;
