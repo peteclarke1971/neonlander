@@ -429,19 +429,30 @@ export const GameEngine: React.FC<Props> = ({
     let isTimeTrial = mode === "timetrial";
     let timeTrialConfig;
     
+    // ALWAYS retrieve Time Trial config if in Time Trial mode (regardless of seed override)
+    if (isTimeTrial) {
+      timeTrialConfig = getTimeTrialLevelConfig(level);
+      console.log("⏱️ Time Trial level config loaded:", {
+        level,
+        configSeed: timeTrialConfig.seed,
+        padCount: timeTrialConfig.padCount,
+        hasOverride: typeof seedOverride === "number"
+      });
+    }
+    
+    // NOW determine which seed to use
     if (typeof seedOverride === "number" && Number.isFinite(seedOverride)) {
       seed = (Math.abs(Math.floor(seedOverride)) >>> 0);
-      console.log("🌱 Using seed override:", seed);
+      console.log("🌱 Using seed override:", seed, isTimeTrial ? "(Time Trial mode preserved)" : "");
     } else if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
       console.log("🕳️ Using cavern seed:", seed, "for level", level);
-    } else if (isTimeTrial) {
-      // Time Trial uses fixed levels with deterministic seeds
-      timeTrialConfig = getTimeTrialLevelConfig(level);
+    } else if (isTimeTrial && timeTrialConfig) {
+      // Use Time Trial's deterministic seed
       seed = timeTrialConfig.seed;
       console.log("⏱️ Using Time Trial seed:", seed, "for level", level, "with", timeTrialConfig.padCount, "pads");
-    } else if (typeof seedOverride !== "number" || !Number.isFinite(seedOverride)) {
-      // For classic mode (non-caverns), generate new seed ONLY if no override exists
+    } else {
+      // Classic or fixed mode
       seed = mode === "fixed" ? fixedSeed : ((Math.floor(Math.random() * 1e9) ^ Date.now()) >>> 0);
       console.log("🎲 Using", mode, "mode seed:", seed, "for level", level);
     }
