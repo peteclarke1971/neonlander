@@ -21,6 +21,9 @@ interface Props {
   // Blackout zone state
   blackoutActive?: boolean;
   blackoutTimer?: number;
+  // Light Storm state
+  lightStormActive?: boolean;
+  lightStormTimer?: number;
   // Color zone
   zoneName?: string;
   // Gyroscope controls
@@ -50,6 +53,8 @@ export const SurvivalHUD: React.FC<Props> = ({
   cometTimer = 0,
   blackoutActive = false,
   blackoutTimer = 0,
+  lightStormActive = false,
+  lightStormTimer = 0,
   zoneName,
   showGyroButton = false,
   gyroActive = false,
@@ -192,6 +197,44 @@ export const SurvivalHUD: React.FC<Props> = ({
                 </div>
                 <span className="text-xs" style={{ color: 'hsl(0, 100%, 60%, 0.7)' }}>
                   {Math.ceil(blackoutTimer)}s
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Light Storm Badge */}
+        {lightStormActive && (
+          <div className="mt-2 flex items-center justify-between bg-yellow-500/20 border border-yellow-400/60 rounded px-2 py-1 animate-pulse">
+            <div className="flex items-center gap-2">
+              <svg 
+                className="w-4 h-4" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5"
+                style={{ color: 'hsl(50, 100%, 60%)' }}
+              >
+                <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+              </svg>
+              <span className="text-xs font-bold" style={{ color: 'hsl(50, 100%, 60%)' }}>
+                LIGHT STORM
+              </span>
+            </div>
+            
+            {lightStormTimer > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1 bg-yellow-950/40 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-300"
+                    style={{ 
+                      width: `${(lightStormTimer / 15) * 100}%`,
+                      backgroundColor: 'hsl(50, 100%, 60%)'
+                    }}
+                  />
+                </div>
+                <span className="text-xs" style={{ color: 'hsl(50, 100%, 60%, 0.7)' }}>
+                  {Math.ceil(lightStormTimer)}s
                 </span>
               </div>
             )}

@@ -136,6 +136,27 @@ export const SurvivalEngine: React.FC<Props> = ({
   const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
   const SPOTLIGHT_RANGE = 400; // world units
   
+  // Light Storm constants
+  const LIGHT_STORM_DURATION = 15; // 15 seconds per storm
+  const LIGHT_STORM_SWEEP_INTERVAL = 2.0; // 2 seconds between sweeps
+  const LIGHT_STORM_SWEEP_SPEED = 3.0; // seconds to cross screen
+  const LIGHT_STORM_INITIAL_BEAM_WIDTH = 400; // Start wide
+  const LIGHT_STORM_MIN_BEAM_WIDTH = 100; // End narrow (1/4 of initial)
+  const LIGHT_STORM_FADE_OUT = 2.0; // 2 second fade out at end
+  
+  // Light Storm state
+  const lightStormActiveRef = useRef(false);
+  const [lightStormActive, setLightStormActive] = useState(false);
+  const lightStormTimerRef = useRef(0);
+  const lightStormOccurrenceCountRef = useRef(0);
+  const firstLightStormTriggeredRef = useRef(false);
+  const nextLightStormDistanceRef = useRef(10000);
+  const sweepPhaseRef = useRef(0);
+  const sweepTimerRef = useRef(0);
+  const sweepXRef = useRef(0);
+  const sweepActiveRef = useRef(false);
+  const currentBeamWidthRef = useRef(LIGHT_STORM_INITIAL_BEAM_WIDTH);
+  
   // Weather system state
   const weatherStateRef = useRef<WeatherState>(createWeatherState());
   const weatherParticlesRef = useRef<WeatherParticle[]>([]);
@@ -889,6 +910,83 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Audio: fade music back in
           audio.current.fadeInMusic(5.0);
+        }
+      }
+      
+      // Light Storm trigger logic
+      if (!lightStormActiveRef.current && !isDead) {
+        
+        // FIRST LIGHT STORM: Distance-based (10000m)
+        if (!firstLightStormTriggeredRef.current && currentDistance >= 10000) {
+          console.log('🌩️ First Light Storm triggered at 10000m');
+          lightStormActiveRef.current = true;
+          setLightStormActive(true);
+          lightStormTimerRef.current = LIGHT_STORM_DURATION;
+          firstLightStormTriggeredRef.current = true;
+          lightStormOccurrenceCountRef.current = 1;
+          
+          const randomInterval = 4000 + Math.random() * 6000;
+          nextLightStormDistanceRef.current = currentDistance + randomInterval;
+          
+          sweepTimerRef.current = 0;
+          sweepActiveRef.current = false;
+          currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
+        }
+        
+        // SUBSEQUENT LIGHT STORMS: Distance-based random intervals
+        else if (firstLightStormTriggeredRef.current && currentDistance >= nextLightStormDistanceRef.current) {
+          console.log('🌩️ Light Storm triggered at', currentDistance, 'm');
+          lightStormActiveRef.current = true;
+          setLightStormActive(true);
+          lightStormTimerRef.current = LIGHT_STORM_DURATION;
+          lightStormOccurrenceCountRef.current += 1;
+          
+          const randomInterval = 4000 + Math.random() * 6000;
+          nextLightStormDistanceRef.current = currentDistance + randomInterval;
+          
+          sweepTimerRef.current = 0;
+          sweepActiveRef.current = false;
+          
+          const narrowingFactor = Math.min(3, lightStormOccurrenceCountRef.current - 1);
+          currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH - 
+            (narrowingFactor * (LIGHT_STORM_INITIAL_BEAM_WIDTH - LIGHT_STORM_MIN_BEAM_WIDTH) / 3);
+        }
+      }
+      
+      // Update Light Storm timer
+      if (lightStormActiveRef.current) {
+        lightStormTimerRef.current -= dt;
+        
+        if (lightStormTimerRef.current <= 0) {
+          lightStormActiveRef.current = false;
+          setLightStormActive(false);
+          lightStormTimerRef.current = 0;
+          sweepActiveRef.current = false;
+          console.log('🌩️ Light Storm ended');
+        }
+      }
+      
+      // Update sweep animation (only during light storm)
+      if (lightStormActiveRef.current) {
+        sweepTimerRef.current -= dt;
+        
+        if (sweepTimerRef.current <= 0 && !sweepActiveRef.current) {
+          sweepActiveRef.current = true;
+          sweepPhaseRef.current = 0;
+          sweepXRef.current = cameraX - viewWidth * 0.6;
+          sweepTimerRef.current = LIGHT_STORM_SWEEP_INTERVAL;
+        }
+        
+        if (sweepActiveRef.current) {
+          const progressSpeed = dt / LIGHT_STORM_SWEEP_SPEED;
+          sweepPhaseRef.current += progressSpeed;
+          
+          sweepXRef.current = cameraX - viewWidth * 0.6 + (sweepPhaseRef.current * viewWidth * 2.2);
+          
+          if (sweepPhaseRef.current >= 1.0) {
+            sweepActiveRef.current = false;
+            sweepPhaseRef.current = 0;
+          }
         }
       }
       
@@ -2190,8 +2288,76 @@ export const SurvivalEngine: React.FC<Props> = ({
         shadowIntensity = shouldOptimize ? 0 : 14;
       }
       
-      // BLACKOUT MODE: Render terrain to off-screen canvas for spotlight masking
-      if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && offscreenTerrainCtxRef.current) {
+      // LIGHT STORM MODE: Render terrain to off-screen canvas (completely black outside sweep)
+      if (lightStormActiveRef.current && offscreenTerrainCtxRef.current) {
+        const offCtx = offscreenTerrainCtxRef.current;
+        
+        offCtx.clearRect(0, 0, c.width, c.height);
+        
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.scale(dprInit, dprInit);
+        offCtx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        offCtx.scale(zoom, zoom);
+        offCtx.translate(-cameraX + shake, anchor);
+        
+        offCtx.globalAlpha = 1.0;
+        offCtx.strokeStyle = terrainColor;
+        offCtx.shadowColor = terrainColor;
+        offCtx.shadowBlur = shadowIntensity * 1.5;
+        offCtx.lineWidth = 2;
+        
+        for (const chunk of chunks) {
+          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
+          
+          offCtx.beginPath();
+          for (let i = 0; i < chunk.points.length; i++) {
+            const pt = chunk.points[i];
+            if (i === 0) offCtx.moveTo(pt.x, pt.y);
+            else offCtx.lineTo(pt.x, pt.y);
+          }
+          offCtx.stroke();
+          
+          for (const pad of chunk.pads) {
+            offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+            offCtx.fillRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            offCtx.strokeStyle = terrainColor;
+            offCtx.strokeRect(pad.xStart, pad.y, pad.xEnd - pad.xStart, 2);
+            
+            if (pad.bonus2x) {
+              offCtx.save();
+              offCtx.textAlign = "center";
+              offCtx.textBaseline = "top";
+              offCtx.font = `700 ${12 * dprInit}px "Orbitron", sans-serif`;
+              offCtx.shadowColor = terrainColor;
+              offCtx.shadowBlur = 25 * dprInit;
+              offCtx.fillStyle = terrainColor;
+              offCtx.globalAlpha = 1.0;
+              const centerX = (pad.xStart + pad.xEnd) / 2;
+              offCtx.fillText("2x", centerX, pad.y + 4);
+              offCtx.restore();
+            }
+          }
+          
+          for (const mp of chunk.movingPads) {
+            movingPadSystem.renderMovingPad(
+              offCtx,
+              mp,
+              cameraX,
+              0,
+              1,
+              c.width,
+              c.height,
+              terrainColor
+            );
+          }
+        }
+        
+        offCtx.globalAlpha = 1;
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // NO terrain visible on main canvas during Light Storm (completely black)
+        
+      } else if (blackoutActiveRef.current && blackoutTransitionRef.current < 0.8 && offscreenTerrainCtxRef.current) {
         const offCtx = offscreenTerrainCtxRef.current;
         
         // Clear off-screen canvas
@@ -2345,23 +2511,30 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.globalAlpha = 1;
       }
       
-      // Draw anomalies (gravity wells) - enhanced glow during blackout
+      // Draw anomalies (gravity wells) - enhanced glow during blackout and light storm
       if (allAnomalies.length > 0) {
-        if (blackoutActiveRef.current) {
+        if (lightStormActiveRef.current) {
           ctx.save();
-          ctx.shadowBlur = (ctx.shadowBlur || 15) * 2; // Double glow
+          ctx.shadowBlur = (ctx.shadowBlur || 15) * 2.5;
+        } else if (blackoutActiveRef.current) {
+          ctx.save();
+          ctx.shadowBlur = (ctx.shadowBlur || 15) * 2;
         }
         drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor);
-        if (blackoutActiveRef.current) {
+        if (lightStormActiveRef.current || blackoutActiveRef.current) {
           ctx.restore();
         }
       }
       
-      // Draw volcanoes - enhanced glow during blackout
+      // Draw volcanoes - enhanced glow during blackout and light storm
       if (allVolcanoes.length > 0) {
-        if (blackoutActiveRef.current) {
+        if (lightStormActiveRef.current) {
           ctx.save();
-          ctx.shadowBlur = 30 * dprInit; // Increased from 15
+          ctx.shadowBlur = 40 * dprInit;
+          ctx.shadowColor = 'rgba(255, 100, 0, 1.0)';
+        } else if (blackoutActiveRef.current) {
+          ctx.save();
+          ctx.shadowBlur = 30 * dprInit;
           ctx.shadowColor = 'rgba(255, 100, 0, 0.9)';
         }
         drawVolcanoes(
@@ -2372,15 +2545,16 @@ export const SurvivalEngine: React.FC<Props> = ({
           cameraX - viewWidth / 2,
           cameraX + viewWidth / 2
         );
-        if (blackoutActiveRef.current) {
+        if (lightStormActiveRef.current || blackoutActiveRef.current) {
           ctx.restore();
         }
       }
       
-      // Render hazards (viewport culling included in drawHazards)
+      // Render hazards (viewport culling included in drawHazards) - enhanced glow during light storm
       const allHazards = hazardsRef.current;
       if (allHazards.length > 0) {
-        drawHazards(ctx, allHazards, neonColor, shouldOptimize ? 4 : 8);
+        const hazardGlowIntensity = lightStormActiveRef.current ? 20 : (shouldOptimize ? 4 : 8);
+        drawHazards(ctx, allHazards, neonColor, hazardGlowIntensity);
       }
       
       // Render asteroid field (if active)
@@ -2774,6 +2948,77 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.translate(-cameraX + shake, anchor);
       }
       
+      // Composite off-screen terrain using vertical sweep beam (during Light Storm)
+      if (lightStormActiveRef.current && sweepActiveRef.current && !isDead && offscreenTerrainCanvasRef.current) {
+        ctx.save();
+        
+        const stormFadeAlpha = lightStormTimerRef.current < LIGHT_STORM_FADE_OUT 
+          ? (lightStormTimerRef.current / LIGHT_STORM_FADE_OUT) 
+          : 1.0;
+        
+        const beamWidth = currentBeamWidthRef.current;
+        const beamCenterX = sweepXRef.current;
+        const beamLeftX = beamCenterX - beamWidth / 2;
+        const beamRightX = beamCenterX + beamWidth / 2;
+        
+        // Create vertical beam clipping path
+        ctx.beginPath();
+        ctx.rect(
+          beamLeftX,
+          -viewHeight * 2,
+          beamWidth,
+          viewHeight * 4
+        );
+        ctx.closePath();
+        
+        // Draw beam gradient glow (additive blending)
+        const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
+        gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+        gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+        gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
+        gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+        gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fill();
+        
+        // Clip to beam area
+        ctx.clip();
+        
+        // Draw off-screen terrain (only visible inside beam)
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1.0 * stormFadeAlpha;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        // Add bloom/glow layer
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.2 * stormFadeAlpha;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        ctx.restore();
+        
+        // Re-apply camera transform for remaining objects
+        ctx.scale(dprInit, dprInit);
+        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shake, anchor);
+        
+        // Draw bright leading edge
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * stormFadeAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = 'rgba(200, 220, 255, 1)';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(beamRightX, -viewHeight * 2);
+        ctx.lineTo(beamRightX, viewHeight * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+      
       ctx.restore();
       
       // Screen-space overlays (bonus popups)
@@ -2947,6 +3192,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         cometTimer={cometTimerRef.current}
         blackoutActive={blackoutActive}
         blackoutTimer={blackoutTimerRef.current}
+        lightStormActive={lightStormActive}
+        lightStormTimer={lightStormTimerRef.current}
         zoneName={classicColorsMode.current ? undefined : currentPalette.name}
         weatherType={weatherStateRef.current.currentWeather}
         showGyroButton={isTouch && !isUsingPCControls}
