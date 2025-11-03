@@ -448,6 +448,19 @@ const retryGame = () => {
 
   const handleRetryLevel = () => {
     console.log('🔄 Retrying level:', lastResult.level);
+    
+    // Preserve the level that was just played
+    const levelToRetry = lastResult.level ?? carry?.level ?? successCount;
+    setCarry({ score: 0, landings: 0, level: levelToRetry });
+    setSuccessCount(levelToRetry);
+    
+    // Preserve the seed to ensure same level layout
+    setSeedOverride(lastPlayedSeed);
+    
+    // Reset leaderboard display state
+    setShowLeaderboardsAfterInitials(false);
+    
+    // Force GameEngine remount with preserved state
     setGameKey(prev => prev + 1);
     setView("game");
   };
