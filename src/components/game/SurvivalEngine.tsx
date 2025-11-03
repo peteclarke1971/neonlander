@@ -139,9 +139,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Light Storm constants
   const LIGHT_STORM_DURATION = 15; // 15 seconds per storm
   const LIGHT_STORM_SWEEP_INTERVAL = 2.0; // 2 seconds between sweeps
-  const LIGHT_STORM_SWEEP_SPEED = 3.0; // seconds to cross screen
-  const LIGHT_STORM_INITIAL_BEAM_WIDTH = 400; // Start wide
-  const LIGHT_STORM_MIN_BEAM_WIDTH = 100; // End narrow (1/4 of initial)
+  const LIGHT_STORM_SWEEP_SPEED = 6.0; // seconds to cross screen (half speed)
+  const LIGHT_STORM_INITIAL_BEAM_WIDTH = 300; // Start at 0.75x width
+  const LIGHT_STORM_MIN_BEAM_WIDTH = 75; // End narrow (1/4 of initial)
   const LIGHT_STORM_FADE_OUT = 2.0; // 2 second fade out at end
   
   // Light Storm state
@@ -156,6 +156,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   const sweepXRef = useRef(0);
   const sweepActiveRef = useRef(false);
   const currentBeamWidthRef = useRef(LIGHT_STORM_INITIAL_BEAM_WIDTH);
+  
+  // Effect coordination tracking
+  const lastEffectEndTimeRef = useRef(0);
+  const EFFECT_SEPARATION_TIME = 15; // Minimum 15 seconds between effects
   
   // Weather system state
   const weatherStateRef = useRef<WeatherState>(createWeatherState());
@@ -851,8 +855,16 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Blackout trigger logic
       if (!blackoutActiveRef.current && !isDead) {
         
+        // SAFETY CHECK: Don't trigger if light storm or comet is active
+        if (lightStormActiveRef.current || cometActiveRef.current) {
+          // Skip this frame, will retry next frame
+        }
+        // SAFETY CHECK: Ensure minimum separation from last effect
+        else if (currentTime - lastEffectEndTimeRef.current < EFFECT_SEPARATION_TIME) {
+          // Not enough time has passed since last effect ended
+        }
         // FIRST BLACKOUT: Distance-based (1500-1700m)
-        if (!firstBlackoutTriggeredRef.current && currentDistance >= 1500) {
+        else if (!firstBlackoutTriggeredRef.current && currentDistance >= 1500) {
           // Random trigger point between 1500-1700m
           const randomTriggerDistance = 1500 + Math.random() * 200;
           
@@ -904,6 +916,9 @@ export const SurvivalEngine: React.FC<Props> = ({
           setBlackoutActive(false);
           blackoutTransitionRef.current = 1.0;
           
+          // Track end time for effect separation
+          lastEffectEndTimeRef.current = currentTime;
+          
           // Schedule next blackout: random 60-120 seconds from now
           const randomCooldown = 60 + Math.random() * 60; // 60-120 seconds
           nextBlackoutTimeRef.current = currentTime + randomCooldown;
@@ -916,8 +931,16 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Light Storm trigger logic
       if (!lightStormActiveRef.current && !isDead) {
         
+        // SAFETY CHECK: Don't trigger if blackout or comet is active
+        if (blackoutActiveRef.current || cometActiveRef.current) {
+          // Skip this frame, will retry next frame
+        }
+        // SAFETY CHECK: Ensure minimum separation from last effect
+        else if (currentTime - lastEffectEndTimeRef.current < EFFECT_SEPARATION_TIME) {
+          // Not enough time has passed since last effect ended
+        }
         // FIRST LIGHT STORM: Distance-based (10000m)
-        if (!firstLightStormTriggeredRef.current && currentDistance >= 10000) {
+        else if (!firstLightStormTriggeredRef.current && currentDistance >= 10000) {
           console.log('🌩️ First Light Storm triggered at 10000m');
           lightStormActiveRef.current = true;
           setLightStormActive(true);
@@ -962,6 +985,9 @@ export const SurvivalEngine: React.FC<Props> = ({
           setLightStormActive(false);
           lightStormTimerRef.current = 0;
           sweepActiveRef.current = false;
+          
+          // Track end time for effect separation
+          lastEffectEndTimeRef.current = currentTime;
           console.log('🌩️ Light Storm ended');
         }
       }
@@ -1308,8 +1334,16 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Comet event system
           if (!firstCometSpawnedRef.current) {
+            // SAFETY CHECK: Don't trigger if light storm or blackout is active
+            if (lightStormActiveRef.current || blackoutActiveRef.current) {
+              // Skip comet spawn this frame
+            }
+            // SAFETY CHECK: Ensure minimum separation from last effect
+            else if (currentTime - lastEffectEndTimeRef.current < EFFECT_SEPARATION_TIME) {
+              // Not enough time has passed
+            }
             // First comet: guaranteed spawn during chunks 5-8
-            if (chunksGeneratedRef.current >= 5 && chunksGeneratedRef.current <= 8) {
+            else if (chunksGeneratedRef.current >= 5 && chunksGeneratedRef.current <= 8) {
               // 10% chance per second during this window
               if (Math.random() < 0.1 * dt) {
                 cometActiveRef.current = true;
@@ -1324,32 +1358,47 @@ export const SurvivalEngine: React.FC<Props> = ({
                 nextCometBlockRef.current = chunksGeneratedRef.current + gap;
               }
             }
-            // If player somehow reaches chunk 9 without triggering, force spawn
-            if (chunksGeneratedRef.current > 8) {
-              cometActiveRef.current = true;
-              setCometActive(true);
-              cometTimerRef.current = 10.0;
-              cometTrailAlphaRef.current = 1.0;
-              cometPositionRef.current = { x: 0, y: 0, progress: 0 };
-              firstCometSpawnedRef.current = true;
-              
-              // Set next comet target
-              const gap = 8 + Math.floor(Math.random() * 9);
-              nextCometBlockRef.current = chunksGeneratedRef.current + gap;
+            // If player somehow reaches chunk 9 without triggering, force spawn (with safety checks)
+            else if (chunksGeneratedRef.current > 8) {
+              if (!lightStormActiveRef.current && !blackoutActiveRef.current && 
+                  currentTime - lastEffectEndTimeRef.current >= EFFECT_SEPARATION_TIME) {
+                cometActiveRef.current = true;
+                setCometActive(true);
+                cometTimerRef.current = 10.0;
+                cometTrailAlphaRef.current = 1.0;
+                cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+                firstCometSpawnedRef.current = true;
+                
+                // Set next comet target
+                const gap = 8 + Math.floor(Math.random() * 9);
+                nextCometBlockRef.current = chunksGeneratedRef.current + gap;
+              }
             }
           } else {
             // Subsequent comets: block-based spawning
             if (!cometActiveRef.current && chunksGeneratedRef.current >= nextCometBlockRef.current) {
-              // Spawn comet immediately when we reach the target block
-              cometActiveRef.current = true;
-              setCometActive(true);
-              cometTimerRef.current = 10.0;
-              cometTrailAlphaRef.current = 1.0;
-              cometPositionRef.current = { x: 0, y: 0, progress: 0 };
-              
-              // Set next comet target: 8-16 blocks from now
-              const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
-              nextCometBlockRef.current = chunksGeneratedRef.current + gap;
+              // SAFETY CHECK: Don't overlap with other effects
+              if (lightStormActiveRef.current || blackoutActiveRef.current) {
+                // Delay comet by 1 block
+                nextCometBlockRef.current = chunksGeneratedRef.current + 1;
+              }
+              // SAFETY CHECK: Ensure minimum separation
+              else if (currentTime - lastEffectEndTimeRef.current < EFFECT_SEPARATION_TIME) {
+                // Delay comet by 1 block
+                nextCometBlockRef.current = chunksGeneratedRef.current + 1;
+              }
+              else {
+                // Spawn comet immediately when we reach the target block
+                cometActiveRef.current = true;
+                setCometActive(true);
+                cometTimerRef.current = 10.0;
+                cometTrailAlphaRef.current = 1.0;
+                cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+                
+                // Set next comet target: 8-16 blocks from now
+                const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
+                nextCometBlockRef.current = chunksGeneratedRef.current + gap;
+              }
             }
           }
           
@@ -1361,7 +1410,9 @@ export const SurvivalEngine: React.FC<Props> = ({
             if (cometTimerRef.current <= 0) {
               cometActiveRef.current = false;
               setCometActive(false);
-              // No need for cooldown timer anymore - block counter handles it
+              
+              // Track end time for effect separation
+              lastEffectEndTimeRef.current = currentTime;
             }
           }
           
