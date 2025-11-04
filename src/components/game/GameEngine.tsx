@@ -170,6 +170,10 @@ export const GameEngine: React.FC<Props> = ({
     gradient: CanvasGradient | null;
     cachedWidth: number;
   }>({ gradient: null, cachedWidth: 0 });
+  
+  // Terrain caching for iPad performance
+  const terrainCacheDirty = useRef(true);
+  const lastCachedCameraX = useRef(0);
   const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
   const SPOTLIGHT_RANGE = 400; // world units
   const LIGHT_STORM_SWEEP_SPEED = 9.0; // seconds to cross screen
@@ -179,6 +183,7 @@ export const GameEngine: React.FC<Props> = ({
   // Pre-level message state for special levels
   const [specialLevelMessage, setSpecialLevelMessage] = useState<string>("");
   const [showSpecialMessage, setShowSpecialMessage] = useState(false);
+  const [waitingForMessageComplete, setWaitingForMessageComplete] = useState(false);
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -363,6 +368,60 @@ export const GameEngine: React.FC<Props> = ({
 
   // Ensure UI mode is off during gameplay
   useEffect(() => { try { setUiMode(false); } catch {} }, []);
+  
+  // Start countdown when special message completes
+  useEffect(() => {
+    if (!waitingForMessageComplete && specialLevelType.current !== 'normal' && !introRef.current) {
+      // Message display is complete, now start the countdown
+      const initCountdown = () => {
+        if (!introRef.current && containerRef.current) {
+          introRef.current = createCountdownIntro();
+          introRef.current.onDone(() => {
+            // Gameplay resumes on 'GO' start; ensure overlay clears fully on done
+          });
+          
+          const initSeed = Date.now();
+          introRef.current.start({
+            variant: "freeze",
+            seed: initSeed,
+            onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+            onGo: () => { 
+              setWorldPaused(false); worldPausedRef.current = false;
+              setPlayerLocked(false); playerLockedRef.current = false;
+              invulnerabilityTimer.current = 1200;
+              
+              if (mode === "timetrial") {
+                setTimeTrialState(prev => ({
+                  ...prev,
+                  raceStartTime: performance.now(),
+                  raceActive: true
+                }));
+                timeTrialGhostFrames.current = [];
+              }
+              
+              timerStartTimeoutRef.current = setTimeout(() => {
+                setTimerActive(true);
+                timerActiveRef.current = true;
+              }, 2000);
+              try { audio.current.playIntroGo(); } catch {} 
+            },
+            onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
+          });
+          setWorldPaused(true); worldPausedRef.current = true;
+          setPlayerLocked(true); playerLockedRef.current = true;
+
+          const parent = containerRef.current;
+          if (parent) {
+            const wCss = parent.clientWidth;
+            const hCss = parent.clientHeight;
+            const yCss = (mode === "caverns") ? hCss / 2 : hCss * 0.45;
+            setShipScreenPos({ x: wCss / 2, y: yCss });
+          }
+        }
+      };
+      initCountdown();
+    }
+  }, [waitingForMessageComplete, mode]);
 
   // Cursor management setup
   useEffect(() => {
@@ -468,6 +527,8 @@ export const GameEngine: React.FC<Props> = ({
       sweepXRef.current = 0;
       sweepActiveRef.current = true;
       currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
+      terrainCacheDirty.current = true;
+      lastCachedCameraX.current = -9999;
     }
     
     // Sync off-screen canvas size with main canvas
@@ -494,13 +555,15 @@ export const GameEngine: React.FC<Props> = ({
     }
     
     // Show pre-level message for special levels BEFORE countdown
-    // This happens synchronously and blocks countdown initialization
+    // Block countdown initialization until message is complete
     if (levelType === 'blackout') {
       setSpecialLevelMessage("DARK SIDE");
       setShowSpecialMessage(true);
+      setWaitingForMessageComplete(true);
     } else if (levelType === 'lightbeam') {
       setSpecialLevelMessage("SEARCH IN PROGRESS");
       setShowSpecialMessage(true);
+      setWaitingForMessageComplete(true);
     }
     
     // Check if this is a cavern level - only in caverns mode
@@ -1117,7 +1180,7 @@ export const GameEngine: React.FC<Props> = ({
     let thrustHold = 0; // seconds held
     let rumbleNext = 0; // next time to send a rumble pulse (ms timestamp)
     
-    // Initialize countdown intro (delay if special message is showing)
+    // Initialize countdown intro
     const initCountdown = () => {
       if (!introRef.current) {
         introRef.current = createCountdownIntro();
@@ -1171,14 +1234,8 @@ export const GameEngine: React.FC<Props> = ({
       }
     };
     
-    // If special level message is showing, delay countdown by 2 seconds
-    if (specialLevelType.current !== 'normal') {
-      setTimeout(() => {
-        setShowSpecialMessage(false);
-        setSpecialLevelMessage("");
-        initCountdown();
-      }, 2000);
-    } else {
+    // Only initialize countdown if not waiting for special message
+    if (specialLevelType.current === 'normal') {
       initCountdown();
     }
 
@@ -2577,54 +2634,72 @@ export const GameEngine: React.FC<Props> = ({
         const offCtx = offscreenTerrainCtxRef.current;
         const offCanvas = offscreenTerrainCanvasRef.current;
         
-        // Clear off-screen canvas
-        offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+        // Only redraw terrain when camera moves significantly (caching for iPad performance)
+        const cameraMovedSignificantly = Math.abs(cameraX - lastCachedCameraX.current) > (isIPad ? 400 : 200);
         
-        // Apply same camera transform as main canvas
-        offCtx.setTransform(1, 0, 0, 1, 0, 0);
-        offCtx.scale(dpr, dpr);
-        offCtx.translate(w / (2 * dpr), h / (2 * dpr));
-        offCtx.scale(zoom, zoom);
-        offCtx.translate(-cameraX + shakeX, anchor);
-        
-        // Render terrain at FULL BRIGHTNESS to off-screen canvas
-        // iPad-specific optimizations
-        offCtx.globalAlpha = 1.0;
-        offCtx.strokeStyle = neonColor;
-        offCtx.shadowColor = neonColor;
-        offCtx.shadowBlur = shadowBlur * (lightBeamQuality === 'high' ? 1.5 : 0.5);
-        offCtx.lineWidth = lightBeamQuality === 'high' ? 2 : 1.5;
-        
-        // Draw terrain to off-screen canvas
-        const drawTerrainOffscreen = (offset: number) => {
-          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+        if (terrainCacheDirty.current || cameraMovedSignificantly) {
+          // Clear off-screen canvas
+          offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
           
-          offCtx.beginPath();
-          for (let i = 0; i < terrain.points.length; i++) {
-            const p = terrain.points[i];
-            if (i === 0) offCtx.moveTo(p.x + offset, p.y);
-            else offCtx.lineTo(p.x + offset, p.y);
-          }
-          offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
-          offCtx.stroke();
-        };
-        
-        const wrap = Math.floor(cameraX / terrain.worldWidth);
-        // iPad optimization: skip middle wrap iteration
-        const wrapRange = lightBeamQuality === 'high' ? [-1, 0, 1] : [-1, 1];
-        for (const w of wrapRange) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
-        
-        // Draw pads to off-screen canvas
-        for (const pad of terrain.pads) {
-          const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-          offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
-          offCtx.fillRect(pad.xStart, pad.y, w, 2);
+          // Apply same camera transform as main canvas
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
+          offCtx.scale(dpr, dpr);
+          offCtx.translate(w / (2 * dpr), h / (2 * dpr));
+          offCtx.scale(zoom, zoom);
+          offCtx.translate(-cameraX + shakeX, anchor);
+          
+          // Render terrain at FULL BRIGHTNESS to off-screen canvas
+          // iPad-specific optimizations
+          offCtx.globalAlpha = 1.0;
           offCtx.strokeStyle = neonColor;
-          offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+          offCtx.shadowColor = neonColor;
+          offCtx.shadowBlur = shadowBlur * (lightBeamQuality === 'high' ? 1.5 : 0.25);
+          offCtx.lineWidth = lightBeamQuality === 'high' ? 2 : 1.5;
+          
+          // Draw terrain to off-screen canvas
+          const drawTerrainOffscreen = (offset: number) => {
+            if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+            
+            offCtx.beginPath();
+            const step = lightBeamQuality === 'high' ? 1 : 2;
+            for (let i = 0; i < terrain.points.length; i += step) {
+              const p = terrain.points[i];
+              if (i === 0) offCtx.moveTo(p.x + offset, p.y);
+              else offCtx.lineTo(p.x + offset, p.y);
+            }
+            offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+            offCtx.stroke();
+          };
+          
+          const wrap = Math.floor(cameraX / terrain.worldWidth);
+          // iPad optimization: skip middle wrap iteration
+          const wrapRange = lightBeamQuality === 'high' ? [-1, 0, 1] : [-1, 1];
+          for (const w of wrapRange) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
+          
+          // Draw pads to off-screen canvas
+          for (const pad of terrain.pads) {
+            const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+            offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+            offCtx.fillRect(pad.xStart, pad.y, w, 2);
+            
+            // iPad: no shadow on pads for performance
+            if (lightBeamQuality === 'medium') {
+              offCtx.shadowBlur = 0;
+            }
+            offCtx.strokeStyle = neonColor;
+            offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+            if (lightBeamQuality === 'medium') {
+              offCtx.shadowBlur = shadowBlur * 0.25;
+            }
+          }
+          
+          offCtx.globalAlpha = 1;
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
+          
+          // Mark cache as clean
+          terrainCacheDirty.current = false;
+          lastCachedCameraX.current = cameraX;
         }
-        
-        offCtx.globalAlpha = 1;
-        offCtx.setTransform(1, 0, 0, 1, 0, 0);
         
         // Main canvas stays completely black - no terrain visible
         
@@ -3190,11 +3265,18 @@ export const GameEngine: React.FC<Props> = ({
         const cache = lightBeamGradientCache.current;
         if (!cache.gradient || Math.abs(cache.cachedWidth - beamWidth) > 5) {
           const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
-          gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-          gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-          gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
-          gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          if (lightBeamQuality === 'high') {
+            gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+            gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+            gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
+            gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+            gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          } else {
+            // iPad: simpler 3-stop gradient
+            gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+            gradient.addColorStop(0.5, `rgba(210, 230, 255, ${0.4 * stormFadeAlpha})`);
+            gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          }
           cache.gradient = gradient;
           cache.cachedWidth = beamWidth;
         }
@@ -3812,6 +3894,7 @@ export const GameEngine: React.FC<Props> = ({
           onComplete={() => {
             setShowSpecialMessage(false);
             setSpecialLevelMessage("");
+            setWaitingForMessageComplete(false);
           }}
         />
       )}
