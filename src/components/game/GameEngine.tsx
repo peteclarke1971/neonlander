@@ -155,6 +155,27 @@ export const GameEngine: React.FC<Props> = ({
     lastEarned: number;
   }>({ bullseye: false, speedBonus: false, padBonus2x: false, lastEarned: 0 });
   
+  // Special level type refs (blackout and light beam)
+  const specialLevelType = useRef<'normal' | 'blackout' | 'lightbeam'>('normal');
+  const blackoutActive = useRef(false);
+  const lightStormActive = useRef(false);
+  const offscreenTerrainCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenTerrainCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const sweepPhaseRef = useRef(0);
+  const sweepTimerRef = useRef(0);
+  const sweepXRef = useRef(0);
+  const sweepActiveRef = useRef(false);
+  const currentBeamWidthRef = useRef(300); // Initial beam width
+  const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
+  const SPOTLIGHT_RANGE = 400; // world units
+  const LIGHT_STORM_SWEEP_SPEED = 9.0; // seconds to cross screen
+  const LIGHT_STORM_INITIAL_BEAM_WIDTH = 300;
+  const LIGHT_STORM_MIN_BEAM_WIDTH = 75;
+  
+  // Pre-level message state for special levels
+  const [specialLevelMessage, setSpecialLevelMessage] = useState<string>("");
+  const [showSpecialMessage, setShowSpecialMessage] = useState(false);
+  
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
@@ -381,6 +402,16 @@ export const GameEngine: React.FC<Props> = ({
       setIsTouch(false);
     }
   }, []);
+  
+  // Setup off-screen canvas for special level effects
+  useEffect(() => {
+    offscreenTerrainCanvasRef.current = document.createElement('canvas');
+    offscreenTerrainCtxRef.current = offscreenTerrainCanvasRef.current.getContext('2d');
+    return () => {
+      offscreenTerrainCanvasRef.current = null;
+      offscreenTerrainCtxRef.current = null;
+    };
+  }, []);
 
   // Force unmount bonus messages after calculated duration
   useEffect(() => {
@@ -400,6 +431,13 @@ export const GameEngine: React.FC<Props> = ({
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     mountedRef.current = true; // Reset on mount
     
+    // Helper function to determine special level type
+    const getSpecialLevelType = (level: number): 'normal' | 'blackout' | 'lightbeam' => {
+      if (level % 10 === 9 && level >= 9) return 'blackout';
+      if (level % 10 === 4 && level >= 14) return 'lightbeam';
+      return 'normal';
+    };
+    
     const initializeGame = async () => {
       const c = canvasRef.current!;
       const ctx = c.getContext("2d")!;
@@ -408,6 +446,46 @@ export const GameEngine: React.FC<Props> = ({
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
     // Clear volcano particles at start of each level
     setVolcanoParticles([]);
+    
+    // Determine if this is a special level (only for classic mode)
+    const isClassicMode = mode === "classic";
+    const levelType = isClassicMode ? getSpecialLevelType(level) : 'normal';
+    specialLevelType.current = levelType;
+    
+    // Set special level flags
+    blackoutActive.current = levelType === 'blackout';
+    lightStormActive.current = levelType === 'lightbeam';
+    
+    // Initialize light beam state
+    if (levelType === 'lightbeam') {
+      sweepTimerRef.current = 0;
+      sweepXRef.current = 0;
+      sweepActiveRef.current = true;
+      currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
+    }
+    
+    // Show pre-level message for special levels
+    if (levelType === 'blackout') {
+      setSpecialLevelMessage("DARK SIDE");
+      setShowSpecialMessage(true);
+      setTimeout(() => {
+        setShowSpecialMessage(false);
+        setSpecialLevelMessage("");
+      }, 2000);
+    } else if (levelType === 'lightbeam') {
+      setSpecialLevelMessage("SEARCH IN PROGRESS");
+      setShowSpecialMessage(true);
+      setTimeout(() => {
+        setShowSpecialMessage(false);
+        setSpecialLevelMessage("");
+      }, 2000);
+    }
+    
+    // Sync off-screen canvas size with main canvas
+    if (offscreenTerrainCanvasRef.current) {
+      offscreenTerrainCanvasRef.current.width = c.width;
+      offscreenTerrainCanvasRef.current.height = c.height;
+    }
     
     // Initialize demo AI if in demo mode
     if (isDemo) {
@@ -419,7 +497,12 @@ export const GameEngine: React.FC<Props> = ({
     // Physics state
     const baseSeed = 873421;
     const fixedSeed = baseSeed + (difficulty === "hard" ? 100000 : 0) + (level | 0) * 9973;
-    const levelVar = Math.min(Math.max(0, level), 20);
+    let levelVar = Math.min(Math.max(0, level), 20);
+    
+    // Reduce terrain complexity for special levels (make them slightly easier)
+    if (specialLevelType.current === 'blackout' || specialLevelType.current === 'lightbeam') {
+      levelVar = Math.max(0, levelVar - 1);
+    }
     
     // Check if this is a cavern level - only in caverns mode
     const isCavernLevel = mode === "caverns";
@@ -2311,6 +2394,25 @@ export const GameEngine: React.FC<Props> = ({
         if (bullseyeT > 2.2) bullseyeT = -1;
       }
 
+      // Update light beam sweep for lightbeam levels
+      if (lightStormActive.current && !worldPausedRef.current) {
+        sweepTimerRef.current += dt;
+        
+        // Calculate sweep progress (0 to 1)
+        const sweepProgress = (sweepTimerRef.current % LIGHT_STORM_SWEEP_SPEED) / LIGHT_STORM_SWEEP_SPEED;
+        
+        // Calculate beam position (world-space, left to right)
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const viewWidth = c.width / (zoom * dpr);
+        sweepXRef.current = cameraX - viewWidth / 2 + sweepProgress * viewWidth * 2;
+        
+        // Narrow beam width over time
+        const widthProgress = Math.min(1, sweepTimerRef.current / 30);
+        currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH - ((LIGHT_STORM_INITIAL_BEAM_WIDTH - LIGHT_STORM_MIN_BEAM_WIDTH) * widthProgress);
+        
+        sweepActiveRef.current = true;
+      }
+
       updateHud();
       render();
       if (!running && !crashed) cancelAnimationFrame(rafRef.current);
@@ -2378,6 +2480,11 @@ export const GameEngine: React.FC<Props> = ({
           return prev;
         });
       }
+
+      // Viewport culling bounds
+      const viewWCull = w / (zoom * dpr);
+      const viewLeft = cameraX - viewWCull / 2;
+      const viewRight = cameraX + viewWCull / 2;
 
       // Background stars: only for non-cavern levels
       if (!isCavernLevel) {
@@ -2452,14 +2559,135 @@ export const GameEngine: React.FC<Props> = ({
       ctx.lineWidth = 2;
       const shadowBlur = shouldOptimizePerformance ? 3 : 8; // Significantly reduced shadow blur
       ctx.shadowBlur = shadowBlur;
-      
-      // Viewport culling bounds
-      const viewWCull = w / (zoom * dpr);
-      const viewLeft = cameraX - viewWCull / 2;
-      const viewRight = cameraX + viewWCull / 2;
 
-      // Terrain/Cavern rendering
-      if (isCavernLevel) {
+      // Special rendering for light beam levels
+      if (lightStormActive.current && sweepActiveRef.current && !isCavernLevel && offscreenTerrainCtxRef.current && offscreenTerrainCanvasRef.current) {
+        const offCtx = offscreenTerrainCtxRef.current;
+        const offCanvas = offscreenTerrainCanvasRef.current;
+        
+        // Clear off-screen canvas
+        offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+        
+        // Apply same camera transform as main canvas
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.scale(dpr, dpr);
+        offCtx.translate(w / (2 * dpr), h / (2 * dpr));
+        offCtx.scale(zoom, zoom);
+        offCtx.translate(-cameraX + shakeX, anchor);
+        
+        // Render terrain at FULL BRIGHTNESS to off-screen canvas
+        offCtx.globalAlpha = 1.0;
+        offCtx.strokeStyle = neonColor;
+        offCtx.shadowColor = neonColor;
+        offCtx.shadowBlur = shadowBlur * 1.5;
+        offCtx.lineWidth = 2;
+        
+        // Draw terrain to off-screen canvas
+        const drawTerrainOffscreen = (offset: number) => {
+          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+          
+          offCtx.beginPath();
+          for (let i = 0; i < terrain.points.length; i++) {
+            const p = terrain.points[i];
+            if (i === 0) offCtx.moveTo(p.x + offset, p.y);
+            else offCtx.lineTo(p.x + offset, p.y);
+          }
+          offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+          offCtx.stroke();
+        };
+        
+        const wrap = Math.floor(cameraX / terrain.worldWidth);
+        for (let w = -1; w <= 1; w++) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
+        
+        // Draw pads to off-screen canvas
+        for (const pad of terrain.pads) {
+          const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+          offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+          offCtx.fillRect(pad.xStart, pad.y, w, 2);
+          offCtx.strokeStyle = neonColor;
+          offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+        }
+        
+        offCtx.globalAlpha = 1;
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Main canvas stays completely black - no terrain visible
+        
+      } else if (blackoutActive.current && !isCavernLevel && offscreenTerrainCtxRef.current && offscreenTerrainCanvasRef.current) {
+        const offCtx = offscreenTerrainCtxRef.current;
+        const offCanvas = offscreenTerrainCanvasRef.current;
+        
+        // Clear off-screen canvas
+        offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+        
+        // Apply same camera transform as main canvas
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        offCtx.scale(dpr, dpr);
+        offCtx.translate(w / (2 * dpr), h / (2 * dpr));
+        offCtx.scale(zoom, zoom);
+        offCtx.translate(-cameraX + shakeX, anchor);
+        
+        // Render terrain at FULL BRIGHTNESS to off-screen canvas
+        offCtx.globalAlpha = 1.0;
+        offCtx.strokeStyle = neonColor;
+        offCtx.shadowColor = neonColor;
+        offCtx.shadowBlur = shadowBlur * 1.5;
+        offCtx.lineWidth = 2;
+        
+        // Draw terrain to off-screen canvas
+        const drawTerrainOffscreen = (offset: number) => {
+          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+          
+          offCtx.beginPath();
+          for (let i = 0; i < terrain.points.length; i++) {
+            const p = terrain.points[i];
+            if (i === 0) offCtx.moveTo(p.x + offset, p.y);
+            else offCtx.lineTo(p.x + offset, p.y);
+          }
+          offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+          offCtx.stroke();
+        };
+        
+        const wrap = Math.floor(cameraX / terrain.worldWidth);
+        for (let w = -1; w <= 1; w++) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
+        
+        // Draw pads to off-screen canvas
+        for (const pad of terrain.pads) {
+          const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+          offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+          offCtx.fillRect(pad.xStart, pad.y, w, 2);
+          offCtx.strokeStyle = neonColor;
+          offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+        }
+        
+        offCtx.globalAlpha = 1;
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Draw very faint terrain outline on main canvas (alpha 0.05)
+        ctx.globalAlpha = 0.05;
+        ctx.strokeStyle = neonColor;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2;
+        
+        const drawTerrainFaint = (offset: number) => {
+          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+          
+          ctx.beginPath();
+          for (let i = 0; i < terrain.points.length; i++) {
+            const p = terrain.points[i];
+            if (i === 0) ctx.moveTo(p.x + offset, p.y);
+            else ctx.lineTo(p.x + offset, p.y);
+          }
+          ctx.stroke();
+        };
+        
+        const wrapFaint = Math.floor(cameraX / terrain.worldWidth);
+        for (let w = -1; w <= 1; w++) drawTerrainFaint((wrapFaint + w) * terrain.worldWidth);
+        
+        ctx.globalAlpha = 1;
+        
+      } else if (isCavernLevel) {
         // Render cavern walls
         const cavernData = terrain as CavernData;
         ctx.save();
@@ -2859,6 +3087,135 @@ export const GameEngine: React.FC<Props> = ({
         ctx.strokeStyle = neonColor as any;
         ctx.lineWidth = 2.2;
         ctx.stroke();
+        ctx.restore();
+      }
+      
+      // Composite off-screen terrain using spotlight (during blackout)
+      if (blackoutActive.current && !crashed && offscreenTerrainCanvasRef.current) {
+        ctx.save();
+        
+        const spotX = x;
+        const spotY = y;
+        const spotAngle = angle + Math.PI / 2; // Point downward from ship
+        const spotlightIntensity = 1.0;
+        
+        // Create spotlight cone path
+        const leftAngle = spotAngle - SPOTLIGHT_ANGLE / 2;
+        const rightAngle = spotAngle + SPOTLIGHT_ANGLE / 2;
+        const leftX = spotX + Math.cos(leftAngle) * SPOTLIGHT_RANGE;
+        const leftY = spotY + Math.sin(leftAngle) * SPOTLIGHT_RANGE;
+        const rightX = spotX + Math.cos(rightAngle) * SPOTLIGHT_RANGE;
+        const rightY = spotY + Math.sin(rightAngle) * SPOTLIGHT_RANGE;
+        
+        // Draw spotlight gradient with additive blending
+        const gradient = ctx.createRadialGradient(
+          spotX, spotY, 0,
+          spotX, spotY, SPOTLIGHT_RANGE
+        );
+        gradient.addColorStop(0, `rgba(255, 255, 220, ${0.6 * spotlightIntensity})`);
+        gradient.addColorStop(0.5, `rgba(255, 255, 200, ${0.3 * spotlightIntensity})`);
+        gradient.addColorStop(1, `rgba(255, 255, 180, 0)`);
+        
+        ctx.beginPath();
+        ctx.moveTo(spotX, spotY);
+        ctx.lineTo(leftX, leftY);
+        ctx.arc(spotX, spotY, SPOTLIGHT_RANGE, leftAngle, rightAngle);
+        ctx.lineTo(spotX, spotY);
+        ctx.closePath();
+        
+        ctx.fillStyle = gradient;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fill();
+        
+        // Create clipping path for terrain composite
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clip();
+        
+        // Draw off-screen terrain (only visible inside clip region)
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        // Add bloom/glow layer
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 * spotlightIntensity;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        ctx.restore();
+        
+        // Re-apply camera transform for remaining objects
+        ctx.scale(dpr, dpr);
+        ctx.translate(w / (2 * dpr), h / (2 * dpr));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shakeX, anchor);
+      }
+      
+      // Composite off-screen terrain using vertical sweep beam (during Light Storm)
+      if (lightStormActive.current && sweepActiveRef.current && !crashed && offscreenTerrainCanvasRef.current) {
+        ctx.save();
+        
+        const stormFadeAlpha = 1.0;
+        
+        const beamWidth = currentBeamWidthRef.current;
+        const beamCenterX = sweepXRef.current;
+        const beamLeftX = beamCenterX - beamWidth / 2;
+        const beamRightX = beamCenterX + beamWidth / 2;
+        
+        // Create vertical beam clipping path
+        ctx.beginPath();
+        ctx.rect(
+          beamLeftX,
+          -viewH * 2,
+          beamWidth,
+          viewH * 4
+        );
+        ctx.closePath();
+        
+        // Draw beam gradient glow (additive blending)
+        const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
+        gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+        gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+        gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
+        gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+        gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fill();
+        
+        // Clip to beam area
+        ctx.clip();
+        
+        // Draw off-screen terrain (only visible inside beam)
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1.0 * stormFadeAlpha;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        // Add bloom/glow layer
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.2 * stormFadeAlpha;
+        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        
+        ctx.restore();
+        
+        // Re-apply camera transform for remaining objects
+        ctx.scale(dpr, dpr);
+        ctx.translate(w / (2 * dpr), h / (2 * dpr));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shakeX, anchor);
+        
+        // Draw bright leading edge
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * stormFadeAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = 'rgba(200, 220, 255, 1)';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(beamRightX, -viewH * 2);
+        ctx.lineTo(beamRightX, viewH * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
         ctx.restore();
       }
 
@@ -3418,6 +3775,20 @@ export const GameEngine: React.FC<Props> = ({
             setShowBonusMessages(false);
             setBonusMessages([]);
             hasShownBonusThisLanding.current = false;
+          }}
+        />
+      )}
+      
+      {/* Special level message display */}
+      {showSpecialMessage && specialLevelMessage && (
+        <BonusMessageDisplay
+          messages={[specialLevelMessage]}
+          neonColor={neonColor}
+          delayMs={0}
+          skipRequested={false}
+          onComplete={() => {
+            setShowSpecialMessage(false);
+            setSpecialLevelMessage("");
           }}
         />
       )}
