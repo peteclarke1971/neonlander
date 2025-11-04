@@ -166,6 +166,10 @@ export const GameEngine: React.FC<Props> = ({
   const sweepXRef = useRef(0);
   const sweepActiveRef = useRef(false);
   const currentBeamWidthRef = useRef(300); // Initial beam width
+  const lightBeamGradientCache = useRef<{
+    gradient: CanvasGradient | null;
+    cachedWidth: number;
+  }>({ gradient: null, cachedWidth: 0 });
   const SPOTLIGHT_ANGLE = 25 * (Math.PI / 180); // 25° cone
   const SPOTLIGHT_RANGE = 400; // world units
   const LIGHT_STORM_SWEEP_SPEED = 9.0; // seconds to cross screen
@@ -187,10 +191,12 @@ export const GameEngine: React.FC<Props> = ({
   
   // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isIPad = /iPad|Macintosh/i.test(navigator.userAgent) && 'ontouchend' in document;
   const shouldOptimizePerformance = isMobile || lowGraphics;
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
+  const lightBeamQuality = isIPad ? 'medium' : 'high';
   
   // Volcano particles state
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
@@ -464,23 +470,6 @@ export const GameEngine: React.FC<Props> = ({
       currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
     }
     
-    // Show pre-level message for special levels
-    if (levelType === 'blackout') {
-      setSpecialLevelMessage("DARK SIDE");
-      setShowSpecialMessage(true);
-      setTimeout(() => {
-        setShowSpecialMessage(false);
-        setSpecialLevelMessage("");
-      }, 2000);
-    } else if (levelType === 'lightbeam') {
-      setSpecialLevelMessage("SEARCH IN PROGRESS");
-      setShowSpecialMessage(true);
-      setTimeout(() => {
-        setShowSpecialMessage(false);
-        setSpecialLevelMessage("");
-      }, 2000);
-    }
-    
     // Sync off-screen canvas size with main canvas
     if (offscreenTerrainCanvasRef.current) {
       offscreenTerrainCanvasRef.current.width = c.width;
@@ -502,6 +491,16 @@ export const GameEngine: React.FC<Props> = ({
     // Reduce terrain complexity for special levels (make them slightly easier)
     if (specialLevelType.current === 'blackout' || specialLevelType.current === 'lightbeam') {
       levelVar = Math.max(0, levelVar - 1);
+    }
+    
+    // Show pre-level message for special levels BEFORE countdown
+    // This happens synchronously and blocks countdown initialization
+    if (levelType === 'blackout') {
+      setSpecialLevelMessage("DARK SIDE");
+      setShowSpecialMessage(true);
+    } else if (levelType === 'lightbeam') {
+      setSpecialLevelMessage("SEARCH IN PROGRESS");
+      setShowSpecialMessage(true);
     }
     
     // Check if this is a cavern level - only in caverns mode
@@ -1118,56 +1117,69 @@ export const GameEngine: React.FC<Props> = ({
     let thrustHold = 0; // seconds held
     let rumbleNext = 0; // next time to send a rumble pulse (ms timestamp)
     
-    // Initialize countdown intro
-    if (!introRef.current) {
-      introRef.current = createCountdownIntro();
-      introRef.current.onDone(() => {
-        // Gameplay resumes on 'GO' start; ensure overlay clears fully on done
-      });
-      
-      // Start countdown with "freeze" variant for lander
-      const introSeed = mix(levelSeed, "INTRO");
-      introRef.current.start({
-        variant: "freeze",
-        seed: introSeed,
-        onTick: () => { try { audio.current.playIntroTick(); } catch {} },
-        onGo: () => { 
-          setWorldPaused(false); worldPausedRef.current = false;
-          setPlayerLocked(false); playerLockedRef.current = false;
-          invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
-          
-          // Start Time Trial timer immediately after countdown
-          if (mode === "timetrial") {
-            setTimeTrialState(prev => ({
-              ...prev,
-              raceStartTime: performance.now(),
-              raceActive: true
-            }));
-            // Initialize ghost recording from the start
-            timeTrialGhostFrames.current = [];
-            console.log("🏁 Time Trial timer & ghost recording started at countdown end");
-          }
-          
-          // Start timer fallback - if no movement within 2 seconds after GO, start timer anyway
-          timerStartTimeoutRef.current = setTimeout(() => {
-            setTimerActive(true);
-            timerActiveRef.current = true;
-          }, 2000);
-          try { audio.current.playIntroGo(); } catch {} 
-        },
-        onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
-      });
-      setWorldPaused(true); worldPausedRef.current = true;
-      setPlayerLocked(true); playerLockedRef.current = true;
+    // Initialize countdown intro (delay if special message is showing)
+    const initCountdown = () => {
+      if (!introRef.current) {
+        introRef.current = createCountdownIntro();
+        introRef.current.onDone(() => {
+          // Gameplay resumes on 'GO' start; ensure overlay clears fully on done
+        });
+        
+        // Start countdown with "freeze" variant for lander
+        const introSeed = mix(levelSeed, "INTRO");
+        introRef.current.start({
+          variant: "freeze",
+          seed: introSeed,
+          onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+          onGo: () => { 
+            setWorldPaused(false); worldPausedRef.current = false;
+            setPlayerLocked(false); playerLockedRef.current = false;
+            invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+            
+            // Start Time Trial timer immediately after countdown
+            if (mode === "timetrial") {
+              setTimeTrialState(prev => ({
+                ...prev,
+                raceStartTime: performance.now(),
+                raceActive: true
+              }));
+              // Initialize ghost recording from the start
+              timeTrialGhostFrames.current = [];
+              console.log("🏁 Time Trial timer & ghost recording started at countdown end");
+            }
+            
+            // Start timer fallback - if no movement within 2 seconds after GO, start timer anyway
+            timerStartTimeoutRef.current = setTimeout(() => {
+              setTimerActive(true);
+              timerActiveRef.current = true;
+            }, 2000);
+            try { audio.current.playIntroGo(); } catch {} 
+          },
+          onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
+        });
+        setWorldPaused(true); worldPausedRef.current = true;
+        setPlayerLocked(true); playerLockedRef.current = true;
 
-      // Ensure overlay knows ship screen position from the very start of countdown
-      const parent = containerRef.current!;
-      if (parent) {
-        const wCss = parent.clientWidth;
-        const hCss = parent.clientHeight;
-        const yCss = (mode === "caverns") ? hCss / 2 : hCss * 0.45;
-        setShipScreenPos({ x: wCss / 2, y: yCss });
+        // Ensure overlay knows ship screen position from the very start of countdown
+        const parent = containerRef.current!;
+        if (parent) {
+          const wCss = parent.clientWidth;
+          const hCss = parent.clientHeight;
+          const yCss = (mode === "caverns") ? hCss / 2 : hCss * 0.45;
+          setShipScreenPos({ x: wCss / 2, y: yCss });
+        }
       }
+    };
+    
+    // If special level message is showing, delay countdown by 2 seconds
+    if (specialLevelType.current !== 'normal') {
+      setTimeout(() => {
+        setShowSpecialMessage(false);
+        setSpecialLevelMessage("");
+        initCountdown();
+      }, 2000);
+    } else {
+      initCountdown();
     }
 
     const loop = () => {
@@ -2576,11 +2588,12 @@ export const GameEngine: React.FC<Props> = ({
         offCtx.translate(-cameraX + shakeX, anchor);
         
         // Render terrain at FULL BRIGHTNESS to off-screen canvas
+        // iPad-specific optimizations
         offCtx.globalAlpha = 1.0;
         offCtx.strokeStyle = neonColor;
         offCtx.shadowColor = neonColor;
-        offCtx.shadowBlur = shadowBlur * 1.5;
-        offCtx.lineWidth = 2;
+        offCtx.shadowBlur = shadowBlur * (lightBeamQuality === 'high' ? 1.5 : 0.5);
+        offCtx.lineWidth = lightBeamQuality === 'high' ? 2 : 1.5;
         
         // Draw terrain to off-screen canvas
         const drawTerrainOffscreen = (offset: number) => {
@@ -2597,7 +2610,9 @@ export const GameEngine: React.FC<Props> = ({
         };
         
         const wrap = Math.floor(cameraX / terrain.worldWidth);
-        for (let w = -1; w <= 1; w++) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
+        // iPad optimization: skip middle wrap iteration
+        const wrapRange = lightBeamQuality === 'high' ? [-1, 0, 1] : [-1, 1];
+        for (const w of wrapRange) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
         
         // Draw pads to off-screen canvas
         for (const pad of terrain.pads) {
@@ -3171,13 +3186,19 @@ export const GameEngine: React.FC<Props> = ({
         );
         ctx.closePath();
         
-        // Draw beam gradient glow (additive blending)
-        const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
-        gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-        gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-        gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
-        gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-        gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        // Draw beam gradient glow (additive blending) with caching
+        const cache = lightBeamGradientCache.current;
+        if (!cache.gradient || Math.abs(cache.cachedWidth - beamWidth) > 5) {
+          const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
+          gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+          gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+          gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
+          gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+          cache.gradient = gradient;
+          cache.cachedWidth = beamWidth;
+        }
+        const gradient = cache.gradient!;
         
         ctx.fillStyle = gradient;
         ctx.globalCompositeOperation = 'lighter';
@@ -3192,10 +3213,12 @@ export const GameEngine: React.FC<Props> = ({
         ctx.globalAlpha = 1.0 * stormFadeAlpha;
         ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
         
-        // Add bloom/glow layer
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.2 * stormFadeAlpha;
-        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        // Add bloom/glow layer (skip on iPad for performance)
+        if (lightBeamQuality === 'high') {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.2 * stormFadeAlpha;
+          ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        }
         
         ctx.restore();
         
