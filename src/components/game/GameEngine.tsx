@@ -3207,19 +3207,6 @@ export const GameEngine: React.FC<Props> = ({
         ctx.translate(w / (2 * dpr), h / (2 * dpr));
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shakeX, anchor);
-        
-        // Draw bright leading edge
-        ctx.save();
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * stormFadeAlpha})`;
-        ctx.lineWidth = 3;
-        ctx.shadowColor = 'rgba(200, 220, 255, 1)';
-        ctx.shadowBlur = 15;
-        ctx.beginPath();
-        ctx.moveTo(beamRightX, -viewH * 2);
-        ctx.lineTo(beamRightX, viewH * 2);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.restore();
       }
 
       // Spectacular particle rendering with dramatically enhanced thruster effects
