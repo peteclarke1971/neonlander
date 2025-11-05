@@ -3151,6 +3151,32 @@ export const GameEngine: React.FC<Props> = ({
         ctx.translate(w / (2 * dpr), h / (2 * dpr));
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shakeX, anchor);
+        
+        // Render thruster particles inside spotlight
+        if (particles.length > 0) {
+          ctx.save();
+          
+          for (const p of particles) {
+            const isThruster = p.color === neonColor || p.color.includes('hsla');
+            const ageRatio = p.life / p.max;
+            const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7);
+            
+            ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+            ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
+            
+            ctx.beginPath();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = p.color as any;
+            
+            const lineWidth = shouldOptimizePerformance ? 1.8 : 
+              (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8);
+            ctx.lineWidth = lineWidth;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
       }
       
       // Composite off-screen terrain using vertical sweep beam (during Light Storm)
@@ -3207,6 +3233,32 @@ export const GameEngine: React.FC<Props> = ({
         ctx.translate(w / (2 * dpr), h / (2 * dpr));
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shakeX, anchor);
+        
+        // Render thruster particles inside light beam
+        if (particles.length > 0) {
+          ctx.save();
+          
+          for (const p of particles) {
+            const isThruster = p.color === neonColor || p.color.includes('hsla');
+            const ageRatio = p.life / p.max;
+            const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7);
+            
+            ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+            ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
+            
+            ctx.beginPath();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = p.color as any;
+            
+            const lineWidth = shouldOptimizePerformance ? 1.8 : 
+              (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8);
+            ctx.lineWidth = lineWidth;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
       }
 
       // Spectacular particle rendering with dramatically enhanced thruster effects
