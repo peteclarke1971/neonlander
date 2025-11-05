@@ -429,16 +429,6 @@ export const GameEngine: React.FC<Props> = ({
     }
   }, [showBonusMessages, bonusMessages]);
 
-  // Watch for special message completion and continue initialization
-  useEffect(() => {
-    // This useEffect is intentionally empty - the main game initialization useEffect
-    // will re-run when waitingForSpecialMessage changes from true to false,
-    // allowing it to continue past the early return and complete initialization
-    if (!waitingForSpecialMessage && specialLevelType.current !== 'normal') {
-      console.log("✅ Special message complete, main useEffect will now continue initialization");
-    }
-  }, [waitingForSpecialMessage]);
-
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     mountedRef.current = true; // Reset on mount
@@ -450,6 +440,38 @@ export const GameEngine: React.FC<Props> = ({
       return 'normal';
     };
     
+    // Check for special levels BEFORE initializing game
+    const isClassicMode = mode === "classic";
+    const levelType = isClassicMode ? getSpecialLevelType(level) : 'normal';
+    
+    // If it's a special level and we haven't shown the message yet, STOP and show message
+    if (levelType !== 'normal' && messageShownForLevel.current !== level && !waitingForSpecialMessage) {
+      messageShownForLevel.current = level;
+      specialLevelType.current = levelType;
+      
+      // Set flags for the level type
+      if (levelType === 'blackout') {
+        blackoutActive.current = true;
+        setSpecialLevelMessage("DARK SIDE");
+      } else if (levelType === 'lightbeam') {
+        lightStormActive.current = true;
+        sweepTimerRef.current = 0;
+        sweepXRef.current = 0;
+        sweepActiveRef.current = true;
+        currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
+        setSpecialLevelMessage("SEARCH IN PROGRESS");
+      }
+      
+      setShowSpecialMessage(true);
+      setWaitingForSpecialMessage(true);
+      return; // Don't call initializeGame yet - wait for message to complete
+    }
+    
+    // If we're waiting for the message to complete, don't initialize
+    if (waitingForSpecialMessage) {
+      return;
+    }
+    
     const initializeGame = async () => {
       const c = canvasRef.current!;
       const ctx = c.getContext("2d")!;
@@ -459,41 +481,8 @@ export const GameEngine: React.FC<Props> = ({
     // Clear volcano particles at start of each level
     setVolcanoParticles([]);
     
-    // Determine if this is a special level (only for classic mode)
-    const isClassicMode = mode === "classic";
-    const levelType = isClassicMode ? getSpecialLevelType(level) : 'normal';
+    // Special level type was already determined above, just sync the refs
     specialLevelType.current = levelType;
-    
-    // Set special level flags
-    blackoutActive.current = levelType === 'blackout';
-    lightStormActive.current = levelType === 'lightbeam';
-    
-    // Initialize light beam state
-    if (levelType === 'lightbeam') {
-      sweepTimerRef.current = 0;
-      sweepXRef.current = 0;
-      sweepActiveRef.current = true;
-      currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
-    }
-    
-    // Show pre-level message for special levels - STOP here and wait
-    // Only show message if we haven't shown it for this level yet
-    if (levelType === 'blackout' && messageShownForLevel.current !== level) {
-      messageShownForLevel.current = level;
-      setSpecialLevelMessage("DARK SIDE");
-      setShowSpecialMessage(true);
-      setWaitingForSpecialMessage(true);
-      return; // Stop initialization until message completes
-    } else if (levelType === 'lightbeam' && messageShownForLevel.current !== level) {
-      messageShownForLevel.current = level;
-      setSpecialLevelMessage("SEARCH IN PROGRESS");
-      setShowSpecialMessage(true);
-      setWaitingForSpecialMessage(true);
-      return; // Stop initialization until message completes
-    }
-    
-    // If we reach here and specialLevelType is set, it means message completed
-    // and we're continuing initialization (second pass through this useEffect)
     
     // Sync off-screen canvas size with main canvas
     if (offscreenTerrainCanvasRef.current) {
