@@ -175,6 +175,8 @@ export const GameEngine: React.FC<Props> = ({
   // Pre-level message state for special levels
   const [specialLevelMessage, setSpecialLevelMessage] = useState<string>("");
   const [showSpecialMessage, setShowSpecialMessage] = useState(false);
+  const [waitingForSpecialMessage, setWaitingForSpecialMessage] = useState(false);
+  const messageShownForLevel = useRef<number>(-1); // Track which level we showed message for
   
   // Camera and cavern state for FX renderer
   const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
@@ -427,6 +429,16 @@ export const GameEngine: React.FC<Props> = ({
     }
   }, [showBonusMessages, bonusMessages]);
 
+  // Watch for special message completion and continue initialization
+  useEffect(() => {
+    // This useEffect is intentionally empty - the main game initialization useEffect
+    // will re-run when waitingForSpecialMessage changes from true to false,
+    // allowing it to continue past the early return and complete initialization
+    if (!waitingForSpecialMessage && specialLevelType.current !== 'normal') {
+      console.log("✅ Special message complete, main useEffect will now continue initialization");
+    }
+  }, [waitingForSpecialMessage]);
+
   useEffect(() => {
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     mountedRef.current = true; // Reset on mount
@@ -464,22 +476,24 @@ export const GameEngine: React.FC<Props> = ({
       currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
     }
     
-    // Show pre-level message for special levels
-    if (levelType === 'blackout') {
+    // Show pre-level message for special levels - STOP here and wait
+    // Only show message if we haven't shown it for this level yet
+    if (levelType === 'blackout' && messageShownForLevel.current !== level) {
+      messageShownForLevel.current = level;
       setSpecialLevelMessage("DARK SIDE");
       setShowSpecialMessage(true);
-      setTimeout(() => {
-        setShowSpecialMessage(false);
-        setSpecialLevelMessage("");
-      }, 2000);
-    } else if (levelType === 'lightbeam') {
+      setWaitingForSpecialMessage(true);
+      return; // Stop initialization until message completes
+    } else if (levelType === 'lightbeam' && messageShownForLevel.current !== level) {
+      messageShownForLevel.current = level;
       setSpecialLevelMessage("SEARCH IN PROGRESS");
       setShowSpecialMessage(true);
-      setTimeout(() => {
-        setShowSpecialMessage(false);
-        setSpecialLevelMessage("");
-      }, 2000);
+      setWaitingForSpecialMessage(true);
+      return; // Stop initialization until message completes
     }
+    
+    // If we reach here and specialLevelType is set, it means message completed
+    // and we're continuing initialization (second pass through this useEffect)
     
     // Sync off-screen canvas size with main canvas
     if (offscreenTerrainCanvasRef.current) {
@@ -3328,7 +3342,7 @@ export const GameEngine: React.FC<Props> = ({
       try { audio.current.stopFuelAlarm(); } catch {} 
       try { audio.current.stopLevelMusic(); } catch {} 
     };
-  }, [difficulty, onGameOver, paused, level, mode, seedOverride]);
+  }, [difficulty, onGameOver, paused, level, mode, seedOverride, waitingForSpecialMessage]);
 
 
   return (
@@ -3789,6 +3803,7 @@ export const GameEngine: React.FC<Props> = ({
           onComplete={() => {
             setShowSpecialMessage(false);
             setSpecialLevelMessage("");
+            setWaitingForSpecialMessage(false); // Signal to continue initialization
           }}
         />
       )}
