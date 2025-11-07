@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getInitialsPositions, ParticleTarget } from "./utils/letterBitmaps";
 import { isDesktopDevice } from "@/lib/deviceDetection";
+import { gateThrustUntilRelease } from "@/hooks/use-gamepad";
 
 interface InitialsFireworksProps {
   initials: string;
@@ -385,6 +386,7 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
         const gp = gamepads[i];
         if (gp && (gp.buttons[0]?.pressed || gp.buttons[1]?.pressed)) {
           setSkipped(true);
+          gateThrustUntilRelease(); // Prevent button press from carrying over
           onSkip();
           return;
         }
