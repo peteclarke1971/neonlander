@@ -15,6 +15,7 @@ import NeonRacing from "./pages/NeonRacing";
 import NeonDocking from "./pages/NeonDocking";
 import Duel from "./pages/Duel";
 import Survival from "./pages/Survival";
+import SeedValidation from "./pages/SeedValidation";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/survival" element={<Survival />} />
           <Route path="/cavern-fx-demo" element={<CavernFXDemo />} />
           <Route path="/settings/controls" element={<ControlsSettings />} />
+          <Route path="/seed-validation" element={<SeedValidation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

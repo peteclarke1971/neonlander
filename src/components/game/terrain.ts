@@ -25,8 +25,9 @@ export function generateTerrain(
   isTimeTrial = false, 
   timeTrialPadCount?: number,
   mode?: Mode,
-  timeTrialLevelConfig?: TimeTrialLevelConfig
-): TerrainData {
+  timeTrialLevelConfig?: TimeTrialLevelConfig,
+  validationMode = false
+): TerrainData | null {
   const rand = mulberry32(seed);
   const points: { x: number; y: number }[] = [];
   
@@ -147,6 +148,12 @@ export function generateTerrain(
     if (actualCount !== expectedCount) {
       console.error(`[TimeTrial] ❌ CRITICAL: Missing pads! Generated ${actualCount}/${expectedCount} pads`);
       console.error(`[TimeTrial] ❌ Level cannot start with missing pads. This is a critical generation error.`);
+      
+      // In validation mode, return null instead of throwing
+      if (validationMode) {
+        return null;
+      }
+      
       // Throw error to prevent level from starting with missing pads
       throw new Error(`Time Trial level generation failed: Expected ${expectedCount} pads but only generated ${actualCount}. This level is unplayable.`);
     }
@@ -163,6 +170,12 @@ export function generateTerrain(
     
     if (!continuous) {
       console.error(`[TimeTrial] ❌ Level cannot start with non-continuous pad sequence. This is a critical generation error.`);
+      
+      // In validation mode, return null instead of throwing
+      if (validationMode) {
+        return null;
+      }
+      
       throw new Error(`Time Trial level generation failed: Pad sequence is not continuous. This level is unplayable.`);
     }
     
