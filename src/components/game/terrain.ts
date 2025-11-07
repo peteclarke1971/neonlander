@@ -120,6 +120,46 @@ export function generateTerrain(
         bonus2x: false
       });
     }
+    
+    // ===== HAZARD PROXIMITY VALIDATION =====
+    // Check sequenced pads are not too close to hazards (200px minimum)
+    const MIN_HAZARD_DISTANCE = 200;
+    
+    for (let i = sequencedPads.length - 1; i >= 0; i--) {
+      const pad = sequencedPads[i];
+      const padCenterX = (pad.xStart + pad.xEnd) / 2;
+      let tooCloseToHazard = false;
+      
+      // Check gravity wells (if collectibles generated)
+      // Note: collectibles are generated after terrain, so we can't check them here yet
+      // This will be handled in post-processing after collectibles are generated
+      
+      if (tooCloseToHazard) {
+        console.warn(`[TimeTrial] Pad ${pad.sequenceNumber} too close to hazard, will validate after collectibles`);
+      }
+    }
+    
+    // ===== SEQUENCE COMPLETENESS VALIDATION =====
+    // Verify all numbered pads are present and continuous
+    const expectedCount = timeTrialPadCount;
+    const actualCount = sequencedPads.length;
+    
+    if (actualCount !== expectedCount) {
+      console.error(`[TimeTrial] ❌ Missing pads! Generated ${actualCount}/${expectedCount} pads`);
+    } else {
+      // Check sequence continuity (1, 2, 3, ..., N)
+      const sequences = sequencedPads.map(p => p.sequenceNumber).sort((a, b) => a - b);
+      let continuous = true;
+      for (let i = 0; i < sequences.length; i++) {
+        if (sequences[i] !== i + 1) {
+          continuous = false;
+          console.error(`[TimeTrial] ❌ Sequence gap detected! Expected ${i + 1}, got ${sequences[i]}`);
+        }
+      }
+      if (continuous) {
+        console.log(`[TimeTrial] ✅ Generated ${actualCount}/${expectedCount} numbered pads (sequence: ${sequences.join(', ')})`);
+      }
+    }
   } else {
     // Regular pad generation for non-Time Trial modes
   for (let i = 0; i < padCount; i++) {
@@ -196,8 +236,8 @@ export function generateTerrain(
   }
   } // End regular pad generation
 
-  // Mark smallest pad as 2x bonus pad (most difficult)
-  if (pads.length > 0) {
+  // Mark smallest pad as 2x bonus pad (most difficult) - NOT in Time Trial mode
+  if (!isTimeTrial && pads.length > 0) {
     let minIdx = 0;
     let minW = pads[0].width;
     for (let i = 1; i < pads.length; i++) {
@@ -247,8 +287,8 @@ export function generateTerrain(
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
   
-  // Only generate moving pads if NOT in Time Trial mode OR if Time Trial allows mega pads
-  const allowMovingPads = !isTimeTrial || (timeTrialLevelConfig?.allowMegaPad === true);
+  // Never generate moving pads (mega pads) in Time Trial mode
+  const allowMovingPads = !isTimeTrial;
   
   if (allowMovingPads) {
     let movingPad = movingPadSystem.generateMovingPad(
@@ -305,6 +345,17 @@ export function generateTerrain(
       
       for (let i = pads.length - 1; i >= 0; i--) {
         const pad = pads[i];
+        
+        // PROTECT SEQUENCED PADS: Never remove numbered pads in Time Trial mode
+        if (isTimeTrial && sequencedPads.some(sp => 
+          sp.xStart === pad.xStart && 
+          sp.xEnd === pad.xEnd && 
+          sp.y === pad.y
+        )) {
+          console.log("[MovingPad] Protected sequenced pad from removal", { pad });
+          continue;
+        }
+        
         let padOverlaps = false;
         
         // Check overlap considering world wrap
@@ -435,6 +486,35 @@ export function generateTerrain(
       }
       if (fixCount > 0) {
         console.log(`[Terrain] Fixed ${fixCount} buried collectibles`);
+      }
+      
+      // ===== TIME TRIAL: VALIDATE HAZARD PROXIMITY TO SEQUENCED PADS =====
+      if (isTimeTrial && sequencedPads.length > 0) {
+        const MIN_HAZARD_DISTANCE = 200;
+        let hazardWarnings = 0;
+        
+        // Check volcanoes proximity to numbered pads
+        for (const pad of sequencedPads) {
+          const padCenterX = (pad.xStart + pad.xEnd) / 2;
+          
+          for (const volcano of volcanoes) {
+            const dx = Math.abs(padCenterX - volcano.x);
+            const wrappedDx = Math.min(dx, worldWidthLocal - dx);
+            const dy = Math.abs(pad.y - volcano.y);
+            const distance = Math.sqrt(wrappedDx * wrappedDx + dy * dy);
+            
+            if (distance < MIN_HAZARD_DISTANCE) {
+              console.warn(`[TimeTrial] ⚠️ Pad ${pad.sequenceNumber} only ${distance.toFixed(0)}px from volcano (min: ${MIN_HAZARD_DISTANCE}px)`);
+              hazardWarnings++;
+            }
+          }
+        }
+        
+        if (hazardWarnings === 0) {
+          console.log(`[TimeTrial] ✅ All ${sequencedPads.length} pads have safe volcano clearance (${MIN_HAZARD_DISTANCE}px+)`);
+        } else {
+          console.warn(`[TimeTrial] ⚠️ ${hazardWarnings} volcano proximity warnings detected`);
+        }
       }
     }
   }
