@@ -442,7 +442,7 @@ export const GameEngine: React.FC<Props> = ({
     
     // Check for special levels BEFORE initializing game
     const isClassicMode = mode === "classic";
-    const levelType = isClassicMode ? getSpecialLevelType(level) : 'normal';
+    const levelType = (isClassicMode || mode === "fixed") ? getSpecialLevelType(level) : 'normal';
     
     // If it's a special level and we haven't shown the message yet, STOP and show message
     if (levelType !== 'normal' && messageShownForLevel.current !== level && !waitingForSpecialMessage) {
