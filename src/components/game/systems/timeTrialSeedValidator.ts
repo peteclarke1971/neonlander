@@ -18,19 +18,28 @@ export interface SeedValidationResult {
  */
 function testSeed(level: number, seed: number, padCount: number): number {
   try {
+    // Match GameEngine.tsx constants
+    const WORLD_WIDTH = 4000;
+    const BASE_HEIGHT = 360;
+    const AMPLITUDE = 180;
+    
+    // Match GameEngine.tsx levelVar calculation
+    const levelVar = Math.min(Math.max(0, level), 20);
+    const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
+    
     const terrain = generateTerrain(
       seed,
-      8000, // worldWidth
-      400, // base
-      150, // amplitude
-      1, // complexity
+      WORLD_WIDTH,      // 4000 instead of 8000
+      BASE_HEIGHT,      // 360 instead of 400
+      terrainAmp,       // Dynamic (180-900) instead of fixed 150
+      levelVar,         // Dynamic (0-20) instead of fixed 1
       level,
       'easy',
-      true, // isTimeTrial
+      true,             // isTimeTrial
       padCount,
       'timetrial',
-      undefined, // timeTrialLevelConfig
-      true // validationMode - suppress errors
+      undefined,        // timeTrialLevelConfig
+      true              // validationMode - suppress errors
     );
     
     // Check if terrain generation succeeded
