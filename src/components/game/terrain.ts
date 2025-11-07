@@ -145,21 +145,28 @@ export function generateTerrain(
     const actualCount = sequencedPads.length;
     
     if (actualCount !== expectedCount) {
-      console.error(`[TimeTrial] ❌ Missing pads! Generated ${actualCount}/${expectedCount} pads`);
-    } else {
-      // Check sequence continuity (1, 2, 3, ..., N)
-      const sequences = sequencedPads.map(p => p.sequenceNumber).sort((a, b) => a - b);
-      let continuous = true;
-      for (let i = 0; i < sequences.length; i++) {
-        if (sequences[i] !== i + 1) {
-          continuous = false;
-          console.error(`[TimeTrial] ❌ Sequence gap detected! Expected ${i + 1}, got ${sequences[i]}`);
-        }
-      }
-      if (continuous) {
-        console.log(`[TimeTrial] ✅ Generated ${actualCount}/${expectedCount} numbered pads (sequence: ${sequences.join(', ')})`);
+      console.error(`[TimeTrial] ❌ CRITICAL: Missing pads! Generated ${actualCount}/${expectedCount} pads`);
+      console.error(`[TimeTrial] ❌ Level cannot start with missing pads. This is a critical generation error.`);
+      // Throw error to prevent level from starting with missing pads
+      throw new Error(`Time Trial level generation failed: Expected ${expectedCount} pads but only generated ${actualCount}. This level is unplayable.`);
+    }
+    
+    // Check sequence continuity (1, 2, 3, ..., N)
+    const sequences = sequencedPads.map(p => p.sequenceNumber).sort((a, b) => a - b);
+    let continuous = true;
+    for (let i = 0; i < sequences.length; i++) {
+      if (sequences[i] !== i + 1) {
+        continuous = false;
+        console.error(`[TimeTrial] ❌ CRITICAL: Sequence gap detected! Expected ${i + 1}, got ${sequences[i]}`);
       }
     }
+    
+    if (!continuous) {
+      console.error(`[TimeTrial] ❌ Level cannot start with non-continuous pad sequence. This is a critical generation error.`);
+      throw new Error(`Time Trial level generation failed: Pad sequence is not continuous. This level is unplayable.`);
+    }
+    
+    console.log(`[TimeTrial] ✅ All ${actualCount} pads generated successfully (sequence 1-${actualCount})`);
   } else {
     // Regular pad generation for non-Time Trial modes
   for (let i = 0; i < padCount; i++) {
@@ -274,6 +281,7 @@ export function generateTerrain(
   };
 
   // Generate volcanoes for this level
+  // In Time Trial mode, limit to 1 volcano maximum
   const volcanoes = generateVolcanoes(seed ^ 0xCAFE, worldWidth, level, (x) => {
     const xx = ((x % worldWidth) + worldWidth) % worldWidth;
     let i = Math.floor((xx / worldWidth) * segments);
@@ -282,7 +290,7 @@ export function generateTerrain(
     const x1 = (i + 1) * step;
     const t = (xx - x0) / (x1 - x0);
     return points[i].y * (1 - t) + points[i + 1].y * t;
-  }, points, pads);
+  }, points, pads, isTimeTrial);
 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];

@@ -107,11 +107,15 @@ export function generateVolcanoes(
   level: number,
   getHeightAt: (x: number) => number,
   terrainPoints: { x: number; y: number }[],
-  pads: { xStart: number; xEnd: number; y: number }[]
+  pads: { xStart: number; xEnd: number; y: number }[],
+  isTimeTrial: boolean = false
 ): Volcano[] {
   const config = getVolcanoConfigForLevel(level);
   const rng = mulberry32(seed ^ 0xC0DE);
   const volcanoes: Volcano[] = [];
+  
+  // In Time Trial mode, limit to 1 volcano maximum
+  const maxVolcanoes = isTimeTrial ? Math.min(config.count, 1) : config.count;
 
   // Find suitable locations (peaks or flat areas)
   const candidates: { x: number; y: number; score: number }[] = [];
@@ -140,7 +144,7 @@ export function generateVolcanoes(
   // Sort by score and select best locations
   candidates.sort((a, b) => b.score - a.score);
   
-  for (let i = 0; i < Math.min(config.count, candidates.length); i++) {
+  for (let i = 0; i < Math.min(maxVolcanoes, candidates.length); i++) {
     // Ensure minimum distance between volcanoes
     let candidate = candidates[i];
     let validPlacement = true;

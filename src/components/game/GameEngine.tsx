@@ -684,7 +684,12 @@ export const GameEngine: React.FC<Props> = ({
     const windZones = WIND_ENABLED ? generateWindZones(seed, terrain.worldWidth, levelVar) : [];
 
     // Anomalies (gravity wells) — appear from level 3, start at 1, +1 every 3 levels, capped at 5.
-    const anomalyCount = levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 3), 5) : 0;
+    // In Time Trial mode, limit to 1 anomaly maximum
+    const isTimeTrialMode = mode === "timetrial";
+    let anomalyCount = levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 3), 5) : 0;
+    if (isTimeTrialMode) {
+      anomalyCount = Math.min(anomalyCount, 1);
+    }
     // Create seeded RNG for anomaly radius scaling
     const anomalySizeRng = mulberry32(levelSeed + 777); // Different offset from spawn RNG
     // Challenge multiplier: Level 1: 1.0x safety, Level 10: 0.85x, Level 20: 0.7x (minimum)
@@ -694,6 +699,27 @@ export const GameEngine: React.FC<Props> = ({
       // Apply consistent 0.25x scaling for visual size
       radius: a.radius * 0.25,
     }));
+    
+    // In Time Trial mode, validate anomaly proximity to sequenced pads
+    if (isTimeTrialMode && anomalies.length > 0) {
+      const MIN_HAZARD_DISTANCE = 200;
+      const sequencedPads = terrain.pads.filter((p): p is SequencedPad => 'sequenceNumber' in p && typeof p.sequenceNumber === 'number');
+      
+      for (const pad of sequencedPads) {
+        const padCenterX = (pad.xStart + pad.xEnd) / 2;
+        
+        for (const anomaly of anomalies) {
+          const dx = Math.abs(padCenterX - anomaly.x);
+          const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
+          const dy = Math.abs(pad.y - anomaly.y);
+          const distance = Math.sqrt(wrappedDx * wrappedDx + dy * dy);
+          
+          if (distance < MIN_HAZARD_DISTANCE) {
+            console.warn(`[TimeTrial] ⚠️ Pad ${pad.sequenceNumber} is ${distance.toFixed(0)}px from gravity well (minimum: ${MIN_HAZARD_DISTANCE}px)`);
+          }
+        }
+      }
+    }
 
     // Moving hazards — appear from level 3, start at 1, +1 every 5 levels, capped at 4. Disabled in caverns.
     const hazardCount = isCavernLevel ? 0 : (levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 5), 4) : 0);
