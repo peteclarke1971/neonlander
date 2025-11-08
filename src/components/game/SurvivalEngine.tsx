@@ -2269,7 +2269,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       ctx.restore();
       
-      // Render dust clouds (world-space, after stars, before terrain mask)
+      // Render dust clouds (screen-space, after stars, before terrain mask)
       const isDustActive = weatherStateRef.current.currentWeather === "dust-clouds" || 
         (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "dust-clouds");
       if (isDustActive) {
@@ -2283,6 +2283,13 @@ export const SurvivalEngine: React.FC<Props> = ({
           dprInit,
           shouldOptimize
         );
+      }
+      
+      // Render lightning bolts (screen-space, after stars, before terrain)
+      const isStormActive = weatherStateRef.current.currentWeather === "em-storm" || 
+        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "em-storm");
+      if (isStormActive) {
+        renderLightningBolts(ctx, lightningBoltsRef.current, dprInit, shouldOptimize);
       }
       
       // Fill terrain shape with black to mask stars behind it
@@ -3117,13 +3124,6 @@ export const SurvivalEngine: React.FC<Props> = ({
         (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "plasma-drizzle");
       if (isPlasmaActive) {
         renderPlasmaParticles(ctx, weatherParticlesRef.current, dprInit, shouldOptimize);
-      }
-      
-      // Render lightning bolts
-      const isStormActive = weatherStateRef.current.currentWeather === "em-storm" || 
-        (weatherStateRef.current.isTransitioning && weatherStateRef.current.nextWeather === "em-storm");
-      if (isStormActive) {
-        renderLightningBolts(ctx, lightningBoltsRef.current, dprInit, shouldOptimize);
       }
       
       // Render rainbow diffraction after plasma drizzle

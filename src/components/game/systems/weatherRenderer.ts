@@ -37,7 +37,7 @@ export function renderRainParticles(
 }
 
 /**
- * Render dust cloud particles (world-space)
+ * Render dust cloud particles (screen-space)
  */
 export function renderDustClouds(
   ctx: CanvasRenderingContext2D,
@@ -50,26 +50,28 @@ export function renderDustClouds(
   lowGraphics: boolean
 ): void {
   ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   
   for (const p of particles) {
     if (p.type !== "dust") continue;
     
+    // Convert world coordinates to screen coordinates for positioning only
     const screenX = (p.x - cameraX) * zoom + anchor;
     const screenY = p.y * zoom;
     
     ctx.globalAlpha = p.alpha * 0.6;
     
     if (lowGraphics) {
-      // Simple circles in low graphics mode
+      // Simple circles in low graphics mode (fixed size)
       ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(screenX * dpr, screenY * dpr, p.size * zoom * dpr, 0, Math.PI * 2);
+      ctx.arc(screenX * dpr, screenY * dpr, p.size * dpr, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // Radial gradient for soft edges
+      // Radial gradient for soft edges (fixed size)
       const gradient = ctx.createRadialGradient(
         screenX * dpr, screenY * dpr, 0,
-        screenX * dpr, screenY * dpr, p.size * zoom * dpr
+        screenX * dpr, screenY * dpr, p.size * dpr
       );
       gradient.addColorStop(0, p.color);
       gradient.addColorStop(0.5, p.color.replace(/[\d.]+\)/, '0.5)'));
@@ -77,7 +79,7 @@ export function renderDustClouds(
       
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(screenX * dpr, screenY * dpr, p.size * zoom * dpr, 0, Math.PI * 2);
+      ctx.arc(screenX * dpr, screenY * dpr, p.size * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
   }
