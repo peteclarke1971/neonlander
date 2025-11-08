@@ -1,4 +1,4 @@
-import { Pad, CollectiblesData, Volcano } from "./types";
+import { Pad, CollectiblesData, Volcano, SequencedPad } from "./types";
 import { CavernBake, CavernBakeResult } from "./systems/cavernBake";
 import { Vec2 } from "./systems/sdf";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -37,6 +37,7 @@ export interface CavernData {
   outlinePolylines: Vec2[][];
   collisionGrid: boolean[][];
   collisionCellSize: number;
+  sequencedPads?: SequencedPad[]; // For time trial mode compatibility
 }
 
 export function generateCavern(seed: number, level: number, difficulty: "easy" | "hard"): CavernData {

@@ -555,12 +555,12 @@ export const GameEngine: React.FC<Props> = ({
          })();
     
     // Setup Time Trial state if in time trial mode
-    if (isTimeTrial && !isCavernLevel && terrain.pads && timeTrialConfig) {
-      const sequencedPads = terrain.pads.map((pad, idx) => ({
+    if (isTimeTrial && !isCavernLevel && terrain.sequencedPads && timeTrialConfig) {
+      // Use the sequenced pads from terrain generation (already numbered correctly)
+      const sequencedPads = terrain.sequencedPads.map(pad => ({
         ...pad,
-        sequenceNumber: idx + 1,
-        completed: false
-      })) as SequencedPad[];
+        completed: false // Reset completion state for new game
+      }));
       
       setTimeTrialState({
         sequencedPads,
@@ -575,8 +575,14 @@ export const GameEngine: React.FC<Props> = ({
       console.log("⏱️ Time Trial initialized:", {
         level,
         padCount: timeTrialConfig.padCount,
+        actualPadCount: sequencedPads.length,
         pads: sequencedPads.map(p => ({ seq: p.sequenceNumber, x: (p.xStart + p.xEnd) / 2 }))
       });
+      
+      // CRITICAL VALIDATION: Verify we have the correct number of pads
+      if (sequencedPads.length !== timeTrialConfig.padCount) {
+        console.error(`❌ CRITICAL: Expected ${timeTrialConfig.padCount} pads but got ${sequencedPads.length}!`);
+      }
     }
     
     // ===== RUNTIME SANITY CHECKS =====
