@@ -23,10 +23,16 @@ export default function SeedValidation() {
     setResults([]);
     setValidatedConfig("");
 
+    // Force regeneration for levels 10-49 with completely new seeds
+    const forceRegenerate = (level: number) => level >= 10 && level <= 49;
+
     // Run validation with progress updates
-    const validationResults = validateAllTimeTrialSeeds((current, total) => {
-      setProgress((current / total) * 100);
-    });
+    const validationResults = validateAllTimeTrialSeeds(
+      (current, total) => {
+        setProgress((current / total) * 100);
+      },
+      forceRegenerate
+    );
 
     setResults(validationResults);
     setValidatedConfig(generateValidatedConfig(validationResults));

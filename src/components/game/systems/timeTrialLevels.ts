@@ -83,6 +83,7 @@ export const TIME_TRIAL_LEVELS: TimeTrialLevelConfig[] = [
 
 /**
  * Get configuration for a specific Time Trial level
+ * NOTE: Difficulty does NOT affect terrain generation in Time Trial mode
  */
 export function getTimeTrialLevelConfig(level: number, difficulty: Difficulty = 'easy'): TimeTrialLevelConfig {
   const baseConfig = TIME_TRIAL_LEVELS[level];
@@ -90,7 +91,7 @@ export function getTimeTrialLevelConfig(level: number, difficulty: Difficulty = 
     // Fallback for levels beyond 49
     return {
       level,
-      seed: getTimeTrialSeed(level, difficulty),
+      seed: BASE_SEED + level * 7919,
       padCount: 5,
       hasSpaceJunk: true,
       hasGravityWells: true,
@@ -100,11 +101,8 @@ export function getTimeTrialLevelConfig(level: number, difficulty: Difficulty = 
     };
   }
   
-  // Update seed based on difficulty
-  return {
-    ...baseConfig,
-    seed: getTimeTrialSeed(level, difficulty)
-  };
+  // Return config as-is - no seed modification based on difficulty
+  return baseConfig;
 }
 
 /**

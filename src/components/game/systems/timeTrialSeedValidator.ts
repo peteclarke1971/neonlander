@@ -27,6 +27,9 @@ function testSeed(level: number, seed: number, padCount: number): number {
     const levelVar = Math.min(Math.max(0, level), 20);
     const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
     
+    // Get the actual config object that will be used in-game
+    const config = TIME_TRIAL_LEVELS[level];
+    
     const terrain = generateTerrain(
       seed,
       WORLD_WIDTH,      // 4000 instead of 8000
@@ -34,11 +37,11 @@ function testSeed(level: number, seed: number, padCount: number): number {
       terrainAmp,       // Dynamic (180-900) instead of fixed 150
       levelVar,         // Dynamic (0-20) instead of fixed 1
       level,
-      'easy',
+      'easy',           // Difficulty doesn't matter for Time Trial
       true,             // isTimeTrial
       padCount,
       'timetrial',
-      undefined,        // timeTrialLevelConfig
+      config,           // Pass the actual config, not undefined
       true              // validationMode - suppress errors
     );
     
@@ -93,7 +96,8 @@ export function findValidSeed(
  * Returns a map of level -> validation results
  */
 export function validateAllTimeTrialSeeds(
-  onProgress?: (level: number, total: number) => void
+  onProgress?: (level: number, total: number) => void,
+  forceRegenerate: (level: number) => boolean = () => false
 ): SeedValidationResult[] {
   const results: SeedValidationResult[] = [];
   
@@ -107,7 +111,38 @@ export function validateAllTimeTrialSeeds(
       onProgress(level + 1, TIME_TRIAL_LEVELS.length);
     }
     
-    // Test the current seed
+    // Force regeneration for specified levels (10-49)
+    if (forceRegenerate(level)) {
+      console.log(`[Validator] Level ${level}: Forcing new seed generation`);
+      const newBaseSeed = 1000000 + level * 9973; // Completely different base
+      const replacement = findValidSeed(level, newBaseSeed, expectedPads);
+      
+      if (replacement) {
+        results.push({
+          level,
+          seed: replacement.seed,
+          expectedPads,
+          actualPads: expectedPads,
+          isValid: true,
+          validatedSeed: replacement.seed,
+          attempts: replacement.attempts
+        });
+        console.log(`[Validator] Level ${level}: Found new valid seed ${replacement.seed} after ${replacement.attempts} attempts`);
+      } else {
+        results.push({
+          level,
+          seed,
+          expectedPads,
+          actualPads: -1,
+          isValid: false,
+          error: `Failed to find valid seed after 1000 attempts`
+        });
+        console.error(`[Validator] Level ${level}: Failed to find new valid seed`);
+      }
+      continue;
+    }
+    
+    // Normal validation for other levels
     const actualPads = testSeed(level, seed, expectedPads);
     const isValid = actualPads === expectedPads;
     
@@ -169,7 +204,7 @@ export function generateValidatedConfig(results: SeedValidationResult[]): string
       : '';
     
     config += `  { level: ${result.level}, seed: ${result.seed}, padCount: ${result.expectedPads}, `;
-    config += `hasVolcanoes: ${originalConfig.hasVolcanoes}, hasGravityWells: ${originalConfig.hasGravityWells}, `;
+    config += `hasSpaceJunk: ${originalConfig.hasSpaceJunk}, hasVolcanoes: ${originalConfig.hasVolcanoes}, hasGravityWells: ${originalConfig.hasGravityWells}, `;
     config += `colorIndex: ${originalConfig.colorIndex}, `;
     config += `description: "${originalConfig.description}" }, // ${status}${seedNote}\n`;
   }
