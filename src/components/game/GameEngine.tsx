@@ -673,8 +673,8 @@ export const GameEngine: React.FC<Props> = ({
       }, 50);
     } catch {}
 
-    // After level 10, keep only small pads (skip for cavern levels)
-    if (levelVar >= 10 && !isCavernLevel) {
+    // After level 10, keep only small pads (skip for cavern levels AND time trial)
+    if (levelVar >= 10 && !isCavernLevel && !isTimeTrial) {
       const widthOf = (p: { xStart: number; xEnd: number }) => (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (terrain.worldWidth - p.xStart + p.xEnd));
       const small = terrain.pads.filter((p) => widthOf(p) <= 36);
       if (small.length > 0) {
