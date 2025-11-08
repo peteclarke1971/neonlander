@@ -437,6 +437,14 @@ export function generateTerrain(
   // Final validation: ensure pads are properly placed and not overlapping
   for (let i = pads.length - 1; i >= 0; i--) {
     const pad = pads[i];
+    
+    // PROTECT SEQUENCED PADS: Never remove numbered pads in Time Trial mode
+    const isSequencedPad = isTimeTrial && sequencedPads.some(sp => 
+      sp.xStart === pad.xStart && 
+      sp.xEnd === pad.xEnd && 
+      sp.y === pad.y
+    );
+    
     const padCenterX = (pad.xStart + pad.xEnd) / 2;
     const padIdx = Math.floor((padCenterX / worldWidthLocal) * segments);
     const clampedIdx = Math.max(0, Math.min(segments - 1, padIdx));
@@ -444,6 +452,23 @@ export function generateTerrain(
     // Get original terrain height at pad center (before any modifications)
     const originalTerrainY = originalHeights.get(clampedIdx) || points[clampedIdx].y;
     
+    if (isSequencedPad) {
+      // For sequenced pads: FORCE-ADJUST terrain to accommodate the pad instead of removing it
+      console.log(`[TimeTrial] Protected sequenced pad from post-processing removal at (${padCenterX.toFixed(1)}, ${pad.y.toFixed(1)})`);
+      
+      // Force terrain to be flat at pad location
+      const padWidth = pad.xEnd - pad.xStart;
+      const halfCount = Math.max(2, Math.round((padWidth / step) * 1.5));
+      
+      for (let j = -halfCount; j <= halfCount; j++) {
+        const idx = ((clampedIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
+        points[idx].y = pad.y; // Force terrain to match pad height
+      }
+      
+      continue; // Skip normal validation logic for sequenced pads
+    }
+    
+    // Normal pad validation for non-sequenced pads
     // Verify pad is not buried below original terrain
     if (pad.y > originalTerrainY + 5) {
       console.warn(`[Terrain] Removing buried pad at (${padCenterX.toFixed(1)}, ${pad.y.toFixed(1)}), original terrain=${originalTerrainY.toFixed(1)}`);
@@ -538,6 +563,28 @@ export function generateTerrain(
         }
       }
     }
+  }
+
+  // ===== FINAL VALIDATION: SEQUENCED PADS =====
+  if (isTimeTrial && sequencedPads.length > 0) {
+    // Verify all sequenced pads still exist in pads array after post-processing
+    for (const seqPad of sequencedPads) {
+      const exists = pads.some(p => 
+        p.xStart === seqPad.xStart && 
+        p.xEnd === seqPad.xEnd && 
+        p.y === seqPad.y
+      );
+      
+      if (!exists) {
+        console.error(`[TimeTrial] ❌ CRITICAL: Sequenced pad ${seqPad.sequenceNumber} was removed during post-processing!`);
+        if (validationMode) {
+          return null;
+        }
+        throw new Error(`Time Trial level generation failed: Sequenced pad ${seqPad.sequenceNumber} was removed. This level is unplayable.`);
+      }
+    }
+    
+    console.log(`[TimeTrial] ✅ Final validation: All ${sequencedPads.length} sequenced pads present after post-processing`);
   }
 
   return { 
