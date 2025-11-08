@@ -29,56 +29,56 @@ function getTimeTrialSeed(level: number, difficulty: Difficulty): number {
  */
 // VALIDATED SEEDS - All seeds tested to produce correct pad counts
 export const TIME_TRIAL_LEVELS: TimeTrialLevelConfig[] = [
-  { level: 0, seed: 42000, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "First Steps" },
-  { level: 1, seed: 49919, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "Getting Started" },
-  { level: 2, seed: 57838, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 1, description: "Building Speed" },
-  { level: 3, seed: 65757, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 1, description: "Quick Hops" },
-  { level: 4, seed: 73676, padCount: 3, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 2, description: "Triple Run" },
-  { level: 5, seed: 81595, padCount: 3, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 2, description: "Three Points" },
-  { level: 6, seed: 89514, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 3, description: "Junk Field" },
-  { level: 7, seed: 97433, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 3, description: "Debris Zone" },
-  { level: 8, seed: 105352, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 4, description: "Salvage Run" },
-  { level: 9, seed: 113271, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 4, description: "Circuit Practice" },
-  { level: 10, seed: 123456, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 5, description: "Three Hop" },
-  { level: 11, seed: 234567, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 5, description: "Quick Collection" },
-  { level: 12, seed: 345678, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "Scavenger" },
-  { level: 13, seed: 456789, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 0, description: "Gravity Introduction" },
-  { level: 14, seed: 567890, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 1, description: "Distortion Run" },
-  { level: 15, seed: 678901, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 1, description: "Mega Introduction" },
-  { level: 16, seed: 789012, padCount: 4, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 2, description: "Quad Challenge" },
-  { level: 17, seed: 890123, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Volcanic Entry" },
-  { level: 18, seed: 901234, padCount: 5, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 3, description: "Five Point" },
-  { level: 19, seed: 112345, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Lava Quad" },
-  { level: 20, seed: 223456, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Hot Route" },
-  { level: 21, seed: 334567, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Pentathlon" },
-  { level: 22, seed: 445678, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Gravity Pull" },
-  { level: 23, seed: 556789, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Triple Inferno" },
-  { level: 24, seed: 667890, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Five Star" },
-  { level: 25, seed: 778901, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Anomaly Field" },
-  { level: 26, seed: 889012, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Volcanic Circuit" },
-  { level: 27, seed: 990123, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Expert Five" },
-  { level: 28, seed: 101234, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Warped Space" },
-  { level: 29, seed: 212345, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Danger Triple" },
-  { level: 30, seed: 323456, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Ultimate Five" },
-  { level: 31, seed: 434567, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Eruption Zone" },
-  { level: 32, seed: 545678, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Elite Triple" },
-  { level: 33, seed: 656789, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Master Course" },
-  { level: 34, seed: 767890, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Inferno Path" },
-  { level: 35, seed: 878901, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Hot Landing" },
-  { level: 36, seed: 989012, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Champion Five" },
-  { level: 37, seed: 191234, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Molten Path" },
-  { level: 38, seed: 292345, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Triple Threat" },
-  { level: 39, seed: 393456, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Legendary Five" },
-  { level: 40, seed: 494567, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Thermal Run" },
-  { level: 41, seed: 595678, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Elite Circuit" },
-  { level: 42, seed: 696789, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Gauntlet Five" },
-  { level: 43, seed: 797890, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Volcanic Quad" },
-  { level: 44, seed: 898901, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Danger Run" },
-  { level: 45, seed: 909012, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Ultimate Challenge" },
-  { level: 46, seed: 121234, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Expert Course" },
-  { level: 47, seed: 232345, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Final Triple" },
-  { level: 48, seed: 343456, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Gauntlet Run" },
-  { level: 49, seed: 454567, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Final Trial" },
+  { level: 0, seed: 42000, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "First Steps" }, // ✅ Validated
+  { level: 1, seed: 49919, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "Getting Started" }, // ✅ Validated
+  { level: 2, seed: 57838, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 1, description: "Building Speed" }, // ✅ Validated
+  { level: 3, seed: 65757, padCount: 2, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 1, description: "Quick Hops" }, // ✅ Validated
+  { level: 4, seed: 73676, padCount: 3, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 2, description: "Triple Run" }, // ✅ Validated
+  { level: 5, seed: 81595, padCount: 3, hasSpaceJunk: false, hasVolcanoes: false, hasGravityWells: false, colorIndex: 2, description: "Three Points" }, // ✅ Validated
+  { level: 6, seed: 89514, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 3, description: "Junk Field" }, // ✅ Validated
+  { level: 7, seed: 97433, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 3, description: "Debris Zone" }, // ✅ Validated
+  { level: 8, seed: 105352, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 4, description: "Salvage Run" }, // ✅ Validated
+  { level: 9, seed: 113271, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 4, description: "Circuit Practice" }, // ✅ Validated
+  { level: 10, seed: 1099730, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 5, description: "Three Hop" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 11, seed: 1109703, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 5, description: "Quick Collection" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 12, seed: 1119676, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: false, colorIndex: 0, description: "Scavenger" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 13, seed: 1129649, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 0, description: "Gravity Introduction" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 14, seed: 1139622, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 1, description: "Distortion Run" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 15, seed: 1149595, padCount: 3, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 1, description: "Mega Introduction" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 16, seed: 1159568, padCount: 4, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 2, description: "Quad Challenge" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 17, seed: 1169541, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Volcanic Entry" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 18, seed: 1179514, padCount: 5, hasSpaceJunk: true, hasVolcanoes: false, hasGravityWells: true, colorIndex: 3, description: "Five Point" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 19, seed: 1189487, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Lava Quad" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 20, seed: 1199460, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Hot Route" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 21, seed: 1209433, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Pentathlon" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 22, seed: 1219406, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Gravity Pull" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 23, seed: 1229379, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Triple Inferno" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 24, seed: 1239352, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Five Star" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 25, seed: 1249325, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Anomaly Field" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 26, seed: 1259298, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Volcanic Circuit" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 27, seed: 1269271, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Expert Five" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 28, seed: 1279244, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Warped Space" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 29, seed: 1289217, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Danger Triple" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 30, seed: 1299190, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Ultimate Five" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 31, seed: 1309163, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Eruption Zone" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 32, seed: 1319136, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Elite Triple" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 33, seed: 1329109, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Master Course" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 34, seed: 1339082, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Inferno Path" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 35, seed: 1349055, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Hot Landing" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 36, seed: 1359028, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Champion Five" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 37, seed: 1369001, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Molten Path" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 38, seed: 1378974, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Triple Threat" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 39, seed: 1388947, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 1, description: "Legendary Five" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 40, seed: 1398920, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Thermal Run" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 41, seed: 1408893, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 2, description: "Elite Circuit" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 42, seed: 1418866, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Gauntlet Five" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 43, seed: 1428839, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 3, description: "Volcanic Quad" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 44, seed: 1438812, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Danger Run" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 45, seed: 1448785, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 4, description: "Ultimate Challenge" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 46, seed: 1458758, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Expert Course" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 47, seed: 1468731, padCount: 3, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 5, description: "Final Triple" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 48, seed: 1478704, padCount: 5, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Gauntlet Run" }, // ✅ Validated (replaced, +0 attempts)
+  { level: 49, seed: 1488677, padCount: 4, hasSpaceJunk: true, hasVolcanoes: true, hasGravityWells: true, colorIndex: 0, description: "Final Trial" }, // ✅ Validated (replaced, +0 attempts)
 ];
 
 /**
