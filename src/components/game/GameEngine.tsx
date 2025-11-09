@@ -190,7 +190,7 @@ export const GameEngine: React.FC<Props> = ({
   
   // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const shouldOptimizePerformance = isMobile || lowGraphics;
+  const shouldOptimizePerformance = lowGraphics;
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
