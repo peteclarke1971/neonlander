@@ -1105,18 +1105,22 @@ export const GameEngine: React.FC<Props> = ({
     // Style points helper functions
     const spawnStyle360Burst = (px: number, py: number) => {
       const particles = [];
-      const count = 32; // Particles in all directions
+      const count = 48; // More particles for dramatic effect!
+      const colors = ['#00ff00', '#ffff00', '#ff8800', '#00ffff'];
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
-        const speed = 120 + Math.random() * 60;
+        const speed = 150 + Math.random() * 100; // 150-250 px/s
+        const size = 3 + Math.random() * 5; // 3-8px varying sizes
         particles.push({
           id: `${Date.now()}_${i}`,
           x: px,
           y: py,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 1.2,
-          maxLife: 1.2
+          life: 1.5,
+          maxLife: 1.5,
+          size,
+          color: colors[Math.floor(Math.random() * colors.length)]
         });
       }
       setStyleParticles(prev => [...prev, ...particles]);
@@ -2539,6 +2543,16 @@ export const GameEngine: React.FC<Props> = ({
         if (d) debrisPool.release(d);
       }
 
+      // Update style particles (360° burst)
+      setStyleParticles(prev => {
+        return prev.filter(p => {
+          p.life -= dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          return p.life > 0;
+        });
+      });
+
       // Shooting stars update
       for (let i = shooting.length - 1; i >= 0; i--) {
         const s = shooting[i];
@@ -3266,14 +3280,16 @@ export const GameEngine: React.FC<Props> = ({
 
       // Render 360° particle burst (style points)
       for (const particle of styleParticles) {
-        const alpha = particle.life / particle.maxLife;
+        const alpha = Math.max(0, particle.life / particle.maxLife);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = neonColor as any;
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = neonColor as any;
+        const particleColor = (particle as any).color || neonColor;
+        const particleSize = (particle as any).size || 5;
+        ctx.fillStyle = particleColor as any;
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = particleColor as any;
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, 5, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, particleSize, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }

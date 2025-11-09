@@ -100,19 +100,25 @@ export function update360Tracking(
       return null;
     }
     
-    // Track accumulated rotation
-    // Note: angle increases for right rotation, decreases for left
-    const angleChange = angle - rot.startAngle;
+    // Track accumulated rotation with proper angle wrapping
+    let angleChange = angle - rot.startAngle;
     
-    // Accumulate absolute rotation
-    if (rot.direction === 'right') {
-      rot.totalRotation = angleChange;
-    } else {
-      rot.totalRotation = -angleChange;
+    // Normalize to [-π, π] range to handle wrapping at 0/2π boundary
+    while (angleChange > Math.PI) angleChange -= 2 * Math.PI;
+    while (angleChange < -Math.PI) angleChange += 2 * Math.PI;
+    
+    // Accumulate rotation based on direction
+    if (rot.direction === 'right' && angleChange > 0) {
+      rot.totalRotation += angleChange;
+    } else if (rot.direction === 'left' && angleChange < 0) {
+      rot.totalRotation += Math.abs(angleChange);
     }
     
+    // Update start angle for next frame
+    rot.startAngle = angle;
+    
     // Check if completed 360° (2π radians)
-    if (Math.abs(rot.totalRotation) >= Math.PI * 2) {
+    if (rot.totalRotation >= Math.PI * 2) {
       // Award 360 points! Reset tracking so another 360 can be earned
       rot.active = false;
       rot.keyHeld = false;
@@ -141,8 +147,8 @@ export function updateNearMiss(
   // Calculate total velocity
   const totalVelocity = Math.sqrt(vx * vx + vy * vy);
   
-  // Check if fast enough (>= 2 m/s)
-  if (totalVelocity < 2.0) {
+  // Check if fast enough (>= 1 m/s) - Much easier now!
+  if (totalVelocity < 1.0) {
     // Too slow, reset tracking
     if (nm.active) {
       nm.active = false;
@@ -150,29 +156,43 @@ export function updateNearMiss(
     return null;
   }
   
-  // Calculate distance from terrain (check from bottom of lander)
-  const terrainHeight = getHeightAt(x);
-  const landerBottom = y + 8; // Lander foot approximation
-  const distance = Math.abs(landerBottom - terrainHeight);
+  // Check multiple points on lander for near miss (left foot, center, right foot)
+  const checkPoints = [
+    { x: x - 6, y: y + 8 }, // Left foot
+    { x: x, y: y + 8 },     // Center bottom
+    { x: x + 6, y: y + 8 }  // Right foot
+  ];
   
-  // Check if within 10px of terrain
-  if (distance <= 10) {
+  let minDistance = Infinity;
+  for (const point of checkPoints) {
+    const terrainHeight = getHeightAt(point.x);
+    const distance = Math.abs(point.y - terrainHeight);
+    minDistance = Math.min(minDistance, distance);
+  }
+  
+  // Check if within 30px of terrain (much easier!)
+  if (minDistance <= 30) {
     if (!nm.active) {
       // Start tracking
       nm.active = true;
       nm.startTime = currentTime;
       nm.startX = x;
       nm.startY = y;
-      nm.lastDistance = distance;
+      nm.lastDistance = minDistance;
+      console.log("🎯 Near miss tracking started", { distance: minDistance, velocity: totalVelocity });
     } else {
       // Continue tracking
-      nm.lastDistance = distance;
+      nm.lastDistance = minDistance;
+      const elapsed = currentTime - nm.startTime;
+      console.log("🎯 Near miss tracking...", { distance: minDistance, elapsed, needed: 0.3 });
       
-      // Check if maintained for 0.5 seconds
-      if (currentTime - nm.startTime >= 0.5) {
+      // Check if maintained for 0.3 seconds (much easier!)
+      if (elapsed >= 0.3) {
         // Award near miss!
         const awardX = x;
-        const awardY = terrainHeight; // Position at terrain level
+        const awardY = y + 8; // Position at lander bottom
+        
+        console.log("✅ NEAR MISS AWARDED!");
         
         // Reset for next potential near miss
         nm.active = false;
@@ -184,6 +204,7 @@ export function updateNearMiss(
   } else {
     // Too far from terrain, reset
     if (nm.active) {
+      console.log("❌ Near miss lost - too far from terrain", { distance: minDistance });
       nm.active = false;
     }
   }
