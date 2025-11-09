@@ -30,6 +30,7 @@ function mulberry32(seed: number) {
 import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
+import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
 import { generateHazards, updateHazards, drawHazards, checkHazardCollision } from "./systems/hazards";
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
@@ -272,6 +273,26 @@ export const GameEngine: React.FC<Props> = ({
   // Demo AI system
   const demoAI = useRef<DemoAIState | null>(null);
   const [demoStartTime, setDemoStartTime] = useState<number>(0);
+  
+  // Style points tracking
+  const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
+  const [styleParticles, setStyleParticles] = useState<Array<{
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    maxLife: number;
+  }>>([]);
+  const [nearMissTexts, setNearMissTexts] = useState<Array<{
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    life: number;
+    maxLife: number;
+  }>>([]);
   
   
   // Hint system: show rotation boost hint on first hard level
@@ -1081,6 +1102,37 @@ export const GameEngine: React.FC<Props> = ({
       }
     };
     
+    // Style points helper functions
+    const spawnStyle360Burst = (px: number, py: number) => {
+      const particles = [];
+      const count = 32; // Particles in all directions
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const speed = 80 + Math.random() * 40;
+        particles.push({
+          id: `${Date.now()}_${i}`,
+          x: px,
+          y: py,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.8,
+          maxLife: 0.8
+        });
+      }
+      setStyleParticles(prev => [...prev, ...particles]);
+    };
+
+    const spawnNearMissText = (px: number, py: number) => {
+      setNearMissTexts(prev => [...prev, {
+        id: `${Date.now()}`,
+        x: px,
+        y: py,
+        text: "NEAR MISS",
+        life: 2.0,
+        maxLife: 2.0
+      }]);
+    };
+    
     const spawnShooting = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const viewWpx = c.width / dpr;
@@ -1404,6 +1456,45 @@ export const GameEngine: React.FC<Props> = ({
         }
       } else {
         rumbleNext = now;
+      }
+
+      // Style points tracking (only in classic and fixed modes)
+      if ((mode === "classic" || mode === "fixed") && running && !crashed && !playerLockedRef.current) {
+        // Update 360° rotation tracking
+        const rotation360Result = update360Tracking(
+          stylePointsStateRef.current,
+          angle,
+          keys.current.left,
+          keys.current.right,
+          dt,
+          abortRotationActive.current,
+          elapsed
+        );
+        
+        if (rotation360Result?.awarded) {
+          score += 360;
+          // Spawn 360° particle burst at lander position
+          spawnStyle360Burst(x, y);
+          // TODO: Add audio later
+        }
+        
+        // Update near miss tracking
+        const nearMissResult = updateNearMiss(
+          stylePointsStateRef.current,
+          x,
+          y,
+          vx,
+          vy,
+          terrain.getHeightAt,
+          dt,
+          elapsed
+        );
+        
+        if (nearMissResult?.awarded) {
+          score += 250;
+          // Spawn "NEAR MISS" text at award location
+          spawnNearMissText(nearMissResult.awardX, nearMissResult.awardY);
+        }
       }
 
       // Prevent thrust input during countdown intro
@@ -1942,6 +2033,9 @@ export const GameEngine: React.FC<Props> = ({
                 hasShownBonusThisLanding.current = true;
               }
               
+              // Reset style points for next flight (caverns mode doesn't use style points)
+              resetStylePoints(stylePointsStateRef.current);
+              
               cameraShake = 6;
               audio.current.landing();
               audio.current.stopThruster();
@@ -1991,12 +2085,21 @@ export const GameEngine: React.FC<Props> = ({
             earned = Math.floor(earned * landedPad.scoreMult);
             
             const pWidth = landedPad.width ?? 32;
-            const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
-            const speedBonus = elapsed < 10;
-            if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); }
-            if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
-            
-            score += earned;
+              const bullseye = Math.abs(x - landedPad.currentPos.x) <= pWidth * 0.03;
+              const speedBonus = elapsed < 10;
+              if (bullseye) { earned += Math.floor(500 * landedPad.scoreMult); }
+              if (speedBonus) { earned += Math.floor(500 * landedPad.scoreMult); }
+              
+              // Check for perfect landing (classic and fixed only)
+              let perfectLanding = false;
+              if (mode === "classic" || mode === "fixed") {
+                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy);
+                if (perfectLanding) {
+                  earned += Math.floor(1000 * landedPad.scoreMult);
+                }
+              }
+              
+              score += earned;
             landings += 1;
             setCurrentLandings(landings);
             
@@ -2008,14 +2111,18 @@ export const GameEngine: React.FC<Props> = ({
               lastEarned: earned
             });
             
-            // Build message queue for display
-            const messages: string[] = [];
-            if (speedBonus) messages.push("500 POINT SPEED BONUS");
-            if (bullseye) messages.push("500 POINT BULLSEYE");
-            if (messages.length > 0 && !hasShownBonusThisLanding.current) {
-              setBonusMessages(messages);
-              hasShownBonusThisLanding.current = true;
-            }
+              // Build message queue for display
+              const messages: string[] = [];
+              if (speedBonus) messages.push("500 POINT SPEED BONUS");
+              if (bullseye) messages.push("500 POINT BULLSEYE");
+              if (perfectLanding) messages.push("1000 POINT PERFECT LANDING!");
+              if (messages.length > 0 && !hasShownBonusThisLanding.current) {
+                setBonusMessages(messages);
+                hasShownBonusThisLanding.current = true;
+              }
+              
+              // Reset style points for next flight
+              resetStylePoints(stylePointsStateRef.current);
             
             cameraShake = 8; // Extra camera shake for MEGA landing
             audio.current.landing();
@@ -2164,6 +2271,15 @@ export const GameEngine: React.FC<Props> = ({
               const speedBonus = elapsed < 10;
               if (bullseye) { earned += 500; }
               if (speedBonus) { earned += 500; }
+              
+              // Check for perfect landing (classic and fixed only)
+              let perfectLanding = false;
+              if (mode === "classic" || mode === "fixed") {
+                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy);
+                if (perfectLanding) {
+                  earned += 1000;
+                }
+              }
 
               score += earned;
               landings += 1;
@@ -2181,10 +2297,14 @@ export const GameEngine: React.FC<Props> = ({
               const messages: string[] = [];
               if (speedBonus) messages.push("500 POINT SPEED BONUS");
               if (bullseye) messages.push("500 POINT BULLSEYE");
+              if (perfectLanding) messages.push("1000 POINT PERFECT LANDING!");
               if (messages.length > 0 && !hasShownBonusThisLanding.current) {
                 setBonusMessages(messages);
                 hasShownBonusThisLanding.current = true;
               }
+              
+              // Reset style points for next flight
+              resetStylePoints(stylePointsStateRef.current);
               
               cameraShake = 6;
               audio.current.landing();
@@ -2339,6 +2459,26 @@ export const GameEngine: React.FC<Props> = ({
       const maxStep = maxRate * dt;
       zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
       if (cameraShake > 0) cameraShake -= 60 * dt;
+
+      // Update style particles (360° burst)
+      setStyleParticles(prev => {
+        const updated = prev.map(p => ({
+          ...p,
+          x: p.x + p.vx * dt,
+          y: p.y + p.vy * dt,
+          life: p.life - dt
+        }));
+        return updated.filter(p => p.life > 0);
+      });
+
+      // Update near miss texts
+      setNearMissTexts(prev => {
+        const updated = prev.map(t => ({
+          ...t,
+          life: t.life - dt
+        }));
+        return updated.filter(t => t.life > 0);
+      });
 
       // Enhanced particles update with thruster-friendly limits
       const maxParticles = shouldOptimizePerformance ? 30 : 300; // Allow 300 particles for spectacular thruster effects
@@ -3121,6 +3261,38 @@ export const GameEngine: React.FC<Props> = ({
           ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
           ctx.stroke();
         }
+        ctx.restore();
+      }
+
+      // Render 360° particle burst (style points)
+      for (const particle of styleParticles) {
+        const alpha = particle.life / particle.maxLife;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = neonColor as any;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = neonColor as any;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Render near miss text (style points)
+      for (const text of nearMissTexts) {
+        const alpha = text.life / text.maxLife;
+        const yOffset = (1 - alpha) * 30; // Float upward
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 16px "Orbitron", sans-serif';
+        ctx.fillStyle = neonColor as any;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.textAlign = 'center';
+        const screenX = text.x;
+        const screenY = text.y - yOffset;
+        ctx.strokeText(text.text, screenX, screenY);
+        ctx.fillText(text.text, screenX, screenY);
         ctx.restore();
       }
 
