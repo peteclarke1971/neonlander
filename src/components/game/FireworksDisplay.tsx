@@ -37,6 +37,7 @@ interface FireworksDisplayProps {
   lowGraphics?: boolean;
   isWorldRecord?: boolean;
   isHighScore?: boolean;
+  debugCycleTrigger?: number; // Trigger for debug cycling on home screen
 }
 
 // Object pool for particle reuse
@@ -68,7 +69,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   fireworkCount,
   lowGraphics = false,
   isWorldRecord = false,
-  isHighScore = false
+  isHighScore = false,
+  debugCycleTrigger
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1440,9 +1442,34 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       }
     };
 
-    window.addEventListener('keydown', handleDebugKey);
-    return () => window.removeEventListener('keydown', handleDebugKey);
-  }, [debugCycleIndex, launchFireworks]);
+    document.addEventListener('keydown', handleDebugKey);
+    return () => document.removeEventListener('keydown', handleDebugKey);
+  }, [debugCycleIndex]);
+  
+  // External debug trigger (for home screen button)
+  useEffect(() => {
+    if (debugCycleTrigger !== undefined && debugCycleTrigger > 0) {
+      // Clear existing particles and reset
+      setParticles([]);
+      hasLaunched.current = false;
+      
+      // Get current cycle config
+      const config = debugCycleOrder.current[debugCycleIndex];
+      console.log(`🎆 External Trigger Fireworks: ${config.label}`);
+      
+      // Launch fireworks with override parameters
+      setTimeout(() => {
+        launchFireworks(
+          config.type as any,
+          config.season as any,
+          config.highScore
+        );
+      }, 100);
+      
+      // Advance to next cycle
+      setDebugCycleIndex((prev) => (prev + 1) % debugCycleOrder.current.length);
+    }
+  }, [debugCycleTrigger]);
 
   // Touch screen input for skipping
   useEffect(() => {

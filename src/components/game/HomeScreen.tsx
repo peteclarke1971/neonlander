@@ -5,6 +5,7 @@ import { Difficulty, HighScore, Mode } from "./types";
 import { InitialsBadge } from "./InitialsBadge";
 import { HomeStarfield } from "./HomeStarfield";
 import { AudioManager } from "./AudioManager";
+import FireworksDisplay from "./FireworksDisplay";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fetchTop, submitScore } from "@/lib/leaderboard";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, setLastDeviceId, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
@@ -119,6 +120,29 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
   >("local-classic");
   const [onlineClassic, setOnlineClassic] = useState<{ initials: string; score: number; difficulty: Difficulty; created_at?: string }[]>([]);
   const [onlineFixed, setOnlineFixed] = useState<{ initials: string; score: number; difficulty: Difficulty; created_at?: string }[]>([]);
+
+  // Fireworks preview state
+  const [fireworksConfig, setFireworksConfig] = useState<{
+    show: boolean;
+    type: 'regular' | '2x' | 'moving';
+    season?: 'halloween' | 'christmas';
+    highScore: boolean;
+    key: number;
+  }>({ show: false, type: 'regular', season: undefined, highScore: false, key: 0 });
+  
+  const fireworksCycleOrder = useRef([
+    { type: 'regular' as const, season: undefined, highScore: false, label: 'Regular Landing' },
+    { type: '2x' as const, season: undefined, highScore: false, label: '2x Landing' },
+    { type: 'moving' as const, season: undefined, highScore: false, label: 'Moving Landing' },
+    { type: 'regular' as const, season: undefined, highScore: true, label: 'High Score' },
+    { type: 'regular' as const, season: 'halloween' as const, highScore: false, label: 'Halloween Regular' },
+    { type: '2x' as const, season: 'halloween' as const, highScore: false, label: 'Halloween 2x' },
+    { type: 'moving' as const, season: 'halloween' as const, highScore: false, label: 'Halloween Moving' },
+    { type: 'regular' as const, season: 'christmas' as const, highScore: false, label: 'Christmas Regular' },
+    { type: '2x' as const, season: 'christmas' as const, highScore: false, label: 'Christmas 2x' },
+    { type: 'moving' as const, season: 'christmas' as const, highScore: false, label: 'Christmas Moving' },
+  ]);
+  const fireworksCycle = useRef(0);
 
 const navigate = useNavigate();
 
@@ -436,6 +460,20 @@ useEffect(() => {
       <div className="absolute inset-0 z-0" aria-hidden>
         <HomeStarfield />
       </div>
+      
+      {/* Fireworks Display */}
+      {fireworksConfig.show && (
+        <div key={fireworksConfig.key} className="absolute inset-0 z-30 pointer-events-none">
+          <FireworksDisplay
+            landingType={fireworksConfig.type}
+            isHighScore={fireworksConfig.highScore}
+            neonColor="hsl(var(--neon))"
+            onComplete={() => setFireworksConfig(prev => ({ ...prev, show: false }))}
+            onSkip={() => setFireworksConfig(prev => ({ ...prev, show: false }))}
+            debugCycleTrigger={fireworksConfig.key}
+          />
+        </div>
+      )}
       <div className="absolute inset-0 z-10 opacity-50 pointer-events-none" aria-hidden>
         <div className="pointer-events-none w-full h-full" style={{
           background: "radial-gradient(800px 400px at 50% 0%, hsla(var(--neon),0.15), transparent 60%)"
@@ -589,19 +627,38 @@ useEffect(() => {
           </div>
         )}
 
-        {/* Nebula FX toggle (visible for all modes) */}
+        {/* Nebula FX toggle and Fireworks Preview (visible for all modes) */}
         <div className="mt-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Visual Effects</div>
-          <button
-            className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
-              nebulaFxEnabled
-                ? "bg-green-500/20 text-green-400 border border-green-500/40"
-                : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
-            }`}
-            onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}
-          >
-            🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
-          </button>
+          <div className="flex gap-2 justify-center">
+            <button
+              className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                nebulaFxEnabled
+                  ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                  : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+              }`}
+              onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}
+            >
+              🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
+            </button>
+            <button
+              className="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40 hover:text-accent hover:border-accent/40"
+              onClick={() => {
+                const config = fireworksCycleOrder.current[fireworksCycle.current];
+                setFireworksConfig({
+                  show: true,
+                  type: config.type,
+                  season: config.season,
+                  highScore: config.highScore,
+                  key: Date.now()
+                });
+                fireworksCycle.current = (fireworksCycle.current + 1) % fireworksCycleOrder.current.length;
+                console.log('🎆 Fireworks Preview:', config.label);
+              }}
+            >
+              🎆 Fireworks
+            </button>
+          </div>
         </div>
 
         {/* Play by Seed */}
