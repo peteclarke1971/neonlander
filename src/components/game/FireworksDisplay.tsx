@@ -751,9 +751,13 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           // Add stem particles at top
           const isStem = pumpkinY < -pumpkinRadius * 0.8 && Math.abs(pumpkinX) < 10;
           
+          // Halloween colors: neon orange and purple
+          const halloweenColors = ['#FF6B35', '#FFA500', '#FF4500']; // Neon orange variants
+          const pumpkinColor = halloweenColors[i % halloweenColors.length];
+          
           newParticles.push(createParticle(pumpkinX * 0.08, pumpkinY * 0.08, {
             shape: 'circle',
-            color: isStem ? '#8B4513' : '#FF8C00',
+            color: isStem ? '#8B4513' : pumpkinColor,
             size: isStem ? 3 : 4,
             glowSize: isStem ? 4 : 8,
             gravity: true,
@@ -784,9 +788,13 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             batY = Math.sin(t) * 30 - wingT * 20; // Wing curves
           }
           
+          // Halloween colors: neon purple variants
+          const purpleColors = ['#9D4EDD', '#C77DFF', '#E0AAFF'];
+          const batColor = purpleColors[i % purpleColors.length];
+          
           newParticles.push(createParticle(batX * 0.08, batY * 0.08, {
             shape: 'circle',
-            color: i % 3 === 0 ? '#2C1810' : '#1A0F08',
+            color: batColor,
             size: 3,
             glowSize: 5,
             gravity: true,
@@ -812,9 +820,13 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             const x = Math.cos(angle) * branchLength * t;
             const y = Math.sin(angle) * branchLength * t;
             
+            // Christmas colors: white variants
+            const whiteColors = ['#FFFFFF', '#F0F0F0', '#E8E8E8'];
+            const snowColor = whiteColors[i % whiteColors.length];
+            
             newParticles.push(createParticle(x * 0.08, y * 0.08, {
               shape: 'circle',
-              color: '#E0F7FF',
+              color: snowColor,
               size: 3,
               glowSize: 6,
               gravity: false, // Snowflakes float
@@ -833,9 +845,11 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
               const sx2 = x + Math.cos(sideAngle2) * sideLength * 0.5;
               const sy2 = y + Math.sin(sideAngle2) * sideLength * 0.5;
               
+              const sideBranchColors = ['#FFFFFF', '#F0F0F0'];
+              
               newParticles.push(createParticle(sx1 * 0.08, sy1 * 0.08, {
                 shape: 'circle',
-                color: '#E0F7FF',
+                color: sideBranchColors[0],
                 size: 2,
                 glowSize: 4,
                 gravity: false,
@@ -845,7 +859,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
               
               newParticles.push(createParticle(sx2 * 0.08, sy2 * 0.08, {
                 shape: 'circle',
-                color: '#E0F7FF',
+                color: sideBranchColors[1],
                 size: 2,
                 glowSize: 4,
                 gravity: false,
@@ -887,12 +901,15 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             y = boxHeight - ((t - 0.75) * 4) * boxHeight * 2;
           }
           
-          // Color: ribbon or box
+          // Christmas colors: neon red for box, neon green for ribbon
           const isRibbon = Math.abs(x) < ribbonWidth || Math.abs(y) < ribbonWidth;
+          const redColors = ['#FF3131', '#FF4444', '#FF6B6B'];
+          const greenColors = ['#39FF14', '#7FFF00', '#32CD32'];
+          const presentColor = isRibbon ? greenColors[i % greenColors.length] : redColors[i % redColors.length];
           
           newParticles.push(createParticle(x * 0.08, y * 0.08, {
             shape: 'circle',
-            color: isRibbon ? '#FFD700' : '#DC143C',
+            color: presentColor,
             size: isRibbon ? 4 : 3,
             glowSize: isRibbon ? 8 : 5,
             gravity: true,
@@ -908,9 +925,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           const bowX = Math.cos(t) * 15;
           const bowY = -boxHeight - 15 + Math.sin(t) * 10;
           
+          // Christmas bow: neon red
+          const bowColors = ['#FF3131', '#FF4444'];
+          
           newParticles.push(createParticle(bowX * 0.08, bowY * 0.08, {
             shape: 'circle',
-            color: '#FFD700',
+            color: bowColors[i % bowColors.length],
             size: 4,
             glowSize: 8,
             gravity: true,
@@ -942,8 +962,16 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             y = 30;
           }
           
-          // Color zones: white cuff, red/green body
-          const color = t < 0.2 ? '#FFFFFF' : t < 0.4 ? '#DC143C' : '#228B22';
+          // Christmas colors: white cuff, neon red and green body
+          const greenColors = ['#39FF14', '#7FFF00', '#32CD32'];
+          let color;
+          if (t < 0.2) {
+            color = '#FFFFFF'; // White cuff
+          } else if (t < 0.4) {
+            color = '#FF3131'; // Neon red
+          } else {
+            color = greenColors[i % greenColors.length]; // Neon green variants
+          }
           
           newParticles.push(createParticle(x * 0.08, y * 0.08, {
             shape: 'circle',
