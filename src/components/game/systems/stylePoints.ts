@@ -21,8 +21,7 @@ export interface StylePointsState {
     lastDistance: number;
   };
   
-  // Awarded bonuses this flight (prevent duplicates per flight)
-  awarded360ThisFlight: boolean;
+  // Track near misses this flight
   nearMissesThisFlight: number;
 }
 
@@ -44,7 +43,6 @@ export function createStylePointsState(): StylePointsState {
       startY: 0,
       lastDistance: 999
     },
-    awarded360ThisFlight: false,
     nearMissesThisFlight: 0
   };
 }
@@ -66,11 +64,6 @@ export function update360Tracking(
   if (abortActive && rot.active) {
     rot.active = false;
     rot.keyHeld = false;
-    return null;
-  }
-  
-  // Already awarded this flight
-  if (state.awarded360ThisFlight) {
     return null;
   }
   
@@ -120,8 +113,7 @@ export function update360Tracking(
     
     // Check if completed 360° (2π radians)
     if (Math.abs(rot.totalRotation) >= Math.PI * 2) {
-      // Award 360 points!
-      state.awarded360ThisFlight = true;
+      // Award 360 points! Reset tracking so another 360 can be earned
       rot.active = false;
       rot.keyHeld = false;
       
@@ -158,13 +150,13 @@ export function updateNearMiss(
     return null;
   }
   
-  // Calculate distance from terrain
+  // Calculate distance from terrain (check from bottom of lander)
   const terrainHeight = getHeightAt(x);
   const landerBottom = y + 8; // Lander foot approximation
   const distance = Math.abs(landerBottom - terrainHeight);
   
-  // Check if within 5px of terrain
-  if (distance <= 5) {
+  // Check if within 10px of terrain
+  if (distance <= 10) {
     if (!nm.active) {
       // Start tracking
       nm.active = true;
@@ -176,8 +168,8 @@ export function updateNearMiss(
       // Continue tracking
       nm.lastDistance = distance;
       
-      // Check if maintained for 1.5 seconds
-      if (currentTime - nm.startTime >= 1.5) {
+      // Check if maintained for 0.5 seconds
+      if (currentTime - nm.startTime >= 0.5) {
         // Award near miss!
         const awardX = x;
         const awardY = terrainHeight; // Position at terrain level
@@ -226,6 +218,5 @@ export function resetStylePoints(state: StylePointsState): void {
   state.rotation360.keyHeld = false;
   state.rotation360.totalRotation = 0;
   state.nearMiss.active = false;
-  state.awarded360ThisFlight = false;
   state.nearMissesThisFlight = 0;
 }

@@ -1108,15 +1108,15 @@ export const GameEngine: React.FC<Props> = ({
       const count = 32; // Particles in all directions
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
-        const speed = 80 + Math.random() * 40;
+        const speed = 120 + Math.random() * 60;
         particles.push({
           id: `${Date.now()}_${i}`,
           x: px,
           y: py,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 0.8,
-          maxLife: 0.8
+          life: 1.2,
+          maxLife: 1.2
         });
       }
       setStyleParticles(prev => [...prev, ...particles]);
@@ -3270,10 +3270,10 @@ export const GameEngine: React.FC<Props> = ({
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.fillStyle = neonColor as any;
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 30;
         ctx.shadowColor = neonColor as any;
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, 5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
