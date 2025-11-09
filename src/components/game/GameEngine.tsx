@@ -276,23 +276,6 @@ export const GameEngine: React.FC<Props> = ({
   
   // Style points tracking
   const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
-  const [styleParticles, setStyleParticles] = useState<Array<{
-    id: string;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    life: number;
-    maxLife: number;
-  }>>([]);
-  const [nearMissTexts, setNearMissTexts] = useState<Array<{
-    id: string;
-    x: number;
-    y: number;
-    text: string;
-    life: number;
-    maxLife: number;
-  }>>([]);
   
   
   // Hint system: show rotation boost hint on first hard level
@@ -946,6 +929,30 @@ export const GameEngine: React.FC<Props> = ({
     type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
     const particles: Particle[] = [];
     
+    // Style points visual effects (local arrays for immediate rendering)
+    type StyleParticle = { 
+      id: string; 
+      x: number; 
+      y: number; 
+      vx: number; 
+      vy: number; 
+      life: number; 
+      maxLife: number;
+      size: number;
+      color: string;
+    };
+    const styleParticles: StyleParticle[] = [];
+    
+    type NearMissText = {
+      id: string;
+      x: number;
+      y: number;
+      text: string;
+      life: number;
+      maxLife: number;
+    };
+    const nearMissTexts: NearMissText[] = [];
+    
 
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
@@ -1104,14 +1111,13 @@ export const GameEngine: React.FC<Props> = ({
     
     // Style points helper functions
     const spawnStyle360Burst = (px: number, py: number) => {
-      const particles = [];
       const count = 48; // More particles for dramatic effect!
       const colors = ['#00ff00', '#ffff00', '#ff8800', '#00ffff'];
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
         const speed = 150 + Math.random() * 100; // 150-250 px/s
         const size = 3 + Math.random() * 5; // 3-8px varying sizes
-        particles.push({
+        styleParticles.push({
           id: `${Date.now()}_${i}`,
           x: px,
           y: py,
@@ -1123,18 +1129,17 @@ export const GameEngine: React.FC<Props> = ({
           color: colors[Math.floor(Math.random() * colors.length)]
         });
       }
-      setStyleParticles(prev => [...prev, ...particles]);
     };
 
     const spawnNearMissText = (px: number, py: number) => {
-      setNearMissTexts(prev => [...prev, {
+      nearMissTexts.push({
         id: `${Date.now()}`,
         x: px,
         y: py,
         text: "NEAR MISS",
         life: 2.0,
         maxLife: 2.0
-      }]);
+      });
     };
     
     const spawnShooting = () => {
@@ -2464,26 +2469,6 @@ export const GameEngine: React.FC<Props> = ({
       zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
       if (cameraShake > 0) cameraShake -= 60 * dt;
 
-      // Update style particles (360° burst)
-      setStyleParticles(prev => {
-        const updated = prev.map(p => ({
-          ...p,
-          x: p.x + p.vx * dt,
-          y: p.y + p.vy * dt,
-          life: p.life - dt
-        }));
-        return updated.filter(p => p.life > 0);
-      });
-
-      // Update near miss texts
-      setNearMissTexts(prev => {
-        const updated = prev.map(t => ({
-          ...t,
-          life: t.life - dt
-        }));
-        return updated.filter(t => t.life > 0);
-      });
-
       // Enhanced particles update with thruster-friendly limits
       const maxParticles = shouldOptimizePerformance ? 30 : 300; // Allow 300 particles for spectacular thruster effects
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -2544,14 +2529,24 @@ export const GameEngine: React.FC<Props> = ({
       }
 
       // Update style particles (360° burst)
-      setStyleParticles(prev => {
-        return prev.filter(p => {
-          p.life -= dt;
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          return p.life > 0;
-        });
-      });
+      for (let i = styleParticles.length - 1; i >= 0; i--) {
+        const p = styleParticles[i];
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.life <= 0) {
+          styleParticles.splice(i, 1);
+        }
+      }
+      
+      // Update near miss texts
+      for (let i = nearMissTexts.length - 1; i >= 0; i--) {
+        const t = nearMissTexts[i];
+        t.life -= dt;
+        if (t.life <= 0) {
+          nearMissTexts.splice(i, 1);
+        }
+      }
 
       // Shooting stars update
       for (let i = shooting.length - 1; i >= 0; i--) {
