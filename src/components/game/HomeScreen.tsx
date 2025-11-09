@@ -44,6 +44,10 @@ interface Props {
 
 export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highScoresFixed, lastPlayedSeed, lastPlayedLevel, onInteraction, recentlySubmittedScore }) => {
   const audioRef = useRef(new AudioManager());
+  
+  // Detect iOS/iPad devices
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
   const [musicOn, setMusicOn] = useState(true);
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
@@ -510,19 +514,21 @@ useEffect(() => {
           >
             {musicOn ? "Mute Music" : "Unmute Music"}
           </Button>
-          <Button
-            ref={lowGfxBtnRef}
-            variant={lowGraphics ? "neon" : "outline"}
-            onClick={() => {
-              const newValue = !lowGraphics;
-              setLowGraphics(newValue);
-              try {
-                localStorage.setItem("ll-graphics-settings", JSON.stringify({ lowGraphics: newValue }));
-              } catch {}
-            }}
-          >
-            {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
-          </Button>
+          {!isIOS && (
+            <Button
+              ref={lowGfxBtnRef}
+              variant={lowGraphics ? "neon" : "outline"}
+              onClick={() => {
+                const newValue = !lowGraphics;
+                setLowGraphics(newValue);
+                try {
+                  localStorage.setItem("ll-graphics-settings", JSON.stringify({ lowGraphics: newValue }));
+                } catch {}
+              }}
+            >
+              {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
+            </Button>
+          )}
           <a href="/duel" className="inline-block">
             <Button variant="neon">⚔️ LANDER DUEL</Button>
           </a>
@@ -544,9 +550,11 @@ useEffect(() => {
           <a href="/cavern-fx-demo" className="inline-block">
             <Button variant="neon">🌟 CAVERN FX DEMO</Button>
           </a>
-          <a href="/settings/controls" className="inline-block">
-            <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
-          </a>
+          {!isIOS && (
+            <a href="/settings/controls" className="inline-block">
+              <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
+            </a>
+          )}
           {showFullscreenBtn && (
             <Button
               ref={fullscreenBtnRef}
@@ -631,7 +639,12 @@ useEffect(() => {
         {/* Nebula FX toggle and Fireworks Preview (visible for all modes) */}
         <div className="mt-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Visual Effects</div>
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center flex-wrap">
+            {isIOS && (
+              <a href="/settings/controls" className="inline-block">
+                <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
+              </a>
+            )}
             <button
               className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
                 nebulaFxEnabled
@@ -659,6 +672,21 @@ useEffect(() => {
             >
               🎆 Fireworks
             </button>
+            {isIOS && (
+              <Button
+                ref={lowGfxBtnRef}
+                variant={lowGraphics ? "neon" : "outline"}
+                onClick={() => {
+                  const newValue = !lowGraphics;
+                  setLowGraphics(newValue);
+                  try {
+                    localStorage.setItem("ll-graphics-settings", JSON.stringify({ lowGraphics: newValue }));
+                  } catch {}
+                }}
+              >
+                {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
+              </Button>
+            )}
           </div>
         </div>
 
