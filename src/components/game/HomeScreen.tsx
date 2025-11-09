@@ -24,6 +24,7 @@ interface GameSettings {
   lowGraphics: boolean;
   showGhost?: boolean;
   nebulaFxEnabled?: boolean;
+  largeRotateButtons?: boolean;
 }
 
 interface Props {
@@ -116,6 +117,15 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
       return true;
     }
   });
+  
+  const [largeRotateButtons, setLargeRotateButtons] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-large-rotate-buttons');
+      return saved ? JSON.parse(saved) : true; // Default ON for easier touch controls
+    } catch {
+      return true;
+    }
+  });
   const [leaderboardView, setLeaderboardView] = useState<
     | "local-classic"
     | "local-fixed"
@@ -190,6 +200,12 @@ const navigate = useNavigate();
       localStorage.setItem('ll-nebula-fx-enabled', JSON.stringify(nebulaFxEnabled));
     } catch {}
   }, [nebulaFxEnabled]);
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-large-rotate-buttons', JSON.stringify(largeRotateButtons));
+    } catch {}
+  }, [largeRotateButtons]);
 
   // Gamepad UI navigation: mirror D-pad/LS to arrow/enter/escape
   useEffect(() => {
@@ -672,6 +688,16 @@ useEffect(() => {
             >
               🎆 Fireworks
             </button>
+            <button
+              className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                largeRotateButtons
+                  ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                  : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"
+              }`}
+              onClick={() => setLargeRotateButtons(!largeRotateButtons)}
+            >
+              🎮 Large Buttons {largeRotateButtons ? "ON" : "OFF"}
+            </button>
             {isIOS && (
               <Button
                 ref={lowGfxBtnRef}
@@ -720,7 +746,8 @@ useEffect(() => {
                 photosensitive,
                 lowGraphics,
                 showGhost: false,
-                nebulaFxEnabled
+                nebulaFxEnabled,
+                largeRotateButtons
               });
             }}
           >
@@ -742,7 +769,8 @@ useEffect(() => {
                     photosensitive,
                     lowGraphics,
                     showGhost,
-                    nebulaFxEnabled
+                    nebulaFxEnabled,
+                    largeRotateButtons
                   })}>
                   Start
                 </Button>
@@ -761,7 +789,8 @@ useEffect(() => {
                         photosensitive,
                         lowGraphics,
                         showGhost,
-                        nebulaFxEnabled
+                        nebulaFxEnabled,
+                        largeRotateButtons
                       })}
                     >
                       {L}
@@ -797,7 +826,8 @@ useEffect(() => {
                       photosensitive,
                       lowGraphics,
                       showGhost: false,
-                      nebulaFxEnabled
+                      nebulaFxEnabled,
+                      largeRotateButtons
                     })}
                   >
                     {L}

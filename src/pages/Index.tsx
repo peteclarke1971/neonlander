@@ -179,9 +179,10 @@ const Index = () => {
     isNewGlobalRecord: boolean;
   } | null>(null);
   const [nebulaFxEnabled, setNebulaFxEnabled] = useState(true);
+  const [largeRotateButtons, setLargeRotateButtons] = useState(true);
   // Global ghost loading now handled dynamically inside GameEngine
   
-  const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean }) => {
+  const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean; largeRotateButtons?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
     // Clear recently submitted score and leaderboard display when starting a new game
@@ -209,6 +210,7 @@ const Index = () => {
       setSeedOverride(seedOverrideParam ?? null);
       setShowGhost(gameSettings?.showGhost ?? false);
       setNebulaFxEnabled(gameSettings?.nebulaFxEnabled ?? true);
+      setLargeRotateButtons(gameSettings?.largeRotateButtons ?? true);
       setGameKey(prev => prev + 1);
       
       try {
@@ -784,6 +786,7 @@ const retryGame = () => {
           onContinueLevel={mode === "timetrial" ? handleContinueLevel : undefined}
           spawnOverride={lastPlayedSpawn ?? undefined}
           nebulaFxEnabled={nebulaFxEnabled}
+          largeRotateButtons={largeRotateButtons}
         />
       )}
       {view === "demo" && (

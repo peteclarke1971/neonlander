@@ -1,4 +1,4 @@
-import { HUDSnapshot, CollectiblesData, Difficulty } from "./types";
+import { HUDSnapshot, CollectiblesData, Difficulty, Mode } from "./types";
 import { useEffect, useState } from "react";
 import { GhostManager } from "./GhostManager";
 import { fetchGlobalGhost } from "@/lib/leaderboard";
@@ -7,9 +7,10 @@ interface Props extends HUDSnapshot {
   collectibles?: CollectiblesData;
   bestTime?: number | null;
   ghostTimeDiff?: number;
+  mode?: Mode;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive, timeTrialLevel }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive, timeTrialLevel, mode }) => {
   const [localRecord, setLocalRecord] = useState<{ time: number; initials: string } | null>(null);
   const [globalRecord, setGlobalRecord] = useState<{ time: number; initials: string } | null>(null);
   
@@ -51,6 +52,13 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
     
     fetchRecords();
   }, [timeTrialTarget, timeTrialLevel, difficulty]);
+  
+  // Detect iPhone
+  const isIPhone = /iPhone/.test(navigator.userAgent);
+  
+  // Determine if HUD should be simplified (iPhone + Classic/Fixed mode only)
+  const simplifyHUD = isIPhone && (mode === "classic" || mode === "fixed");
+  
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
@@ -115,11 +123,15 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
       </div>
     </>
   ) : (
-          // Regular game HUD
+          // Regular game HUD - simplified for iPhone in Classic/Fixed mode
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm font-mono">
-            <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
-            <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
-            <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
+            {!simplifyHUD && (
+              <>
+                <div className="text-accent">ALT</div><div>{Math.max(0, altitude).toFixed(0)} m</div>
+                <div className="text-accent">V.SPD</div><div>{vy.toFixed(2)} m/s</div>
+                <div className="text-accent">H.SPD</div><div>{vx.toFixed(2)} m/s</div>
+              </>
+            )}
             <div className="text-accent">TIME</div>
             <div className="flex flex-col">
               <span>{time.toFixed(1)} s</span>
