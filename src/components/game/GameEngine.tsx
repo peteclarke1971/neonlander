@@ -984,6 +984,7 @@ export const GameEngine: React.FC<Props> = ({
     const PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 4;
     // iPhone-optimized particle count: 10 particles for 60fps with impressive effect
     const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : (isIPhone ? 10 : 25);
+    const THRUSTER_SHADOW_BLUR = shouldOptimizePerformance ? 0 : (isIPhone ? 0 : 25); // No shadow on iPhone for 60fps
     const STAR_COUNT = shouldOptimizePerformance ? 150 : 320;
     const SHADOW_BLUR_DESKTOP = 14;
     const SHADOW_BLUR_MOBILE = 6;
@@ -3255,17 +3256,17 @@ export const GameEngine: React.FC<Props> = ({
           const ageRatio = p.life / p.max;
           const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
           
-          // Dramatic shadow blur for thruster particles
-          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? 25 : 2);
+          // Dramatic shadow blur for thruster particles (disabled on iPhone for performance)
+          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? THRUSTER_SHADOW_BLUR : 2);
           ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
           
           ctx.beginPath();
           ctx.globalAlpha = alpha;
           ctx.strokeStyle = p.color as any;
           
-          // Variable line width for thruster particles - thicker when young
+          // Variable line width for thruster particles - thicker on iPhone to compensate for no shadow
           const lineWidth = shouldOptimizePerformance ? 1.8 : 
-            (isThruster ? (1.5 + (1 - ageRatio) * 1.0) : 1.8); // 1.5-2.5px for thrusters
+            (isThruster ? (isIPhone ? 2.5 + (1 - ageRatio) * 1.5 : 1.5 + (1 - ageRatio) * 1.0) : 1.8);
           ctx.lineWidth = lineWidth;
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
