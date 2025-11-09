@@ -987,6 +987,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         
       case 'trophy':
         console.log('🏆 Creating TROPHY pattern');
+        // Random trophy size for variety (small, medium, large)
+        const trophySize = 0.6 + Math.random() * 0.8; // 0.6x to 1.4x size
         const trophySegments = 60;
         
         for (let i = 0; i < trophySegments; i++) {
@@ -997,26 +999,26 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             // Cup bowl (trapezoid top)
             const bowlT = t * 2;
             const angle = Math.PI + bowlT * Math.PI;
-            const radius = 30 + Math.sin(bowlT * Math.PI) * 10;
+            const radius = (30 + Math.sin(bowlT * Math.PI) * 10) * trophySize;
             x = Math.cos(angle) * radius;
-            y = -40 + Math.sin(angle) * 25;
+            y = (-40 + Math.sin(angle) * 25) * trophySize;
           } else if (t < 0.7) {
             // Thin stem
             const stemT = (t - 0.5) / 0.2;
-            x = (Math.random() - 0.5) * 6;
-            y = -15 + stemT * 30;
+            x = (Math.random() - 0.5) * 6 * trophySize;
+            y = (-15 + stemT * 30) * trophySize;
           } else {
             // Wide base
             const baseT = (t - 0.7) / 0.3;
-            x = -25 + baseT * 50;
-            y = 15;
+            x = (-25 + baseT * 50) * trophySize;
+            y = 15 * trophySize;
           }
           
           newParticles.push(createParticle(x * 0.08, y * 0.08, {
             shape: 'circle',
             color: '#FFD700',
-            size: 4,
-            glowSize: 10,
+            size: 4 * trophySize,
+            glowSize: 10 * trophySize,
             gravity: true,
             life: 180,
             max: 180,
@@ -1024,18 +1026,19 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           }));
         }
         
-        // Add extra gold confetti around trophy
-        for (let i = 0; i < 30; i++) {
+        // Add extra gold confetti around trophy (scaled by size)
+        const confettiCount = Math.floor(30 * trophySize);
+        for (let i = 0; i < confettiCount; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 3 + Math.random() * 4;
+          const speed = (3 + Math.random() * 4) * trophySize;
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
           
           newParticles.push(createParticle(vx, vy, {
             shape: 'star',
             color: '#FFD700',
-            size: 3 + Math.random() * 2,
-            glowSize: 8,
+            size: (3 + Math.random() * 2) * trophySize,
+            glowSize: 8 * trophySize,
             gravity: true,
             life: 150,
             max: 150
@@ -1122,29 +1125,37 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return newParticles;
   }, []);
 
-  // Helper function to add seasonal patterns
-  const getSeasonalPatterns = useCallback((basePatterns: string[], forceSeason: 'halloween' | 'christmas' | null = null, forceHighScore: boolean = false) => {
+  // Helper function to add seasonal patterns - returns EXCLUSIVE patterns for seasonal modes
+  const getSeasonalPatterns = useCallback((
+    basePatterns: string[], 
+    landingType: 'normal' | '2x' | 'moving',
+    forceSeason: 'halloween' | 'christmas' | null = null, 
+    forceHighScore: boolean = false
+  ) => {
+    // PRIORITY 1: If high score, return ONLY trophy (regardless of season)
+    if (isHighScore || forceHighScore) {
+      return ['trophy'];
+    }
+    
     const now = new Date();
     const month = now.getMonth(); // 0 = January, 9 = October, 11 = December
     
-    let seasonalPatterns = [...basePatterns];
-    
-    // October - Halloween (or forced)
+    // PRIORITY 2: If Halloween (October or forced) - EXCLUSIVE patterns
     if (month === 9 || forceSeason === 'halloween') {
-      seasonalPatterns.push('pumpkin', 'bat');
+      if (landingType === 'normal') return ['bat'];
+      if (landingType === '2x') return ['pumpkin'];
+      if (landingType === 'moving') return ['bat', 'pumpkin'];
     }
     
-    // December - Christmas (or forced)
+    // PRIORITY 3: If Christmas (December or forced) - EXCLUSIVE patterns
     if (month === 11 || forceSeason === 'christmas') {
-      seasonalPatterns.push('snowflake', 'present', 'stocking');
+      if (landingType === 'normal') return ['snowflake'];
+      if (landingType === '2x') return ['present'];
+      if (landingType === 'moving') return ['stocking'];
     }
     
-    // High score achievement
-    if (isHighScore || forceHighScore) {
-      seasonalPatterns.push('trophy');
-    }
-    
-    return seasonalPatterns;
+    // Not seasonal - return base patterns
+    return basePatterns;
   }, [isHighScore]);
 
   // Spectacular fireworks launch sequence
@@ -1166,7 +1177,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     // PRIORITY 1: Check for special landing types first (retro-burst, ghost-beaten)
     if (effectiveLandingType === 'retro-burst') {
       launchCount = 12;
-      patterns = getSeasonalPatterns(['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'], forceSeason, forceHighScore);
+      patterns = getSeasonalPatterns(['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'], 'normal', forceSeason, forceHighScore);
       timing = 250;
     } else if (effectiveLandingType === 'ghost-beaten') {
       launchCount = 4;
@@ -1175,24 +1186,24 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     } else if (fireworkCount !== undefined && !overrideLandingType) {
       // PRIORITY 2: Use fireworkCount for survival mode (regular landings)
       launchCount = fireworkCount;
-      patterns = getSeasonalPatterns(['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'], forceSeason, forceHighScore);
+      patterns = getSeasonalPatterns(['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'], 'normal', forceSeason, forceHighScore);
       timing = 300;
     } else {
       // PRIORITY 3: Use landingType for main game mode
       switch (effectiveLandingType) {
         case '2x':
           launchCount = 12;
-          patterns = getSeasonalPatterns(['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'], forceSeason, forceHighScore);
+          patterns = getSeasonalPatterns(['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'], '2x', forceSeason, forceHighScore);
           timing = 150;
           break;
         case 'moving':
           launchCount = 10;
-          patterns = getSeasonalPatterns(['willow', 'chrysanthemum', 'crossette', 'starburst'], forceSeason, forceHighScore);
+          patterns = getSeasonalPatterns(['willow', 'chrysanthemum', 'crossette', 'starburst'], 'moving', forceSeason, forceHighScore);
           timing = 180;
           break;
         default:
           launchCount = 8;
-          patterns = getSeasonalPatterns(['starburst', 'willow', 'star'], forceSeason, forceHighScore);
+          patterns = getSeasonalPatterns(['starburst', 'willow', 'star'], 'normal', forceSeason, forceHighScore);
           timing = 200;
       }
     }
