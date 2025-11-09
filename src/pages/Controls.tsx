@@ -26,6 +26,14 @@ export default function ControlsSettings() {
       return true;
     }
   });
+  const [showFullHUD, setShowFullHUD] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-full-hud');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -56,6 +64,15 @@ export default function ControlsSettings() {
       // Silently fail if localStorage is unavailable
     }
   }, [largeRotateButtons]);
+
+  // Save full HUD setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-show-full-hud', JSON.stringify(showFullHUD));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [showFullHUD]);
 
   // SEO
   useEffect(() => {
@@ -475,6 +492,16 @@ export default function ControlsSettings() {
               <Switch 
                 checked={largeRotateButtons}
                 onCheckedChange={setLargeRotateButtons}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Full HUD</Label>
+                <div className="text-xs text-muted-foreground">Show altitude, speed, and flight data (ON) or minimal HUD (OFF)</div>
+              </div>
+              <Switch 
+                checked={showFullHUD}
+                onCheckedChange={setShowFullHUD}
               />
             </div>
           </div>

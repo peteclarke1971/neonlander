@@ -25,6 +25,7 @@ interface GameSettings {
   showGhost?: boolean;
   nebulaFxEnabled?: boolean;
   largeRotateButtons?: boolean;
+  showFullHUD?: boolean;
 }
 
 interface Props {
@@ -122,6 +123,15 @@ export const HomeScreen: React.FC<Props> = ({ onStart, highScoresClassic, highSc
     try {
       const saved = localStorage.getItem('ll-large-rotate-buttons');
       return saved ? JSON.parse(saved) : true; // Default ON for easier touch controls
+    } catch {
+      return true;
+    }
+  });
+  
+  const [showFullHUD, setShowFullHUD] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-full-hud');
+      return saved ? JSON.parse(saved) : true; // Default ON
     } catch {
       return true;
     }
@@ -747,7 +757,8 @@ useEffect(() => {
                 lowGraphics,
                 showGhost: false,
                 nebulaFxEnabled,
-                largeRotateButtons
+                largeRotateButtons,
+                showFullHUD
               });
             }}
           >
@@ -770,7 +781,8 @@ useEffect(() => {
                     lowGraphics,
                     showGhost,
                     nebulaFxEnabled,
-                    largeRotateButtons
+                    largeRotateButtons,
+                    showFullHUD
                   })}>
                   Start
                 </Button>
@@ -790,7 +802,8 @@ useEffect(() => {
                         lowGraphics,
                         showGhost,
                         nebulaFxEnabled,
-                        largeRotateButtons
+                        largeRotateButtons,
+                        showFullHUD
                       })}
                     >
                       {L}
@@ -827,7 +840,8 @@ useEffect(() => {
                       lowGraphics,
                       showGhost: false,
                       nebulaFxEnabled,
-                      largeRotateButtons
+                      largeRotateButtons,
+                      showFullHUD
                     })}
                   >
                     {L}

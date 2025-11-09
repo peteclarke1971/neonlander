@@ -68,6 +68,7 @@ interface Props {
   spawnOverride?: { x: number; y: number };
   nebulaFxEnabled?: boolean;
   largeRotateButtons?: boolean;
+  showFullHUD?: boolean;
 }
 
 const WORLD_WIDTH = 4000;
@@ -99,7 +100,8 @@ export const GameEngine: React.FC<Props> = ({
   onContinueLevel,
   spawnOverride,
   nebulaFxEnabled = true,
-  largeRotateButtons = true
+  largeRotateButtons = true,
+  showFullHUD = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -3578,7 +3580,7 @@ export const GameEngine: React.FC<Props> = ({
         />
       )}
 
-      <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} mode={mode} />
+      <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} mode={mode} showFullHUD={showFullHUD} />
 
       <div className="pointer-events-none absolute bottom-2 right-3 z-40">
         <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
@@ -3592,7 +3594,7 @@ export const GameEngine: React.FC<Props> = ({
           <div className="flex gap-2">
             <Button 
               variant="neon" 
-              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-6 min-w-[80px]' : ''}`}
+              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center' : ''}`}
               onMouseDown={() => (keys.current.left = true)} 
               onMouseUp={() => (keys.current.left = false)} 
               onMouseLeave={() => (keys.current.left = false)}
@@ -3604,7 +3606,7 @@ export const GameEngine: React.FC<Props> = ({
             </Button>
             <Button 
               variant="neon" 
-              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-6 min-w-[80px]' : ''}`}
+              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center' : ''}`}
               onMouseDown={() => (keys.current.right = true)} 
               onMouseUp={() => (keys.current.right = false)} 
               onMouseLeave={() => (keys.current.right = false)}
@@ -3613,19 +3615,6 @@ export const GameEngine: React.FC<Props> = ({
               onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
             >
               <span className="select-none">{largeRotateButtons ? '►' : 'Rotate ►'}</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="select-none min-w-0 px-2"
-              onMouseDown={() => (keys.current.rotateBoost = true)} 
-              onMouseUp={() => (keys.current.rotateBoost = false)} 
-              onMouseLeave={() => (keys.current.rotateBoost = false)}
-              onTouchStart={(e) => { e.preventDefault(); keys.current.rotateBoost = true; }} 
-              onTouchEnd={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
-              onTouchCancel={(e) => { e.preventDefault(); keys.current.rotateBoost = false; }}
-            >
-              <span className="select-none text-xs">2× ROT</span>
             </Button>
             <Button 
               variant="destructive" 

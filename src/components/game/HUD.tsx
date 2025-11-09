@@ -8,9 +8,10 @@ interface Props extends HUDSnapshot {
   bestTime?: number | null;
   ghostTimeDiff?: number;
   mode?: Mode;
+  showFullHUD?: boolean;
 }
 
-export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive, timeTrialLevel, mode }) => {
+export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, time, difficulty, rotateBoostActive, collectibles, bestTime, ghostTimeDiff, timeTrialTarget, timeTrialTotalPads, timeTrialRaceTime, timeTrialRaceActive, timeTrialLevel, mode, showFullHUD = true }) => {
   const [localRecord, setLocalRecord] = useState<{ time: number; initials: string } | null>(null);
   const [globalRecord, setGlobalRecord] = useState<{ time: number; initials: string } | null>(null);
   
@@ -56,8 +57,8 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
   // Detect iPhone
   const isIPhone = /iPhone/.test(navigator.userAgent);
   
-  // Determine if HUD should be simplified (iPhone + Classic/Fixed mode only)
-  const simplifyHUD = isIPhone && (mode === "classic" || mode === "fixed");
+  // Determine if HUD should be simplified - respect user setting first, then iPhone + Classic/Fixed mode
+  const simplifyHUD = !showFullHUD || (isIPhone && (mode === "classic" || mode === "fixed"));
   
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
