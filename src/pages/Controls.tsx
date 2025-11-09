@@ -18,6 +18,14 @@ export default function ControlsSettings() {
   const [listening, setListening] = useState<{ field: keyof typeof profile.map | null; type: "button" | "axis" | null }>({ field: null, type: null });
   const [cursorConfig, setCursorConfig] = useState<CursorConfig>(loadCursorConfig);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [largeRotateButtons, setLargeRotateButtons] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-large-rotate-buttons');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -39,6 +47,15 @@ export default function ControlsSettings() {
   useEffect(() => {
     saveCursorConfig(cursorConfig);
   }, [cursorConfig]);
+
+  // Save large rotate buttons setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-large-rotate-buttons', JSON.stringify(largeRotateButtons));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [largeRotateButtons]);
 
   // SEO
   useEffect(() => {
@@ -449,6 +466,16 @@ export default function ControlsSettings() {
                 <option value="default">Default</option>
                 <option value="more">More</option>
               </select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Large Buttons</Label>
+                <div className="text-xs text-muted-foreground">Simplified rotate buttons for touch controls (◄ ►)</div>
+              </div>
+              <Switch 
+                checked={largeRotateButtons}
+                onCheckedChange={setLargeRotateButtons}
+              />
             </div>
           </div>
         </div>
