@@ -3264,9 +3264,9 @@ export const GameEngine: React.FC<Props> = ({
           ctx.globalAlpha = alpha;
           ctx.strokeStyle = p.color as any;
           
-          // Variable line width for thruster particles - thicker on iPhone to compensate for no shadow
+          // Variable line width for thruster particles - slightly thicker on iPhone to compensate for no shadow
           const lineWidth = shouldOptimizePerformance ? 1.8 : 
-            (isThruster ? (isIPhone ? 2.5 + (1 - ageRatio) * 1.5 : 1.5 + (1 - ageRatio) * 1.0) : 1.8);
+            (isThruster ? (isIPhone ? 1.8 + (1 - ageRatio) * 1.0 : 1.5 + (1 - ageRatio) * 1.0) : 1.8);
           ctx.lineWidth = lineWidth;
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
