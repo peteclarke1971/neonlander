@@ -190,6 +190,7 @@ export const GameEngine: React.FC<Props> = ({
   
   // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isIPhone = /iPhone/i.test(navigator.userAgent);
   const shouldOptimizePerformance = lowGraphics;
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
@@ -981,7 +982,8 @@ export const GameEngine: React.FC<Props> = ({
     
     // Performance optimization constants
     const PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 4;
-    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 25; // Dramatically enhanced thruster particles for high graphics
+    // iPhone-optimized particle count: 10 particles for 60fps with impressive effect
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : (isIPhone ? 10 : 25);
     const STAR_COUNT = shouldOptimizePerformance ? 150 : 320;
     const SHADOW_BLUR_DESKTOP = 14;
     const SHADOW_BLUR_MOBILE = 6;
