@@ -38,6 +38,7 @@ interface FireworksDisplayProps {
   isWorldRecord?: boolean;
   isHighScore?: boolean;
   debugCycleTrigger?: number; // Trigger for debug cycling on home screen
+  forceSeason?: 'halloween' | 'christmas' | null; // Force specific seasonal theme
 }
 
 // Object pool for particle reuse
@@ -70,7 +71,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   lowGraphics = false,
   isWorldRecord = false,
   isHighScore = false,
-  debugCycleTrigger
+  debugCycleTrigger,
+  forceSeason
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1414,9 +1416,9 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Launch fireworks after delay
   useEffect(() => {
-    const timer = setTimeout(launchFireworks, 300); // Reduced delay
+    const timer = setTimeout(() => launchFireworks(null, forceSeason || null, isHighScore), 300); // Use props
     return () => clearTimeout(timer);
-  }, [launchFireworks]);
+  }, [launchFireworks, forceSeason, isHighScore]);
 
   // Auto-complete after extended time for spectacular show
   useEffect(() => {
@@ -1492,23 +1494,19 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       setParticles([]);
       hasLaunched.current = false;
       
-      // Get current cycle config
-      const config = debugCycleOrder.current[debugCycleIndex];
-      console.log(`🎆 External Trigger Fireworks: ${config.label}`);
+      // Use props directly instead of internal cycle state
+      console.log(`🎆 External Trigger Fireworks: ${landingType} ${forceSeason ? `(${forceSeason})` : ''} ${isHighScore ? '(high score)' : ''}`);
       
-      // Launch fireworks with override parameters
+      // Launch fireworks with props
       setTimeout(() => {
         launchFireworks(
-          config.type as any,
-          config.season as any,
-          config.highScore
+          landingType as any,
+          forceSeason || null,
+          isHighScore
         );
       }, 100);
-      
-      // Advance to next cycle
-      setDebugCycleIndex((prev) => (prev + 1) % debugCycleOrder.current.length);
     }
-  }, [debugCycleTrigger]);
+  }, [debugCycleTrigger, landingType, forceSeason, isHighScore, launchFireworks]);
 
   // Touch screen input for skipping
   useEffect(() => {

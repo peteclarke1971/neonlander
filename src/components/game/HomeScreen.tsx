@@ -467,6 +467,7 @@ useEffect(() => {
           <FireworksDisplay
             landingType={fireworksConfig.type}
             isHighScore={fireworksConfig.highScore}
+            forceSeason={fireworksConfig.season}
             neonColor="hsl(var(--neon))"
             onComplete={() => setFireworksConfig(prev => ({ ...prev, show: false }))}
             onSkip={() => setFireworksConfig(prev => ({ ...prev, show: false }))}
