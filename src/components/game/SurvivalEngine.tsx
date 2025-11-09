@@ -60,6 +60,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [landings, setLandings] = useState(0);
   const [score, setScore] = useState(0);
   const [time, setTime] = useState(0);
+  const [isHighScore, setIsHighScore] = useState(false);
   
   // Color zone state
   const [currentPalette, setCurrentPalette] = useState<ColorPalette>(DEFAULT_PALETTE);
@@ -1761,6 +1762,20 @@ export const SurvivalEngine: React.FC<Props> = ({
                   setScore(currentScore);
                   setLandings(currentLandings);
                   
+                  // Check if this is a high score
+                  try {
+                    const savedScores = localStorage.getItem("survival-mode-high-scores");
+                    if (savedScores) {
+                      const highScores = JSON.parse(savedScores);
+                      const isHigh = highScores.length < 5 || currentScore > highScores[4].score;
+                      setIsHighScore(isHigh);
+                    } else {
+                      setIsHighScore(true); // First score is always high
+                    }
+                  } catch {
+                    setIsHighScore(false);
+                  }
+                  
                   // Trigger fireworks based on landing count
                   const isMoving = !!movingPad;
                   const isBonus = landingPad.bonus2x;
@@ -3316,6 +3331,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           landingType={landingType}
           neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
           fireworkCount={landings}
+          isHighScore={isHighScore}
           onComplete={() => setShowFireworks(false)}
           onSkip={() => setShowFireworks(false)}
           lowGraphics={lowGraphics}

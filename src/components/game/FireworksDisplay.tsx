@@ -13,7 +13,7 @@ interface FireworkParticle {
   color: string;
   secondaryColor?: string;
   type: 'launch' | 'burst' | 'glitter' | 'crackle' | 'comet' | 'secondary';
-  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak' | 'ghost' | 'pentagon' | 'triangle' | 'line' | 'hexagon' | 'ship';
+  shape: 'circle' | 'star' | 'diamond' | 'heart' | 'cross' | 'streak' | 'ghost' | 'pentagon' | 'triangle' | 'line' | 'hexagon' | 'ship' | 'bat' | 'pumpkin' | 'snowflake' | 'present' | 'stocking' | 'trophy';
   size: number;
   gravity: boolean;
   rotation: number;
@@ -36,6 +36,7 @@ interface FireworksDisplayProps {
   fireworkCount?: number;
   lowGraphics?: boolean;
   isWorldRecord?: boolean;
+  isHighScore?: boolean;
 }
 
 // Object pool for particle reuse
@@ -66,7 +67,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   onSkip,
   fireworkCount,
   lowGraphics = false,
-  isWorldRecord = false
+  isWorldRecord = false,
+  isHighScore = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -77,6 +79,21 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   const performanceManager = useRef(new PerformanceManager());
   const [performanceStats, setPerformanceStats] = useState({ fps: 60, quality: 'high' });
   const lastFrameTime = useRef(0);
+  
+  // Debug cycling state for F key
+  const [debugCycleIndex, setDebugCycleIndex] = useState(0);
+  const debugCycleOrder = useRef([
+    { type: 'regular', season: null, highScore: false, label: 'Regular' },
+    { type: '2x', season: null, highScore: false, label: '2x Pad' },
+    { type: 'moving', season: null, highScore: false, label: 'Moving Pad' },
+    { type: 'regular', season: null, highScore: true, label: 'High Score' },
+    { type: 'regular', season: 'halloween', highScore: false, label: 'Halloween Regular' },
+    { type: '2x', season: 'halloween', highScore: false, label: 'Halloween 2x' },
+    { type: 'moving', season: 'halloween', highScore: false, label: 'Halloween Moving' },
+    { type: 'regular', season: 'christmas', highScore: false, label: 'Christmas Regular' },
+    { type: '2x', season: 'christmas', highScore: false, label: 'Christmas 2x' },
+    { type: 'moving', season: 'christmas', highScore: false, label: 'Christmas Moving' }
+  ]);
 
   // Performance-based quality settings
   const qualitySettings = useMemo(() => {
@@ -714,6 +731,288 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         }, 1000);
         break;
         
+      case 'pumpkin':
+        console.log('🎃 Creating PUMPKIN pattern with ridges');
+        const pumpkinSegments = 50;
+        const pumpkinRadius = 60;
+        
+        for (let i = 0; i < pumpkinSegments; i++) {
+          const t = (i / pumpkinSegments) * Math.PI * 2;
+          // Pumpkin body with 5 vertical ridges
+          const ridges = 5;
+          const ridgeDepth = 0.15;
+          const radius = pumpkinRadius * (1 - ridgeDepth * Math.abs(Math.sin(t * ridges)));
+          
+          const pumpkinX = Math.cos(t) * radius * 0.9; // Slightly wider
+          const pumpkinY = Math.sin(t) * radius * 1.1; // Slightly taller
+          
+          // Add stem particles at top
+          const isStem = pumpkinY < -pumpkinRadius * 0.8 && Math.abs(pumpkinX) < 10;
+          
+          newParticles.push(createParticle(pumpkinX * 0.08, pumpkinY * 0.08, {
+            shape: 'circle',
+            color: isStem ? '#8B4513' : '#FF8C00',
+            size: isStem ? 3 : 4,
+            glowSize: isStem ? 4 : 8,
+            gravity: true,
+            life: 150,
+            max: 150
+          }));
+        }
+        break;
+        
+      case 'bat':
+        console.log('🦇 Creating BAT pattern with wings');
+        const batSegments = 60;
+        const batScale = 50;
+        
+        for (let i = 0; i < batSegments; i++) {
+          const t = (i / batSegments) * Math.PI * 2;
+          let batX, batY;
+          
+          // Body and head (center)
+          if (Math.abs(Math.cos(t)) < 0.2) {
+            batX = Math.cos(t) * 10;
+            batY = Math.sin(t) * 15;
+          } else {
+            // Wings (swept curves on sides)
+            const side = Math.cos(t) > 0 ? 1 : -1;
+            const wingT = Math.abs(Math.sin(t));
+            batX = side * (20 + wingT * 60);
+            batY = Math.sin(t) * 30 - wingT * 20; // Wing curves
+          }
+          
+          newParticles.push(createParticle(batX * 0.08, batY * 0.08, {
+            shape: 'circle',
+            color: i % 3 === 0 ? '#2C1810' : '#1A0F08',
+            size: 3,
+            glowSize: 5,
+            gravity: true,
+            life: 140,
+            max: 140
+          }));
+        }
+        break;
+        
+      case 'snowflake':
+        console.log('❄️ Creating SNOWFLAKE pattern');
+        const branches = 6;
+        const branchLength = 60;
+        const sideBranchCount = 3;
+        
+        // Main branches
+        for (let branch = 0; branch < branches; branch++) {
+          const angle = (branch / branches) * Math.PI * 2;
+          const branchSegments = 15;
+          
+          for (let i = 0; i < branchSegments; i++) {
+            const t = i / branchSegments;
+            const x = Math.cos(angle) * branchLength * t;
+            const y = Math.sin(angle) * branchLength * t;
+            
+            newParticles.push(createParticle(x * 0.08, y * 0.08, {
+              shape: 'circle',
+              color: '#E0F7FF',
+              size: 3,
+              glowSize: 6,
+              gravity: false, // Snowflakes float
+              life: 200,
+              max: 200
+            }));
+            
+            // Side branches at 40% and 60% along main branch
+            if (t > 0.35 && t < 0.45 || t > 0.55 && t < 0.65) {
+              const sideAngle1 = angle + Math.PI / 4;
+              const sideAngle2 = angle - Math.PI / 4;
+              const sideLength = branchLength * 0.3;
+              
+              const sx1 = x + Math.cos(sideAngle1) * sideLength * 0.5;
+              const sy1 = y + Math.sin(sideAngle1) * sideLength * 0.5;
+              const sx2 = x + Math.cos(sideAngle2) * sideLength * 0.5;
+              const sy2 = y + Math.sin(sideAngle2) * sideLength * 0.5;
+              
+              newParticles.push(createParticle(sx1 * 0.08, sy1 * 0.08, {
+                shape: 'circle',
+                color: '#E0F7FF',
+                size: 2,
+                glowSize: 4,
+                gravity: false,
+                life: 200,
+                max: 200
+              }));
+              
+              newParticles.push(createParticle(sx2 * 0.08, sy2 * 0.08, {
+                shape: 'circle',
+                color: '#E0F7FF',
+                size: 2,
+                glowSize: 4,
+                gravity: false,
+                life: 200,
+                max: 200
+              }));
+            }
+          }
+        }
+        break;
+        
+      case 'present':
+        console.log('🎁 Creating PRESENT pattern');
+        const boxWidth = 50;
+        const boxHeight = 60;
+        const ribbonWidth = 8;
+        
+        // Box outline (rectangular)
+        const boxSegments = 40;
+        for (let i = 0; i < boxSegments; i++) {
+          const t = i / boxSegments;
+          let x, y;
+          
+          if (t < 0.25) {
+            // Top edge
+            x = -boxWidth + (t * 4) * boxWidth * 2;
+            y = -boxHeight;
+          } else if (t < 0.5) {
+            // Right edge
+            x = boxWidth;
+            y = -boxHeight + ((t - 0.25) * 4) * boxHeight * 2;
+          } else if (t < 0.75) {
+            // Bottom edge
+            x = boxWidth - ((t - 0.5) * 4) * boxWidth * 2;
+            y = boxHeight;
+          } else {
+            // Left edge
+            x = -boxWidth;
+            y = boxHeight - ((t - 0.75) * 4) * boxHeight * 2;
+          }
+          
+          // Color: ribbon or box
+          const isRibbon = Math.abs(x) < ribbonWidth || Math.abs(y) < ribbonWidth;
+          
+          newParticles.push(createParticle(x * 0.08, y * 0.08, {
+            shape: 'circle',
+            color: isRibbon ? '#FFD700' : '#DC143C',
+            size: isRibbon ? 4 : 3,
+            glowSize: isRibbon ? 8 : 5,
+            gravity: true,
+            life: 150,
+            max: 150
+          }));
+        }
+        
+        // Bow on top
+        const bowSegments = 20;
+        for (let i = 0; i < bowSegments; i++) {
+          const t = (i / bowSegments) * Math.PI * 2;
+          const bowX = Math.cos(t) * 15;
+          const bowY = -boxHeight - 15 + Math.sin(t) * 10;
+          
+          newParticles.push(createParticle(bowX * 0.08, bowY * 0.08, {
+            shape: 'circle',
+            color: '#FFD700',
+            size: 4,
+            glowSize: 8,
+            gravity: true,
+            life: 150,
+            max: 150
+          }));
+        }
+        break;
+        
+      case 'stocking':
+        console.log('🧦 Creating STOCKING pattern');
+        const stockingSegments = 50;
+        
+        for (let i = 0; i < stockingSegments; i++) {
+          const t = i / stockingSegments;
+          let x, y;
+          
+          if (t < 0.2) {
+            // Cuff (top horizontal part)
+            x = -20 + t * 5 * 40;
+            y = -50;
+          } else if (t < 0.6) {
+            // Vertical leg
+            x = -20 + (t - 0.2) * 40;
+            y = -50 + ((t - 0.2) / 0.4) * 80;
+          } else {
+            // Horizontal foot
+            x = ((t - 0.6) / 0.4) * 50;
+            y = 30;
+          }
+          
+          // Color zones: white cuff, red/green body
+          const color = t < 0.2 ? '#FFFFFF' : t < 0.4 ? '#DC143C' : '#228B22';
+          
+          newParticles.push(createParticle(x * 0.08, y * 0.08, {
+            shape: 'circle',
+            color,
+            size: 4,
+            glowSize: 6,
+            gravity: true,
+            life: 160,
+            max: 160
+          }));
+        }
+        break;
+        
+      case 'trophy':
+        console.log('🏆 Creating TROPHY pattern');
+        const trophySegments = 60;
+        
+        for (let i = 0; i < trophySegments; i++) {
+          const t = i / trophySegments;
+          let x, y;
+          
+          if (t < 0.5) {
+            // Cup bowl (trapezoid top)
+            const bowlT = t * 2;
+            const angle = Math.PI + bowlT * Math.PI;
+            const radius = 30 + Math.sin(bowlT * Math.PI) * 10;
+            x = Math.cos(angle) * radius;
+            y = -40 + Math.sin(angle) * 25;
+          } else if (t < 0.7) {
+            // Thin stem
+            const stemT = (t - 0.5) / 0.2;
+            x = (Math.random() - 0.5) * 6;
+            y = -15 + stemT * 30;
+          } else {
+            // Wide base
+            const baseT = (t - 0.7) / 0.3;
+            x = -25 + baseT * 50;
+            y = 15;
+          }
+          
+          newParticles.push(createParticle(x * 0.08, y * 0.08, {
+            shape: 'circle',
+            color: '#FFD700',
+            size: 4,
+            glowSize: 10,
+            gravity: true,
+            life: 180,
+            max: 180,
+            secondaryColor: '#FFA500'
+          }));
+        }
+        
+        // Add extra gold confetti around trophy
+        for (let i = 0; i < 30; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 4;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'star',
+            color: '#FFD700',
+            size: 3 + Math.random() * 2,
+            glowSize: 8,
+            gravity: true,
+            life: 150,
+            max: 150
+          }));
+        }
+        break;
+        
       default: // Enhanced starburst
         console.log('💫 Creating STARBURST pattern - classic burst');
         for (let i = 0; i < baseCount; i++) {
@@ -793,47 +1092,77 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return newParticles;
   }, []);
 
+  // Helper function to add seasonal patterns
+  const getSeasonalPatterns = useCallback((basePatterns: string[], forceSeason: 'halloween' | 'christmas' | null = null, forceHighScore: boolean = false) => {
+    const now = new Date();
+    const month = now.getMonth(); // 0 = January, 9 = October, 11 = December
+    
+    let seasonalPatterns = [...basePatterns];
+    
+    // October - Halloween (or forced)
+    if (month === 9 || forceSeason === 'halloween') {
+      seasonalPatterns.push('pumpkin', 'bat');
+    }
+    
+    // December - Christmas (or forced)
+    if (month === 11 || forceSeason === 'christmas') {
+      seasonalPatterns.push('snowflake', 'present', 'stocking');
+    }
+    
+    // High score achievement
+    if (isHighScore || forceHighScore) {
+      seasonalPatterns.push('trophy');
+    }
+    
+    return seasonalPatterns;
+  }, [isHighScore]);
+
   // Spectacular fireworks launch sequence
-  const launchFireworks = useCallback(() => {
+  const launchFireworks = useCallback((
+    overrideLandingType: string | null = null,
+    forceSeason: 'halloween' | 'christmas' | null = null,
+    forceHighScore: boolean = false
+  ) => {
     if (hasLaunched.current || !canvasRef.current) return;
     hasLaunched.current = true;
 
     const canvas = canvasRef.current;
     const colors = getColors();
+    const effectiveLandingType = overrideLandingType || landingType;
     
     // Different show types based on landing
     let launchCount: number, patterns: string[], timing: number;
     
     // PRIORITY 1: Check for special landing types first (retro-burst, ghost-beaten)
-    if (landingType === 'retro-burst') {
+    if (effectiveLandingType === 'retro-burst') {
       launchCount = 12;
-      patterns = ['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'];
+      patterns = getSeasonalPatterns(['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'], forceSeason, forceHighScore);
       timing = 250;
-    } else if (landingType === 'ghost-beaten') {
+    } else if (effectiveLandingType === 'ghost-beaten') {
       launchCount = 4;
       patterns = ['giant-ghost', 'giant-ghost', 'giant-ghost', 'giant-ghost'];
       timing = 500;
-    } else if (fireworkCount !== undefined) {
+    } else if (fireworkCount !== undefined && !overrideLandingType) {
       // PRIORITY 2: Use fireworkCount for survival mode (regular landings)
       launchCount = fireworkCount;
-      patterns = ['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'];
+      patterns = getSeasonalPatterns(['starburst', 'spiral', 'heart', 'star', 'willow', 'chrysanthemum', 'crossette', 'double-burst', 'ring', 'palm'], forceSeason, forceHighScore);
       timing = 300;
     } else {
       // PRIORITY 3: Use landingType for main game mode
-      switch (landingType) {
+      switch (effectiveLandingType) {
         case '2x':
           launchCount = 12;
-          patterns = ['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'];
+          patterns = getSeasonalPatterns(['spiral', 'heart', 'star', 'chrysanthemum', 'crossette', 'double-burst'], forceSeason, forceHighScore);
           timing = 150;
           break;
         case 'moving':
           launchCount = 10;
-          patterns = ['willow', 'chrysanthemum', 'crossette', 'starburst'];
+          patterns = getSeasonalPatterns(['willow', 'chrysanthemum', 'crossette', 'starburst'], forceSeason, forceHighScore);
           timing = 180;
           break;
         default:
           launchCount = 8;
-          patterns = ['starburst', 'willow', 'star'];
+          patterns = getSeasonalPatterns(['starburst', 'willow', 'star'], forceSeason, forceHighScore);
           timing = 200;
       }
     }
@@ -1084,6 +1413,36 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     const interval = setInterval(checkGamepad, 100);
     return () => clearInterval(interval);
   }, [onSkip]);
+
+  // F key debug cycling through firework displays
+  useEffect(() => {
+    const handleDebugKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyF') {
+        // Clear existing particles and reset
+        setParticles([]);
+        hasLaunched.current = false;
+        
+        // Get current cycle config
+        const config = debugCycleOrder.current[debugCycleIndex];
+        console.log(`🎆 Debug Fireworks: ${config.label}`);
+        
+        // Launch fireworks with override parameters
+        setTimeout(() => {
+          launchFireworks(
+            config.type as any,
+            config.season as any,
+            config.highScore
+          );
+        }, 100);
+        
+        // Advance to next cycle
+        setDebugCycleIndex((prev) => (prev + 1) % debugCycleOrder.current.length);
+      }
+    };
+
+    window.addEventListener('keydown', handleDebugKey);
+    return () => window.removeEventListener('keydown', handleDebugKey);
+  }, [debugCycleIndex, launchFireworks]);
 
   // Touch screen input for skipping
   useEffect(() => {

@@ -3486,6 +3486,7 @@ export const GameEngine: React.FC<Props> = ({
           landingType={landingType}
           neonColor={neonColor}
           isWorldRecord={isWorldRecord}
+          isHighScore={isWorldRecord}
           lowGraphics={lowGraphics}
         onComplete={async () => {
           setShowFireworks(false);
