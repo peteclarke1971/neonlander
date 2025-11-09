@@ -1110,9 +1110,8 @@ export const GameEngine: React.FC<Props> = ({
     };
     
     // Style points helper functions
-    const spawnStyle360Burst = (px: number, py: number) => {
+    const spawnStyle360Burst = (px: number, py: number, terrainColor: string) => {
       const count = 48; // More particles for dramatic effect!
-      const colors = ['#00ff00', '#ffff00', '#ff8800', '#00ffff'];
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
         const speed = 150 + Math.random() * 100; // 150-250 px/s
@@ -1126,7 +1125,7 @@ export const GameEngine: React.FC<Props> = ({
           life: 1.5,
           maxLife: 1.5,
           size,
-          color: colors[Math.floor(Math.random() * colors.length)]
+          color: terrainColor // Use current terrain neon color
         });
       }
     };
@@ -1482,8 +1481,8 @@ export const GameEngine: React.FC<Props> = ({
         
         if (rotation360Result?.awarded) {
           score += 360;
-          // Spawn 360° particle burst at lander position
-          spawnStyle360Burst(x, y);
+          // Spawn 360° particle burst at lander position using current terrain color
+          spawnStyle360Burst(x, y, neonColor);
           // TODO: Add audio later
         }
         

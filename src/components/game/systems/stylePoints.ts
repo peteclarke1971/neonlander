@@ -19,6 +19,7 @@ export interface StylePointsState {
     startX: number;
     startY: number;
     lastDistance: number;
+    lastAwardTime: number; // Cooldown tracking
   };
   
   // Track near misses this flight
@@ -41,7 +42,8 @@ export function createStylePointsState(): StylePointsState {
       startTime: 0,
       startX: 0,
       startY: 0,
-      lastDistance: 999
+      lastDistance: 999,
+      lastAwardTime: 0 // Initialize cooldown
     },
     nearMissesThisFlight: 0
   };
@@ -188,17 +190,27 @@ export function updateNearMiss(
       
       // Check if maintained for 0.3 seconds (much easier!)
       if (elapsed >= 0.3) {
-        // Award near miss!
-        const awardX = x;
-        const awardY = y + 8; // Position at lander bottom
+        // Check cooldown - must be 1 second since last award
+        const timeSinceLastAward = currentTime - nm.lastAwardTime;
+        const COOLDOWN = 1.0;
         
-        console.log("✅ NEAR MISS AWARDED!");
-        
-        // Reset for next potential near miss
-        nm.active = false;
-        state.nearMissesThisFlight++;
-        
-        return { awarded: true, awardX, awardY };
+        if (timeSinceLastAward >= COOLDOWN) {
+          // Award near miss!
+          const awardX = x;
+          const awardY = y + 8; // Position at lander bottom
+          
+          console.log("✅ NEAR MISS AWARDED!");
+          
+          // Reset for next potential near miss
+          nm.active = false;
+          nm.lastAwardTime = currentTime;
+          state.nearMissesThisFlight++;
+          
+          return { awarded: true, awardX, awardY };
+        } else {
+          console.log("⏱️ Near miss on cooldown. Time remaining:", (COOLDOWN - timeSinceLastAward).toFixed(2));
+          nm.active = false; // Reset but don't award
+        }
       }
     }
   } else {
