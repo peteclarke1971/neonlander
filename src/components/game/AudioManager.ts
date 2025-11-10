@@ -389,18 +389,18 @@ export class AudioManager {
       this.sfxGain.connect(this.master);
     }
     
-    // Always play crash1 for consistent Time Trial landing sound
-    if (!this.crash1Buffer) {
-      this.crash1Buffer = await this.loadBuffer("/audio/crash1.mp3");
+    // Use fuel loop sound for successful landings
+    if (!this.fuelLoopBuffer) {
+      this.fuelLoopBuffer = await this.loadBuffer("/audio/fuel_10_percent_loop.mp3");
     }
     
-    if (this.crash1Buffer) {
+    if (this.fuelLoopBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
       this.landingSoundGain.gain.value = 0.7;
       
       const src = this.ctx.createBufferSource();
-      src.buffer = this.crash1Buffer;
+      src.buffer = this.fuelLoopBuffer;
       src.connect(this.landingSoundGain);
       this.landingSoundGain.connect(this.sfxGain);
       src.start(0);
