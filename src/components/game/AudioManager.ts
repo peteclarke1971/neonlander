@@ -433,13 +433,13 @@ export class AudioManager {
       this.sfxGain.connect(this.master);
     }
     
-    if (this.landingBuffer) {
+    if (this.fuelLoopBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
       this.landingSoundGain.gain.value = 0.9;
       
       const src = this.ctx.createBufferSource();
-      src.buffer = this.landingBuffer;
+      src.buffer = this.fuelLoopBuffer;
       src.connect(this.landingSoundGain);
       this.landingSoundGain.connect(this.sfxGain);
       src.start(0);
