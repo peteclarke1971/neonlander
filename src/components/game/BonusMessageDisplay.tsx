@@ -21,6 +21,7 @@ export const BonusMessageDisplay = ({
   const startTimeRef = useRef<number>(0);
   const messageStartTimeRef = useRef<number>(0);
   const isAnimatingRef = useRef<boolean>(false);
+  const isIPhone = /iPhone/i.test(navigator.userAgent);
 
   // Handle skip request
   useEffect(() => {
@@ -109,6 +110,11 @@ export const BonusMessageDisplay = ({
   const scaleAmt = 0.85 + Math.sin(Math.PI * t) * 0.6;
   const alpha = 1 - Math.abs(2 * t - 1);
 
+  // Adjust sizes for iPhone
+  const textSize = isIPhone ? 'text-2xl' : 'text-5xl';
+  const shadowBlur = isIPhone ? 14 : 28;
+  const strokeWidth = isIPhone ? 1 : 2;
+
   return (
     <div 
       className="fixed inset-0 pointer-events-none flex items-center justify-center z-50"
@@ -118,12 +124,12 @@ export const BonusMessageDisplay = ({
       }}
     >
       <div
-        className="text-center font-black text-5xl"
+        className={`text-center font-black ${textSize}`}
         style={{
           fontFamily: '"Orbitron", sans-serif',
           color: neonColor,
-          textShadow: `0 0 28px ${neonColor}, 0 0 56px ${neonColor}`,
-          WebkitTextStroke: `2px ${neonColor}`,
+          textShadow: `0 0 ${shadowBlur}px ${neonColor}, 0 0 ${shadowBlur * 2}px ${neonColor}`,
+          WebkitTextStroke: `${strokeWidth}px ${neonColor}`,
           paintOrder: 'stroke fill',
         }}
       >
