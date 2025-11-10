@@ -2108,7 +2108,7 @@ export const GameEngine: React.FC<Props> = ({
               // Check for perfect landing (classic and fixed only)
               let perfectLanding = false;
               if (mode === "classic" || mode === "fixed") {
-                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy);
+                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy, bullseye);
                 if (perfectLanding) {
                   earned += Math.floor(1000 * landedPad.scoreMult);
                 }
@@ -2290,7 +2290,7 @@ export const GameEngine: React.FC<Props> = ({
               // Check for perfect landing (classic and fixed only)
               let perfectLanding = false;
               if (mode === "classic" || mode === "fixed") {
-                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy);
+                perfectLanding = checkPerfectLanding(vx, vy, okAngle, okVx, okVy, bullseye);
                 if (perfectLanding) {
                   earned += 1000;
                 }

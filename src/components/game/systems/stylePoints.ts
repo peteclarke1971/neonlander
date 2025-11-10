@@ -225,24 +225,30 @@ export function updateNearMiss(
 }
 
 // Check for perfect landing
-// Returns true if landing qualifies as "perfect" (total velocity <= 0.5 m/s)
+// Returns true if landing qualifies as "perfect" (total velocity <= 0.2 m/s AND bullseye)
 export function checkPerfectLanding(
   vx: number,
   vy: number,
   okAngle: boolean,
   okVx: boolean,
-  okVy: boolean
+  okVy: boolean,
+  bullseye: boolean
 ): boolean {
   // Must pass basic landing checks
   if (!okAngle || !okVx || !okVy) {
     return false;
   }
   
+  // Must be a bullseye landing (centered on pad)
+  if (!bullseye) {
+    return false;
+  }
+  
   // Calculate total velocity
   const totalVelocity = Math.sqrt(vx * vx + vy * vy);
   
-  // Perfect landing threshold: <= 0.5 m/s
-  return totalVelocity <= 0.5;
+  // Perfect landing threshold: <= 0.2 m/s (feather light touchdown)
+  return totalVelocity <= 0.2;
 }
 
 // Reset state for new flight
