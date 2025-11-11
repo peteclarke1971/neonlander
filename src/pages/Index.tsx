@@ -474,6 +474,7 @@ const retryGame = () => {
     // Update carry/successCount to reflect the next level
     setCarry({ score: 0, landings: 0, level: nextLevel });
     setSuccessCount(nextLevel);
+    setSeedOverride(null); // Clear seed override so next level uses its configured seed
     // Update neon color for next level
     const colors = [
       "330 100% 60%", "50 100% 60%", "140 100% 55%",
