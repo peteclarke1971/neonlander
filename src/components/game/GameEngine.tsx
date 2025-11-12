@@ -151,7 +151,9 @@ export const GameEngine: React.FC<Props> = ({
   // Animation frame ref for proper cleanup
   const rafRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(true);
-  const frameMarkerRef = useRef(0); // Used for layer invalidation timing
+  
+  // Anti-throttling frame marker counter (bypasses Chromium's frame rate throttling)
+  const frameMarkerRef = useRef(0);
   
   // Landing bonus tracking state
   const [lastLandingBonuses, setLastLandingBonuses] = useState<{
@@ -418,10 +420,7 @@ export const GameEngine: React.FC<Props> = ({
   // Setup off-screen canvas for special level effects
   useEffect(() => {
     offscreenTerrainCanvasRef.current = document.createElement('canvas');
-    offscreenTerrainCtxRef.current = offscreenTerrainCanvasRef.current.getContext('2d', {
-      willReadFrequently: false, // We composite but don't read
-      alpha: true  // Need alpha for compositing effects
-    });
+    offscreenTerrainCtxRef.current = offscreenTerrainCanvasRef.current.getContext('2d');
     return () => {
       offscreenTerrainCanvasRef.current = null;
       offscreenTerrainCtxRef.current = null;
@@ -487,11 +486,7 @@ export const GameEngine: React.FC<Props> = ({
     
     const initializeGame = async () => {
       const c = canvasRef.current!;
-      const ctx = c.getContext("2d", { 
-        alpha: false,           // Enable GPU fast-path
-        desynchronized: true,   // Reduce compositor sync overhead
-        willReadFrequently: false // We don't read pixels frequently in main canvas
-      })!;
+      const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
     const neonColor = `hsl(${styles.getPropertyValue('--neon')})`;
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
@@ -2625,27 +2620,17 @@ export const GameEngine: React.FC<Props> = ({
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, w, h);
 
-      // Animated corner markers (imperceptible to users but detectable by browser)
+      // Anti-throttling marker: imperceptible pixel that changes each frame
+      // Prevents Chromium's frame rate throttling intervention (4-frame detection)
       frameMarkerRef.current = (frameMarkerRef.current + 1) % 1000;
-      const markerTime = performance.now() * 0.001;
-      const pulse = 0.5 + 0.5 * Math.sin(markerTime * 3);
-      const pulse2 = 0.5 + 0.5 * Math.cos(markerTime * 5);
-
       ctx.save();
-      ctx.globalAlpha = 0.05; // Very subtle but visible to compositor
-      ctx.fillStyle = `rgba(${Math.floor(pulse * 255)}, ${Math.floor(pulse2 * 255)}, 200, 0.5)`;
-      ctx.fillRect(0, 0, 2, 2); // Top-left
-      ctx.fillRect(w - 2, 0, 2, 2); // Top-right
-      ctx.fillRect(0, h - 2, 2, 2); // Bottom-left
-      ctx.fillRect(w - 2, h - 2, 2, 2); // Bottom-right
+      ctx.globalAlpha = 0.003; // Nearly invisible (0.3% opacity)
+      ctx.fillStyle = frameMarkerRef.current % 2 === 0 ? '#FFFFFF' : '#FEFEFE';
+      ctx.fillRect(w - 1, h - 1, 1, 1); // Single pixel in bottom-right corner
       ctx.restore();
 
-      // Micro camera jitter (imperceptible but ensures continuous pixel changes)
-      const microJitter = 0.02;
-      const jitterX = Math.sin(elapsed * 157.3) * microJitter;
-      const jitterY = Math.cos(elapsed * 213.7) * microJitter;
-      const shakeX = (Math.random() - 0.5) * cameraShake + jitterX;
-      const shakeY = (Math.random() - 0.5) * cameraShake + jitterY;
+      const shakeX = (Math.random() - 0.5) * cameraShake;
+      const shakeY = (Math.random() - 0.5) * cameraShake;
 
       ctx.translate(w / 2 + shakeX, h / 2 + shakeY);
       ctx.scale(zoom * dpr, zoom * dpr);
@@ -3507,10 +3492,7 @@ export const GameEngine: React.FC<Props> = ({
       const starLimit = shouldOptimizePerformance ? Math.min(100, stars.length) : stars.length;
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
-        // Enhanced twinkling (ensures continuous visible pixel changes)
-        const twinkleSpeed = s.tw * 2.5; // 2.5x faster twinkling
-        const twinkleAmp = 0.6; // Larger amplitude (was 0.3)
-        const a = s.baseA * (0.4 + twinkleAmp * Math.sin(s.ph + elapsed * twinkleSpeed));
+        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
         const x = (s.x % wpx + wpx) % wpx;
         const y = Math.max(0, Math.min(hpx, s.y));
