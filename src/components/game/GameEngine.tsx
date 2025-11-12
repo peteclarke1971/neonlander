@@ -152,6 +152,9 @@ export const GameEngine: React.FC<Props> = ({
   const rafRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(true);
   
+  // Anti-throttling frame marker counter (bypasses Chromium's frame rate throttling)
+  const frameMarkerRef = useRef(0);
+  
   // Landing bonus tracking state
   const [lastLandingBonuses, setLastLandingBonuses] = useState<{
     bullseye: boolean;
@@ -2616,6 +2619,15 @@ export const GameEngine: React.FC<Props> = ({
 
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, w, h);
+
+      // Anti-throttling marker: imperceptible pixel that changes each frame
+      // Prevents Chromium's frame rate throttling intervention (4-frame detection)
+      frameMarkerRef.current = (frameMarkerRef.current + 1) % 1000;
+      ctx.save();
+      ctx.globalAlpha = 0.003; // Nearly invisible (0.3% opacity)
+      ctx.fillStyle = frameMarkerRef.current % 2 === 0 ? '#FFFFFF' : '#FEFEFE';
+      ctx.fillRect(w - 1, h - 1, 1, 1); // Single pixel in bottom-right corner
+      ctx.restore();
 
       const shakeX = (Math.random() - 0.5) * cameraShake;
       const shakeY = (Math.random() - 0.5) * cameraShake;
