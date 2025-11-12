@@ -91,12 +91,10 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       const targetX = (shipPosition?.x ?? centerX);
       const targetY = (shipPosition?.y ?? centerY);
 
-      // Create deterministic randomness for this state
-      const rng = mulberry32(mix(0, "INTRO_RENDER", state.wordIndex));
-      
-      // Digit jiggle offset
-      const jiggleX = (rng() - 0.5) * 12;
-      const jiggleY = (rng() - 0.5) * 12;
+      // Time-based jiggle (ensures continuous pixel changes every frame)
+      const timeJitter = performance.now() * 0.01; // Fast jitter
+      const jiggleX = Math.sin(timeJitter * 1.3) * 6 + Math.cos(timeJitter * 2.7) * 6;
+      const jiggleY = Math.cos(timeJitter * 1.1) * 6 + Math.sin(timeJitter * 2.3) * 6;
 
       if (state.phase === "countdown" || state.phase === "go") {
         let alpha = 0;
@@ -156,8 +154,8 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           const ringRadius = baseSize * 0.8 * (1 + ringProgress * 2);
           const ringAlpha = Math.max(0, 1 - ringProgress);
           
-          // Ring radius jitter
-          const ringJitter = (rng() - 0.5) * 8;
+          // Ring radius jitter (time-based for continuous animation)
+          const ringJitter = Math.sin(timeJitter * 7.1) * 4;
           
           ctx.save();
           ctx.globalAlpha = ringAlpha;

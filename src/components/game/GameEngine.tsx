@@ -1286,13 +1286,6 @@ export const GameEngine: React.FC<Props> = ({
         return;
       }
       rafRef.current = requestAnimationFrame(loop);
-      
-      // Force compositor acknowledgment (fixes Chromium 142+ frame pacing issues)
-      if ('requestPostAnimationFrame' in window) {
-        (window as any).requestPostAnimationFrame(() => {
-          // Empty callback - just forces compositor notification
-        });
-      }
       const now = performance.now();
       const dt = Math.min(0.033, (now - last) / 1000); // clamp dt
       lastDtForCam = dt;
@@ -2632,9 +2625,27 @@ export const GameEngine: React.FC<Props> = ({
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, w, h);
 
-      frameMarkerRef.current = (frameMarkerRef.current + 1) % 60;
-      const shakeX = (Math.random() - 0.5) * cameraShake;
-      const shakeY = (Math.random() - 0.5) * cameraShake;
+      // Animated corner markers (imperceptible to users but detectable by browser)
+      frameMarkerRef.current = (frameMarkerRef.current + 1) % 1000;
+      const markerTime = performance.now() * 0.001;
+      const pulse = 0.5 + 0.5 * Math.sin(markerTime * 3);
+      const pulse2 = 0.5 + 0.5 * Math.cos(markerTime * 5);
+
+      ctx.save();
+      ctx.globalAlpha = 0.05; // Very subtle but visible to compositor
+      ctx.fillStyle = `rgba(${Math.floor(pulse * 255)}, ${Math.floor(pulse2 * 255)}, 200, 0.5)`;
+      ctx.fillRect(0, 0, 2, 2); // Top-left
+      ctx.fillRect(w - 2, 0, 2, 2); // Top-right
+      ctx.fillRect(0, h - 2, 2, 2); // Bottom-left
+      ctx.fillRect(w - 2, h - 2, 2, 2); // Bottom-right
+      ctx.restore();
+
+      // Micro camera jitter (imperceptible but ensures continuous pixel changes)
+      const microJitter = 0.02;
+      const jitterX = Math.sin(elapsed * 157.3) * microJitter;
+      const jitterY = Math.cos(elapsed * 213.7) * microJitter;
+      const shakeX = (Math.random() - 0.5) * cameraShake + jitterX;
+      const shakeY = (Math.random() - 0.5) * cameraShake + jitterY;
 
       ctx.translate(w / 2 + shakeX, h / 2 + shakeY);
       ctx.scale(zoom * dpr, zoom * dpr);
@@ -3496,7 +3507,10 @@ export const GameEngine: React.FC<Props> = ({
       const starLimit = shouldOptimizePerformance ? Math.min(100, stars.length) : stars.length;
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
-        const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
+        // Enhanced twinkling (ensures continuous visible pixel changes)
+        const twinkleSpeed = s.tw * 2.5; // 2.5x faster twinkling
+        const twinkleAmp = 0.6; // Larger amplitude (was 0.3)
+        const a = s.baseA * (0.4 + twinkleAmp * Math.sin(s.ph + elapsed * twinkleSpeed));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
         const x = (s.x % wpx + wpx) % wpx;
         const y = Math.max(0, Math.min(hpx, s.y));
@@ -3535,13 +3549,6 @@ export const GameEngine: React.FC<Props> = ({
       }
       ctx.globalAlpha = 1;
       ctx.restore();
-      
-      // Force compositor layer invalidation for Chromium 142+
-      // Ensures proper frame scheduling without throttling
-      if (frameMarkerRef.current % 60 === 0) {
-        // Touch transform every 60 frames to force layer update
-        c.style.transform = c.style.transform || '';
-      }
     };
 
     // HUD update timer integrated into main loop
