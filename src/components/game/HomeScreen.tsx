@@ -629,7 +629,7 @@ export const HomeScreen: React.FC<Props> = ({
       </div>
 
       <section className="relative z-20 text-center animate-enter" onKeyDownCapture={handleKeyDown}>
-        <h1 className="neon-title text-5xl md:text-6xl font-extrabold font-display tracking-widest mb-3 text-foreground drop-shadow-[0_0_18px_hsla(var(--neon),_0.5)]">
+        <h1 className="neon-title md:text-6xl font-extrabold font-display tracking-widest mb-3 text-foreground drop-shadow-[0_0_18px_hsla(var(--neon),_0.5)] py-[30px] text-7xl">
           NEON LUNAR LANDER
 
 
