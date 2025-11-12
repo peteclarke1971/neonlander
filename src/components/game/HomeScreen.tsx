@@ -631,6 +631,8 @@ export const HomeScreen: React.FC<Props> = ({
       <section className="relative z-20 text-center animate-enter" onKeyDownCapture={handleKeyDown}>
         <h1 className="neon-title text-5xl md:text-6xl font-extrabold font-display tracking-widest mb-3 text-foreground drop-shadow-[0_0_18px_hsla(var(--neon),_0.5)]">
           NEON LUNAR LANDER
+
+
         </h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
       </p>
