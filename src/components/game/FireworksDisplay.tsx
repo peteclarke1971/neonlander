@@ -39,6 +39,7 @@ interface FireworksDisplayProps {
   isHighScore?: boolean;
   debugCycleTrigger?: number; // Trigger for debug cycling on home screen
   forceSeason?: 'halloween' | 'christmas' | null; // Force specific seasonal theme
+  allowSkip?: boolean; // Control whether skip is enabled (default: true)
 }
 
 // Object pool for particle reuse
@@ -72,7 +73,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   isWorldRecord = false,
   isHighScore = false,
   debugCycleTrigger,
-  forceSeason
+  forceSeason,
+  allowSkip = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1434,6 +1436,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Handle input for skipping
   useEffect(() => {
+    if (!allowSkip) return;
+    
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
         onSkip();
@@ -1442,10 +1446,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [onSkip]);
+  }, [onSkip, allowSkip]);
 
   // Gamepad input for skipping
   useEffect(() => {
+    if (!allowSkip) return;
+    
     const checkGamepad = () => {
       const gamepad = anyGamepad();
       if (gamepad && (gamepad.buttons[0]?.pressed || gamepad.buttons[1]?.pressed)) {
@@ -1455,7 +1461,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     const interval = setInterval(checkGamepad, 100);
     return () => clearInterval(interval);
-  }, [onSkip]);
+  }, [onSkip, allowSkip]);
 
   // F key debug cycling through firework displays
   useEffect(() => {
@@ -1510,6 +1516,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
   // Touch screen input for skipping
   useEffect(() => {
+    if (!allowSkip) return;
+    
     const handleTouch = (e: TouchEvent) => {
       e.preventDefault();
       onSkip();
@@ -1517,7 +1525,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
 
     window.addEventListener('touchstart', handleTouch);
     return () => window.removeEventListener('touchstart', handleTouch);
-  }, [onSkip]);
+  }, [onSkip, allowSkip]);
 
   // Performance-optimized rendering with shapes, glow, and trails
   useEffect(() => {
