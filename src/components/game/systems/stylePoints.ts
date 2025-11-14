@@ -10,6 +10,8 @@ export interface StylePointsState {
     direction: 'left' | 'right' | null;
     totalRotation: number;
     keyHeld: boolean;
+    consecutiveRotations: number; // Track how many 360s completed in current sequence (0-3)
+    rotationsCapped: boolean; // Flag to prevent scoring after hitting 3-rotation cap
   };
   
   // Near Miss tracking
@@ -35,7 +37,9 @@ export function createStylePointsState(): StylePointsState {
       startTime: 0,
       direction: null,
       totalRotation: 0,
-      keyHeld: false
+      keyHeld: false,
+      consecutiveRotations: 0,
+      rotationsCapped: false
     },
     nearMiss: {
       active: false,
@@ -50,7 +54,7 @@ export function createStylePointsState(): StylePointsState {
 }
 
 // Update 360° rotation tracking
-// Returns { awarded: true, currentAngle } if 360° completed
+// Returns { awarded: true, currentAngle, consecutiveCount } if 360° completed
 export function update360Tracking(
   state: StylePointsState,
   angle: number,
@@ -59,7 +63,7 @@ export function update360Tracking(
   dt: number,
   abortActive: boolean,
   currentTime: number
-): { awarded: boolean; currentAngle: number } | null {
+): { awarded: boolean; currentAngle: number; consecutiveCount: number } | null {
   const rot = state.rotation360;
   
   // Reset if abort is used
@@ -85,10 +89,12 @@ export function update360Tracking(
     return null;
   }
   
-  // Key released or direction changed - reset
+  // Key released or direction changed - reset sequence
   if (rot.active && (!anyPressed || (leftPressed && rot.direction === 'right') || (rightPressed && rot.direction === 'left'))) {
     rot.active = false;
     rot.keyHeld = false;
+    rot.consecutiveRotations = 0; // Reset sequence counter
+    rot.rotationsCapped = false; // Reset cap flag
     return null;
   }
   
@@ -121,11 +127,24 @@ export function update360Tracking(
     
     // Check if completed 360° (2π radians)
     if (rot.totalRotation >= Math.PI * 2) {
-      // Award 360 points! Reset tracking so another 360 can be earned
-      rot.active = false;
-      rot.keyHeld = false;
+      // Check if already capped at 3 rotations
+      if (rot.rotationsCapped) {
+        return null; // No award, cap reached
+      }
       
-      return { awarded: true, currentAngle: angle };
+      // Increment consecutive rotation counter
+      rot.consecutiveRotations++;
+      
+      // Check if reached 3-rotation cap
+      if (rot.consecutiveRotations >= 3) {
+        rot.rotationsCapped = true;
+      }
+      
+      // Reset for next potential rotation (don't reset active/keyHeld - allow continuous rotation)
+      rot.totalRotation = 0;
+      rot.startAngle = angle;
+      
+      return { awarded: true, currentAngle: angle, consecutiveCount: rot.consecutiveRotations };
     }
   }
   
