@@ -2360,9 +2360,9 @@ export const GameEngine: React.FC<Props> = ({
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
               running = false;
               setTimeout(() => {
-                // Ghost-beating check: get the current best time and compare
-                const currentBestTime = isGhostMode ? ghostManager.current.getLunarLanderBestTime(difficulty, level) : null;
-                const isGhostBeaten = isGhostMode && currentBestTime !== null && elapsed < currentBestTime;
+                // Ghost-beating check: check if ghost is still visible (hasn't landed yet)
+                const currentGhostState = isGhostMode ? ghostManager.current.getLunarLanderGhostState(difficulty, level, elapsed) : null;
+                const isGhostBeaten = isGhostMode && currentGhostState !== null && currentGhostState.visible;
                 
                 const padType = isGhostBeaten ? 'ghost-beaten' : applied2x ? '2x' : 'regular';
                 
