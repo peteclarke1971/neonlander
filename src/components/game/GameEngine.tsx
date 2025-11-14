@@ -3660,11 +3660,13 @@ export const GameEngine: React.FC<Props> = ({
 
       <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} mode={mode} showFullHUD={showFullHUD} />
 
-      <div className="pointer-events-none absolute bottom-2 right-3 z-40">
-        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-          FPS: {Math.round(fps)} • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}
+      {showFullHUD && (
+        <div className="pointer-events-none absolute bottom-2 right-3 z-40">
+          <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
+            FPS: {Math.round(fps)} • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Controls overlay - Only show if not using PC controls */}
       {!isUsingPCControls && (
@@ -3720,10 +3722,12 @@ export const GameEngine: React.FC<Props> = ({
       )}
 
       {/* Top controls */}
-      <div className="absolute top-4 right-4 z-20 flex gap-2 select-none">
-        <Button variant="hero" className="select-none" onClick={() => setPaused((p) => !p)}><span className="select-none">{paused ? "Resume" : "Pause"}</span></Button>
-        <Button variant="outline" className="select-none" onClick={onExit}><span className="select-none">Exit</span></Button>
-      </div>
+      {showFullHUD && (
+        <div className="absolute top-4 right-4 z-20 flex gap-2 select-none">
+          <Button variant="hero" className="select-none" onClick={() => setPaused((p) => !p)}><span className="select-none">{paused ? "Resume" : "Pause"}</span></Button>
+          <Button variant="outline" className="select-none" onClick={onExit}><span className="select-none">Exit</span></Button>
+        </div>
+      )}
       
       
       {/* Countdown Overlay */}

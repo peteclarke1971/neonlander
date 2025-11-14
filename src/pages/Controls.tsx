@@ -497,7 +497,7 @@ export default function ControlsSettings() {
             <div className="flex items-center justify-between">
               <div>
                 <Label>Full HUD</Label>
-                <div className="text-xs text-muted-foreground">Show altitude, speed, and flight data (ON) or minimal HUD (OFF)</div>
+                <div className="text-xs text-muted-foreground">Hide all UI elements for clean recording (keeps touch controls visible)</div>
               </div>
               <Switch 
                 checked={showFullHUD}

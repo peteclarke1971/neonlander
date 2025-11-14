@@ -60,6 +60,11 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
   // Determine if HUD should be simplified - respect user setting first, then iPhone + Classic/Fixed mode
   const simplifyHUD = !showFullHUD || (isIPhone && (mode === "classic" || mode === "fixed"));
   
+  // Completely hide HUD when setting is off
+  if (!showFullHUD) {
+    return null;
+  }
+  
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
