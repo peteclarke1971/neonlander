@@ -961,6 +961,16 @@ export const GameEngine: React.FC<Props> = ({
     };
     const nearMissTexts: NearMissText[] = [];
     
+    type FloatingScoreText = {
+      id: string;
+      x: number;
+      y: number;
+      points: number;
+      life: number;
+      maxLife: number;
+    };
+    const floatingScoreTexts: FloatingScoreText[] = [];
+    
 
     // Debris (lander shards on crash)
     type Debris = { x: number; y: number; vx: number; vy: number; angle: number; av: number; life: number; max: number; size: number; kind: "plate" | "rod" | "chip" };
@@ -1148,6 +1158,17 @@ export const GameEngine: React.FC<Props> = ({
         text: "NEAR MISS",
         life: 2.0,
         maxLife: 2.0
+      });
+    };
+    
+    const spawnFloatingScore = (px: number, py: number, points: number) => {
+      floatingScoreTexts.push({
+        id: `score_${Date.now()}`,
+        x: px,
+        y: py,
+        points: points,
+        life: 0,
+        maxLife: 0.5 // 0.5 seconds duration
       });
     };
     
@@ -1490,9 +1511,17 @@ export const GameEngine: React.FC<Props> = ({
         );
         
         if (rotation360Result?.awarded) {
-          score += 360;
-          // Spawn 360° particle burst at lander position using current terrain color
+          const consecutiveCount = rotation360Result.consecutiveCount;
+          const pointsAwarded = 360 * consecutiveCount; // 360, 720, or 1080
+          
+          score += pointsAwarded;
+          
+          // Spawn particle burst at lander position using current terrain color
           spawnStyle360Burst(x, y, neonColor);
+          
+          // Spawn floating score text showing points earned
+          spawnFloatingScore(x, y, pointsAwarded);
+          
           // TODO: Add audio later
         }
         
@@ -2556,6 +2585,17 @@ export const GameEngine: React.FC<Props> = ({
           nearMissTexts.splice(i, 1);
         }
       }
+      
+      // Update floating score texts
+      for (let i = floatingScoreTexts.length - 1; i >= 0; i--) {
+        const text = floatingScoreTexts[i];
+        text.life += dt;
+        text.y -= 30 * dt; // Float upward at 30 px/s
+        
+        if (text.life >= text.maxLife) {
+          floatingScoreTexts.splice(i, 1);
+        }
+      }
 
       // Shooting stars update
       for (let i = shooting.length - 1; i >= 0; i--) {
@@ -3322,6 +3362,32 @@ export const GameEngine: React.FC<Props> = ({
         const screenY = text.y - yOffset;
         ctx.strokeText(text.text, screenX, screenY);
         ctx.fillText(text.text, screenX, screenY);
+        ctx.restore();
+      }
+      
+      // Render floating score texts (rotation style points)
+      for (const text of floatingScoreTexts) {
+        const t = text.life / text.maxLife;
+        const alpha = 1 - t; // Fade from 1 to 0
+        const scale = 1 + t * 0.3; // Grow slightly as it fades
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${24 * scale}px "Orbitron", monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Glowing text effect
+        ctx.shadowColor = neonColor as any;
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = neonColor as any;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        
+        ctx.strokeText(text.points.toString(), text.x, text.y);
+        ctx.fillText(text.points.toString(), text.x, text.y);
+        
+        ctx.shadowBlur = 0;
         ctx.restore();
       }
 
