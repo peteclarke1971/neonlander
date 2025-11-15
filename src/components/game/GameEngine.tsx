@@ -2024,7 +2024,22 @@ export const GameEngine: React.FC<Props> = ({
             }
             
             okVy = Math.abs(relativeVel.y) < vyThresh;
-            okVx = Math.abs(relativeVel.x) < 25.0; // Increased from 20.0 to 25.0 for moving pads
+            
+            // Scale horizontal threshold with level and pad speed
+            let vxThresh = 25.0; // Base threshold
+            
+            // Progressive level-based forgiveness after level 5 (same as vertical)
+            if (level > 5) {
+              const levelForgiveness = (level - 5) * 3.0; // 3.0 px/s per level
+              vxThresh += levelForgiveness;
+            }
+            
+            // Additional forgiveness for very fast pads (same logic as vertical)
+            if (isVeryFast && nearCenter && okAngle) {
+              vxThresh *= 1.6; // 60% increase for very fast pads
+            }
+            
+            okVx = Math.abs(relativeVel.x) < vxThresh;
           } else {
             okVy = Math.abs(vy) < (difficulty === "easy" ? 1.8 : 1.2);
             okVx = Math.abs(vx) < (difficulty === "easy" ? 1.5 : 1.0);
