@@ -1983,7 +1983,7 @@ export const GameEngine: React.FC<Props> = ({
             
             for (const p of t.pads) {
               const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
-              const margin = 2; // Small tolerance for pixel-perfect landing feel
+              const margin = 0; // Strict landing - both feet must be on pad
               
               // Check if BOTH feet are within pad boundaries (with margin)
               let bothFeetOnPad = false;
