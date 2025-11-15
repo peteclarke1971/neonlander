@@ -2481,6 +2481,10 @@ export const GameEngine: React.FC<Props> = ({
       };
 
       // Calculate enhanced zoom based on terrain clearance AND landing pad proximity
+      // Mobile devices start more zoomed out (30% reduction for better visibility)
+      const isMobileDevice = !isDesktopDevice();
+      const mobileZoomMultiplier = isMobileDevice ? 0.7 : 1.0;
+      
       let targetZoom = 1.0;
       
       if (isCavernLevel) {
@@ -2502,16 +2506,20 @@ export const GameEngine: React.FC<Props> = ({
         const near = 0, far = 420;
         const tRaw = Math.min(1, Math.max(0, (effClr - near) / (far - near)));
         const s = tRaw * tRaw * (3 - 2 * tRaw);
-        targetZoom = 1.4 * (1 - s) + 1.0 * s; // Base terrain zoom (1.0x to 1.4x)
+        
+        // Base terrain zoom (1.0x to 1.4x on desktop, 0.7x to 0.98x on mobile)
+        const baseMin = 1.0 * mobileZoomMultiplier;
+        const baseMax = 1.4 * mobileZoomMultiplier;
+        targetZoom = baseMax * (1 - s) + baseMin * s;
         
         // Check for landing pad proximity enhancement
         const nearestPadDist = getNearestPadDistance();
         const padDetectionRange = 250;
         
         if (nearestPadDist < padDetectionRange) {
-          // Enhanced zoom for landing approach (1.4x to 3.0x)
+          // Enhanced zoom for landing approach (1.4x to 3.0x on desktop, 0.98x to 2.1x on mobile)
           const padProximityRatio = 1 - (nearestPadDist / padDetectionRange);
-          const enhancedZoom = 1.4 + (1.6 * padProximityRatio * padProximityRatio); // Exponential curve
+          const enhancedZoom = (1.4 + (1.6 * padProximityRatio * padProximityRatio)) * mobileZoomMultiplier;
           targetZoom = Math.max(targetZoom, enhancedZoom);
         }
       }
