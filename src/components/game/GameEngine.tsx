@@ -1977,25 +1977,30 @@ export const GameEngine: React.FC<Props> = ({
           if (!isCavernLevel) {
             const t = terrain as TerrainData;
             const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
+            // Lander feet positions (feet are 24px wide total, ±12px from center)
+            const leftFoot = ((xx - 12) % t.worldWidth + t.worldWidth) % t.worldWidth;
+            const rightFoot = ((xx + 12) % t.worldWidth + t.worldWidth) % t.worldWidth;
+            
             for (const p of t.pads) {
               const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
-              const margin = 0; // Strict landing - no overhang allowed
-              let dist = 0;
+              const margin = 2; // Small tolerance for pixel-perfect landing feel
+              
+              // Check if BOTH feet are within pad boundaries (with margin)
+              let bothFeetOnPad = false;
+              
               if (p.xStart <= p.xEnd) {
-                if (xx < p.xStart) dist = p.xStart - xx;
-                else if (xx > p.xEnd) dist = xx - p.xEnd;
-                else dist = 0;
+                // Normal pad (doesn't wrap)
+                const leftOnPad = (leftFoot >= p.xStart - margin && leftFoot <= p.xEnd + margin);
+                const rightOnPad = (rightFoot >= p.xStart - margin && rightFoot <= p.xEnd + margin);
+                bothFeetOnPad = leftOnPad && rightOnPad;
               } else {
-                const inLeft = xx >= p.xStart;
-                const inRight = xx <= p.xEnd;
-                if (inLeft || inRight) dist = 0;
-                else {
-                  const toStart = (p.xStart - xx + t.worldWidth) % t.worldWidth;
-                  const toEnd = (xx - p.xEnd + t.worldWidth) % t.worldWidth;
-                  dist = Math.min(toStart, toEnd);
-                }
+                // Wrapping pad
+                const leftOnPad = (leftFoot >= p.xStart - margin) || (leftFoot <= p.xEnd + margin);
+                const rightOnPad = (rightFoot >= p.xStart - margin) || (rightFoot <= p.xEnd + margin);
+                bothFeetOnPad = leftOnPad && rightOnPad;
               }
-              if (dist <= margin) { nearPad = p; break; }
+              
+              if (bothFeetOnPad) { nearPad = p; break; }
             }
           }
           const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
