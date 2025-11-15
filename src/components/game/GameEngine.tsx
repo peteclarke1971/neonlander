@@ -1965,7 +1965,7 @@ export const GameEngine: React.FC<Props> = ({
         }
         
         if (collisionDetected && !playerLockedRef.current && invulnerabilityTimer.current <= 0) {
-          const pad = terrain.getPadAt(x);
+          const pad = null; // Don't use center-based detection - use feet-based only
           let nearPad: Pad | null = null;
           
           // Check for moving pad collision first
@@ -2206,7 +2206,7 @@ export const GameEngine: React.FC<Props> = ({
                 setShowBonusMessages(true);
               }
             }, 500);
-          } else if ((pad || nearPad) && okAngle && okVy && okVx && fuel >= 0) {
+          } else if (nearPad && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
             if (mode === "timetrial" && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
