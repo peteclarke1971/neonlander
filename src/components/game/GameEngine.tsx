@@ -1979,7 +1979,7 @@ export const GameEngine: React.FC<Props> = ({
             const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
             for (const p of t.pads) {
               const w = p.width ?? (p.xEnd >= p.xStart ? (p.xEnd - p.xStart) : (t.worldWidth - p.xStart + p.xEnd));
-              const margin = Math.max(4, Math.min(10, w * 0.2));
+              const margin = 2; // Tightened to 2 pixels for precise landings
               let dist = 0;
               if (p.xStart <= p.xEnd) {
                 if (xx < p.xStart) dist = p.xStart - xx;
