@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ControlsSettings from "./pages/Controls";
@@ -19,13 +20,52 @@ import SeedValidation from "./pages/SeedValidation";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
+const App = () => {
+  const [scanlinesEnabled, setScanlinesEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanlines-enabled');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  // Listen for changes from Controls page
+  useEffect(() => {
+    const handleScanlinesChange = (e: CustomEvent) => {
+      setScanlinesEnabled(e.detail);
+    };
+    window.addEventListener('scanlinesChanged', handleScanlinesChange as EventListener);
+    return () => {
+      window.removeEventListener('scanlinesChanged', handleScanlinesChange as EventListener);
+    };
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {/* Global Scanline Overlay */}
+        {scanlinesEnabled && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 9999,
+              background: 'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 1px, rgba(0, 0, 0, 0.15) 1px, rgba(0, 0, 0, 0.15) 2px)',
+              opacity: 0.5,
+              mixBlendMode: 'multiply'
+            }}
+            aria-hidden="true"
+          />
+        )}
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/asteroids" element={<Asteroids />} />
           <Route path="/asteroids-color" element={<AsteroidsColor />} />
@@ -44,6 +84,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
