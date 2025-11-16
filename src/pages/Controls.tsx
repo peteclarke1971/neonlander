@@ -42,6 +42,38 @@ export default function ControlsSettings() {
       return false;
     }
   });
+  const [scanlineSpacing, setScanlineSpacing] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanline-spacing');
+      return saved ? JSON.parse(saved) : 2;
+    } catch {
+      return 2;
+    }
+  });
+  const [scanlineOpacity, setScanlineOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanline-opacity');
+      return saved ? JSON.parse(saved) : 0.15;
+    } catch {
+      return 0.15;
+    }
+  });
+  const [scanlineIntensity, setScanlineIntensity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanline-intensity');
+      return saved ? JSON.parse(saved) : 0.5;
+    } catch {
+      return 0.5;
+    }
+  });
+  const [scanlineBlendMode, setScanlineBlendMode] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanline-blend-mode');
+      return saved ? JSON.parse(saved) : 'multiply';
+    } catch {
+      return 'multiply';
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -86,12 +118,39 @@ export default function ControlsSettings() {
   useEffect(() => {
     try {
       localStorage.setItem('ll-scanlines-enabled', JSON.stringify(scanlinesEnabled));
-      // Dispatch custom event so App.tsx can react immediately
       window.dispatchEvent(new CustomEvent('scanlinesChanged', { detail: scanlinesEnabled }));
     } catch {
       // Silently fail if localStorage is unavailable
     }
   }, [scanlinesEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-scanline-spacing', JSON.stringify(scanlineSpacing));
+      window.dispatchEvent(new CustomEvent('scanlineSettingsChanged'));
+    } catch {}
+  }, [scanlineSpacing]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-scanline-opacity', JSON.stringify(scanlineOpacity));
+      window.dispatchEvent(new CustomEvent('scanlineSettingsChanged'));
+    } catch {}
+  }, [scanlineOpacity]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-scanline-intensity', JSON.stringify(scanlineIntensity));
+      window.dispatchEvent(new CustomEvent('scanlineSettingsChanged'));
+    } catch {}
+  }, [scanlineIntensity]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-scanline-blend-mode', JSON.stringify(scanlineBlendMode));
+      window.dispatchEvent(new CustomEvent('scanlineSettingsChanged'));
+    } catch {}
+  }, [scanlineBlendMode]);
 
   // SEO
   useEffect(() => {
@@ -533,6 +592,69 @@ export default function ControlsSettings() {
                 onCheckedChange={setScanlinesEnabled}
               />
             </div>
+
+            {scanlinesEnabled && (
+              <div className="ml-6 space-y-4 mt-4 p-4 border border-border rounded-lg bg-muted/30">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Line Spacing: {scanlineSpacing}px</Label>
+                  </div>
+                  <Slider
+                    value={[scanlineSpacing]}
+                    onValueChange={(value) => setScanlineSpacing(value[0])}
+                    min={1}
+                    max={5}
+                    step={1}
+                  />
+                  <div className="text-xs text-muted-foreground">Smaller = more dense lines</div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Line Opacity: {scanlineOpacity.toFixed(2)}</Label>
+                  </div>
+                  <Slider
+                    value={[scanlineOpacity]}
+                    onValueChange={(value) => setScanlineOpacity(value[0])}
+                    min={0}
+                    max={0.5}
+                    step={0.05}
+                  />
+                  <div className="text-xs text-muted-foreground">Darkness of the scanlines</div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Overall Intensity: {scanlineIntensity.toFixed(1)}</Label>
+                  </div>
+                  <Slider
+                    value={[scanlineIntensity]}
+                    onValueChange={(value) => setScanlineIntensity(value[0])}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                  />
+                  <div className="text-xs text-muted-foreground">Overall effect strength</div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Blend Mode</Label>
+                  <Select value={scanlineBlendMode} onValueChange={setScanlineBlendMode}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiply">Multiply (Classic)</SelectItem>
+                      <SelectItem value="overlay">Overlay (Bright)</SelectItem>
+                      <SelectItem value="darken">Darken (Subtle)</SelectItem>
+                      <SelectItem value="screen">Screen (Light)</SelectItem>
+                      <SelectItem value="hard-light">Hard Light (Intense)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">How the effect blends with content</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

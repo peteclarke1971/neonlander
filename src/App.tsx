@@ -30,14 +30,37 @@ const App = () => {
     }
   });
 
+  const [scanlineSettings, setScanlineSettings] = useState(() => ({
+    spacing: 2,
+    opacity: 0.15,
+    intensity: 0.5,
+    blendMode: 'multiply'
+  }));
+
+  const loadScanlineSettings = () => {
+    try {
+      setScanlineSettings({
+        spacing: JSON.parse(localStorage.getItem('ll-scanline-spacing') || '2'),
+        opacity: JSON.parse(localStorage.getItem('ll-scanline-opacity') || '0.15'),
+        intensity: JSON.parse(localStorage.getItem('ll-scanline-intensity') || '0.5'),
+        blendMode: JSON.parse(localStorage.getItem('ll-scanline-blend-mode') || '"multiply"')
+      });
+    } catch {}
+  };
+
   // Listen for changes from Controls page
   useEffect(() => {
     const handleScanlinesChange = (e: CustomEvent) => {
       setScanlinesEnabled(e.detail);
     };
+    const handleSettingsChange = () => {
+      loadScanlineSettings();
+    };
     window.addEventListener('scanlinesChanged', handleScanlinesChange as EventListener);
+    window.addEventListener('scanlineSettingsChanged', handleSettingsChange);
     return () => {
       window.removeEventListener('scanlinesChanged', handleScanlinesChange as EventListener);
+      window.removeEventListener('scanlineSettingsChanged', handleSettingsChange);
     };
   }, []);
 
@@ -55,9 +78,9 @@ const App = () => {
               height: '100%',
               pointerEvents: 'none',
               zIndex: 9999,
-              background: 'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 1px, rgba(0, 0, 0, 0.15) 1px, rgba(0, 0, 0, 0.15) 2px)',
-              opacity: 0.5,
-              mixBlendMode: 'multiply'
+              background: `repeating-linear-gradient(0deg, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) ${scanlineSettings.spacing - 1}px, rgba(0, 0, 0, ${scanlineSettings.opacity}) ${scanlineSettings.spacing - 1}px, rgba(0, 0, 0, ${scanlineSettings.opacity}) ${scanlineSettings.spacing}px)`,
+              opacity: scanlineSettings.intensity,
+              mixBlendMode: scanlineSettings.blendMode as any
             }}
             aria-hidden="true"
           />
