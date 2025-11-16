@@ -1009,8 +1009,10 @@ export const GameEngine: React.FC<Props> = ({
     for (let i = 0; i < STAR_COUNT; i++) {
       const sx = Math.random() * pxW;
       const sy = Math.random() * pxH;
-      const bright = Math.random() < 0.15;
-      stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: bright ? 0.95 : 0.6, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
+      const bright = Math.random() < 0.06; // Only 6% bright stars for more subtle effect
+      // More variation in regular star brightness for natural look
+      const baseAlpha = bright ? 0.9 : (0.3 + Math.random() * 0.4);
+      stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: baseAlpha, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
     }
 
     // Background decorations system - load for classic mode only if Nebula FX is enabled
