@@ -1016,35 +1016,35 @@ export const GameEngine: React.FC<Props> = ({
       // 30% - Tiny dust stars (barely visible)
       if (rand < 0.30) {
         size = 0.5 + Math.random() * 0.3; // 0.5-0.8
-        baseAlpha = 0.15 + Math.random() * 0.15; // 0.15-0.3
+        baseAlpha = 0.075 + Math.random() * 0.075; // 0.075-0.15 (50% of original)
         bright = false;
         renderStyle = Math.random() < 0.4 ? 'rect' : 'circle'; // 40% rectangles
       }
       // 35% - Small dim stars
       else if (rand < 0.65) {
         size = 0.8 + Math.random() * 0.4; // 0.8-1.2
-        baseAlpha = 0.3 + Math.random() * 0.2; // 0.3-0.5
+        baseAlpha = 0.15 + Math.random() * 0.1; // 0.15-0.25 (50% of original)
         bright = false;
         renderStyle = Math.random() < 0.3 ? 'rect' : 'circle'; // 30% rectangles
       }
       // 20% - Medium moderate stars
       else if (rand < 0.85) {
         size = 1.2 + Math.random() * 0.6; // 1.2-1.8
-        baseAlpha = 0.4 + Math.random() * 0.25; // 0.4-0.65
+        baseAlpha = 0.2 + Math.random() * 0.125; // 0.2-0.325 (50% of original)
         bright = false;
         renderStyle = Math.random() < 0.25 ? 'rect' : 'circle'; // 25% rectangles
       }
       // 10% - Large brighter stars
       else if (rand < 0.95) {
         size = 1.8 + Math.random() * 0.4; // 1.8-2.2
-        baseAlpha = 0.6 + Math.random() * 0.2; // 0.6-0.8
+        baseAlpha = 0.3 + Math.random() * 0.1; // 0.3-0.4 (50% of original)
         bright = false;
         renderStyle = 'circle'; // Always circular
       }
       // 5% - Very bright stars
       else {
         size = 2.2 + Math.random() * 0.4; // 2.2-2.6
-        baseAlpha = 0.8 + Math.random() * 0.15; // 0.8-0.95
+        baseAlpha = 0.4 + Math.random() * 0.075; // 0.4-0.475 (50% of original)
         bright = true;
         renderStyle = 'circle'; // Always circular for bright stars
       }
