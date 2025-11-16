@@ -538,7 +538,8 @@ export class EndlessTerrainGenerator {
         mode: 'surface' as const,
         startPos: { x: startX + this.config.chunkWidth * 0.4, y: this.config.baseHeight - 150 },
         goalPos: { x: endX - this.config.chunkWidth * 0.2, y: this.config.baseHeight - 150 },
-        chunkNumber // Pass chunk number for force spawn logic
+        chunkNumber, // Pass chunk number for force spawn logic
+        level: Math.max(1, chunkNumber) // Use chunk number as level proxy for difficulty
       };
       
       collectibles = generateCollectibles(seed + 6666, placementContext, '#00FFFF');

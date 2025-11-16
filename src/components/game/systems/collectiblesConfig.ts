@@ -13,6 +13,27 @@ export const COLLECTIBLES_CONFIG = {
   safeWindowSec: 1.2, // minimum safe window vs hazards
   fuelMarginMinPctTank: 8, // minimum fuel margin after collection route
   
+  // Spacing configuration
+  minSpacingBetweenItems: 350, // Minimum pixels between collectibles (~11x ship height)
+  
+  // Difficulty configuration
+  hardPlacementStartLevel: 6, // After level 5 = level 6+
+  
+  // Tricky placement weights for hard levels (after level 5)
+  trickyPlacementTypes: {
+    nearTerrain: 0.3,      // Very close to terrain surface
+    narrowCanyon: 0.25,     // Bottom of narrow canyons
+    volcanoZone: 0.25,      // Within volcano eruption range
+    gravityWell: 0.2        // Close to/within gravity well
+  },
+  
+  // Tricky placement parameters
+  terrainProximity: 40,              // Pixels from terrain surface for "near terrain"
+  canyonWidthMax: 150,               // Max width to be considered "narrow canyon"
+  canyonDepthMin: 50,                // Minimum depth for canyon detection
+  volcanoRangeMultiplier: 0.8,       // Place within 0.8x eruption radius
+  gravityWellRangeMultiplier: 0.7,   // Place within 0.7x anomaly radius
+  
   // Placement attempt limits
   maxPlacementAttempts: 50,
   maxRepairAttempts: 10,
