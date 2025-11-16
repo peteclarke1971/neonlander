@@ -34,6 +34,14 @@ export default function ControlsSettings() {
       return true;
     }
   });
+  const [scanlinesEnabled, setScanlinesEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-scanlines-enabled');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -73,6 +81,17 @@ export default function ControlsSettings() {
       // Silently fail if localStorage is unavailable
     }
   }, [showFullHUD]);
+
+  // Save scanlines setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-scanlines-enabled', JSON.stringify(scanlinesEnabled));
+      // Dispatch custom event so App.tsx can react immediately
+      window.dispatchEvent(new CustomEvent('scanlinesChanged', { detail: scanlinesEnabled }));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [scanlinesEnabled]);
 
   // SEO
   useEffect(() => {
@@ -502,6 +521,16 @@ export default function ControlsSettings() {
               <Switch 
                 checked={showFullHUD}
                 onCheckedChange={setShowFullHUD}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>CRT Scanlines</Label>
+                <div className="text-xs text-muted-foreground">Simulate old-school CRT monitor effect</div>
+              </div>
+              <Switch 
+                checked={scanlinesEnabled}
+                onCheckedChange={setScanlinesEnabled}
               />
             </div>
           </div>
