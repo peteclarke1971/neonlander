@@ -983,7 +983,7 @@ export const GameEngine: React.FC<Props> = ({
     // Note: occasional background satellites are rendered in screen-space for ambience (no gameplay effect)
 
     // Starfield (static twinkles) and shooting stars
-    type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean };
+    type Star = { x: number; y: number; size: number; baseA: number; tw: number; ph: number; bright: boolean; renderStyle: 'circle' | 'rect' };
     type Shooting = { x: number; y: number; vx: number; vy: number; life: number; max: number };
     type BgSat = { x: number; y: number; vx: number; vy: number; life: number; max: number; scale: number; rot: number; rotV: number };
     const stars: Star[] = [];
@@ -1009,10 +1009,56 @@ export const GameEngine: React.FC<Props> = ({
     for (let i = 0; i < STAR_COUNT; i++) {
       const sx = Math.random() * pxW;
       const sy = Math.random() * pxH;
-      const bright = Math.random() < 0.06; // Only 6% bright stars for more subtle effect
-      // More variation in regular star brightness for natural look
-      const baseAlpha = bright ? 0.9 : (0.3 + Math.random() * 0.4);
-      stars.push({ x: sx, y: sy, size: bright ? 2.4 : 1.4, baseA: baseAlpha, tw: 0.5 + Math.random() * 1.5, ph: Math.random() * Math.PI * 2, bright });
+      const rand = Math.random();
+      
+      let size, baseAlpha, bright, renderStyle;
+      
+      // 30% - Tiny dust stars (barely visible)
+      if (rand < 0.30) {
+        size = 0.5 + Math.random() * 0.3; // 0.5-0.8
+        baseAlpha = 0.15 + Math.random() * 0.15; // 0.15-0.3
+        bright = false;
+        renderStyle = Math.random() < 0.4 ? 'rect' : 'circle'; // 40% rectangles
+      }
+      // 35% - Small dim stars
+      else if (rand < 0.65) {
+        size = 0.8 + Math.random() * 0.4; // 0.8-1.2
+        baseAlpha = 0.3 + Math.random() * 0.2; // 0.3-0.5
+        bright = false;
+        renderStyle = Math.random() < 0.3 ? 'rect' : 'circle'; // 30% rectangles
+      }
+      // 20% - Medium moderate stars
+      else if (rand < 0.85) {
+        size = 1.2 + Math.random() * 0.6; // 1.2-1.8
+        baseAlpha = 0.4 + Math.random() * 0.25; // 0.4-0.65
+        bright = false;
+        renderStyle = Math.random() < 0.25 ? 'rect' : 'circle'; // 25% rectangles
+      }
+      // 10% - Large brighter stars
+      else if (rand < 0.95) {
+        size = 1.8 + Math.random() * 0.4; // 1.8-2.2
+        baseAlpha = 0.6 + Math.random() * 0.2; // 0.6-0.8
+        bright = false;
+        renderStyle = 'circle'; // Always circular
+      }
+      // 5% - Very bright stars
+      else {
+        size = 2.2 + Math.random() * 0.4; // 2.2-2.6
+        baseAlpha = 0.8 + Math.random() * 0.15; // 0.8-0.95
+        bright = true;
+        renderStyle = 'circle'; // Always circular for bright stars
+      }
+      
+      stars.push({ 
+        x: sx, 
+        y: sy, 
+        size, 
+        baseA: baseAlpha, 
+        tw: 0.5 + Math.random() * 1.5, 
+        ph: Math.random() * Math.PI * 2, 
+        bright,
+        renderStyle
+      });
     }
 
     // Background decorations system - load for classic mode only if Nebula FX is enabled
@@ -3589,23 +3635,31 @@ export const GameEngine: React.FC<Props> = ({
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
-        ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        ctx.globalAlpha = Math.min(1, Math.max(0.1, a)); // Lower minimum from 0.25 to 0.1 for fainter stars
         
-        // Add glow for bright stars even in low graphics
+        // Adjust shadowBlur based on star size and type
         if (s.bright && !shouldOptimizePerformance) {
           ctx.shadowBlur = 8;
         } else if (s.bright && shouldOptimizePerformance) {
-          ctx.shadowBlur = 4; // Reduced but still visible glow
+          ctx.shadowBlur = 4;
+        } else if (s.size < 0.9) {
+          // Tiny stars get minimal or no glow for subtlety
+          ctx.shadowBlur = shouldOptimizePerformance ? 0 : 1;
         } else {
           ctx.shadowBlur = shouldOptimizePerformance ? 2 : 4;
         }
         
         const x = (s.x % wpx + wpx) % wpx;
         const y = Math.max(0, Math.min(hpx, s.y));
-        // Draw stars as circles instead of rectangles
-        ctx.beginPath();
-        ctx.arc(x, y, s.size, 0, Math.PI * 2);
-        ctx.fill();
+        
+        // Render based on style - mix circles and rectangles
+        if (s.renderStyle === 'rect') {
+          ctx.fillRect(x - s.size / 2, y - s.size / 2, s.size, s.size);
+        } else {
+          ctx.beginPath();
+          ctx.arc(x, y, s.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.shadowBlur = 0; // Reset shadow blur
       ctx.globalAlpha = 1;
