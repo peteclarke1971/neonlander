@@ -604,21 +604,25 @@ export class MovingPadSystem {
     }
   }
 
-  // Check if lander is on moving pad (with generous tolerance for moving pads)
+  // Check if lander is on moving pad (both feet must be within pad bounds)
   isOnMovingPad(x: number, y: number, pad: MovingPad, level?: number): boolean {
     const padWidth = pad.width || 32;
     const footY = y + 8; // Lander foot is ~8 pixels below center
     
-    // Performance optimization: removed debug logging
+    // Check both feet positions (12 pixels left and right of center)
+    const leftFootX = x - 12;
+    const rightFootX = x + 12;
     
-    // Check horizontal bounds with appropriate tolerance
-    const horizontalTolerance = pad.motion === "shuttle" ? 2 : 6; // More generous for vertical pads
-    if (x < pad.currentPos.x - padWidth / 2 - horizontalTolerance || 
-        x > pad.currentPos.x + padWidth / 2 + horizontalTolerance) {
+    // Strict horizontal bounds check (no margin, like regular pads)
+    const padLeft = pad.currentPos.x - padWidth / 2;
+    const padRight = pad.currentPos.x + padWidth / 2;
+    
+    // Both feet must be within pad bounds
+    if (leftFootX < padLeft || rightFootX > padRight) {
       return false;
     }
     
-    // Check vertical bounds - be extra generous for moving pads
+    // Check vertical bounds - keep generous tolerance for moving pads
     let verticalTolerance = 16; // Base tolerance for all moving pads
     
     // Increase tolerance after level 5 for high-level forgiveness
