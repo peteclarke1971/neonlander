@@ -3579,40 +3579,67 @@ export const GameEngine: React.FC<Props> = ({
       const hpx = ctx.canvas.height / dpr;
       ctx.save();
       ctx.shadowColor = neonColor as any;
-      ctx.shadowBlur = shouldOptimizePerformance ? 2 : 4; // Reduced shadow blur for stars
       ctx.fillStyle = neonColor as any;
       // Map CSS px to device px
       ctx.scale(dpr, dpr);
-      // Static twinkling stars in screen space - render fewer stars on low performance
-      const starLimit = shouldOptimizePerformance ? Math.min(100, stars.length) : stars.length;
+      // Static twinkling stars in screen space - render more stars even in low graphics
+      const starLimit = shouldOptimizePerformance ? Math.min(200, stars.length) : stars.length;
       for (let i = 0; i < starLimit; i++) {
         const s = stars[i];
         const a = s.baseA * (0.7 + 0.3 * Math.sin(s.ph + elapsed * s.tw));
         ctx.globalAlpha = Math.min(1, Math.max(0.25, a));
+        
+        // Add glow for bright stars even in low graphics
+        if (s.bright && !shouldOptimizePerformance) {
+          ctx.shadowBlur = 8;
+        } else if (s.bright && shouldOptimizePerformance) {
+          ctx.shadowBlur = 4; // Reduced but still visible glow
+        } else {
+          ctx.shadowBlur = shouldOptimizePerformance ? 2 : 4;
+        }
+        
         const x = (s.x % wpx + wpx) % wpx;
         const y = Math.max(0, Math.min(hpx, s.y));
-        ctx.fillRect(x, y, s.size, s.size);
+        // Draw stars as circles instead of rectangles
+        ctx.beginPath();
+        ctx.arc(x, y, s.size, 0, Math.PI * 2);
+        ctx.fill();
       }
+      ctx.shadowBlur = 0; // Reset shadow blur
       ctx.globalAlpha = 1;
-      // Shooting stars
+      // Shooting stars with enhanced glow
       for (const sh of shooting) {
         const t = 1 - Math.min(1, sh.life / sh.max);
         ctx.globalAlpha = t;
+        
+        // Add glow even in low graphics
+        ctx.shadowBlur = shouldOptimizePerformance ? 4 : 6;
+        ctx.shadowColor = neonColor as any;
+        
         ctx.beginPath();
         ctx.moveTo(sh.x, sh.y);
         ctx.lineTo(sh.x - sh.vx * 0.06, sh.y - sh.vy * 0.06);
         ctx.lineWidth = 2;
         ctx.strokeStyle = neonColor as any;
         ctx.stroke();
+        
+        ctx.shadowBlur = 0; // Reset for next iteration
       }
       ctx.globalAlpha = 1;
-      // Background small satellites
+      // Background small satellites with subtle glow
       for (const s of bgSats) {
         const tScale = s.scale;
         ctx.save();
         ctx.translate(s.x, s.y);
         ctx.rotate(s.rot);
         ctx.scale(tScale, tScale);
+        
+        // Add subtle glow in low graphics
+        if (shouldOptimizePerformance) {
+          ctx.shadowBlur = 3;
+          ctx.shadowColor = neonColor as any;
+        }
+        
         ctx.strokeStyle = neonColor as any;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -3624,6 +3651,7 @@ export const GameEngine: React.FC<Props> = ({
         ctx.stroke();
         ctx.restore();
       }
+      ctx.shadowBlur = 0; // Reset shadow blur
       ctx.globalAlpha = 1;
       ctx.restore();
     };
