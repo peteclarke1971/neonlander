@@ -1930,7 +1930,8 @@ export const GameEngine: React.FC<Props> = ({
                   startPos: { x: terrain.worldWidth / 2, y: 200 },
                   goalPos: { x: terrain.pads[terrain.pads.length - 1]?.xStart || terrain.worldWidth - 100, y: terrain.pads[terrain.pads.length - 1]?.y || 400 },
                   checkCollision: isCavernLevel ? (terrain as any).checkCollision : undefined,
-                  chunkNumber: 0 // Not chunk-based (fixed level)
+                  chunkNumber: 0, // Not chunk-based (fixed level)
+                  level: levelVar || 1 // Pass level for difficulty-based placement
                 };
                 collectiblesRef.current.wormholeDoor = generateWormholeDoor(seed, context);
                 if (collectiblesRef.current.wormholeDoor) {

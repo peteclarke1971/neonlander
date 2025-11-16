@@ -54,10 +54,13 @@ export interface PlacementContext {
   startPos: Vec2;
   goalPos: Vec2;
   chunkNumber: number; // For force spawn logic
+  level: number; // For difficulty-based logic
   // For caverns
   checkCollision?: (x: number, y: number, radius: number) => boolean;
   // For hazards/volcanoes
   hasHazardAt?: (x: number, y: number, radius: number) => boolean;
+  volcanoes?: Array<{ x: number; y: number; size: number }>; // For tricky placement
+  anomalies?: Array<{ x: number; y: number; radius: number }>; // For gravity well placement
 }
 
 // Seeded random number generator
@@ -93,6 +96,86 @@ function selectShape(rng: () => number): SpaceJunkShape {
     if (rand <= 0) return shape;
   }
   return shapes[shapes.length - 1]; // fallback
+}
+
+// Check if items have minimum spacing between them
+function hasMinimumSpacing(
+  x: number, 
+  y: number, 
+  existingJunk: SpaceJunk[], 
+  minDistance: number
+): boolean {
+  for (const junk of existingJunk) {
+    const dist = Math.sqrt((x - junk.pos.x) ** 2 + (y - junk.pos.y) ** 2);
+    if (dist < minDistance) return false;
+  }
+  return true;
+}
+
+// Check if position is near terrain surface (hard placement)
+function isNearTerrainSurface(x: number, y: number, context: PlacementContext): boolean {
+  const terrainY = context.getHeightAt(x);
+  const distance = terrainY - y;
+  const config = COLLECTIBLES_CONFIG;
+  return distance > 0 && distance <= config.terrainProximity;
+}
+
+// Check if position is in narrow canyon
+function isInNarrowCanyon(x: number, y: number, context: PlacementContext): boolean {
+  const config = COLLECTIBLES_CONFIG;
+  const searchRadius = 100;
+  let leftWall = x, rightWall = x;
+  const currentY = context.getHeightAt(x);
+  
+  // Find left wall
+  for (let dx = -10; dx > -searchRadius; dx -= 10) {
+    const checkY = context.getHeightAt(x + dx);
+    if (checkY < currentY - config.canyonDepthMin) {
+      leftWall = x + dx;
+      break;
+    }
+  }
+  
+  // Find right wall  
+  for (let dx = 10; dx < searchRadius; dx += 10) {
+    const checkY = context.getHeightAt(x + dx);
+    if (checkY < currentY - config.canyonDepthMin) {
+      rightWall = x + dx;
+      break;
+    }
+  }
+  
+  const canyonWidth = rightWall - leftWall;
+  return canyonWidth < config.canyonWidthMax && y > currentY - config.canyonDepthMin;
+}
+
+// Check if position is within volcano eruption range
+function isInVolcanoZone(x: number, y: number, context: PlacementContext): boolean {
+  if (!context.volcanoes || context.volcanoes.length === 0) return false;
+  
+  const config = COLLECTIBLES_CONFIG;
+  for (const volcano of context.volcanoes) {
+    const dist = Math.sqrt((x - volcano.x) ** 2 + (y - volcano.y) ** 2);
+    const eruptionRadius = volcano.size * 3; // Approximate eruption range
+    if (dist < eruptionRadius * config.volcanoRangeMultiplier) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Check if position is near gravity well
+function isInGravityWell(x: number, y: number, context: PlacementContext): boolean {
+  if (!context.anomalies || context.anomalies.length === 0) return false;
+  
+  const config = COLLECTIBLES_CONFIG;
+  for (const anomaly of context.anomalies) {
+    const dist = Math.sqrt((x - anomaly.x) ** 2 + (y - anomaly.y) ** 2);
+    if (dist < anomaly.radius * config.gravityWellRangeMultiplier) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Check if position is safe for surface placement
@@ -179,11 +262,12 @@ function isSafeCavernPosition(
   return true;
 }
 
-// Generate a single space junk item
+// Generate a single space junk item with spacing enforcement
 function generateSpaceJunkItem(
   levelSeed: number,
   index: number,
   context: PlacementContext,
+  existingJunk: SpaceJunk[],
   terrainColor?: string
 ): SpaceJunk | null {
   const seed = createJunkSeed(levelSeed, index);
@@ -192,7 +276,7 @@ function generateSpaceJunkItem(
   const shape = selectShape(rng);
   const config = COLLECTIBLES_CONFIG;
   
-  // Try to find a safe position
+  // Try to find a safe position with spacing
   for (let attempt = 0; attempt < config.maxPlacementAttempts; attempt++) {
     const x = 100 + rng() * (context.worldWidth - 200);
     const y = context.mode === "surface" 
@@ -203,7 +287,9 @@ function generateSpaceJunkItem(
       ? isSafeSurfacePosition(x, y, context)
       : isSafeCavernPosition(x, y, context);
     
-    if (isSafe) {
+    const hasSpacing = hasMinimumSpacing(x, y, existingJunk, config.minSpacingBetweenItems);
+    
+    if (isSafe && hasSpacing) {
       return {
         id: `junk_${index}_${seed}`,
         pos: { x, y },
@@ -220,6 +306,95 @@ function generateSpaceJunkItem(
   }
   
   return null; // Failed to place
+}
+
+// Generate in tricky locations for hard levels (level 6+)
+function generateTrickyJunkItem(
+  levelSeed: number,
+  index: number,
+  context: PlacementContext,
+  existingJunk: SpaceJunk[],
+  terrainColor?: string
+): SpaceJunk | null {
+  const seed = createJunkSeed(levelSeed, index + 1000); // Different seed offset for tricky items
+  const rng = mulberry32(seed);
+  const config = COLLECTIBLES_CONFIG;
+  
+  const shape = selectShape(rng);
+  
+  // Select tricky placement type based on weights and availability
+  const weights = config.trickyPlacementTypes;
+  const availableTypes: Array<'nearTerrain' | 'narrowCanyon' | 'volcanoZone' | 'gravityWell'> = ['nearTerrain', 'narrowCanyon'];
+  
+  // Only include volcano and gravity well types if data is available
+  if (context.volcanoes && context.volcanoes.length > 0) {
+    availableTypes.push('volcanoZone');
+  }
+  if (context.anomalies && context.anomalies.length > 0) {
+    availableTypes.push('gravityWell');
+  }
+  
+  // Calculate total weight for available types
+  const totalWeight = availableTypes.reduce((sum, type) => sum + weights[type], 0);
+  let roll = rng() * totalWeight;
+  
+  let selectedType = availableTypes[0];
+  for (const type of availableTypes) {
+    roll -= weights[type];
+    if (roll <= 0) {
+      selectedType = type;
+      break;
+    }
+  }
+  
+  // Try to place according to selected type
+  for (let attempt = 0; attempt < config.maxPlacementAttempts; attempt++) {
+    const x = 100 + rng() * (context.worldWidth - 200);
+    const y = context.mode === "surface" 
+      ? 100 + rng() * (context.worldHeight / 2)
+      : 100 + rng() * (context.worldHeight - 200);
+    
+    // Check basic safety
+    const isSafe = context.mode === "surface"
+      ? isSafeSurfacePosition(x, y, context)
+      : isSafeCavernPosition(x, y, context);
+    
+    const hasSpacing = hasMinimumSpacing(x, y, existingJunk, config.minSpacingBetweenItems);
+    
+    // Check tricky placement criteria
+    let meetsCriteria = false;
+    switch (selectedType) {
+      case 'nearTerrain':
+        meetsCriteria = isNearTerrainSurface(x, y, context);
+        break;
+      case 'narrowCanyon':
+        meetsCriteria = isInNarrowCanyon(x, y, context);
+        break;
+      case 'volcanoZone':
+        meetsCriteria = isInVolcanoZone(x, y, context);
+        break;
+      case 'gravityWell':
+        meetsCriteria = isInGravityWell(x, y, context);
+        break;
+    }
+    
+    if (isSafe && hasSpacing && meetsCriteria) {
+      return {
+        id: `junk_${index}_${seed}`,
+        pos: { x, y },
+        shape,
+        spinDegPerSec: (rng() - 0.5) * 60,
+        tint: terrainColor || JUNK_TINTS[shape],
+        radius: config.pickupRadius * 0.5,
+        fuelRewardPct: config.fuelRewardPct,
+        points: config.pointsPerPickup,
+        collected: false,
+        seed
+      };
+    }
+  }
+  
+  return null; // Failed to place in tricky location
 }
 
 // Repair placement for failed items
@@ -285,11 +460,26 @@ export function generateCollectibles(
     };
   }
   
-  // Generate space junk items
+  const isHardLevel = context.level >= config.hardPlacementStartLevel;
+  
+  // Generate space junk items with difficulty-based placement
   for (let i = 0; i < config.count; i++) {
-    let junk = generateSpaceJunkItem(levelSeed, i, context, terrainColor);
+    let junk: SpaceJunk | null = null;
     
-    // Try repairs if initial placement failed
+    // First item is always easy placement, items 2 and 3 are tricky on hard levels
+    const useTrickyPlacement = isHardLevel && i >= 1;
+    
+    if (useTrickyPlacement) {
+      // Try tricky placement strategies
+      junk = generateTrickyJunkItem(levelSeed, i, context, spaceJunk, terrainColor);
+    }
+    
+    // Fallback to normal placement if tricky failed or not needed
+    if (!junk) {
+      junk = generateSpaceJunkItem(levelSeed, i, context, spaceJunk, terrainColor);
+    }
+    
+    // Try repairs if placement failed
     if (!junk) {
       for (let repair = 0; repair < config.maxRepairAttempts && !junk; repair++) {
         // Create a dummy junk for repair attempts
@@ -315,32 +505,19 @@ export function generateCollectibles(
     }
   }
   
-  // Ensure minimum guaranteed items
+  // Ensure minimum guaranteed items (with spacing)
   while (spaceJunk.length < config.minItemsGuaranteed) {
-    const fallbackJunk: SpaceJunk = {
-      id: `junk_fallback_${spaceJunk.length}`,
-      pos: {
-        x: context.startPos.x + 120 + spaceJunk.length * 80,
-        y: context.startPos.y - 60
-      },
-      shape: "panel",
-      spinDegPerSec: 15,
-      tint: terrainColor || JUNK_TINTS.panel,
-      radius: config.pickupRadius * 0.5,
-      fuelRewardPct: config.fuelRewardPct + 2, // Extra reward for fallback
-      points: config.pointsPerPickup,
-      collected: false,
-      seed: levelSeed + spaceJunk.length + 9999
-    };
-    
-    spaceJunk.push(fallbackJunk);
+    const idx = spaceJunk.length;
+    const junk = generateSpaceJunkItem(levelSeed, idx + 100, context, spaceJunk, terrainColor);
+    if (junk) {
+      spaceJunk.push(junk);
+    } else {
+      break; // Can't place more
+    }
   }
-  
-  // Shield generation moved to endlessTerrain.ts for independent spawning
   
   return {
     spaceJunk,
-    shieldPickup: undefined, // Shield generation handled in endlessTerrain.ts
     collected: new Set(),
     totalCollected: 0,
     setComplete: false

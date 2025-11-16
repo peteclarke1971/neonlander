@@ -508,7 +508,9 @@ export function generateTerrain(
         x: pads.length > 0 ? (pads[pads.length - 1].xStart + pads[pads.length - 1].xEnd) / 2 : worldWidthLocal - 100, 
         y: pads.length > 0 ? pads[pads.length - 1].y : 400 
       },
-      chunkNumber: 0 // Not chunk-based (fixed level)
+      chunkNumber: 0, // Not chunk-based (fixed level)
+      level: level, // Pass level for difficulty-based placement
+      volcanoes: volcanoes // Pass volcanoes for tricky placement
     };
     
     // Use a terrain-based color for collectibles
