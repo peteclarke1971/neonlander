@@ -3439,9 +3439,6 @@ export const SurvivalEngine: React.FC<Props> = ({
               <span className="select-none">Rotate ►</span>
             </Button>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Tap screen: Thrust | Arrows/W: Keys
-          </div>
         </div>
       )}
       
