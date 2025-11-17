@@ -1708,14 +1708,8 @@ export const SurvivalEngine: React.FC<Props> = ({
           let terrainY = getHeightAt(shipX);
           const shipBottom = shipY + 12;
           
-          // Check if ship has cleared terrain by 10px to re-enable collision and apply pending fuel
+          // Check if ship has cleared terrain by 10px to re-enable collision
           if (!terrainCollisionEnabled.current && shipBottom < terrainY - 10) {
-            // Apply pending fuel refill now that we're airborne
-            if (pendingRefillAmount.current > 0) {
-              fuelAmount = Math.min(fuelCap, fuelAmount + pendingRefillAmount.current);
-              visualFuelRef.current = fuelBeforeLandingRef.current; // Trigger refuel animation
-              pendingRefillAmount.current = 0;
-            }
             terrainCollisionEnabled.current = true;
           }
           
@@ -1754,10 +1748,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 timerActiveRef.current = false;
                 setTimerActive(false);
                 
-                // Store fuel refill for application after takeoff
-                const refillAmount = 60; // Consistent 60 fuel per landing
-                pendingRefillAmount.current = refillAmount;
-                fuelBeforeLandingRef.current = fuelAmount; // Store pre-refill amount for animation
+                // No refueling on landing (disabled)
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
