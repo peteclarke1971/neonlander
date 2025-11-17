@@ -187,6 +187,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   // REM: REMOVE LATER - Unbreakable shield cheat (for testing)
   const unbreakableShieldRef = useRef(false);
   
+  // Terrain collision immunity flag (disabled during landing/refuel)
+  const terrainCollisionEnabled = useRef(false); // Start disabled (we start landed)
+  
   // Visual fuel state for integrated indicator
   const visualFuelRef = useRef(100);
   const prevFuelPercentRef = useRef(1);
@@ -1702,7 +1705,12 @@ export const SurvivalEngine: React.FC<Props> = ({
           let terrainY = getHeightAt(shipX);
           const shipBottom = shipY + 12;
           
-          if (shipBottom >= terrainY) {
+          // Check if ship has cleared terrain by 10px to re-enable collision
+          if (!terrainCollisionEnabled.current && shipBottom < terrainY - 10) {
+            terrainCollisionEnabled.current = true;
+          }
+          
+          if (terrainCollisionEnabled.current && shipBottom >= terrainY) {
             // Check for pad landing
             const pad = getPadAt(shipX, shipY);
             const movingPad = getMovingPadAt(shipX, shipY);
@@ -1723,6 +1731,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 shipVy = 0;
                 shipVx = 0;
                 shipAngularVel = 0;
+                
+                // Disable terrain collision during landing/refueling
+                terrainCollisionEnabled.current = false;
                 
                 // Freeze the moving pad when landing on it
                 if (movingPad) {
@@ -1960,6 +1971,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             lastTakeoffTime.current = currentTime;
             timerActiveRef.current = true;
             setTimerActive(true);
+            
+            // Note: Terrain collision stays disabled until ship clears terrain by 10px
           }
         }
       }
