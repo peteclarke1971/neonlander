@@ -2970,7 +2970,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           const waveAmp = liquidWaveAmplitudeRef.current;
           
           // Build liquid surface polygon
-          const resolution = shouldOptimize ? 8 : 16; // Points along surface
+          const resolution = shouldOptimize ? 8 : 28; // Points along surface (higher resolution for high-gfx)
           const points: {x: number, y: number}[] = [];
           
           // Add bottom corners
@@ -2985,19 +2985,36 @@ export const SurvivalEngine: React.FC<Props> = ({
             // Base height with tilt
             const tiltOffset = (t - 0.5) * 16 * Math.tan(tiltAngle);
             
-            // Add surface waves (2-3 harmonics for realism)
+            // Add surface waves with multiple harmonics
             let waveOffset = 0;
+            let meniscusOffset = 0;
+            
             if (!shouldOptimize) {
-              waveOffset = 
-                Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.6 +
-                Math.sin(t * Math.PI * 4 - wavePhase * 1.3) * waveAmp * 0.3 +
-                Math.sin(t * Math.PI * 6 + wavePhase * 0.7) * waveAmp * 0.1;
+              // Meniscus effect (surface tension at container edges)
+              const edgeDistance = Math.abs(t - 0.5) * 2; // 0 at center, 1 at edges
+              
+              if (edgeDistance > 0.7) {
+                const meniscusStrength = Math.pow((edgeDistance - 0.7) / 0.3, 2);
+                // Curve upward at edges (adhesion to container walls)
+                meniscusOffset = meniscusStrength * 1.2;
+              }
+              
+              // 6 wave harmonics for realistic fluid motion
+              const dampening = edgeDistance > 0.7 ? (1 - Math.pow((edgeDistance - 0.7) / 0.3, 2) * 0.6) : 1;
+              waveOffset = (
+                Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.40 +           // Primary wave
+                Math.sin(t * Math.PI * 4 - wavePhase * 1.3) * waveAmp * 0.25 +     // Secondary
+                Math.sin(t * Math.PI * 6 + wavePhase * 0.7) * waveAmp * 0.15 +     // Tertiary
+                Math.sin(t * Math.PI * 8 + wavePhase * 2.1) * waveAmp * 0.10 +     // Fine detail
+                Math.sin(t * Math.PI * 12 - wavePhase * 1.7) * waveAmp * 0.06 +    // Micro ripples
+                Math.sin(t * Math.PI * 16 + wavePhase * 0.9) * waveAmp * 0.04      // Surface texture
+              ) * dampening;
             } else {
               // Single wave for low graphics
               waveOffset = Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.8;
             }
             
-            const y = baseY + tiltOffset + waveOffset;
+            const y = baseY + tiltOffset + waveOffset + meniscusOffset;
             points.push({ x, y });
           }
           
