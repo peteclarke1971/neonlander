@@ -187,9 +187,6 @@ export const SurvivalEngine: React.FC<Props> = ({
   // REM: REMOVE LATER - Unbreakable shield cheat (for testing)
   const unbreakableShieldRef = useRef(false);
   
-  // Pending fuel refill (applied after takeoff clearance)
-  const pendingRefillAmount = useRef(0);
-  
   // Terrain collision immunity flag (disabled during landing/refuel)
   const terrainCollisionEnabled = useRef(false); // Start disabled (we start landed)
   
@@ -1748,7 +1745,10 @@ export const SurvivalEngine: React.FC<Props> = ({
                 timerActiveRef.current = false;
                 setTimerActive(false);
                 
-                // No refueling on landing (disabled)
+                // Add fuel refill (consistent throughout the game)
+                // TEMPORARILY DISABLED FOR DIAGNOSTIC: Testing if refueling causes crash
+                // const refillAmount = 60; // Consistent 60 fuel per landing
+                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
@@ -2911,11 +2911,9 @@ export const SurvivalEngine: React.FC<Props> = ({
         ctx.restore();
       }
       
-      // Smooth visual fuel interpolation for refuel animation
-      const fuelPercent = fuelAmount / fuelCap;
-      const visualFuelPercent = visualFuelRef.current / fuelCap;
-      const smoothFuelPercent = visualFuelPercent + (fuelPercent - visualFuelPercent) * 0.05;
-      visualFuelRef.current = smoothFuelPercent * fuelCap;
+      // TEMPORARILY DISABLED: Visual fuel interpolation (smooth animation)
+      // Always keep visual fuel matching actual fuel (no animation)
+      visualFuelRef.current = fuelAmount;
       
       // Draw ship BEFORE spotlight masking (so lander stays visible)
       if (!isDead) {
