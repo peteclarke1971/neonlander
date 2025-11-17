@@ -188,9 +188,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   const unbreakableShieldRef = useRef(false);
   
   // Visual fuel state for integrated indicator
-  const visualFuelRef = useRef(200);
+  const visualFuelRef = useRef(100);
   const prevFuelPercentRef = useRef(1);
-  const fuelBeforeLandingRef = useRef(200);
+  const fuelBeforeLandingRef = useRef(100);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
