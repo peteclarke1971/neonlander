@@ -2352,43 +2352,41 @@ export const SurvivalEngine: React.FC<Props> = ({
         renderLightningBolts(ctx, lightningBoltsRef.current, dprInit, shouldOptimize);
       }
       
-      // Fill terrain shape with black to mask stars behind it
+      // Fill terrain shape with black to mask stars behind it (both low and high-gfx)
       // This must be done BEFORE applying camera transform
-      if (!shouldOptimize) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(dprInit, dprInit);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dprInit, dprInit);
+      
+      // Apply same camera transform used for terrain
+      ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
+      ctx.scale(zoom, zoom);
+      ctx.translate(-cameraX + shake, anchor);
+      
+      // Fill terrain shape with solid black
+      ctx.fillStyle = '#000000';
+      
+      for (const chunk of chunks) {
+        if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
         
-        // Apply same camera transform used for terrain
-        ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cameraX + shake, anchor);
+        ctx.beginPath();
+        // Start from far below the terrain
+        ctx.moveTo(chunk.startX, 2000);
         
-        // Fill terrain shape with solid black
-        ctx.fillStyle = '#000000';
-        
-        for (const chunk of chunks) {
-          if (chunk.startX > cameraX + viewWidth || chunk.endX < cameraX - viewWidth * 0.5) continue;
-          
-          ctx.beginPath();
-          // Start from far below the terrain
-          ctx.moveTo(chunk.startX, 2000);
-          
-          // Trace up to and along the terrain line
-          ctx.lineTo(chunk.points[0].x, chunk.points[0].y);
-          for (let i = 1; i < chunk.points.length; i++) {
-            const pt = chunk.points[i];
-            ctx.lineTo(pt.x, pt.y);
-          }
-          
-          // Close back down
-          ctx.lineTo(chunk.endX, 2000);
-          ctx.closePath();
-          ctx.fill();
+        // Trace up to and along the terrain line
+        ctx.lineTo(chunk.points[0].x, chunk.points[0].y);
+        for (let i = 1; i < chunk.points.length; i++) {
+          const pt = chunk.points[i];
+          ctx.lineTo(pt.x, pt.y);
         }
         
-        ctx.restore();
+        // Close back down
+        ctx.lineTo(chunk.endX, 2000);
+        ctx.closePath();
+        ctx.fill();
       }
+      
+      ctx.restore();
       
       // Apply zoom and camera transform (both horizontal and vertical)
       ctx.translate(c.width / (2 * dprInit), c.height / (2 * dprInit));
