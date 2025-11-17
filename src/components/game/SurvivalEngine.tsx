@@ -71,8 +71,8 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [altitude, setAltitude] = useState(0);
   const [vx, setVx] = useState(0);
   const [vy, setVy] = useState(0);
-  const [fuel, setFuel] = useState(200);
-  const fuelCap = 200;
+  const [fuel, setFuel] = useState(100);
+  const fuelCap = 100;
   
   // Volcano particles state (persistent between frames)
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
