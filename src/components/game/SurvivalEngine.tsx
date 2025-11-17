@@ -1746,9 +1746,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 setTimerActive(false);
                 
                 // Add fuel refill (consistent throughout the game)
-                // TEMPORARILY DISABLED FOR DIAGNOSTIC: Testing if refueling causes crash
-                // const refillAmount = 60; // Consistent 60 fuel per landing
-                // fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
+                // RE-ENABLED TEMPORARILY: Can be easily disabled by commenting out next 2 lines
+                const refillAmount = 60; // Consistent 60 fuel per landing
+                fuelAmount = Math.min(fuelCap, fuelAmount + refillAmount);
                 
                 // Add score only if player has moved from start
                 if (hasMovedFromStart) {
@@ -1962,8 +1962,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             landedPad = null;
             
-            // TEMPORARILY DISABLED: Reset visual fuel to pre-refill amount to trigger animation
-            // visualFuelRef.current = fuelBeforeLandingRef.current;
+            // RE-ENABLED TEMPORARILY: Reset visual fuel to pre-refill amount to trigger animation
+            visualFuelRef.current = fuelBeforeLandingRef.current;
             
             // Small upward impulse to help clear the pad
             shipVy = -1.5;
