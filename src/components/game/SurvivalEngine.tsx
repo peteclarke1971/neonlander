@@ -172,6 +172,15 @@ export const SurvivalEngine: React.FC<Props> = ({
   const rainbowAlphaRef = useRef(0);
   const padResidueMapRef = useRef<Map<string, { alpha: number; color: string }>>(new Map());
   
+  // Liquid fuel sloshing physics
+  const liquidTiltAngleRef = useRef(0);        // Current tilt angle of liquid surface
+  const liquidTiltVelocityRef = useRef(0);     // Angular velocity of tilt
+  const liquidWavePhaseRef = useRef(0);        // Phase for surface wave animation
+  const liquidWaveAmplitudeRef = useRef(0);    // Amplitude of surface ripples
+  const prevShipVxRef = useRef(0);             // Previous frame velocity for acceleration calc
+  const prevShipVyRef = useRef(0);             // Previous frame Vy for acceleration calc
+  const prevShipAngularVelRef = useRef(0);     // Previous angular velocity
+  
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
   
@@ -1200,6 +1209,56 @@ export const SurvivalEngine: React.FC<Props> = ({
           audio.current.setThruster(1);
         } else {
           audio.current.setThruster(0);
+        }
+        
+        // Update liquid sloshing physics
+        if (!isLanded) {
+          // Calculate acceleration in ship's reference frame
+          const accelX = (shipVx - prevShipVxRef.current) / dt;
+          const accelY = (shipVy - prevShipVyRef.current) / dt;
+          prevShipVxRef.current = shipVx;
+          prevShipVyRef.current = shipVy;
+          
+          // Lateral acceleration component (perpendicular to ship's forward)
+          const lateralAccel = accelX * Math.cos(shipAngle) - accelY * Math.sin(shipAngle);
+          
+          // Angular acceleration
+          const angularAccel = (shipAngularVel - prevShipAngularVelRef.current) / dt;
+          prevShipAngularVelRef.current = shipAngularVel;
+          
+          // Spring-damper physics for liquid tilt
+          const SPRING_K = 15.0;        // Restoring force strength
+          const DAMPING = 0.85;          // Friction/damping
+          const SENSITIVITY = 0.008;     // How much acceleration affects tilt
+          const ANGULAR_INFLUENCE = 0.3; // How much rotation affects liquid
+          
+          // External force from ship movement (inertia - liquid lags behind)
+          const externalForce = -lateralAccel * SENSITIVITY - angularAccel * ANGULAR_INFLUENCE;
+          
+          // Spring force (tries to level the liquid)
+          const springForce = -liquidTiltAngleRef.current * SPRING_K;
+          
+          // Update tilt velocity and angle
+          liquidTiltVelocityRef.current += (springForce + externalForce) * dt;
+          liquidTiltVelocityRef.current *= Math.pow(DAMPING, dt * 60); // Frame-rate independent damping
+          liquidTiltAngleRef.current += liquidTiltVelocityRef.current * dt;
+          
+          // Clamp tilt to reasonable range (±0.4 radians ≈ ±23°)
+          liquidTiltAngleRef.current = Math.max(-0.4, Math.min(0.4, liquidTiltAngleRef.current));
+          
+          // Surface wave animation
+          liquidWavePhaseRef.current += dt * 3.5; // Wave speed
+          
+          // Wave amplitude reacts to acceleration (ripples when disturbed)
+          const disturbance = Math.abs(lateralAccel) * 0.002 + Math.abs(angularAccel) * 0.5;
+          liquidWaveAmplitudeRef.current += disturbance;
+          liquidWaveAmplitudeRef.current *= Math.pow(0.92, dt * 60); // Decay
+          liquidWaveAmplitudeRef.current = Math.min(liquidWaveAmplitudeRef.current, 3.0); // Max amplitude
+        } else {
+          // When landed, gradually settle the liquid
+          liquidTiltVelocityRef.current *= Math.pow(0.8, dt * 60);
+          liquidTiltAngleRef.current *= Math.pow(0.9, dt * 60);
+          liquidWaveAmplitudeRef.current *= Math.pow(0.95, dt * 60);
         }
         
         // Always update hazards and asteroids (even when landed)
@@ -2889,7 +2948,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           flickerAlpha = 0.4 + flickerPhase * 0.6;
         }
         
-        // Draw fuel fill - clipped to triangle shape (with isolated alpha)
+        // Draw fuel fill with sloshing physics - clipped to triangle shape (with isolated alpha)
         if (smoothFuelPercent > 0.01) {
           ctx.save();
           
@@ -2901,7 +2960,48 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.closePath();
           ctx.clip();
           
-          // Draw fill from bottom up with isolated alpha
+          // Calculate base liquid height
+          const fillHeight = 20 * smoothFuelPercent;
+          const baseY = 10 - fillHeight;
+          
+          // Get sloshing parameters
+          const tiltAngle = liquidTiltAngleRef.current;
+          const wavePhase = liquidWavePhaseRef.current;
+          const waveAmp = liquidWaveAmplitudeRef.current;
+          
+          // Build liquid surface polygon
+          const resolution = shouldOptimize ? 8 : 16; // Points along surface
+          const points: {x: number, y: number}[] = [];
+          
+          // Add bottom corners
+          points.push({ x: -8, y: 10 });
+          points.push({ x: 8, y: 10 });
+          
+          // Generate wavy, tilted top surface (right to left for proper winding)
+          for (let i = resolution; i >= 0; i--) {
+            const t = i / resolution; // 0 to 1 (right to left)
+            const x = -8 + 16 * t;
+            
+            // Base height with tilt
+            const tiltOffset = (t - 0.5) * 16 * Math.tan(tiltAngle);
+            
+            // Add surface waves (2-3 harmonics for realism)
+            let waveOffset = 0;
+            if (!shouldOptimize) {
+              waveOffset = 
+                Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.6 +
+                Math.sin(t * Math.PI * 4 - wavePhase * 1.3) * waveAmp * 0.3 +
+                Math.sin(t * Math.PI * 6 + wavePhase * 0.7) * waveAmp * 0.1;
+            } else {
+              // Single wave for low graphics
+              waveOffset = Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.8;
+            }
+            
+            const y = baseY + tiltOffset + waveOffset;
+            points.push({ x, y });
+          }
+          
+          // Draw the liquid polygon
           ctx.fillStyle = fillColor;
           if (!shouldOptimize) {
             ctx.shadowColor = fillColor;
@@ -2909,8 +3009,13 @@ export const SurvivalEngine: React.FC<Props> = ({
           }
           ctx.globalAlpha = fillAlpha * flickerAlpha;
           
-          const fillHeight = 20 * smoothFuelPercent;
-          ctx.fillRect(-8, 10 - fillHeight, 16, fillHeight);
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.closePath();
+          ctx.fill();
           
           ctx.restore();
         }
