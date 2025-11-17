@@ -1711,8 +1711,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             if (landingPad) {
               // Easy mode landing requirements (matching main game)
               const okAngle = Math.abs(shipAngle) < 0.18; // ~10 degrees
-              const okVy = Math.abs(shipVy) < 18.0;  // 18 m/s vertical (was incorrectly 1.8)
-              const okVx = Math.abs(shipVx) < 15.0;  // 15 m/s horizontal (was incorrectly 1.5)
+              const okVy = Math.abs(shipVy) < 1.8;  // 1.8 m/s vertical velocity
+              const okVx = Math.abs(shipVx) < 1.5;  // 1.5 m/s horizontal velocity
               
               if (okAngle && okVy && okVx) {
                 // Successful landing!
