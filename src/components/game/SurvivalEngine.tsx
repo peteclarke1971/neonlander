@@ -71,8 +71,8 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [altitude, setAltitude] = useState(0);
   const [vx, setVx] = useState(0);
   const [vy, setVy] = useState(0);
-  const [fuel, setFuel] = useState(100);
-  const fuelCap = 100;
+  const [fuel, setFuel] = useState(50);
+  const fuelCap = 200;
   
   // Volcano particles state (persistent between frames)
   const [volcanoParticles, setVolcanoParticles] = useState<VolcanoParticle[]>([]);
@@ -191,9 +191,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   const terrainCollisionEnabled = useRef(false); // Start disabled (we start landed)
   
   // Visual fuel state for integrated indicator
-  const visualFuelRef = useRef(100);
+  const visualFuelRef = useRef(50);
   const prevFuelPercentRef = useRef(1);
-  const fuelBeforeLandingRef = useRef(100);
+  const fuelBeforeLandingRef = useRef(50);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(new AudioManager());
