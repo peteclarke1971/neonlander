@@ -3344,6 +3344,27 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
 
+      // Low fuel warning - pulsing red lander (classic/fixed/timetrial only)
+      let shipColor = neonColor;
+      if ((mode === "classic" || mode === "fixed" || mode === "timetrial") && fuel <= 50) {
+        if (fuel < 10) {
+          // Solid red when critically low
+          shipColor = "#ff0000";
+        } else {
+          // Pulsing red - frequency increases as fuel decreases
+          // Fuel 50 = slow (2Hz), Fuel 10 = fast (8Hz)
+          const fuelRatio = (fuel - 10) / 40; // 0 to 1 range (10 to 50 fuel)
+          const pulseFreq = 2 + (1 - fuelRatio) * 6; // 2Hz to 8Hz
+          const pulse = (Math.sin(elapsed * pulseFreq * Math.PI * 2) + 1) / 2; // 0 to 1
+          
+          // Red influence increases as fuel decreases
+          const redInfluence = 0.3 + (1 - fuelRatio) * 0.7; // 30% to 100% red
+          
+          // Oscillate between neon and red based on pulse and fuel level
+          shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
+        }
+      }
+
       // Lander
       if (!crashed) {
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
@@ -3355,7 +3376,7 @@ export const GameEngine: React.FC<Props> = ({
           ctx.lineTo(8, 10);
           ctx.lineTo(-8, 10);
           ctx.closePath();
-          ctx.strokeStyle = neonColor as any;
+          ctx.strokeStyle = shipColor as any;
           ctx.lineWidth = 2;
           ctx.stroke();
 
