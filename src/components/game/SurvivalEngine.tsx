@@ -180,6 +180,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const prevShipVxRef = useRef(0);             // Previous frame velocity for acceleration calc
   const prevShipVyRef = useRef(0);             // Previous frame Vy for acceleration calc
   const prevShipAngularVelRef = useRef(0);     // Previous angular velocity
+  const forceSloshingTimerRef = useRef(0);     // Timer for post-refuel sloshing effect
   
   // Unlimited fuel cheat (for testing)
   const unlimitedFuelRef = useRef(false);
@@ -1215,7 +1216,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         }
         
         // Update liquid sloshing physics
-        if (!isLanded) {
+        if (!isLanded || forceSloshingTimerRef.current > 0) {
           // Calculate acceleration in ship's reference frame
           const accelX = (shipVx - prevShipVxRef.current) / dt;
           const accelY = (shipVy - prevShipVyRef.current) / dt;
@@ -1236,7 +1237,22 @@ export const SurvivalEngine: React.FC<Props> = ({
           const ANGULAR_INFLUENCE = 0.3; // How much rotation affects liquid
           
           // External force from ship movement (inertia - liquid lags behind)
-          const externalForce = -lateralAccel * SENSITIVITY - angularAccel * ANGULAR_INFLUENCE;
+          let externalForce = -lateralAccel * SENSITIVITY - angularAccel * ANGULAR_INFLUENCE;
+          
+          // Add artificial sloshing when refueling completes (simulate fuel settling)
+          if (forceSloshingTimerRef.current > 0) {
+            // Create wave-like disturbance that diminishes over time
+            const sloshProgress = 1 - (forceSloshingTimerRef.current / 1.5); // Progress from 0 to 1
+            const sloshFrequency = 3.5; // Oscillation frequency
+            const sloshIntensity = 150 * (1 - sloshProgress); // Diminishing intensity
+            externalForce += Math.sin(currentTime * sloshFrequency) * sloshIntensity;
+            
+            // Decrement timer
+            forceSloshingTimerRef.current -= dt;
+            if (forceSloshingTimerRef.current < 0) {
+              forceSloshingTimerRef.current = 0;
+            }
+          }
           
           // Spring force (tries to level the liquid)
           const springForce = -liquidTiltAngleRef.current * SPRING_K;
@@ -1255,10 +1271,16 @@ export const SurvivalEngine: React.FC<Props> = ({
           // Wave amplitude reacts to acceleration (ripples when disturbed)
           const disturbance = Math.abs(lateralAccel) * 0.002 + Math.abs(angularAccel) * 0.5;
           liquidWaveAmplitudeRef.current += disturbance;
+          
+          // Extra disturbance during forced sloshing
+          if (forceSloshingTimerRef.current > 0) {
+            liquidWaveAmplitudeRef.current += 0.08;
+          }
+          
           liquidWaveAmplitudeRef.current *= Math.pow(0.92, dt * 60); // Decay
           liquidWaveAmplitudeRef.current = Math.min(liquidWaveAmplitudeRef.current, 3.0); // Max amplitude
         } else {
-          // When landed, gradually settle the liquid
+          // When landed (and not force-sloshing), gradually settle the liquid
           liquidTiltVelocityRef.current *= Math.pow(0.8, dt * 60);
           liquidTiltAngleRef.current *= Math.pow(0.9, dt * 60);
           liquidWaveAmplitudeRef.current *= Math.pow(0.95, dt * 60);
@@ -2913,7 +2935,14 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // TEMPORARILY DISABLED: Visual fuel interpolation (smooth animation)
       // Always keep visual fuel matching actual fuel (no animation)
+      const prevVisualFuel = visualFuelRef.current;
       visualFuelRef.current = fuelAmount;
+      
+      // Trigger sloshing effect when refueling animation completes
+      if (isLanded && prevVisualFuel < fuelAmount - 0.5 && Math.abs(visualFuelRef.current - fuelAmount) < 0.1) {
+        // Just finished refueling - start sloshing timer (1.5 seconds)
+        forceSloshingTimerRef.current = 1.5;
+      }
       
       // Draw ship BEFORE spotlight masking (so lander stays visible)
       if (!isDead) {
