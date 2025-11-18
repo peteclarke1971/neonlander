@@ -3344,29 +3344,58 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
 
-      // Low fuel warning - pulsing red lander (classic/fixed/timetrial only)
+      // Helper function to interpolate between two hex colors
+      const lerpColor = (color1: string, color2: string, t: number): string => {
+        const r1 = parseInt(color1.slice(1, 3), 16);
+        const g1 = parseInt(color1.slice(3, 5), 16);
+        const b1 = parseInt(color1.slice(5, 7), 16);
+        
+        const r2 = parseInt(color2.slice(1, 3), 16);
+        const g2 = parseInt(color2.slice(3, 5), 16);
+        const b2 = parseInt(color2.slice(5, 7), 16);
+        
+        const r = Math.round(r1 + (r2 - r1) * t);
+        const g = Math.round(g1 + (g2 - g1) * t);
+        const b = Math.round(b1 + (b2 - b1) * t);
+        
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      };
+
+      // Low fuel warning - smooth color fade and pulsing glow (classic/fixed/timetrial only)
       let shipColor = neonColor;
+      let shipShadowBlur = shadowBlur;
+      
       if ((mode === "classic" || mode === "fixed" || mode === "timetrial") && fuel <= 50) {
         if (fuel < 10) {
-          // Solid red when critically low
+          // Solid red with pulsing glow when critically low
           shipColor = "#ff0000";
+          // Pulsing glow effect (20-40px) at 5Hz for urgency
+          const glowPulse = (Math.sin(elapsed * 5 * Math.PI * 2) + 1) / 2; // 0 to 1
+          shipShadowBlur = 20 + glowPulse * 20; // 20-40px pulsing
         } else {
-          // Pulsing red - frequency increases as fuel decreases
-          // Fuel 50 = slow (2Hz), Fuel 10 = fast (8Hz)
-          const fuelRatio = (fuel - 10) / 40; // 0 to 1 range (10 to 50 fuel)
+          // Smooth color fade from neon to red
+          const fuelRatio = (fuel - 10) / 40; // 0 to 1 (10 to 50 fuel)
           const pulseFreq = 2 + (1 - fuelRatio) * 6; // 2Hz to 8Hz
           const pulse = (Math.sin(elapsed * pulseFreq * Math.PI * 2) + 1) / 2; // 0 to 1
           
-          // Red influence increases as fuel decreases
+          // Interpolate between neon and red based on pulse and fuel level
           const redInfluence = 0.3 + (1 - fuelRatio) * 0.7; // 30% to 100% red
+          const colorBlend = pulse * (1 - redInfluence) + redInfluence; // How much red
           
-          // Oscillate between neon and red based on pulse and fuel level
-          shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
+          shipColor = lerpColor(neonColor, "#ff0000", colorBlend);
         }
       }
 
       // Lander
       if (!crashed) {
+        // Save original shadow settings
+        const originalShadowColor = ctx.shadowColor;
+        const originalShadowBlur = ctx.shadowBlur;
+        
+        // Update shadow to match ship color
+        ctx.shadowColor = shipColor as any;
+        ctx.shadowBlur = shipShadowBlur;
+        
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
           ctx.save();
           ctx.translate(x + offset, y);
@@ -3396,6 +3425,10 @@ export const GameEngine: React.FC<Props> = ({
           }
           ctx.restore();
         }
+        
+        // Restore original shadow settings for other elements
+        ctx.shadowColor = originalShadowColor;
+        ctx.shadowBlur = originalShadowBlur;
       }
 
       // Spectacular particle rendering with dramatically enhanced thruster effects
