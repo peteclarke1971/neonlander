@@ -401,6 +401,11 @@ export function getInitialsPositions(
   
   // Generate particle targets for each letter
   chars.forEach((char, letterIndex) => {
+    // Skip space characters - don't render any fireworks for them
+    if (char === ' ' || char === '_') {
+      return;
+    }
+    
     const bitmap = LETTER_BITMAPS[char] || LETTER_BITMAPS['A']; // Fallback to 'A'
     const letterStartX = startX + (letterIndex * (letterWidth + letterSpacing));
     
