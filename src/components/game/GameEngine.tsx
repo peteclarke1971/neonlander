@@ -3378,9 +3378,16 @@ export const GameEngine: React.FC<Props> = ({
           const pulseFreq = 2 + (1 - fuelRatio) * 6; // 2Hz to 8Hz
           const pulse = (Math.sin(elapsed * pulseFreq * Math.PI * 2) + 1) / 2; // 0 to 1
           
-          // Interpolate between neon and red based on pulse and fuel level
+          // Apply cubic easing to make the pulse more dramatic
+          // This makes the color spend more time at extremes (neon or red)
+          // and less time in the middle (orange/yellow blends)
+          const easedPulse = pulse < 0.5 
+            ? 4 * pulse * pulse * pulse  // ease-in cubic
+            : 1 - Math.pow(-2 * pulse + 2, 3) / 2;  // ease-out cubic
+          
+          // Interpolate between neon and red based on eased pulse and fuel level
           const redInfluence = 0.3 + (1 - fuelRatio) * 0.7; // 30% to 100% red
-          const colorBlend = pulse * (1 - redInfluence) + redInfluence; // How much red
+          const colorBlend = easedPulse * (1 - redInfluence) + redInfluence; // How much red
           
           shipColor = lerpColor(neonColor, "#ff0000", colorBlend);
         }
