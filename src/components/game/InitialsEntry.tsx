@@ -70,11 +70,6 @@ export const InitialsEntry: React.FC<Props> = ({
           newInitials[currentSlot - 1] = '';
           return newInitials;
         });
-        setCharIndex(prev => {
-          const newIndex = [...prev];
-          newIndex[currentSlot - 1] = 0; // Reset to 'A'
-          return newIndex;
-        });
       }
     } else {
       // Regular character: commit it
@@ -84,10 +79,16 @@ export const InitialsEntry: React.FC<Props> = ({
       
       if (currentSlot === 2) {
         // Third character committed - auto submit!
-        handleSubmit(newInitials.join(''));
+        handleSubmit(newInitials.join('').replace(/_/g, ' '));
       } else {
         // Move to next slot
         setCurrentSlot(prev => prev + 1);
+        // Copy current character index to next slot
+        setCharIndex(prev => {
+          const newIndex = [...prev];
+          newIndex[currentSlot + 1] = newIndex[currentSlot];
+          return newIndex;
+        });
       }
     }
   };
