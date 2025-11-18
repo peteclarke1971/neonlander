@@ -199,7 +199,7 @@ export function generateTerrain(
     let width: number;
     if (r < 0.35) {
       // Small pads: ~1.5x lander width (lander ~16px wide)
-      width = 24 + rand() * 8; // 24-32
+      width = 28 + rand() * 8; // 28-36
     } else if (r < 0.75) {
       // Medium pads
       width = step * (0.8 + rand() * 0.8); // ~40-80 if step≈50
