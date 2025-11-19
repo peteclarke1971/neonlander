@@ -52,6 +52,13 @@ export class AudioManager {
   
   // Mission success music
   private missionSuccessBuffer?: AudioBuffer | null;
+  
+  // Lightning sound placeholders (will be implemented later)
+  private lightningBuffers: {
+    rumble?: AudioBuffer | null;
+    crack?: AudioBuffer | null;
+    impact?: AudioBuffer | null;
+  } = {};
 
   constructor() {
     // Load global music mute state from localStorage
@@ -492,6 +499,19 @@ export class AudioManager {
     gain.connect(this.master);
     osc.start();
     osc.stop(this.ctx.currentTime + 0.06);
+  }
+  
+  // Lightning sound placeholders - ready for future audio files
+  playLightningSound(distance: 'far' | 'close', volume: number = 0.5) {
+    // TODO: Add lightning sound files
+    // far: low rumble sound
+    // close: loud crack/boom sound
+    // Will use lightningBuffers.rumble and lightningBuffers.crack
+  }
+  
+  playLightningImpactSound(volume: number = 0.8) {
+    // TODO: Add terrain impact sound
+    // Will use lightningBuffers.impact
   }
 
   // ===== Shield sounds =====
