@@ -2873,9 +2873,8 @@ export const GameEngine: React.FC<Props> = ({
         if (mode === "classic" && level === 4) {
           ctx.save();
           
-          // Calculate dynamic water line based on terrain at camera position
-          const terrainHeightAtCamera = terrain.getHeightAt(cameraX);
-          const waterLineWorldY = terrainHeightAtCamera + 120; // 120 pixels below terrain surface
+          // Fixed water line position in world space (prevents vertical bobbing)
+          const waterLineWorldY = 550; // Fixed Y coordinate in world space
           
           // Convert to screen space
           const waterLineScreenY = (h / (2 * dpr)) + (waterLineWorldY + anchor) * zoom;
