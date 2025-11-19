@@ -3492,7 +3492,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       {showFireworks && landingType && (
         <FireworksDisplay
           landingType={landingType}
-          neonColor={getComputedStyle(document.documentElement).getPropertyValue('--neon')}
+          neonColor={classicColorsMode.current ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})` : currentPalette.accent}
           fireworkCount={landings}
           isHighScore={isHighScore}
           onComplete={() => setShowFireworks(false)}
