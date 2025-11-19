@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { anyGamepad } from '../../hooks/use-gamepad';
 import { PerformanceManager } from './utils/performanceManager';
 import { ObjectPool } from './utils/objectPool';
+import { getArcadeShapePositions } from './utils/arcadeBitmaps';
 
 interface FireworkParticle {
   x: number;
@@ -385,64 +386,53 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         break;
         
       case 'ghost':
-        console.log('👻 Creating GHOST pattern with Pac-Man style ghosts');
+        console.log('👻 Creating GHOST pattern - bitmap burst');
         const ghostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500']; // Classic Pac-Man colors
-        for (let i = 0; i < baseCount; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 1.5 + Math.random() * 2; // Slower, floaty movement
+        const dotSize = 4;
+        const ghostTargets = getArcadeShapePositions('GHOST', 0, 0, dotSize);
+        
+        // Create particles for each position in the ghost bitmap
+        ghostTargets.forEach((target) => {
+          const speed = 0.5 + Math.random() * 0.8;
+          const angle = Math.atan2(target.y, target.x);
           const vx = Math.cos(angle) * speed;
-          const vy = Math.sin(angle) * speed - 0.5; // Slight upward bias
-          newParticles.push(createParticle(vx, vy, { 
-            shape: 'ghost',
-            color: ghostColors[i % ghostColors.length],
-            size: 6 + Math.random() * 4, // Larger for better visibility
-            gravity: false, // Ghosts float!
-            life: 200 + Math.random() * 100, // Longer life for ethereal effect
-            max: 200 + Math.random() * 100,
-            glowSize: 12 + Math.random() * 6, // More dramatic glow
-            rotationSpeed: (Math.random() - 0.5) * 0.05, // Very slow gentle rotation
-            colorTransition: true,
-            secondaryColor: 'rgba(255, 255, 255, 0.4)'
+          const vy = Math.sin(angle) * speed;
+          
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'circle',
+            color: ghostColors[Math.floor(Math.random() * ghostColors.length)],
+            size: 3 + Math.random() * 2,
+            gravity: true,
+            life: 150 + Math.random() * 50,
+            max: 200,
+            glowSize: 6 + Math.random() * 3
           }));
-        }
+        });
         break;
         
       case 'giant-ghost':
-        console.log('👻👑 Creating GIANT GHOST pattern - massive Pac-Man ghost finale!');
+        console.log('👻👑 Creating GIANT GHOST pattern - bitmap burst');
         const giantGhostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500'];
-        // Create one massive central ghost
-        newParticles.push(createParticle(0, 0, {
-          shape: 'ghost',
-          color: giantGhostColors[0], // Red ghost (Blinky)
-          size: 40, // Massive size
-          gravity: false,
-          life: 300,
-          max: 300,
-          glowSize: 30,
-          rotationSpeed: 0.02,
-          vx: 0, // Stationary
-          vy: 0
-        }));
+        const giantDotSize = 8;
+        const giantGhostTargets = getArcadeShapePositions('GHOST', 0, 0, giantDotSize);
         
-        // Floating particles around the giant ghost
-        for (let i = 0; i < 60; i++) {
-          const angle = (i / 60) * Math.PI * 2;
-          const radius = 80 + Math.sin(i * 0.5) * 20; // Wavy circle
-          const vx = Math.cos(angle) * 0.5;
-          const vy = Math.sin(angle) * 0.5;
+        // Create larger particles for giant ghost effect
+        giantGhostTargets.forEach((target) => {
+          const speed = 0.3 + Math.random() * 0.5;
+          const angle = Math.atan2(target.y, target.x);
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
           newParticles.push(createParticle(vx, vy, {
             shape: 'circle',
-            color: giantGhostColors[i % giantGhostColors.length],
-            size: 3 + Math.random() * 2,
-            gravity: false,
-            life: 250,
-            max: 250,
-            glowSize: 8,
-            x: x + Math.cos(angle) * radius,
-            y: y + Math.sin(angle) * radius,
-            rotationSpeed: (Math.random() - 0.5) * 0.1
+            color: giantGhostColors[Math.floor(Math.random() * giantGhostColors.length)],
+            size: 5 + Math.random() * 3,
+            gravity: true,
+            life: 200 + Math.random() * 100,
+            max: 300,
+            glowSize: 10 + Math.random() * 5
           }));
-        }
+        });
         break;
         
       case 'pentagon-shatter':
@@ -1184,9 +1174,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       patterns = getSeasonalPatterns(['pentagon-shatter', 'star-constellation', 'geometric-rose', 'vector-heart', 'hexagon-honeycomb', 'lander-swarm'], 'normal', forceSeason, forceHighScore);
       timing = 250;
     } else if (effectiveLandingType === 'ghost-beaten') {
-      launchCount = 4;
-      patterns = ['giant-ghost', 'giant-ghost', 'giant-ghost', 'giant-ghost'];
-      timing = 500;
+      // Mix of ghosts and Pac-Man for arcade feel
+      launchCount = lowGraphics ? 4 : 6;
+      patterns = lowGraphics 
+        ? ['ghost', 'ghost', 'pacman', 'giant-ghost']
+        : ['ghost', 'giant-ghost', 'ghost', 'pacman', 'giant-ghost', 'ghost'];
+      timing = 400;
     } else if (fireworkCount !== undefined && !overrideLandingType) {
       // PRIORITY 2: Use fireworkCount for survival mode (regular landings)
       launchCount = fireworkCount;
@@ -1246,41 +1239,40 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       }, i * timing);
     }
     
-    // Grand finale for ghost-beaten - MAGICAL GHOST ARMY WITH GIANT GHOST!
-    if (landingType === 'ghost-beaten') {
+    // Grand finale for ghost-beaten - Pac-Man chasing ghosts!
+    if (landingType === 'ghost-beaten' && !lowGraphics) {
       setTimeout(() => {
-        // First wave: ghost parade across the sky
-        for (let i = 0; i < 6; i++) {
-          const x = canvas.width * (0.15 + i * 0.14);
-          const targetY = canvas.height * 0.25;
+        // Ghost parade across top
+        const ghostCount = 4;
+        for (let i = 0; i < ghostCount; i++) {
+          const x = canvas.width * (0.2 + i * 0.2);
+          const targetY = canvas.height * 0.3;
           setTimeout(() => {
             setParticles(prev => [...prev, ...createBurst(x, targetY, colors, 'ghost')]);
-          }, i * 100);
+          }, i * 150);
         }
         
-        // GIANT GHOST FINALE - dramatic pause then massive ghost appears in center
-        setTimeout(() => {
-          const centerX = canvas.width / 2;
-          const centerY = canvas.height * 0.4;
-          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'giant-ghost')]);
-        }, 800); // Pause for dramatic effect
-        
-        // Second wave: heart explosion in center
+        // Pac-Man chase finale
         setTimeout(() => {
           const centerX = canvas.width * 0.5;
-          const centerY = canvas.height * 0.3;
-          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'heart')]);
-          
-          // Triple ghost finale around the heart
-          setTimeout(() => {
-            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI * 2 / 3) {
-              const x = centerX + Math.cos(angle) * 150;
-              const y = centerY + Math.sin(angle) * 100;
-              setParticles(prev => [...prev, ...createBurst(x, y, colors, 'ghost')]);
-            }
-          }, 300);
-        }, 800);
-      }, launchCount * timing + 500);
+          const centerY = canvas.height * 0.5;
+          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'pacman')]);
+        }, 700);
+        
+        // Final giant ghost burst
+        setTimeout(() => {
+          const centerX = canvas.width * 0.5;
+          const centerY = canvas.height * 0.4;
+          setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'giant-ghost')]);
+        }, 1200);
+      }, 2500);
+    } else if (landingType === 'ghost-beaten' && lowGraphics) {
+      // Simplified finale for low graphics
+      setTimeout(() => {
+        const centerX = canvas.width * 0.5;
+        const centerY = canvas.height * 0.4;
+        setParticles(prev => [...prev, ...createBurst(centerX, centerY, colors, 'giant-ghost')]);
+      }, 2500);
     }
     
     // Grand finale for 2x bonus
@@ -1626,7 +1618,9 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             drawStreak(ctx, 0, 0, effectiveSize, particle.vx, particle.vy);
             break;
           case 'ghost':
-            drawGhost(ctx, 0, 0, effectiveSize);
+            // Ghost shapes now use simple circles arranged in bitmap patterns
+            ctx.arc(0, 0, effectiveSize, 0, Math.PI * 2);
+            ctx.fill();
             break;
           case 'pentagon':
           case 'triangle':
