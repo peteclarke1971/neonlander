@@ -1841,9 +1841,14 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         </div>
       )}
       
-      <div className="absolute bottom-8 text-center text-white/80 text-sm drop-shadow-lg pointer-events-none">
-        Press THRUST to continue
-      </div>
+      {fireworkCount === 1 && (
+        <div 
+          className="absolute bottom-8 text-center text-sm drop-shadow-lg pointer-events-none"
+          style={{ color: neonColor, opacity: 0.8 }}
+        >
+          Press THRUST to continue
+        </div>
+      )}
     </div>
   );
 };

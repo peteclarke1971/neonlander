@@ -22,6 +22,7 @@ import { getColorForDistance, DEFAULT_PALETTE, isClassicColorsMode, ColorPalette
 import { createWeatherState, updateWeatherTransition, getWeatherIntensity, generateLightningBolt, getLightningLimit, WeatherState, WeatherParticle, LightningBolt } from "./systems/weather";
 import { spawnRainParticles, spawnDustParticles, spawnPlasmaParticles, updateRainParticles, updateDustParticles, updatePlasmaParticles, applyTransitionAlpha } from "./systems/weatherParticles";
 import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLightningBolts, renderRainbowDiffraction, renderPadResidue, updateLightningBolts } from "./systems/weatherRenderer";
+import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -47,7 +48,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
-  const [isUsingPCControls, setIsUsingPCControls] = useState(false);
+  const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
+    // Check localStorage first, then check if desktop device
+    return hasPCControlsPreference() || isDesktopDevice();
+  });
   const [fps, setFps] = useState(0);
   
   // Gyroscope controls
@@ -300,19 +304,31 @@ export const SurvivalEngine: React.FC<Props> = ({
       // Use same keyboard controls as main game
       if (["a", "arrowleft"].includes(k)) {
         keys.current.left = down;
-        if (down) setIsUsingPCControls(true);
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
       }
       if (["d", "arrowright"].includes(k)) {
         keys.current.right = down;
-        if (down) setIsUsingPCControls(true);
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
       }
       if (["w", "arrowup", " "].includes(k)) {
         keys.current.thrust = down;
-        if (down) setIsUsingPCControls(true);
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
       }
       if (["shift"].includes(k)) {
         keys.current.rotateBoost = down;
-        if (down) setIsUsingPCControls(true);
+        if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
       }
       
       // Toggle unlimited fuel cheat with 'i' key (for testing)
@@ -1061,6 +1077,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         const gp = anyGamepad();
         if (gp && !isUsingPCControls) {
           setIsUsingPCControls(true);
+          setPCControlsPreference(true);
         }
         if (gp) {
           // Handle gamepad hot-swap
