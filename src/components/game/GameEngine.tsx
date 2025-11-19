@@ -3671,6 +3671,142 @@ export const GameEngine: React.FC<Props> = ({
       }
 
       // Screen-space overlays removed - now handled by BonusMessageDisplay component
+      
+      // ============= LIQUID REFLECTION EFFECT (Level 4 Classic Mode Only) =============
+      if (mode === "classic" && level === 4 && !isCavernLevel) {
+        ctx.save();
+        
+        // Define water line position
+        const waterLineY = 550;
+        
+        // Create clipping region for reflection (only below water line)
+        ctx.beginPath();
+        ctx.rect(-viewWCull, waterLineY, viewWCull * 2, h / zoom);
+        ctx.clip();
+        
+        // Set up vertical flip transformation
+        ctx.scale(1, -1);
+        ctx.translate(0, -waterLineY * 2);
+        
+        // Apply transparency for liquid effect
+        const reflectionOpacity = shouldOptimizePerformance ? 0.25 : 0.35;
+        ctx.globalAlpha = reflectionOpacity;
+        
+        // Optional: Add subtle ripple distortion (time-based)
+        if (!shouldOptimizePerformance) {
+          const rippleAmount = 2;
+          ctx.translate(Math.sin(elapsed * 1.5) * rippleAmount, 0);
+        }
+        
+        // ===== Re-render Terrain =====
+        ctx.strokeStyle = neonColor;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = shouldOptimizePerformance ? 0 : shadowBlur;
+        ctx.lineWidth = 2;
+        
+        const drawTerrainReflection = (offset: number) => {
+          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+          ctx.beginPath();
+          for (let i = 0; i < terrain.points.length; i++) {
+            const p = terrain.points[i];
+            if (i === 0) ctx.moveTo(p.x + offset, p.y);
+            else ctx.lineTo(p.x + offset, p.y);
+          }
+          ctx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+          ctx.stroke();
+        };
+        
+        const wrapRefl = Math.floor(cameraX / terrain.worldWidth);
+        for (let wr = -1; wr <= 1; wr++) drawTerrainReflection((wrapRefl + wr) * terrain.worldWidth);
+        
+        // ===== Re-render Landing Pads =====
+        for (const pad of terrain.pads) {
+          const padWidth = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+          const offsets = [];
+          const padLeft = pad.xStart;
+          const padRight = pad.xEnd >= pad.xStart ? pad.xEnd : pad.xEnd + terrain.worldWidth;
+          
+          if (padRight - padLeft > terrain.worldWidth * 0.8) {
+            if (cameraX < terrain.worldWidth * 0.4) offsets.push(0);
+            else offsets.push(-terrain.worldWidth);
+          } else {
+            if (padLeft - cameraX > viewWCull / 2) offsets.push(-terrain.worldWidth);
+            else if (cameraX - padRight > viewWCull / 2) offsets.push(terrain.worldWidth);
+            else offsets.push(0);
+          }
+          
+          for (const offset of offsets) {
+            ctx.save();
+            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.5)` : `rgba(100,255,255,0.5)`;
+            ctx.fillRect(pad.xStart + offset, pad.y, padWidth, 2);
+            ctx.strokeStyle = neonColor;
+            ctx.strokeRect(pad.xStart + offset, pad.y, padWidth, 2);
+            ctx.restore();
+          }
+        }
+        
+        // ===== Re-render Lander =====
+        if (!crashed) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(0, -10);
+          ctx.lineTo(8, 10);
+          ctx.lineTo(-8, 10);
+          ctx.closePath();
+          ctx.strokeStyle = shipColor as any;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // legs
+          ctx.beginPath();
+          ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+          ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+          ctx.stroke();
+          
+          // engine flame if thrust
+          if (lastThrust.current > 0 && fuel > 0) {
+            ctx.beginPath();
+            ctx.moveTo(-3, 10);
+            ctx.lineTo(0, 16 + Math.random() * 8);
+            ctx.lineTo(3, 10);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        
+        // ===== Re-render Particles =====
+        if (particles.length > 0) {
+          ctx.shadowBlur = 0;
+          for (const p of particles) {
+            const ageRatio = p.life / p.max;
+            const alpha = (1 - ageRatio * 0.7) * reflectionOpacity;
+            
+            ctx.beginPath();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = p.color as any;
+            ctx.lineWidth = 1.5;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+            ctx.stroke();
+          }
+        }
+        
+        ctx.restore();
+        
+        // ===== Apply Gradient Fade Mask =====
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        const gradient = ctx.createLinearGradient(0, waterLineY, 0, waterLineY + 350);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(0.3, 'rgba(0,0,0,0.3)');
+        gradient.addColorStop(1, 'rgba(0,0,0,1)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(-viewWCull, waterLineY, viewWCull * 2, 350);
+        ctx.restore();
+      }
+      // ============= END LIQUID REFLECTION EFFECT =============
 
       ctx.restore();
     };
@@ -3763,242 +3899,6 @@ export const GameEngine: React.FC<Props> = ({
       }
       ctx.shadowBlur = 0; // Reset shadow blur
       ctx.globalAlpha = 1;
-      
-      // ============= LIQUID REFLECTION EFFECT (Level 4 Classic Mode Only) =============
-      if (mode === "classic" && level === 4 && !isCavernLevel) {
-        // Capture render variables for reflection
-        const reflViewWCull = viewWCull;
-        const reflViewLeft = viewLeft;
-        const reflViewRight = viewRight;
-        const reflH = h;
-        const reflAnchor = anchor;
-        const reflShadowBlur = shadowBlur;
-        const reflShipColor = shipColor;
-        
-        ctx.save();
-        
-        // Define water line position (adjust based on typical terrain height)
-        const waterLineY = 550;
-        
-        // Create clipping region for reflection (only below water line)
-        ctx.beginPath();
-        ctx.rect(-reflViewWCull, waterLineY, reflViewWCull * 2, reflH / zoom);
-        ctx.clip();
-        
-        // Set up vertical flip transformation
-        ctx.scale(1, -1);
-        ctx.translate(0, -waterLineY * 2);
-        
-        // Apply transparency for liquid effect
-        const reflectionOpacity = shouldOptimizePerformance ? 0.25 : 0.35;
-        ctx.globalAlpha = reflectionOpacity;
-        
-        // Optional: Add subtle ripple distortion (time-based)
-        if (!shouldOptimizePerformance) {
-          const rippleAmount = 2;
-          ctx.translate(Math.sin(elapsed * 1.5) * rippleAmount, 0);
-        }
-        
-        // ===== Re-render Terrain =====
-        ctx.strokeStyle = neonColor;
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = shouldOptimizePerformance ? 0 : reflShadowBlur;
-        ctx.lineWidth = 2;
-        
-        const drawTerrainReflection = (offset: number) => {
-          if (offset + terrain.worldWidth < reflViewLeft || offset > reflViewRight) return;
-          ctx.beginPath();
-          for (let i = 0; i < terrain.points.length; i++) {
-            const p = terrain.points[i];
-            if (i === 0) ctx.moveTo(p.x + offset, p.y);
-            else ctx.lineTo(p.x + offset, p.y);
-          }
-          ctx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
-          ctx.stroke();
-        };
-        
-        const wrapRefl = Math.floor(cameraX / terrain.worldWidth);
-        for (let wr = -1; wr <= 1; wr++) drawTerrainReflection((wrapRefl + wr) * terrain.worldWidth);
-        
-        // ===== Re-render Landing Pads =====
-        for (const pad of terrain.pads) {
-          const padWidth = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-          const offsets = [];
-          const padLeft = pad.xStart;
-          const padRight = pad.xEnd >= pad.xStart ? pad.xEnd : pad.xEnd + terrain.worldWidth;
-          
-          if (padRight - padLeft > terrain.worldWidth * 0.8) {
-            if (cameraX < terrain.worldWidth * 0.4) offsets.push(0);
-            else offsets.push(-terrain.worldWidth);
-          } else {
-            if (padLeft - cameraX > reflViewWCull / 2) offsets.push(-terrain.worldWidth);
-            else if (cameraX - padRight > reflViewWCull / 2) offsets.push(terrain.worldWidth);
-            else offsets.push(0);
-          }
-          
-          for (const offset of offsets) {
-            ctx.save();
-            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.5)` : `rgba(100,255,255,0.5)`;
-            ctx.fillRect(pad.xStart + offset, pad.y, padWidth, 2);
-            ctx.strokeStyle = neonColor;
-            ctx.strokeRect(pad.xStart + offset, pad.y, padWidth, 2);
-            ctx.restore();
-          }
-        }
-        
-        // ===== Re-render Moving Pads =====
-        const terrainData = terrain as TerrainData;
-        if (terrainData.movingPads) {
-          for (const movingPad of terrainData.movingPads) {
-            movingPadSystem.renderMovingPad(
-              ctx,
-              movingPad,
-              cameraX,
-              reflAnchor,
-              zoom,
-              reflViewWCull,
-              reflH / (zoom * dpr),
-              neonColor
-            );
-          }
-        }
-        
-        // ===== Re-render Hazards =====
-        const visibleHazardsRefl = hazards.filter(haz => {
-          const dx = Math.abs(haz.x - cameraX);
-          const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
-          return wrappedDx < reflViewWCull / 2 + 400;
-        });
-        drawHazards(ctx, visibleHazardsRefl, neonColor, shouldOptimizePerformance ? 2 : 4);
-        
-        // ===== Re-render Volcanoes =====
-        if (isCavernLevel) {
-          const cavernData = terrain as CavernData;
-          if (cavernData.volcanoes && cavernData.volcanoes.length > 0) {
-            drawVolcanoes(ctx, cavernData.volcanoes, volcanoParticles, neonColor, reflViewLeft, reflViewRight);
-          }
-        } else {
-          const terrainDataVol = terrain as TerrainData;
-          if (terrainDataVol.volcanoes && terrainDataVol.volcanoes.length > 0) {
-            drawVolcanoes(ctx, terrainDataVol.volcanoes, volcanoParticles, neonColor, reflViewLeft, reflViewRight);
-          }
-        }
-        
-        // ===== Re-render Collectibles =====
-        if (collectiblesRef.current) {
-          collectiblesRef.current.spaceJunk.forEach(junk => {
-            if (junk.collected) return;
-            const junkLeft = junk.pos.x - 50;
-            const junkRight = junk.pos.x + 50;
-            if (junkRight < reflViewLeft || junkLeft > reflViewRight) return;
-            
-            const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
-            const scale = 1.0 + 0.1 * Math.sin(elapsed * 2 + junk.seed * 0.001);
-            const sparkles = sparklesRef.current.get(junk.id);
-            
-            ctx.save();
-            ctx.globalAlpha = reflectionOpacity * 0.9;
-            renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles);
-            ctx.restore();
-          });
-        }
-        
-        // ===== Re-render Lander =====
-        if (!crashed) {
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(angle);
-          ctx.beginPath();
-          ctx.moveTo(0, -10);
-          ctx.lineTo(8, 10);
-          ctx.lineTo(-8, 10);
-          ctx.closePath();
-          ctx.strokeStyle = shipColor as any;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // legs
-          ctx.beginPath();
-          ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
-          ctx.moveTo(6, 8); ctx.lineTo(12, 12);
-          ctx.stroke();
-          
-          // engine flame if thrust
-          if (lastThrust.current > 0 && fuel > 0) {
-            ctx.beginPath();
-            ctx.moveTo(-3, 10);
-            ctx.lineTo(0, 16 + Math.random() * 8);
-            ctx.lineTo(3, 10);
-            ctx.stroke();
-          }
-          ctx.restore();
-        }
-        
-        // ===== Re-render Particles =====
-        if (particles.length > 0) {
-          ctx.shadowBlur = 0;
-          for (const p of particles) {
-            const isThruster = p.color === neonColor || p.color.includes('hsla');
-            const ageRatio = p.life / p.max;
-            const alpha = (1 - ageRatio * 0.7) * reflectionOpacity;
-            
-            ctx.beginPath();
-            ctx.globalAlpha = alpha;
-            ctx.strokeStyle = p.color as any;
-            ctx.lineWidth = 1.5;
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
-            ctx.stroke();
-          }
-        }
-        
-        // ===== Re-render Debris =====
-        for (const d of debris) {
-          ctx.save();
-          ctx.translate(d.x, d.y);
-          ctx.rotate(d.angle);
-          ctx.beginPath();
-          const s = d.size;
-          if (d.kind === "rod") {
-            ctx.moveTo(-s * 3, -s * 0.4);
-            ctx.lineTo(s * 3, -s * 0.4);
-            ctx.lineTo(s * 3, s * 0.4);
-            ctx.lineTo(-s * 3, s * 0.4);
-            ctx.closePath();
-          } else if (d.kind === "plate") {
-            ctx.moveTo(-s, -s * 0.8);
-            ctx.lineTo(s * 1.2, -s * 0.3);
-            ctx.lineTo(s * 0.3, s * 1.3);
-            ctx.lineTo(-s * 1.1, s * 0.4);
-            ctx.closePath();
-          } else {
-            ctx.moveTo(-s, -s * 0.6);
-            ctx.lineTo(s * 0.9, -s * 0.2);
-            ctx.lineTo(-s * 0.2, s);
-            ctx.closePath();
-          }
-          ctx.strokeStyle = neonColor as any;
-          ctx.lineWidth = 2.2;
-          ctx.globalAlpha = reflectionOpacity;
-          ctx.stroke();
-          ctx.restore();
-        }
-        
-        ctx.restore();
-        
-        // ===== Apply Gradient Fade Mask =====
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-out';
-        const gradient = ctx.createLinearGradient(0, waterLineY, 0, waterLineY + 350);
-        gradient.addColorStop(0, 'rgba(0,0,0,0)');
-        gradient.addColorStop(0.3, 'rgba(0,0,0,0.3)');
-        gradient.addColorStop(1, 'rgba(0,0,0,1)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(-reflViewWCull, waterLineY, reflViewWCull * 2, 350);
-        ctx.restore();
-      }
-      // ============= END LIQUID REFLECTION EFFECT =============
-      
       ctx.restore();
     };
 
