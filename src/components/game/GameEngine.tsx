@@ -2826,8 +2826,50 @@ export const GameEngine: React.FC<Props> = ({
           renderDecorations(ctx, bgDecorationsRef.current, bgDecorationImagesRef.current, screenWidth, screenHeight, currentTime);
         }
         
+        // Fill terrain shape with black to mask stars and decorations behind it
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        
+        // Apply same camera transform used for terrain
+        ctx.translate(w / (2 * dpr), h / (2 * dpr));
+        ctx.scale(zoom, zoom);
+        ctx.translate(-cameraX + shakeX, anchor + shakeY);
+        
+        // Fill terrain shape with solid black
+        ctx.fillStyle = '#000000';
+        
+        // Sample terrain points across viewport width
+        const numSamples = 120;
+        const viewWidth = w / (zoom * dpr);
+        const startX = cameraX - viewWidth / 2;
+        const endX = cameraX + viewWidth / 2;
+        
+        ctx.beginPath();
+        // Start from far below terrain (left side)
+        ctx.moveTo(startX, 2000);
+        
+        // Trace along terrain surface
+        for (let i = 0; i <= numSamples; i++) {
+          const worldX = startX + (i / numSamples) * (endX - startX);
+          const worldY = terrain.getHeightAt(worldX);
+          if (i === 0) {
+            ctx.lineTo(worldX, worldY);
+          } else {
+            ctx.lineTo(worldX, worldY);
+          }
+        }
+        
+        // Close back down (right side)
+        ctx.lineTo(endX, 2000);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+        ctx.restore();
+        
         // ============= LIQUID REFLECTION EFFECT (Level 4 Classic Mode Only) =============
-        // Draw BEFORE black terrain fill so it's visible
+        // Draw AFTER black terrain fill so it appears on top
         if (mode === "classic" && level === 4) {
           ctx.save();
           
@@ -2899,74 +2941,52 @@ export const GameEngine: React.FC<Props> = ({
                 if (cameraX < terrain.worldWidth * 0.4) offsets.push(0);
                 else offsets.push(-terrain.worldWidth);
               } else {
-                if (padLeft - cameraX > viewWCull / 2) offsets.push(-terrain.worldWidth);
-                else if (cameraX - padRight > viewWCull / 2) offsets.push(terrain.worldWidth);
-                else offsets.push(0);
+                offsets.push(0);
+                if (padLeft - viewLeft < -terrain.worldWidth * 0.3) offsets.push(terrain.worldWidth);
+                if (viewRight - padRight < -terrain.worldWidth * 0.3) offsets.push(-terrain.worldWidth);
               }
               
               for (const offset of offsets) {
-                ctx.save();
-                ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.6)` : `rgba(100,255,255,0.6)`;
-                ctx.fillRect(pad.xStart + offset, pad.y, padWidth, 2);
-                ctx.strokeStyle = neonColor;
-                ctx.strokeRect(pad.xStart + offset, pad.y, padWidth, 2);
-                ctx.restore();
-              }
-            }
-            
-            // ===== Re-render Lander =====
-            if (!crashed) {
-              ctx.save();
-              ctx.translate(x, y);
-              ctx.rotate(angle);
-              ctx.beginPath();
-              ctx.moveTo(0, -10);
-              ctx.lineTo(8, 10);
-              ctx.lineTo(-8, 10);
-              ctx.closePath();
-              ctx.strokeStyle = neonColor;
-              ctx.lineWidth = 2;
-              ctx.stroke();
-              
-              // legs
-              ctx.beginPath();
-              ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
-              ctx.moveTo(6, 8); ctx.lineTo(12, 12);
-              ctx.stroke();
-              
-              // engine flame if thrust
-              if (lastThrust.current > 0 && fuel > 0) {
-                ctx.beginPath();
-                ctx.moveTo(-3, 10);
-                ctx.lineTo(0, 16 + Math.random() * 8);
-                ctx.lineTo(3, 10);
-                ctx.stroke();
-              }
-              ctx.restore();
-            }
-            
-            // ===== Re-render Particles =====
-            if (particles.length > 0) {
-              ctx.shadowBlur = 0;
-              for (const p of particles) {
-                const ageRatio = p.life / p.max;
-                const alpha = (1 - ageRatio * 0.7) * reflectionOpacity;
+                const px = pad.xStart + offset;
+                const py = pad.y;
                 
+                ctx.strokeStyle = neonColor;
+                ctx.shadowColor = neonColor;
+                ctx.shadowBlur = shouldOptimizePerformance ? 3 : 8;
+                ctx.lineWidth = 2;
+                
+                const padEndX = pad.xEnd >= pad.xStart ? pad.xEnd : pad.xEnd + terrain.worldWidth;
                 ctx.beginPath();
-                ctx.globalAlpha = alpha;
-                ctx.strokeStyle = p.color;
-                ctx.lineWidth = 1.5;
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+                ctx.moveTo(px, py);
+                ctx.lineTo(px + (padEndX - pad.xStart), py);
                 ctx.stroke();
               }
             }
             
-            ctx.restore(); // Restore clip
+            // ===== Re-render Ship =====
+            ctx.shadowBlur = shouldOptimizePerformance ? 3 : 8;
+            ctx.strokeStyle = neonColor;
+            ctx.shadowColor = neonColor;
+            ctx.lineWidth = 2;
             
-            // ===== Apply Gradient Fade Mask =====
             ctx.save();
-            ctx.globalCompositeOperation = 'destination-out';
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            // Draw ship triangle
+            ctx.beginPath();
+            ctx.moveTo(0, -8);
+            ctx.lineTo(-6, 6);
+            ctx.lineTo(6, 6);
+            ctx.closePath();
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // Add dark gradient overlay at bottom of reflection for depth effect
+            ctx.restore();
+            ctx.save();
+            ctx.globalAlpha = 1;
             const gradient = ctx.createLinearGradient(0, waterLineWorldY, 0, waterLineWorldY + 300);
             gradient.addColorStop(0, 'rgba(0,0,0,0)');
             gradient.addColorStop(0.4, 'rgba(0,0,0,0.4)');
@@ -2979,48 +2999,6 @@ export const GameEngine: React.FC<Props> = ({
           ctx.restore();
         }
         // ============= END LIQUID REFLECTION EFFECT =============
-        
-        // Fill terrain shape with black to mask stars and decorations behind it
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(dpr, dpr);
-        
-        // Apply same camera transform used for terrain
-        ctx.translate(w / (2 * dpr), h / (2 * dpr));
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cameraX + shakeX, anchor + shakeY);
-        
-        // Fill terrain shape with solid black
-        ctx.fillStyle = '#000000';
-        
-        // Sample terrain points across viewport width
-        const numSamples = 120;
-        const viewWidth = w / (zoom * dpr);
-        const startX = cameraX - viewWidth / 2;
-        const endX = cameraX + viewWidth / 2;
-        
-        ctx.beginPath();
-        // Start from far below terrain (left side)
-        ctx.moveTo(startX, 2000);
-        
-        // Trace along terrain surface
-        for (let i = 0; i <= numSamples; i++) {
-          const worldX = startX + (i / numSamples) * (endX - startX);
-          const worldY = terrain.getHeightAt(worldX);
-          if (i === 0) {
-            ctx.lineTo(worldX, worldY);
-          } else {
-            ctx.lineTo(worldX, worldY);
-          }
-        }
-        
-        // Close back down (right side)
-        ctx.lineTo(endX, 2000);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
-        ctx.restore();
       }
 
       // World transform for terrain and gameplay
