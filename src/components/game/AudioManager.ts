@@ -196,7 +196,7 @@ export class AudioManager {
     const now = this.ctx.currentTime;
     const norm = Math.min(1, Math.max(0, level));
     const minFloor = 0.0003;
-    const target = norm > 0 ? Math.max(minFloor, norm * 2.4) : minFloor; // doubled volume, keep tiny floor
+    const target = norm > 0 ? Math.max(minFloor, norm * 4.8) : minFloor; // doubled volume, keep tiny floor
 
     const g = this.thrusterGain.gain;
     const lastSet: number = (this as any)._thrusterLastSet || 0;
@@ -333,12 +333,12 @@ export class AudioManager {
     // Volume based on distance (closer = louder)
     const maxHearingDistance = worldWidth * 0.8; // Can hear across 80% of world width
     const distanceRatio = Math.min(1, wrappedDistance / maxHearingDistance);
-    const volume = Math.max(0.1, 1 - distanceRatio * 0.8); // Keep minimum 10% volume
+    const volume = Math.max(0.1, 1 - distanceRatio * 0.8) * 2; // Keep minimum 10% volume
     
     if (this.landingBuffer) {
       this.playSpatialOneShot(this.landingBuffer, volume, panValue);
     } else {
-      this.playSpatialNoise(0.35, volume * 0.8, panValue);
+      this.playSpatialNoise(0.35, volume * 1.6, panValue);
     }
   }
 
@@ -397,7 +397,7 @@ export class AudioManager {
     if (this.fuelLoopBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
-      this.landingSoundGain.gain.value = 0.7;
+      this.landingSoundGain.gain.value = 1.4;
       
       const src = this.ctx.createBufferSource();
       src.buffer = this.fuelLoopBuffer;
@@ -436,7 +436,7 @@ export class AudioManager {
     if (this.fuelLoopBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
-      this.landingSoundGain.gain.value = 0.9;
+      this.landingSoundGain.gain.value = 1.8;
       
       const src = this.ctx.createBufferSource();
       src.buffer = this.fuelLoopBuffer;
