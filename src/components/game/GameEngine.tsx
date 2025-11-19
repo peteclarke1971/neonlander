@@ -17,6 +17,9 @@ import FireworksDisplay from './FireworksDisplay';
 import { BonusMessageDisplay } from './BonusMessageDisplay';
 import { getTimeTrialLevelConfig } from "./systems/timeTrialLevels";
 import { getDecorationsForLevel, preloadDecorationImages, renderDecorations, BackgroundDecoration } from "./systems/backgroundDecorations";
+import { generateLightningBolt, selectBoltType, LEVEL4_CONSTANTS, LightningBolt, LightningAfterglow, LightningImpact } from "./systems/weather";
+import { renderLightningBolts, updateLightningBolts } from "./systems/weatherRenderer";
+import { renderLightningFlash, renderLightningAfterglow, renderLightningImpact, renderOzoneGlow } from "./systems/weatherRendererExtended";
 
 // Simple seeded PRNG (Mulberry32) - needed for random effects
 function mulberry32(seed: number) {
@@ -284,6 +287,15 @@ export const GameEngine: React.FC<Props> = ({
   
   // Style points tracking
   const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
+  
+  // Lightning system state (Level 4 classic mode only)
+  const lightningBolts = useRef<LightningBolt[]>([]);
+  const lightningAfterglows = useRef<LightningAfterglow[]>([]);
+  const lightningImpacts = useRef<LightningImpact[]>([]);
+  const lightningDebris = useRef<any[]>([]);
+  const nextLightningTime = useRef<number>(0.5 + Math.random() * 1.5);
+  const screenFlashAlpha = useRef<number>(0);
+  const lightningEnabled = mode === "classic" && level === 4;
   
   
   // Hint system: show rotation boost hint on first hard level
@@ -2727,6 +2739,133 @@ export const GameEngine: React.FC<Props> = ({
         
         sweepActiveRef.current = true;
       }
+      
+      // ===== LIGHTNING SYSTEM UPDATE (Level 4 Classic Mode) =====
+      if (lightningEnabled && !worldPausedRef.current) {
+        const canvasWidth = c.width;
+        const canvasHeight = c.height;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const maxConcurrent = lowGraphics ? LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW : LEVEL4_CONSTANTS.MAX_CONCURRENT;
+        
+        // Update existing bolts
+        updateLightningBolts(lightningBolts.current, dt);
+        
+        // Update afterglows
+        for (let i = lightningAfterglows.current.length - 1; i >= 0; i--) {
+          const glow = lightningAfterglows.current[i];
+          glow.life += dt;
+          glow.alpha = (1 - glow.life / glow.maxLife) * 0.3;
+          if (glow.life >= glow.maxLife) lightningAfterglows.current.splice(i, 1);
+        }
+        
+        // Update impacts
+        for (let i = lightningImpacts.current.length - 1; i >= 0; i--) {
+          const impact = lightningImpacts.current[i];
+          impact.life += dt;
+          if (impact.life >= impact.maxLife) lightningImpacts.current.splice(i, 1);
+        }
+        
+        // Update debris particles
+        for (let i = lightningDebris.current.length - 1; i >= 0; i--) {
+          const d = lightningDebris.current[i];
+          d.life += dt;
+          d.x += d.vx * dt;
+          d.y += d.vy * dt;
+          d.vy += 400 * dt; // Gravity
+          d.angle += d.av * dt;
+          
+          const terrainHeight = terrain.getHeightAt(d.x);
+          if (d.y >= terrainHeight) {
+            d.y = terrainHeight;
+            d.vy *= -0.4;
+            d.vx *= 0.7;
+          }
+          
+          if (d.life >= d.max) {
+            debrisPool.release(d);
+            lightningDebris.current.splice(i, 1);
+          }
+        }
+        
+        // Spawn new lightning bolts
+        nextLightningTime.current -= dt;
+        if (nextLightningTime.current <= 0) {
+          const boltType = selectBoltType();
+          const newBolt = generateLightningBolt(canvasWidth / dpr, canvasHeight / dpr, boltType);
+          
+          // Check terrain collision
+          const endSeg = newBolt.segments[newBolt.segments.length - 1];
+          const worldX = (endSeg.x - canvasWidth / (2 * dpr)) / zoom + cameraX;
+          const worldY = (endSeg.y - canvasHeight / (2 * dpr)) / zoom;
+          const terrainHeight = terrain.getHeightAt(worldX);
+          
+          if (worldY >= terrainHeight) {
+            // Impact! Spawn effects
+            const impact: LightningImpact = {
+              x: worldX,
+              y: terrainHeight,
+              life: 0,
+              maxLife: 0.3,
+              radius: 40 + Math.random() * 40
+            };
+            lightningImpacts.current.push(impact);
+            
+            // Spawn debris
+            const debrisCount = lowGraphics ? 12 : 20;
+            for (let i = 0; i < debrisCount; i++) {
+              const debris = debrisPool.get();
+              debris.x = worldX;
+              debris.y = terrainHeight;
+              const angle = Math.random() * Math.PI * 2;
+              const speed = 100 + Math.random() * 200;
+              debris.vx = Math.cos(angle) * speed;
+              debris.vy = Math.sin(angle) * speed - 150;
+              debris.angle = Math.random() * Math.PI * 2;
+              debris.av = (Math.random() - 0.5) * 4;
+              debris.life = 0;
+              debris.max = 1.5;
+              debris.size = 2 + Math.random() * 4;
+              debris.kind = ['plate', 'rod', 'chip'][Math.floor(Math.random() * 3)] as any;
+              lightningDebris.current.push(debris);
+            }
+            
+            // Shockwave on ship if close
+            const dist = Math.sqrt((x - worldX) ** 2 + (y - terrainHeight) ** 2);
+            if (dist < 200) {
+              const shockStrength = (200 - dist) / 200;
+              const pushAngle = Math.atan2(y - terrainHeight, x - worldX);
+              vx += Math.cos(pushAngle) * shockStrength * 150;
+              vy += Math.sin(pushAngle) * shockStrength * 150;
+              cameraShake = Math.max(cameraShake, 0.5 + shockStrength * 1.5);
+            }
+            
+            audio.current.playLightningImpactSound(0.8);
+          }
+          
+          lightningBolts.current.push(newBolt);
+          screenFlashAlpha.current = 1.0;
+          
+          // Create afterglow when bolt spawns
+          lightningAfterglows.current.push({
+            segments: [...newBolt.segments],
+            alpha: 0.3,
+            life: 0,
+            maxLife: 0.5
+          });
+          
+          nextLightningTime.current = LEVEL4_CONSTANTS.INTERVAL_MIN + Math.random() * (LEVEL4_CONSTANTS.INTERVAL_MAX - LEVEL4_CONSTANTS.INTERVAL_MIN);
+          
+          if (lightningBolts.current.length > maxConcurrent) {
+            lightningBolts.current.shift();
+          }
+        }
+        
+        // Fade screen flash
+        if (screenFlashAlpha.current > 0) {
+          screenFlashAlpha.current -= dt * 10;
+          if (screenFlashAlpha.current < 0) screenFlashAlpha.current = 0;
+        }
+      }
 
       updateHud();
       render();
@@ -3397,6 +3536,62 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
 
+      // ===== LIGHTNING RENDERING (Level 4 Classic Mode) =====
+      if (lightningEnabled) {
+        ctx.restore(); // Exit world transform
+        
+        // Render impacts (world space)
+        for (const impact of lightningImpacts.current) {
+          ctx.save();
+          ctx.translate(-cameraX, anchor);
+          renderLightningImpact(ctx, impact, cameraX, zoom, 0, h / dpr, dpr);
+          ctx.restore();
+        }
+        
+        // Render debris particles (world space)
+        for (const d of lightningDebris.current) {
+          ctx.save();
+          ctx.translate(d.x - cameraX, d.y + anchor);
+          ctx.rotate(d.angle);
+          ctx.fillStyle = neonColor;
+          ctx.globalAlpha = 1 - d.life / d.max;
+          const size = d.size;
+          if (d.kind === 'plate') {
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+          } else if (d.kind === 'rod') {
+            ctx.fillRect(-size * 1.5, -size / 4, size * 3, size / 2);
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.lineTo(size, size);
+            ctx.lineTo(-size, size);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        
+        // Render afterglows (screen space)
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        for (const glow of lightningAfterglows.current) {
+          renderLightningAfterglow(ctx, glow, dpr, shouldOptimizePerformance);
+        }
+        
+        // Render lightning bolts (screen space)
+        renderLightningBolts(ctx, lightningBolts.current, dpr, shouldOptimizePerformance);
+        
+        // Render ozone glow
+        renderOzoneGlow(ctx, lightningBolts.current.length, w / dpr, h / dpr, dpr);
+        
+        // Render screen flash
+        renderLightningFlash(ctx, screenFlashAlpha.current, w / dpr, h / dpr, dpr);
+        
+        // Restore world transform
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(w / 2 + shakeX, h / 2 + shakeY);
+        ctx.scale(zoom * dpr, zoom * dpr);
+        ctx.save();
+      }
+      
       // Ghost ship (render before player)
       if (ghostShip && ghostShip.visible) {
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
