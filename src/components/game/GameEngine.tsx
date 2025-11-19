@@ -2981,46 +2981,49 @@ export const GameEngine: React.FC<Props> = ({
         // ============= END LIQUID REFLECTION EFFECT =============
         
         // Fill terrain shape with black to mask stars and decorations behind it
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(dpr, dpr);
-        
-        // Apply same camera transform used for terrain
-        ctx.translate(w / (2 * dpr), h / (2 * dpr));
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cameraX + shakeX, anchor + shakeY);
-        
-        // Fill terrain shape with solid black
-        ctx.fillStyle = '#000000';
-        
-        // Sample terrain points across viewport width
-        const numSamples = 120;
-        const viewWidth = w / (zoom * dpr);
-        const startX = cameraX - viewWidth / 2;
-        const endX = cameraX + viewWidth / 2;
-        
-        ctx.beginPath();
-        // Start from far below terrain (left side)
-        ctx.moveTo(startX, 2000);
-        
-        // Trace along terrain surface
-        for (let i = 0; i <= numSamples; i++) {
-          const worldX = startX + (i / numSamples) * (endX - startX);
-          const worldY = terrain.getHeightAt(worldX);
-          if (i === 0) {
-            ctx.lineTo(worldX, worldY);
-          } else {
-            ctx.lineTo(worldX, worldY);
+        // Skip for level 4 classic mode to allow reflection to show
+        if (!(mode === "classic" && level === 4)) {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(dpr, dpr);
+          
+          // Apply same camera transform used for terrain
+          ctx.translate(w / (2 * dpr), h / (2 * dpr));
+          ctx.scale(zoom, zoom);
+          ctx.translate(-cameraX + shakeX, anchor + shakeY);
+          
+          // Fill terrain shape with solid black
+          ctx.fillStyle = '#000000';
+          
+          // Sample terrain points across viewport width
+          const numSamples = 120;
+          const viewWidth = w / (zoom * dpr);
+          const startX = cameraX - viewWidth / 2;
+          const endX = cameraX + viewWidth / 2;
+          
+          ctx.beginPath();
+          // Start from far below terrain (left side)
+          ctx.moveTo(startX, 2000);
+          
+          // Trace along terrain surface
+          for (let i = 0; i <= numSamples; i++) {
+            const worldX = startX + (i / numSamples) * (endX - startX);
+            const worldY = terrain.getHeightAt(worldX);
+            if (i === 0) {
+              ctx.lineTo(worldX, worldY);
+            } else {
+              ctx.lineTo(worldX, worldY);
+            }
           }
+          
+          // Close back down (right side)
+          ctx.lineTo(endX, 2000);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.restore();
+          ctx.restore();
         }
-        
-        // Close back down (right side)
-        ctx.lineTo(endX, 2000);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
-        ctx.restore();
       }
 
       // World transform for terrain and gameplay
