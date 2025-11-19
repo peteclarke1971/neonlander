@@ -2573,10 +2573,10 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // Special zoom out for level 4 classic mode to see reflection
-      if (mode === "classic" && level === 4) {
-        targetZoom = targetZoom / 2;
-      }
+      // Special zoom out for level 4 classic mode - DISABLED (was for reflection effect)
+      // if (mode === "classic" && level === 4) {
+      //   targetZoom = targetZoom / 2;
+      // }
       
       // Apply hysteresis and smooth transitions
       if (Math.abs(targetZoom - prevTargetZoom) < 0.015) targetZoom = prevTargetZoom;
@@ -2869,8 +2869,9 @@ export const GameEngine: React.FC<Props> = ({
         ctx.restore();
         
         // ============= LIQUID REFLECTION EFFECT (Level 4 Classic Mode Only) =============
+        // DISABLED - keeping code for potential future use
         // Draw AFTER black terrain fill so it appears on top
-        if (mode === "classic" && level === 4) {
+        if (false && mode === "classic" && level === 4) {
           ctx.save();
           
           // Fixed water line position in world space (prevents vertical bobbing)
