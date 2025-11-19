@@ -2573,6 +2573,11 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
+      // Special zoom out for level 4 classic mode to see reflection
+      if (mode === "classic" && level === 4) {
+        targetZoom = targetZoom / 4;
+      }
+      
       // Apply hysteresis and smooth transitions
       if (Math.abs(targetZoom - prevTargetZoom) < 0.015) targetZoom = prevTargetZoom;
       prevTargetZoom = targetZoom;
