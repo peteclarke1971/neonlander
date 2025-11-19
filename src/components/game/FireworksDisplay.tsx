@@ -387,11 +387,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         
       case 'ghost':
         console.log('👻 Creating GHOST pattern - bitmap burst');
-        const ghostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500']; // Classic Pac-Man colors
-        const dotSize = 4;
+        const ghostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500']; // Blinky, Pinky, Inky, Clyde
+        const selectedGhostColor = ghostColors[Math.floor(Math.random() * ghostColors.length)]; // ONE color per burst
+        const dotSize = 3; // Denser packing
         const ghostTargets = getArcadeShapePositions('GHOST', 0, 0, dotSize);
         
-        // Create particles for each position in the ghost bitmap
+        // Create particles for each position in the ghost bitmap - all same color
         ghostTargets.forEach((target) => {
           const speed = 0.5 + Math.random() * 0.8;
           const angle = Math.atan2(target.y, target.x);
@@ -400,12 +401,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           
           newParticles.push(createParticle(vx, vy, {
             shape: 'circle',
-            color: ghostColors[Math.floor(Math.random() * ghostColors.length)],
-            size: 3 + Math.random() * 2,
+            color: selectedGhostColor, // Same color for all particles in this burst
+            size: lowGraphics ? 4 : (5 + Math.random() * 2), // Larger, clearer particles
             gravity: true,
             life: 150 + Math.random() * 50,
             max: 200,
-            glowSize: 6 + Math.random() * 3
+            glowSize: lowGraphics ? 8 : (10 + Math.random() * 5) // More vibrant glow
           }));
         });
         break;
@@ -413,10 +414,11 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       case 'giant-ghost':
         console.log('👻👑 Creating GIANT GHOST pattern - bitmap burst');
         const giantGhostColors = ['#FF0000', '#FFB6C1', '#00FFFF', '#FFA500'];
-        const giantDotSize = 8;
+        const selectedGiantColor = giantGhostColors[Math.floor(Math.random() * giantGhostColors.length)]; // ONE color per burst
+        const giantDotSize = 6; // Denser packing for giant ghost
         const giantGhostTargets = getArcadeShapePositions('GHOST', 0, 0, giantDotSize);
         
-        // Create larger particles for giant ghost effect
+        // Create larger particles for giant ghost effect - all same color
         giantGhostTargets.forEach((target) => {
           const speed = 0.3 + Math.random() * 0.5;
           const angle = Math.atan2(target.y, target.x);
@@ -425,12 +427,36 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
           
           newParticles.push(createParticle(vx, vy, {
             shape: 'circle',
-            color: giantGhostColors[Math.floor(Math.random() * giantGhostColors.length)],
-            size: 5 + Math.random() * 3,
+            color: selectedGiantColor, // Same color for all particles in this burst
+            size: lowGraphics ? 6 : (7 + Math.random() * 3), // Larger particles for giant effect
             gravity: true,
             life: 200 + Math.random() * 100,
             max: 300,
-            glowSize: 10 + Math.random() * 5
+            glowSize: lowGraphics ? 10 : (12 + Math.random() * 6) // Extra vibrant glow
+          }));
+        });
+        break;
+        
+      case 'pacman':
+        console.log('🟡 Creating PACMAN pattern - bitmap burst');
+        const pacmanDotSize = 3; // Denser packing
+        const pacmanTargets = getArcadeShapePositions('PACMAN', 0, 0, pacmanDotSize);
+        
+        // Create particles for Pac-Man - all neon yellow
+        pacmanTargets.forEach((target) => {
+          const speed = 0.5 + Math.random() * 0.8;
+          const angle = Math.atan2(target.y, target.x);
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
+          newParticles.push(createParticle(vx, vy, {
+            shape: 'circle',
+            color: '#FFFF00', // Pure neon yellow
+            size: lowGraphics ? 4 : (5 + Math.random() * 2), // Larger, clearer particles
+            gravity: true,
+            life: 150 + Math.random() * 50,
+            max: 200,
+            glowSize: lowGraphics ? 8 : (10 + Math.random() * 5) // Vibrant yellow glow
           }));
         });
         break;
