@@ -2,6 +2,9 @@ export class AudioManager {
   private ctx: AudioContext | null = null;
   private master?: GainNode;
 
+  // Global music mute state (persistent across all modes)
+  private musicGloballyMuted = false;
+
   // Title music
   private titleGain?: GainNode;
   private titleSource?: AudioBufferSourceNode | null;
@@ -49,6 +52,16 @@ export class AudioManager {
   
   // Mission success music
   private missionSuccessBuffer?: AudioBuffer | null;
+
+  constructor() {
+    // Load global music mute state from localStorage
+    try {
+      const stored = localStorage.getItem('ll-music-muted');
+      this.musicGloballyMuted = stored ? JSON.parse(stored) : false;
+    } catch {
+      this.musicGloballyMuted = false;
+    }
+  }
 
   private ensureCtx() {
     if (!this.ctx) {
@@ -126,7 +139,7 @@ export class AudioManager {
     if (!this.ctx || !this.master) return;
     if (!this.titleGain) {
       this.titleGain = this.ctx.createGain();
-      this.titleGain.gain.value = this.titleMuted ? 0 : 0.5;
+      this.titleGain.gain.value = (this.titleMuted || this.musicGloballyMuted) ? 0 : 0.5;
       this.titleGain.connect(this.master);
     }
     if (!this.titleBuffer) {
@@ -609,6 +622,12 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx) return;
     await this.ensureMusicGain();
+    
+    // Apply global mute state
+    if (this.musicGain) {
+      this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
+    }
+    
     const i = ((index % this.musicUrls.length) + this.musicUrls.length) % this.musicUrls.length;
     if (!this.musicBuffers[i]) this.musicBuffers[i] = await this.loadBuffer(this.musicUrls[i]);
     const buf = this.musicBuffers[i];
@@ -669,6 +688,12 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     await this.ensureMusicGain();
+    
+    // Apply global mute state
+    if (this.musicGain) {
+      this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
+    }
+    
     if (!this.missionSuccessBuffer) this.missionSuccessBuffer = await this.loadBuffer("/audio/mission_success.mp3");
     if (this.missionSuccessBuffer && this.musicGain) {
       // Stop any previous mission success music
@@ -689,6 +714,38 @@ export class AudioManager {
       try { this.missionSuccessSource.disconnect(); } catch {}
       this.missionSuccessSource = null;
     }
+  }
+
+  // ========== Global Music Mute API ==========
+  setGlobalMusicMute(muted: boolean) {
+    this.musicGloballyMuted = muted;
+    
+    // Persist to localStorage
+    try {
+      localStorage.setItem('ll-music-muted', JSON.stringify(muted));
+    } catch {}
+    
+    // Apply to currently playing music immediately
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    
+    // Title music
+    if (this.titleGain) {
+      this.titleGain.gain.cancelScheduledValues(now);
+      this.titleGain.gain.setValueAtTime(this.titleGain.gain.value, now);
+      this.titleGain.gain.linearRampToValueAtTime(muted ? 0 : 0.5, now + 0.3);
+    }
+    
+    // Level music
+    if (this.musicGain) {
+      this.musicGain.gain.cancelScheduledValues(now);
+      this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, now);
+      this.musicGain.gain.linearRampToValueAtTime(muted ? 0 : 0.5, now + 0.3);
+    }
+  }
+
+  isGlobalMusicMuted(): boolean {
+    return this.musicGloballyMuted;
   }
 
   // Stop all audio - useful for level transitions

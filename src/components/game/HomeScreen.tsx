@@ -63,7 +63,15 @@ export const HomeScreen: React.FC<Props> = ({
 
   // Detect iOS/iPad devices
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const [musicOn, setMusicOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(() => {
+    // Load global music mute state from localStorage (inverted)
+    try {
+      const stored = localStorage.getItem('ll-music-muted');
+      return stored ? !JSON.parse(stored) : true;
+    } catch {
+      return true;
+    }
+  });
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
       const saved = localStorage.getItem("ll-graphics-settings");
@@ -642,12 +650,11 @@ export const HomeScreen: React.FC<Props> = ({
           <Button ref={musicBtnRef} variant="outline" onClick={() => {
           setMusicOn(prev => {
             const next = !prev;
+            // Use global music mute API for persistent control
+            audioRef.current.setGlobalMusicMute(!next);
             if (next) {
               audioRef.current.resume();
               audioRef.current.playTitleMusic();
-              audioRef.current.setTitleMusicMuted(false);
-            } else {
-              audioRef.current.setTitleMusicMuted(true);
             }
             return next;
           });
