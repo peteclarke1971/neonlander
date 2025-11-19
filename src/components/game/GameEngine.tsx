@@ -2575,7 +2575,7 @@ export const GameEngine: React.FC<Props> = ({
       
       // Special zoom out for level 4 classic mode to see reflection
       if (mode === "classic" && level === 4) {
-        targetZoom = targetZoom / 4;
+        targetZoom = targetZoom / 2;
       }
       
       // Apply hysteresis and smooth transitions
@@ -2874,7 +2874,7 @@ export const GameEngine: React.FC<Props> = ({
           ctx.save();
           
           // Fixed water line position in world space (prevents vertical bobbing)
-          const waterLineWorldY = 550; // Fixed Y coordinate in world space
+          const waterLineWorldY = 380; // Fixed Y coordinate in world space - closer to terrain
           
           // Convert to screen space
           const waterLineScreenY = (h / (2 * dpr)) + (waterLineWorldY + anchor) * zoom;
@@ -2902,9 +2902,9 @@ export const GameEngine: React.FC<Props> = ({
             const reflectionOpacity = shouldOptimizePerformance ? 0.3 : 0.4;
             ctx.globalAlpha = reflectionOpacity;
             
-            // Optional: Add subtle ripple distortion
+            // Add ripple distortion for moving water effect
             if (!shouldOptimizePerformance) {
-              const rippleAmount = 1.5;
+              const rippleAmount = 8;
               ctx.translate(Math.sin(elapsed * 1.2) * rippleAmount, 0);
             }
             
