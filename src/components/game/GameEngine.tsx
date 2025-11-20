@@ -3538,12 +3538,9 @@ export const GameEngine: React.FC<Props> = ({
 
       // ===== LIGHTNING RENDERING (Level 4 Classic Mode) =====
       if (lightningEnabled) {
-        ctx.restore(); // Exit world transform
-        
-        // Render impacts (world space)
+        // Render impacts (world space - keep current transform)
         for (const impact of lightningImpacts.current) {
           ctx.save();
-          ctx.translate(-cameraX, anchor);
           renderLightningImpact(ctx, impact, cameraX, zoom, 0, h / dpr, dpr);
           ctx.restore();
         }
