@@ -2834,8 +2834,8 @@ export const GameEngine: React.FC<Props> = ({
             if (dist < 200) {
               const shockStrength = (200 - dist) / 200;
               const pushAngle = Math.atan2(y - terrainHeight, x - worldX);
-              vx += Math.cos(pushAngle) * shockStrength * 150;
-              vy += Math.sin(pushAngle) * shockStrength * 150;
+              vx += Math.cos(pushAngle) * shockStrength * 85;
+              vy += Math.sin(pushAngle) * shockStrength * 85;
               cameraShake = Math.max(cameraShake, 0.5 + shockStrength * 1.5);
             }
             
