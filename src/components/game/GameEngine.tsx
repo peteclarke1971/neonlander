@@ -2799,8 +2799,6 @@ export const GameEngine: React.FC<Props> = ({
           const worldY = (endSeg.y - canvasHeight / (2 * dpr)) / zoom;
           const terrainHeight = terrain.getHeightAt(worldX);
           
-          console.log('⚡ Lightning bolt check:', { endSeg, worldX, worldY, terrainHeight, hits: worldY >= terrainHeight });
-          
           if (worldY >= terrainHeight) {
             // Impact! Spawn effects
             const impact: LightningImpact = {
@@ -3671,12 +3669,8 @@ export const GameEngine: React.FC<Props> = ({
           const alpha = 1 - fadeProgress;
           
           for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
-            // Convert world coordinates to screen coordinates
-            const screenX = (d.x + offset - cameraX) * zoom + anchor;
-            const screenY = d.y * zoom + h / 2;
-            
             ctx.save();
-            ctx.translate(screenX * dpr, screenY * dpr);
+            ctx.translate(d.x + offset, d.y); // World-space, just like lander
             ctx.rotate(d.angle);
             ctx.globalAlpha = alpha;
             

@@ -262,16 +262,16 @@ export function generateLightningBolt(
       jitterAmount = 120;
       break;
     case "arc":
-      // Medium strikes - go to terrain level
+      // Medium strikes (40-70% of screen)
       startY = 0;
-      endY = canvasHeight * 0.9; // Extend to 90% down to hit terrain
+      endY = canvasHeight * (0.4 + Math.random() * 0.3);
       endX = startX + (Math.random() - 0.5) * canvasWidth * 0.3;
       jitterAmount = 80;
       break;
     case "fork":
-      // Small strikes - still reach terrain
-      startY = canvasHeight * 0.3;
-      endY = canvasHeight * 0.85; // Extend to 85% down to hit terrain
+      // Small strikes (20-40% of screen)
+      startY = canvasHeight * 0.2;
+      endY = canvasHeight * (0.4 + Math.random() * 0.2);
       endX = startX + (Math.random() - 0.5) * canvasWidth * 0.2;
       jitterAmount = 40;
       break;
