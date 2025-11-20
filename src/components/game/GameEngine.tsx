@@ -3693,6 +3693,68 @@ export const GameEngine: React.FC<Props> = ({
         return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
       };
 
+      // ===== LIGHTNING RENDERING (Level 4) =====
+      if (lightningEnabled) {
+        // 1. Render impacts (behind lightning)
+        for (const impact of lightningImpacts.current) {
+          renderLightningImpact(ctx, impact, cameraX, zoom, anchor, h / dpr, dpr);
+        }
+        
+        // 2. Render debris particles (world space)
+        ctx.save();
+        ctx.strokeStyle = neonColor;
+        ctx.fillStyle = neonColor;
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = shadowBlur;
+        ctx.lineWidth = 1.5;
+        
+        for (const d of lightningDebris.current) {
+          const fadeProgress = d.life / d.max;
+          const alpha = 1 - fadeProgress;
+          
+          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            ctx.save();
+            ctx.translate(d.x + offset, d.y);
+            ctx.rotate(d.angle);
+            ctx.globalAlpha = alpha;
+            
+            // Draw different debris shapes
+            ctx.beginPath();
+            if (d.kind === 'plate') {
+              // Rectangle
+              ctx.rect(-d.size / 2, -d.size / 2, d.size, d.size);
+            } else if (d.kind === 'rod') {
+              // Line
+              ctx.moveTo(-d.size, 0);
+              ctx.lineTo(d.size, 0);
+            } else {
+              // Triangle
+              ctx.moveTo(0, -d.size);
+              ctx.lineTo(d.size, d.size);
+              ctx.lineTo(-d.size, d.size);
+              ctx.closePath();
+            }
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+        ctx.restore();
+        
+        // 3. Render afterglows
+        for (const glow of lightningAfterglows.current) {
+          renderLightningAfterglow(ctx, glow, dpr, lowGraphics);
+        }
+        
+        // 4. Render active lightning bolts
+        renderLightningBolts(ctx, lightningBolts.current, dpr, lowGraphics);
+        
+        // 5. Render ozone glow
+        renderOzoneGlow(ctx, lightningBolts.current.length, w / dpr, h / dpr, dpr);
+        
+        // 6. Render screen flash (on top of everything except HUD)
+        renderLightningFlash(ctx, screenFlashAlpha.current, w / dpr, h / dpr, dpr);
+      }
+
       // Low fuel warning - smooth color fade and pulsing glow (classic/fixed/timetrial only)
       let shipColor = neonColor;
       let shipShadowBlur = shadowBlur;
