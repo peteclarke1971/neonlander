@@ -76,6 +76,14 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [fps, setFps] = useState(0);
+  const [touchOpacity, setTouchOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-touch-opacity');
+      return saved ? JSON.parse(saved) : 10;
+    } catch {
+      return 10;
+    }
+  });
   
   // Countdown intro state
   const introRef = useRef<IntroHandle | null>(null);
@@ -1079,7 +1087,7 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
 
       {/* Touch controls overlay for mobile */}
       {isTouch && (
-        <div className="absolute inset-0 pointer-events-none z-10 select-none">
+        <div className="absolute inset-0 pointer-events-none z-10 select-none" style={{ opacity: touchOpacity / 10 }}>
           {/* Right side button - moved in from corner */}
           <div
             className={`absolute bottom-8 right-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-red-600/20 border-red-600/50' : 'bg-blue-600/20 border-blue-600/50'}`}

@@ -74,6 +74,14 @@ export default function ControlsSettings() {
       return 'multiply';
     }
   });
+  const [touchOpacity, setTouchOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-touch-opacity');
+      return saved ? JSON.parse(saved) : 10;
+    } catch {
+      return 10;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -151,6 +159,14 @@ export default function ControlsSettings() {
       window.dispatchEvent(new CustomEvent('scanlineSettingsChanged'));
     } catch {}
   }, [scanlineBlendMode]);
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-touch-opacity', JSON.stringify(touchOpacity));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [touchOpacity]);
 
   // SEO
   useEffect(() => {
@@ -582,6 +598,31 @@ export default function ControlsSettings() {
                 onCheckedChange={setShowFullHUD}
               />
             </div>
+            
+            <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Touch Screen Translucency</Label>
+                  <div className="text-xs text-muted-foreground">Adjust visibility of touch controls for cleaner recordings</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Opacity: {touchOpacity}/10</Label>
+                </div>
+                <Slider
+                  value={[touchOpacity]}
+                  onValueChange={(value) => setTouchOpacity(value[0])}
+                  min={1}
+                  max={10}
+                  step={1}
+                />
+                <div className="text-xs text-muted-foreground">
+                  1 = barely visible, 10 = fully visible
+                </div>
+              </div>
+            </div>
+            
             <div className="flex items-center justify-between">
               <div>
                 <Label>CRT Scanlines</Label>

@@ -103,6 +103,14 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
   const fpsRef = useRef(0);
   const [isTouch, setIsTouch] = useState(false);
+  const [touchOpacity, setTouchOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-touch-opacity');
+      return saved ? JSON.parse(saved) : 10;
+    } catch {
+      return 10;
+    }
+  });
   
   // Countdown intro state
   const introRef = useRef<IntroHandle | null>(null);
@@ -1050,7 +1058,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
 
       {/* Touch controls overlay for mobile */}
       {isTouch && (
-        <div className="absolute inset-0 pointer-events-none z-20 select-none">
+        <div className="absolute inset-0 pointer-events-none z-20 select-none" style={{ opacity: touchOpacity / 10 }}>
           {/* Movement D-pad (swappable with fire button) */}
           <div
             className={`absolute bottom-8 ${swapButtons ? 'right-8' : 'left-8'} w-32 h-32 rounded-full border-2 border-accent/50 bg-accent/10 pointer-events-auto select-none`}
