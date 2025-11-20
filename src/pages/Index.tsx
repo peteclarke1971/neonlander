@@ -636,6 +636,11 @@ const retryGame = () => {
 
   // Demo timer system - 60 seconds on menu, 15 seconds per demo
   useEffect(() => {
+    // Don't run demo timer during active gameplay
+    if (view === "game" || view === "gameover") {
+      return;
+    }
+    
     const interval = setInterval(() => {
       const now = Date.now();
       
