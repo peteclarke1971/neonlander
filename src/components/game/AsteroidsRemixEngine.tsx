@@ -1058,7 +1058,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
 
       {/* Touch controls overlay for mobile */}
       {isTouch && (
-        <div className="absolute inset-0 pointer-events-none z-20 select-none" style={{ opacity: touchOpacity / 10 }}>
+        <div className="absolute inset-0 pointer-events-none z-20 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           {/* Movement D-pad (swappable with fire button) */}
           <div
             className={`absolute bottom-8 ${swapButtons ? 'right-8' : 'left-8'} w-32 h-32 rounded-full border-2 border-accent/50 bg-accent/10 pointer-events-auto select-none`}

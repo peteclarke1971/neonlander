@@ -957,7 +957,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
 
       {/* Touch controls overlay for mobile - 4 button layout matching main Asteroids */}
       {isTouch && (
-        <div className="absolute inset-0 pointer-events-none z-10 select-none" style={{ opacity: touchOpacity / 10 }}>
+        <div className="absolute inset-0 pointer-events-none z-10 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           {/* Right side button - Thrust or Fire based on swapButtons */}
           <div
             className={`absolute bottom-8 right-8 w-28 h-28 rounded-full border-2 border-accent/50 bg-accent/10 flex items-center justify-center pointer-events-auto select-none ${swapButtons ? 'bg-red-600/20 border-red-600/50' : 'bg-blue-600/20 border-blue-600/50'}`}

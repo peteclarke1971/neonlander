@@ -3466,7 +3466,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       {/* Touch Controls - Only show if not using PC controls */}
       {!isUsingPCControls && (
-        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: touchOpacity / 10 }}>
+        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           <div className="flex gap-2">
             <Button 
               variant="outline" 
