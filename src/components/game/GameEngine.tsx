@@ -2799,6 +2799,8 @@ export const GameEngine: React.FC<Props> = ({
           const worldY = (endSeg.y - canvasHeight / (2 * dpr)) / zoom;
           const terrainHeight = terrain.getHeightAt(worldX);
           
+          console.log('⚡ Lightning bolt check:', { endSeg, worldX, worldY, terrainHeight, hits: worldY >= terrainHeight });
+          
           if (worldY >= terrainHeight) {
             // Impact! Spawn effects
             const impact: LightningImpact = {
