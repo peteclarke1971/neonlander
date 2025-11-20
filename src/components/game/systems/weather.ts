@@ -31,7 +31,8 @@ export interface LightningBolt {
   maxLife: number;
   alpha: number;
   branches: LightningBolt[];
-  boltType?: "mega" | "arc" | "fork";
+  boltType?: "mega" | "arc" | "fork" | "tendril";
+  depth?: number;
 }
 
 export interface LightningAfterglow {
@@ -216,158 +217,210 @@ export function getLightningLimit(lowGraphics: boolean): number {
   return lowGraphics ? MAX_LIGHTNING_BOLTS_LOW : MAX_LIGHTNING_BOLTS;
 }
 
+export function selectBoltType(): "mega" | "arc" | "fork" | "tendril" {
+  const roll = Math.random();
+  if (roll < 0.25) return "mega";    // 25% mega
+  if (roll < 0.50) return "arc";     // 25% arc
+  if (roll < 0.70) return "fork";    // 20% fork
+  return "tendril";                   // 30% tendril
+}
+
 /**
  * Generate lightning bolt with branching
  */
 export function generateLightningBolt(
   canvasWidth: number,
   canvasHeight: number,
-  boltTypeOrSegments?: "mega" | "arc" | "fork" | number
+  boltTypeOrSegments?: "mega" | "arc" | "fork" | "tendril" | number,
+  currentDepth: number = 0
 ): LightningBolt {
-  // Determine bolt type and segments
-  let boltType: "mega" | "arc" | "fork" = "arc";
-  let numSegments = 12;
-  
-  if (typeof boltTypeOrSegments === "string") {
-    boltType = boltTypeOrSegments;
-    switch (boltType) {
-      case "mega":
-        numSegments = 20 + Math.floor(Math.random() * 11); // 20-30
-        break;
-      case "arc":
-        numSegments = 8 + Math.floor(Math.random() * 5); // 8-12
-        break;
-      case "fork":
-        numSegments = 5 + Math.floor(Math.random() * 4); // 5-8
-        break;
-    }
-  } else if (typeof boltTypeOrSegments === "number") {
+  // Determine bolt type and params
+  let boltType: "mega" | "arc" | "fork" | "tendril";
+  let numSegments: number;
+  let jitter: number;
+  let branchChance: number;
+  let maxBranchDepth: number;
+  let numBranches: number;
+  let maxLife: number;
+
+  if (typeof boltTypeOrSegments === "number") {
+    // Legacy: number of segments provided
+    boltType = "mega";
     numSegments = boltTypeOrSegments;
-    boltType = "arc"; // default
-  }
-  
-  // Position based on bolt type
-  let startX = Math.random() * canvasWidth;
-  let startY = 0;
-  let endX = startX;
-  let endY = canvasHeight;
-  let jitterAmount = 80;
-  
-  switch (boltType) {
-    case "mega":
-      // Full screen strikes
-      startY = -50;
-      endY = canvasHeight + 50;
-      endX = startX + (Math.random() - 0.5) * canvasWidth * 0.4;
-      jitterAmount = 120;
-      break;
-    case "arc":
-      // Medium strikes (40-70% of screen)
-      startY = 0;
-      endY = canvasHeight * (0.4 + Math.random() * 0.3);
-      endX = startX + (Math.random() - 0.5) * canvasWidth * 0.3;
-      jitterAmount = 80;
-      break;
-    case "fork":
-      // Small strikes (20-40% of screen)
-      startY = canvasHeight * 0.2;
-      endY = canvasHeight * (0.4 + Math.random() * 0.2);
-      endX = startX + (Math.random() - 0.5) * canvasWidth * 0.2;
-      jitterAmount = 40;
-      break;
-  }
-  
-  const boltSegments: { x: number; y: number }[] = [];
-  
-  for (let i = 0; i < numSegments; i++) {
-    const t = i / (numSegments - 1);
-    const x = startX + (endX - startX) * t + (Math.random() - 0.5) * jitterAmount;
-    const y = startY + (endY - startY) * t;
-    boltSegments.push({ x, y });
-  }
-  
-  // Add random branches based on bolt type
-  const branches: LightningBolt[] = [];
-  let branchChance = 0.3;
-  let maxBranchDepth = 1;
-  
-  switch (boltType) {
-    case "mega":
+    jitter = 80;
+    branchChance = 0.7;
+    maxBranchDepth = 3;
+    numBranches = 2;
+    maxLife = LEVEL4_BOLT_LIFETIME_MIN + Math.random() * (LEVEL4_BOLT_LIFETIME_MAX - LEVEL4_BOLT_LIFETIME_MIN);
+  } else {
+    // Bolt type provided or use default
+    boltType = boltTypeOrSegments || selectBoltType();
+    
+    if (boltType === "mega") {
+      numSegments = 20 + Math.floor(Math.random() * 15);
+      jitter = 80;
       branchChance = 0.7;
-      maxBranchDepth = 4;
-      break;
-    case "arc":
+      maxBranchDepth = 3;
+      numBranches = 2 + Math.floor(Math.random() * 2); // 2-3 branches
+      maxLife = LEVEL4_BOLT_LIFETIME_MIN + Math.random() * (LEVEL4_BOLT_LIFETIME_MAX - LEVEL4_BOLT_LIFETIME_MIN);
+    } else if (boltType === "arc") {
+      numSegments = 12 + Math.floor(Math.random() * 8);
+      jitter = 50;
       branchChance = 0.5;
       maxBranchDepth = 2;
-      break;
-    case "fork":
+      numBranches = 1 + Math.floor(Math.random() * 2); // 1-2 branches
+      maxLife = 0.6 + Math.random() * 0.4;
+    } else if (boltType === "fork") {
+      numSegments = 8 + Math.floor(Math.random() * 5);
+      jitter = 60;
       branchChance = 0.3;
       maxBranchDepth = 1;
-      break;
-  }
-  
-  if (Math.random() < branchChance && numSegments > 5) {
-    const branchIdx = 3 + Math.floor(Math.random() * (numSegments - 6));
-    const branchStart = boltSegments[branchIdx];
-    const branchSegments: { x: number; y: number }[] = [branchStart];
-    const branchLength = Math.floor(numSegments / 3);
-    const branchAngle = (Math.random() - 0.5) * Math.PI / 2;
-    
-    for (let i = 1; i < branchLength; i++) {
-      const t = i / branchLength;
-      const x = branchStart.x + Math.cos(branchAngle) * canvasWidth * 0.2 * t + (Math.random() - 0.5) * 40;
-      const y = branchStart.y + Math.sin(branchAngle + Math.PI / 2) * canvasHeight * 0.3 * t;
-      branchSegments.push({ x, y });
+      numBranches = 1;
+      maxLife = 0.4 + Math.random() * 0.3;
+    } else { // tendril
+      numSegments = 15 + Math.floor(Math.random() * 11); // 15-25 segments
+      jitter = 25; // Very low jitter for delicate appearance
+      branchChance = 0.9; // 90% chance to branch
+      maxBranchDepth = 4; // Deep recursion
+      numBranches = 2 + Math.floor(Math.random() * 3); // 2-4 branches
+      maxLife = 0.5 + Math.random() * 0.2; // 0.5-0.7s
     }
-    
-    const branch: LightningBolt = {
-      segments: branchSegments,
-      life: 0,
-      maxLife: 0.15,
-      alpha: 0.7,
-      branches: [],
-      boltType: "fork"
-    };
-    
-    // Recursive branching for mega bolts
-    if (boltType === "mega" && maxBranchDepth > 1 && Math.random() < 0.5) {
-      const subBranch = generateLightningBolt(canvasWidth, canvasHeight, "fork");
-      branch.branches.push(subBranch);
-    }
-    
-    branches.push(branch);
   }
+
+  // Generate bolt path
+  const segments: { x: number; y: number }[] = [];
   
-  // Longer lifetime based on bolt type
-  let maxLife = 0.2;
-  switch (boltType) {
-    case "mega":
-      maxLife = 0.8 + Math.random() * 0.4; // 0.8-1.2s
-      break;
-    case "arc":
-      maxLife = 0.4 + Math.random() * 0.3; // 0.4-0.7s
-      break;
-    case "fork":
-      maxLife = 0.2 + Math.random() * 0.2; // 0.2-0.4s
-      break;
+  // Starting and ending positions
+  let startX: number;
+  let startY: number;
+  let endY: number;
+  
+  if (boltType === "mega") {
+    startX = canvasWidth * (0.2 + Math.random() * 0.6);
+    startY = 0;
+    endY = canvasHeight * (0.6 + Math.random() * 0.3);
+  } else if (boltType === "arc") {
+    startX = canvasWidth * (0.1 + Math.random() * 0.8);
+    startY = 0;
+    endY = canvasHeight * (0.4 + Math.random() * 0.3);
+  } else if (boltType === "fork") {
+    startX = canvasWidth * (0.1 + Math.random() * 0.8);
+    startY = canvasHeight * 0.2;
+    endY = canvasHeight * (0.4 + Math.random() * 0.2);
+  } else { // tendril
+    startX = canvasWidth * (0.15 + Math.random() * 0.7);
+    startY = 0;
+    endY = canvasHeight * (0.7 + Math.random() * 0.2); // 70-90% of screen
   }
-  
-  return {
-    segments: boltSegments,
+
+  segments.push({ x: startX, y: startY });
+
+  // Generate jagged path
+  for (let i = 1; i < numSegments; i++) {
+    const t = i / numSegments;
+    const prevSeg = segments[i - 1];
+    
+    // Interpolate y
+    const y = startY + (endY - startY) * t;
+    
+    // Add horizontal jitter
+    const x = prevSeg.x + (Math.random() - 0.5) * jitter;
+    
+    segments.push({ x, y });
+  }
+
+  const bolt: LightningBolt = {
+    segments,
     life: 0,
     maxLife,
     alpha: 1.0,
-    branches,
-    boltType
+    branches: [],
+    boltType,
+    depth: currentDepth,
   };
-}
 
-// Helper function to select weighted bolt type for Level 4
-export function selectBoltType(): "mega" | "arc" | "fork" {
-  const roll = Math.random();
-  if (roll < 0.4) return "mega"; // 40% mega bolts
-  if (roll < 0.75) return "arc"; // 35% arc bolts
-  return "fork"; // 25% fork bolts
+  // Generate branches with enhanced recursive logic
+  if (currentDepth < maxBranchDepth && numSegments > 5) {
+    for (let b = 0; b < numBranches; b++) {
+      if (Math.random() < branchChance) {
+        const branchStartIdx = Math.floor(numSegments * 0.3 + Math.random() * numSegments * 0.4);
+        const branchStart = segments[branchStartIdx];
+        
+        const branchSegments = Math.max(3, Math.floor(numSegments * 0.4));
+        const branchAngle = (Math.random() - 0.5) * Math.PI * 0.6;
+        const branchLength = (endY - branchStart.y) * (0.4 + Math.random() * 0.4);
+        
+        const branchSegs: { x: number; y: number }[] = [{ ...branchStart }];
+        
+        for (let i = 1; i < branchSegments; i++) {
+          const t = i / branchSegments;
+          const prev = branchSegs[i - 1];
+          
+          const baseX = branchStart.x + Math.cos(branchAngle) * branchLength * t;
+          const baseY = branchStart.y + Math.sin(Math.PI * 0.5) * branchLength * t;
+          
+          const x = baseX + (Math.random() - 0.5) * jitter * 0.5;
+          const y = baseY;
+          
+          branchSegs.push({ x, y });
+        }
+        
+        const branch: LightningBolt = {
+          segments: branchSegs,
+          life: 0,
+          maxLife: maxLife * 0.8,
+          alpha: 0.8,
+          branches: [],
+          boltType,
+          depth: currentDepth + 1,
+        };
+        
+        // Recursive sub-branching (50% chance for branches to create their own branches)
+        if (currentDepth + 1 < maxBranchDepth && Math.random() < 0.5) {
+          const subBranchCount = Math.floor(Math.random() * 2) + 1; // 1-2 sub-branches
+          for (let sb = 0; sb < subBranchCount; sb++) {
+            if (Math.random() < branchChance * 0.7 && branchSegs.length > 3) {
+              const subBranchStartIdx = Math.floor(branchSegs.length * 0.3 + Math.random() * branchSegs.length * 0.3);
+              const subBranchStart = branchSegs[subBranchStartIdx];
+              
+              const subBranchSegments = Math.max(2, Math.floor(branchSegs.length * 0.4));
+              const subBranchAngle = branchAngle + (Math.random() - 0.5) * Math.PI * 0.4;
+              const subBranchLength = branchLength * (0.3 + Math.random() * 0.3);
+              
+              const subBranchSegs: { x: number; y: number }[] = [{ ...subBranchStart }];
+              
+              for (let i = 1; i < subBranchSegments; i++) {
+                const t = i / subBranchSegments;
+                const prev = subBranchSegs[i - 1];
+                
+                const baseX = subBranchStart.x + Math.cos(subBranchAngle) * subBranchLength * t;
+                const baseY = subBranchStart.y + Math.sin(Math.PI * 0.5) * subBranchLength * t;
+                
+                const x = baseX + (Math.random() - 0.5) * jitter * 0.3;
+                const y = baseY;
+                
+                subBranchSegs.push({ x, y });
+              }
+              
+              branch.branches.push({
+                segments: subBranchSegs,
+                life: 0,
+                maxLife: maxLife * 0.6,
+                alpha: 0.6,
+                branches: [],
+                boltType,
+                depth: currentDepth + 2,
+              });
+            }
+          }
+        }
+        
+        bolt.branches.push(branch);
+      }
+    }
+  }
+
+  return bolt;
 }
 
 // Export Level 4 constants for use in GameEngine

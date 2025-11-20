@@ -164,6 +164,10 @@ function renderSingleBolt(
   const fadeProgress = bolt.life / bolt.maxLife;
   const alpha = bolt.alpha * (1 - fadeProgress);
   
+  // Determine if this is a thin tendril bolt
+  const isTendril = bolt.boltType === "tendril";
+  const lineWidthScale = isTendril ? 0.4 : 1.0; // 60% thinner
+  
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'lighter'; // Additive blending
@@ -179,76 +183,85 @@ function renderSingleBolt(
   
   if (lowGraphics) {
     // Simplified 3-layer rendering for low graphics
+    const baseColor = isTendril ? 'hsl(270, 100%, 70%)' : 'hsl(200, 100%, 70%)';
+    const brightColor = isTendril ? 'hsl(270, 100%, 90%)' : 'hsl(200, 100%, 90%)';
+    const coreColor = isTendril ? 'hsl(270, 100%, 98%)' : 'hsl(200, 100%, 98%)';
+    
     // Layer 1: Medium glow
     ctx.globalAlpha = alpha * 0.4;
-    ctx.strokeStyle = 'hsl(200, 100%, 70%)';
-    ctx.lineWidth = 12 * dpr;
-    ctx.shadowColor = 'rgba(150, 180, 255, 0.6)';
-    ctx.shadowBlur = 15 * dpr;
+    ctx.strokeStyle = baseColor;
+    ctx.lineWidth = 12 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(180, 140, 255, 0.6)' : 'rgba(150, 180, 255, 0.6)';
+    ctx.shadowBlur = 15 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
     // Layer 2: Inner glow
     ctx.globalAlpha = alpha * 0.7;
-    ctx.strokeStyle = 'hsl(200, 100%, 90%)';
-    ctx.lineWidth = 5 * dpr;
-    ctx.shadowBlur = 8 * dpr;
+    ctx.strokeStyle = brightColor;
+    ctx.lineWidth = 5 * lineWidthScale * dpr;
+    ctx.shadowBlur = 8 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
     // Layer 3: Core bolt
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = 'hsl(200, 100%, 98%)';
-    ctx.lineWidth = 2 * dpr;
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
-    ctx.shadowBlur = 3 * dpr;
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = 2 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(200, 160, 255, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    ctx.shadowBlur = 3 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
   } else {
     // Full 5-layer rendering for maximum impact
-    // Layer 1: Outer huge glow (purple tint)
+    const outerColor = isTendril ? 'hsl(280, 80%, 60%)' : 'hsl(250, 80%, 60%)';
+    const mediumColor = isTendril ? 'hsl(270, 100%, 70%)' : 'hsl(200, 100%, 70%)';
+    const innerColor = isTendril ? 'hsl(270, 100%, 90%)' : 'hsl(200, 100%, 90%)';
+    const coreColor = isTendril ? 'hsl(270, 100%, 98%)' : 'hsl(200, 100%, 98%)';
+    
+    // Layer 1: Outer huge glow
     ctx.globalAlpha = alpha * 0.25;
-    ctx.strokeStyle = 'hsl(250, 80%, 60%)';
-    ctx.lineWidth = 40 * dpr;
-    ctx.shadowColor = 'rgba(150, 100, 255, 0.6)';
-    ctx.shadowBlur = 60 * dpr;
+    ctx.strokeStyle = outerColor;
+    ctx.lineWidth = 40 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(180, 120, 255, 0.6)' : 'rgba(150, 100, 255, 0.6)';
+    ctx.shadowBlur = 60 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
-    // Layer 2: Medium glow (cyan)
+    // Layer 2: Medium glow
     ctx.globalAlpha = alpha * 0.4;
-    ctx.strokeStyle = 'hsl(200, 100%, 70%)';
-    ctx.lineWidth = 20 * dpr;
-    ctx.shadowColor = 'rgba(100, 200, 255, 0.7)';
-    ctx.shadowBlur = 30 * dpr;
+    ctx.strokeStyle = mediumColor;
+    ctx.lineWidth = 20 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(160, 140, 255, 0.7)' : 'rgba(100, 200, 255, 0.7)';
+    ctx.shadowBlur = 30 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
-    // Layer 3: Inner glow (bright cyan-white)
+    // Layer 3: Inner glow
     ctx.globalAlpha = alpha * 0.7;
-    ctx.strokeStyle = 'hsl(200, 100%, 90%)';
-    ctx.lineWidth = 8 * dpr;
-    ctx.shadowColor = 'rgba(200, 240, 255, 0.8)';
-    ctx.shadowBlur = 15 * dpr;
+    ctx.strokeStyle = innerColor;
+    ctx.lineWidth = 8 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(200, 180, 255, 0.8)' : 'rgba(200, 240, 255, 0.8)';
+    ctx.shadowBlur = 15 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
-    // Layer 4: Core bolt (pure white)
+    // Layer 4: Core bolt
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = 'hsl(200, 100%, 98%)';
-    ctx.lineWidth = 3 * dpr;
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
-    ctx.shadowBlur = 5 * dpr;
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = 3 * lineWidthScale * dpr;
+    ctx.shadowColor = isTendril ? 'rgba(220, 200, 255, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    ctx.shadowBlur = 5 * lineWidthScale * dpr;
     drawPath();
     ctx.stroke();
     
     // Layer 5: Sparkle layer (bright points at segments)
     ctx.globalAlpha = alpha * 0.9;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.shadowBlur = 4 * dpr;
+    ctx.fillStyle = isTendril ? 'rgba(200, 180, 255, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    ctx.shadowBlur = 4 * lineWidthScale * dpr;
     for (const seg of bolt.segments) {
       ctx.beginPath();
-      ctx.arc(seg.x * dpr, seg.y * dpr, 2 * dpr, 0, Math.PI * 2);
+      ctx.arc(seg.x * dpr, seg.y * dpr, 2 * lineWidthScale * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
   }
