@@ -3547,49 +3547,6 @@ export const GameEngine: React.FC<Props> = ({
           renderLightningImpact(ctx, impact, cameraX, zoom, 0, h / dpr, dpr);
           ctx.restore();
         }
-        
-        // Render debris particles (world space)
-        for (const d of lightningDebris.current) {
-          ctx.save();
-          ctx.translate(d.x - cameraX, d.y + anchor);
-          ctx.rotate(d.angle);
-          ctx.fillStyle = neonColor;
-          ctx.globalAlpha = 1 - d.life / d.max;
-          const size = d.size;
-          if (d.kind === 'plate') {
-            ctx.fillRect(-size / 2, -size / 2, size, size);
-          } else if (d.kind === 'rod') {
-            ctx.fillRect(-size * 1.5, -size / 4, size * 3, size / 2);
-          } else {
-            ctx.beginPath();
-            ctx.moveTo(0, -size);
-            ctx.lineTo(size, size);
-            ctx.lineTo(-size, size);
-            ctx.fill();
-          }
-          ctx.restore();
-        }
-        
-        // Render afterglows (screen space)
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        for (const glow of lightningAfterglows.current) {
-          renderLightningAfterglow(ctx, glow, dpr, shouldOptimizePerformance);
-        }
-        
-        // Render lightning bolts (screen space)
-        renderLightningBolts(ctx, lightningBolts.current, dpr, shouldOptimizePerformance);
-        
-        // Render ozone glow
-        renderOzoneGlow(ctx, lightningBolts.current.length, w / dpr, h / dpr, dpr);
-        
-        // Render screen flash
-        renderLightningFlash(ctx, screenFlashAlpha.current, w / dpr, h / dpr, dpr);
-        
-        // Restore world transform
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.translate(w / 2 + shakeX, h / 2 + shakeY);
-        ctx.scale(zoom * dpr, zoom * dpr);
-        ctx.save();
       }
       
       // Ghost ship (render before player)
