@@ -3695,12 +3695,14 @@ export const GameEngine: React.FC<Props> = ({
 
       // ===== LIGHTNING RENDERING (Level 4) =====
       if (lightningEnabled) {
+        ctx.save(); // Isolate lightning rendering state
+        
         // 1. Render impacts (behind lightning)
         for (const impact of lightningImpacts.current) {
           renderLightningImpact(ctx, impact, cameraX, zoom, anchor, h / dpr, dpr);
         }
         
-        // 2. Render debris particles (world space)
+        // 2. Render debris particles (world space) - convert to screen coordinates
         ctx.save();
         ctx.strokeStyle = neonColor;
         ctx.fillStyle = neonColor;
@@ -3713,8 +3715,12 @@ export const GameEngine: React.FC<Props> = ({
           const alpha = 1 - fadeProgress;
           
           for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            // Convert world coordinates to screen coordinates
+            const screenX = (d.x + offset - cameraX) * zoom + anchor;
+            const screenY = d.y * zoom + h / 2;
+            
             ctx.save();
-            ctx.translate(d.x + offset, d.y);
+            ctx.translate(screenX * dpr, screenY * dpr);
             ctx.rotate(d.angle);
             ctx.globalAlpha = alpha;
             
@@ -3751,8 +3757,7 @@ export const GameEngine: React.FC<Props> = ({
         // 5. Render ozone glow
         renderOzoneGlow(ctx, lightningBolts.current.length, w / dpr, h / dpr, dpr);
         
-        // 6. Render screen flash (on top of everything except HUD)
-        renderLightningFlash(ctx, screenFlashAlpha.current, w / dpr, h / dpr, dpr);
+        ctx.restore(); // Restore canvas state after lightning
       }
 
       // Low fuel warning - smooth color fade and pulsing glow (classic/fixed/timetrial only)
@@ -3823,6 +3828,13 @@ export const GameEngine: React.FC<Props> = ({
         // Restore original shadow settings for other elements
         ctx.shadowColor = originalShadowColor;
         ctx.shadowBlur = originalShadowBlur;
+      }
+
+      // Lightning screen flash (rendered AFTER lander, on top of everything except HUD)
+      if (lightningEnabled && screenFlashAlpha.current > 0) {
+        ctx.save();
+        renderLightningFlash(ctx, screenFlashAlpha.current, w / dpr, h / dpr, dpr);
+        ctx.restore();
       }
 
       // Spectacular particle rendering with dramatically enhanced thruster effects
