@@ -955,9 +955,27 @@ export const GameEngine: React.FC<Props> = ({
       ghostShip = { x: 0, y: 0, angle: 0, visible: false };
     }
     
-    // Particles
-    type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string };
+    // Particles (extended with bubble support)
+    type Particle = { 
+      x: number; 
+      y: number; 
+      vx: number; 
+      vy: number; 
+      life: number; 
+      max: number; 
+      color: string;
+      isBubble?: boolean;  // Flag for underwater bubbles
+      size?: number;       // Bubble radius (2-6px range)
+    };
     const particles: Particle[] = [];
+    
+    // Underwater bubble colors - neon cyan/blue palette
+    const bubbleColors = [
+      'rgba(0, 255, 255, 0.8)',     // Bright cyan
+      'rgba(100, 200, 255, 0.8)',   // Light blue
+      'rgba(0, 200, 255, 0.9)',     // Cyan-blue
+      'rgba(150, 230, 255, 0.7)'    // Pale cyan
+    ];
     
     // Style points visual effects (local arrays for immediate rendering)
     type StyleParticle = { 
@@ -1680,27 +1698,51 @@ export const GameEngine: React.FC<Props> = ({
               const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
               const pa = angle + (Math.random() - 0.5) * angleSpread + Math.PI;
               
-              // Enhanced speed range with more variation
-              const sp = shouldOptimizePerformance ? 
-                (60 + Math.random() * 120 * thrust) : 
-                (100 + Math.random() * 200 * thrust); // Dramatically enhanced speed range
-              
-              // Double the lifespan as requested
-              const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
-              
-              // Add slight color variation for high graphics
-              const particleColor = shouldOptimizePerformance ? neonColor : 
-                (Math.random() > 0.7 ? neonColor.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColor);
-              
-              particles.push({ 
-                x: nozzle.x, 
-                y: nozzle.y, 
-                vx: Math.sin(pa) * sp, 
-                vy: -Math.cos(pa) * sp, 
-                life: 0, 
-                max: lifespan, 
-                color: particleColor 
-              });
+              if (isUnderwater) {
+                // UNDERWATER: Spawn bubbles instead of embers
+                const bubbleSize = Math.random() < 0.6 ? 
+                  (2 + Math.random() * 1.5) :  // 60%: small (2-3.5px)
+                  (3.5 + Math.random() * 2.5); // 40%: large (3.5-6px)
+                
+                // Reduced speed for water resistance
+                const sp = shouldOptimizePerformance ? 
+                  (40 + Math.random() * 80 * thrust) :     // Low GFX: 40-120 px/s
+                  (60 + Math.random() * 120 * thrust);     // High GFX: 60-180 px/s
+                
+                const lifespan = shouldOptimizePerformance ? 0.8 : 2.0;  // Bubbles live longer
+                
+                particles.push({
+                  x: nozzle.x,
+                  y: nozzle.y,
+                  vx: Math.sin(pa) * sp,
+                  vy: -Math.cos(pa) * sp,
+                  life: 0,
+                  max: lifespan,
+                  color: bubbleColors[Math.floor(Math.random() * bubbleColors.length)],
+                  isBubble: true,
+                  size: bubbleSize
+                });
+              } else {
+                // REGULAR AIR: Keep existing thruster particle code
+                const sp = shouldOptimizePerformance ? 
+                  (60 + Math.random() * 120 * thrust) : 
+                  (100 + Math.random() * 200 * thrust);
+                
+                const lifespan = shouldOptimizePerformance ? 0.5 : 1.6;
+                
+                const particleColor = shouldOptimizePerformance ? neonColor : 
+                  (Math.random() > 0.7 ? neonColor.replace(')', ', 0.8)').replace('hsl', 'hsla') : neonColor);
+                
+                particles.push({ 
+                  x: nozzle.x, 
+                  y: nozzle.y, 
+                  vx: Math.sin(pa) * sp, 
+                  vy: -Math.cos(pa) * sp, 
+                  life: 0, 
+                  max: lifespan, 
+                  color: particleColor 
+                });
+              }
             }
           }
         }
@@ -2614,6 +2656,29 @@ export const GameEngine: React.FC<Props> = ({
       zoom += Math.max(-maxStep, Math.min(maxStep, desiredDelta));
       if (cameraShake > 0) cameraShake -= 60 * dt;
 
+      // Spawn ambient bubbles from cavern floor when underwater
+      if (isUnderwater && Math.random() < 0.04 * dt * 60) {
+        const bubbleSize = Math.random() < 0.7 ? 
+          (2 + Math.random() * 2) :    // 70% chance: small (2-4px)
+          (4 + Math.random() * 2);     // 30% chance: large (4-6px)
+        
+        // Spawn bubbles across the world width
+        const spawnX = Math.random() * WORLD_WIDTH;
+        const spawnY = terrain.getHeightAt(spawnX) - 10; // Just above terrain floor
+        
+        particles.push({
+          x: spawnX,
+          y: spawnY,
+          vx: (Math.random() - 0.5) * 15,  // Gentle horizontal drift
+          vy: -25 - Math.random() * 20,    // Float upward (25-45 px/s)
+          life: 0,
+          max: 4 + Math.random() * 3,      // 4-7 second lifespan
+          color: bubbleColors[Math.floor(Math.random() * bubbleColors.length)],
+          isBubble: true,
+          size: bubbleSize
+        });
+      }
+      
       // Enhanced particles update with thruster-friendly limits
       const maxParticles = shouldOptimizePerformance ? 30 : 300; // Allow 300 particles for spectacular thruster effects
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -2622,10 +2687,53 @@ export const GameEngine: React.FC<Props> = ({
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         
-        // Time-based damping: lose 30% speed over the particle's lifetime
-        const dampenFactor = Math.pow(0.7, dt / p.max); // Exponential decay, frame-independent
-        p.vx *= dampenFactor;
-        p.vy *= dampenFactor;
+        if (p.isBubble && isUnderwater) {
+          // BUBBLE PHYSICS
+          
+          // Strong upward buoyancy force
+          p.vy -= 85 * dt;
+          
+          // Horizontal wobble (sine wave oscillation)
+          const wobbleFreq = 3 + (p.size || 3) * 0.5;  // Larger bubbles wobble slower
+          p.vx += Math.sin(p.life * wobbleFreq) * 15 * dt;
+          
+          // Terminal velocity cap (larger bubbles rise faster)
+          const terminalVel = -100 - (p.size || 3) * 10;  // -130 to -160 px/s
+          if (p.vy < terminalVel) p.vy = terminalVel;
+          
+          // Extra water drag
+          p.vx *= 0.97;
+          p.vy *= 0.99;
+          
+          // Remove if reached surface (top of screen)
+          if (p.y < -20) {
+            // Spawn pop effect (high graphics only)
+            if (!shouldOptimizePerformance) {
+              for (let j = 0; j < 4; j++) {
+                particles.push({
+                  x: p.x,
+                  y: p.y,
+                  vx: (Math.random() - 0.5) * 50,
+                  vy: (Math.random() - 0.5) * 50,
+                  life: 0,
+                  max: 0.25,
+                  color: p.color,
+                  isBubble: false,  // Tiny sparkles, not bubbles
+                  size: 1
+                });
+              }
+            }
+            particlePool.release(p);
+            particles.splice(i, 1);
+            continue;
+          }
+        } else {
+          // REGULAR PARTICLE PHYSICS
+          // Time-based damping: lose 30% speed over the particle's lifetime
+          const dampenFactor = Math.pow(0.7, dt / p.max); // Exponential decay, frame-independent
+          p.vx *= dampenFactor;
+          p.vy *= dampenFactor;
+        }
         
         if (p.life > p.max) {
           particlePool.release(p);
@@ -3816,28 +3924,79 @@ export const GameEngine: React.FC<Props> = ({
         ctx.save();
         
         for (const p of particles) {
-          // Determine if this is a thruster particle
-          const isThruster = p.color === neonColor || p.color.includes('hsla');
-          
-          // Age-based fade and size variation for thruster particles
           const ageRatio = p.life / p.max;
-          const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7); // Fade out over time
           
-          // Dramatic shadow blur for thruster particles (disabled on iPhone for performance)
-          ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? THRUSTER_SHADOW_BLUR : 2);
-          ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
-          
-          ctx.beginPath();
-          ctx.globalAlpha = alpha;
-          ctx.strokeStyle = p.color as any;
-          
-          // Variable line width for thruster particles - slightly thicker on iPhone to compensate for no shadow
-          const lineWidth = shouldOptimizePerformance ? 1.8 : 
-            (isThruster ? (isIPhone ? 1.8 + (1 - ageRatio) * 1.0 : 1.5 + (1 - ageRatio) * 1.0) : 1.8);
-          ctx.lineWidth = lineWidth;
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
-          ctx.stroke();
+          if (p.isBubble) {
+            // === BUBBLE RENDERING (CIRCLES) ===
+            const bubbleSize = p.size || 3;
+            
+            // Fade out near end of life
+            const alpha = 1 - Math.pow(ageRatio, 3);  // Cubic fade
+            
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            
+            // HIGH GRAPHICS: Full neon glow effect
+            if (!shouldOptimizePerformance) {
+              // Outer glow (large blur)
+              ctx.shadowBlur = bubbleSize * 4;
+              ctx.shadowColor = p.color;
+              ctx.fillStyle = p.color;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, bubbleSize, 0, Math.PI * 2);
+              ctx.fill();
+              
+              // Inner bright core
+              ctx.shadowBlur = bubbleSize * 2;
+              ctx.fillStyle = p.color.replace(/[\d.]+\)$/g, '1.0)');  // Full opacity
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, bubbleSize * 0.7, 0, Math.PI * 2);
+              ctx.fill();
+              
+              // Highlight shimmer (top-left)
+              ctx.shadowBlur = 0;
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+              ctx.beginPath();
+              ctx.arc(
+                p.x - bubbleSize * 0.35,
+                p.y - bubbleSize * 0.35,
+                bubbleSize * 0.35,
+                0,
+                Math.PI * 2
+              );
+              ctx.fill();
+              
+            } else {
+              // LOW GRAPHICS: Simple filled circle with minimal glow
+              ctx.shadowBlur = bubbleSize;
+              ctx.shadowColor = p.color;
+              ctx.fillStyle = p.color;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, bubbleSize, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            
+            ctx.restore();
+            
+          } else {
+            // === REGULAR PARTICLE RENDERING (LINES) ===
+            const isThruster = p.color === neonColor || p.color.includes('hsla');
+            const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7);
+            
+            ctx.shadowBlur = shouldOptimizePerformance ? 0 : (isThruster ? THRUSTER_SHADOW_BLUR : 2);
+            ctx.shadowColor = isThruster ? neonColor as any : p.color as any;
+            
+            ctx.beginPath();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = p.color as any;
+            
+            const lineWidth = shouldOptimizePerformance ? 1.8 : 
+              (isThruster ? (isIPhone ? 1.8 + (1 - ageRatio) * 1.0 : 1.5 + (1 - ageRatio) * 1.0) : 1.8);
+            ctx.lineWidth = lineWidth;
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+            ctx.stroke();
+          }
         }
         ctx.restore();
       }
