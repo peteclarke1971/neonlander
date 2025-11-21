@@ -1701,8 +1701,8 @@ export const GameEngine: React.FC<Props> = ({
       if (isUnderwater) {
         // UNDERWATER: Spawn bubbles instead of embers
         const bubbleSize = Math.random() < 0.6 ? 
-          (4 + Math.random() * 6.5) :  // 60%: small (4-10.5px)
-          (7 + Math.random() * 11);    // 40%: large (7-18px)
+          (2 + Math.random() * 3.25) :  // 60%: small (2-5.25px)
+          (3.5 + Math.random() * 5.5);  // 40%: large (3.5-9px)
         
         // Doubled initial speed for longer thrust trail
         const sp = shouldOptimizePerformance ? 
@@ -2662,8 +2662,8 @@ export const GameEngine: React.FC<Props> = ({
       // Spawn ambient bubbles from cavern floor when underwater
       if (isUnderwater && Math.random() < 0.04 * dt * 60) {
         const bubbleSize = Math.random() < 0.7 ? 
-          (4 + Math.random() * 8) :    // 70% chance: small (4-12px)
-          (8 + Math.random() * 10);    // 30% chance: large (8-18px)
+          (2 + Math.random() * 4) :    // 70% chance: small (2-6px)
+          (4 + Math.random() * 5);     // 30% chance: large (4-9px)
         
         // Spawn bubbles across the world width
         const spawnX = Math.random() * WORLD_WIDTH;
@@ -2712,8 +2712,12 @@ export const GameEngine: React.FC<Props> = ({
           p.vx *= 0.97;
           p.vy *= 0.99;
           
-          // Remove if reached surface (top of screen)
-          if (p.y < -20) {
+          // Remove if bubble floated above visible screen area
+          const canvasH = c.height;
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const viewHeight = canvasH / (dpr * zoom);
+          const screenTopY = y - (viewHeight / 2);
+          if (p.y < screenTopY - 100) {  // 100px buffer above screen
             // Spawn pop effect (high graphics only)
             if (!shouldOptimizePerformance) {
               for (let j = 0; j < 4; j++) {
