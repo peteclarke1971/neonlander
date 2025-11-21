@@ -9,7 +9,7 @@ import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
 import { CoreComposition } from "./systems/coreComposition";
-import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad, CollectiblesData, SpaceJunk, WormholeDoor, SequencedPad } from "./types";
+import { Difficulty, GameOverData, HUDSnapshot, TerrainData, Mode, Pad, MovingPad, CollectiblesData, SpaceJunk, WormholeDoor, SequencedPad, Jellyfish } from "./types";
 import { checkJunkPickup, checkWormholeEntry, collectJunk, generateWormholeDoor } from "./systems/collectibles";
 import { renderSpaceJunk, renderWormholeDoor, generateSparkles, updateSparkles, SPACE_JUNK_ASSETS } from "./systems/spaceJunkAssets";
 import { generateTerrain } from "./terrain";
@@ -85,7 +85,112 @@ const ABORT_BOOST_VELOCITY = -180; // instant upward velocity change
 const ABORT_FUEL_COST = 50; // fixed fuel cost per abort activation
 const ABORT_CAMERA_SHAKE = 12; // visual impact intensity
 
-export const GameEngine: React.FC<Props> = ({ 
+// Jellyfish update and burst logic
+function updateJellyfish(
+  jellyfish: Jellyfish[],
+  dt: number,
+  elapsed: number,
+  worldWidth: number,
+  worldHeight: number
+): void {
+  for (const jf of jellyfish) {
+    // Horizontal drift with world wrapping
+    jf.x += jf.vx * dt;
+    jf.x = ((jf.x % worldWidth) + worldWidth) % worldWidth;
+    
+    // Vertical bobbing (sine wave)
+    jf.bobbingPhase += jf.bobbingSpeed * dt;
+    const targetOffset = Math.sin(jf.bobbingPhase) * jf.bobbingAmplitude;
+    jf.targetY = jf.y + targetOffset;
+    
+    // Smooth interpolation to target Y
+    const yDiff = targetOffset - (jf.y - (jf.y - targetOffset));
+    jf.vy = yDiff * 0.5; // Smooth following
+    jf.y += jf.vy * dt;
+    
+    // Keep within bounds (no wrapping vertically)
+    if (jf.y < 50) jf.y = 50;
+    if (jf.y > worldHeight - 50) jf.y = worldHeight - 50;
+    
+    // Update tentacle animation
+    jf.tentaclePhase += dt * 2;
+    
+    // Electric burst state machine
+    if (!jf.isTelegraphing && !jf.isBursting) {
+      // Countdown to next burst
+      jf.burstTimer -= dt;
+      
+      if (jf.burstTimer <= 1.5) {
+        // Start telegraphing (1.5s warning)
+        jf.isTelegraphing = true;
+        jf.telegraphTimer = 1.5;
+        jf.glowIntensity = 1.5; // Brighten
+      }
+    } else if (jf.isTelegraphing) {
+      // Telegraph warning
+      jf.telegraphTimer -= dt;
+      jf.glowIntensity = 1.5 + Math.sin(elapsed * 15) * 0.5; // Pulsing glow
+      
+      if (jf.telegraphTimer <= 0) {
+        // Trigger burst!
+        jf.isTelegraphing = false;
+        jf.isBursting = true;
+        jf.burstProgress = 0;
+      }
+    } else if (jf.isBursting) {
+      // Active shockwave
+      jf.burstProgress += dt / jf.burstDuration;
+      
+      if (jf.burstProgress >= 1.0) {
+        // Burst complete
+        jf.isBursting = false;
+        jf.burstProgress = 0;
+        jf.glowIntensity = 0.5 + Math.random() * 0.5; // Back to normal
+        jf.burstTimer = jf.burstInterval; // Reset timer
+      }
+    }
+  }
+}
+
+// Check jellyfish collisions
+function checkJellyfishCollision(
+  jellyfish: Jellyfish[],
+  landerX: number,
+  landerY: number,
+  landerRadius: number
+): {
+  directHit: Jellyfish | null;
+  shockwaveHit: Jellyfish | null;
+} {
+  let directHit: Jellyfish | null = null;
+  let shockwaveHit: Jellyfish | null = null;
+  
+  for (const jf of jellyfish) {
+    const dx = landerX - jf.x;
+    const dy = landerY - jf.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Direct collision with jellyfish body
+    const bodyRadius = jf.size * 0.6; // Bell is ~60% of size
+    if (dist < landerRadius + bodyRadius) {
+      directHit = jf;
+      break; // Fatal collision, no need to check more
+    }
+    
+    // Shockwave collision (only during burst)
+    if (jf.isBursting) {
+      const shockwaveRadius = 75 * jf.burstProgress; // Expands to 75px
+      if (dist < shockwaveRadius + landerRadius) {
+        shockwaveHit = jf;
+        // Don't break - check all jellyfish for closest burst
+      }
+    }
+  }
+  
+  return { directHit, shockwaveHit };
+}
+
+export const GameEngine: React.FC<Props> = ({
   difficulty, 
   onExit, 
   onGameOver, 
@@ -821,6 +926,12 @@ export const GameEngine: React.FC<Props> = ({
     let running = true;
     let crashed = false;
     hasShownBonusThisLanding.current = false; // Reset flag at level start
+
+    // Paralysis state (jellyfish shockwave)
+    let isParalyzed = false;
+    let paralysisTimer = 0; // seconds
+    let electrifiedTimer = 0; // visual effect timer
+    let lastShockwaveSource: { x: number; y: number } | null = null;
 
     // Ghost recording and playback initialization
     let gameTime = 0;
@@ -1634,7 +1745,7 @@ export const GameEngine: React.FC<Props> = ({
 
       // Prevent thrust input during countdown intro
       let thrust = 0;
-      if (running && !worldPausedRef.current && !playerLockedRef.current) {
+      if (running && !worldPausedRef.current && !playerLockedRef.current && !isParalyzed) {
         thrust = Math.max(
           gpThrust,
           thrustAnalog.current,
@@ -2022,6 +2133,73 @@ export const GameEngine: React.FC<Props> = ({
               setTimeout(() => {
                 onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
               }, 700);
+      }
+      
+      // Update jellyfish (Level 5 underwater only)
+      if (running && isUnderwater && !isCavernLevel && 'jellyfish' in terrain && terrain.jellyfish) {
+        updateJellyfish(terrain.jellyfish, dt, elapsed, terrain.worldWidth, 800);
+        
+        // Check jellyfish collisions
+        if (!crashed && invulnerabilityTimer.current <= 0) {
+          const { directHit, shockwaveHit } = checkJellyfishCollision(
+            terrain.jellyfish,
+            x,
+            y,
+            10 // lander radius
+          );
+          
+          // Direct hit = instant death
+          if (directHit) {
+            running = false;
+            crashed = true;
+            spawnExplosion();
+            spawnDebris();
+            audio.current.explosion();
+            audio.current.stopThruster();
+            cameraShake = 24;
+            if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+            setTimeout(() => {
+              onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+            }, 700);
+          }
+          // Shockwave hit = knockback + paralysis (only if not already paralyzed)
+          else if (shockwaveHit && !isParalyzed) {
+            isParalyzed = true;
+            paralysisTimer = 3.0; // 3 seconds
+            electrifiedTimer = 3.0;
+            lastShockwaveSource = { x: shockwaveHit.x, y: shockwaveHit.y };
+            
+            // Knockback away from jellyfish
+            const dx = x - shockwaveHit.x;
+            const dy = y - shockwaveHit.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const knockbackForce = 150; // Strong knockback
+            
+            if (dist > 0) {
+              vx += (dx / dist) * knockbackForce;
+              vy += (dy / dist) * knockbackForce;
+            }
+            
+            cameraShake = 12;
+            audio.current.jellyfishShock();
+            if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.8); } catch {} }
+          }
+        }
+      }
+
+      // Update paralysis state
+      if (isParalyzed) {
+        paralysisTimer -= dt;
+        electrifiedTimer -= dt;
+        
+        if (paralysisTimer <= 0) {
+          isParalyzed = false;
+          paralysisTimer = 0;
+        }
+        
+        if (electrifiedTimer <= 0) {
+          electrifiedTimer = 0;
+        }
       }
       
       // Check collectible pickups
@@ -3605,6 +3783,102 @@ export const GameEngine: React.FC<Props> = ({
         ctx.restore();
       }
 
+      // Render jellyfish (Level 5 underwater only)
+      if (isUnderwater && !isCavernLevel && 'jellyfish' in terrain && terrain.jellyfish) {
+        ctx.save();
+        
+        for (const jf of terrain.jellyfish) {
+          // Viewport culling
+          if (jf.x < viewLeft - 100 || jf.x > viewRight + 100) continue;
+          
+          const bellRadius = jf.size * 0.6;
+          const tentacleLength = jf.size * 1.2;
+          
+          // Jellyfish color
+          const baseColor = '#00ddff';
+          const glowColor = '#00ffff';
+          
+          ctx.shadowColor = glowColor;
+          ctx.shadowBlur = shouldOptimizePerformance ? 10 : (20 * jf.glowIntensity);
+          
+          // Draw bell
+          ctx.strokeStyle = baseColor;
+          ctx.fillStyle = baseColor;
+          ctx.globalAlpha = 0.4 + (jf.glowIntensity * 0.2);
+          ctx.lineWidth = 2;
+          
+          ctx.beginPath();
+          ctx.arc(jf.x, jf.y, bellRadius, Math.PI, Math.PI * 2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          
+          // Draw tentacles
+          ctx.globalAlpha = 0.6;
+          const tentacleCount = 6;
+          
+          for (let i = 0; i < tentacleCount; i++) {
+            const angle = Math.PI + (i / tentacleCount) * Math.PI;
+            const baseX = jf.x + Math.cos(angle) * bellRadius;
+            const baseY = jf.y;
+            
+            ctx.beginPath();
+            ctx.moveTo(baseX, baseY);
+            
+            const segments = 4;
+            for (let s = 1; s <= segments; s++) {
+              const t = s / segments;
+              const wave = Math.sin(jf.tentaclePhase + i * 0.5 + s) * (jf.size * 0.2);
+              ctx.lineTo(baseX + wave, baseY + t * tentacleLength);
+            }
+            ctx.stroke();
+          }
+          
+          // Draw electric burst shockwave
+          if (jf.isBursting) {
+            const radius = 75 * jf.burstProgress;
+            ctx.globalAlpha = 0.6 * (1 - jf.burstProgress);
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#ffff00';
+            ctx.shadowBlur = shouldOptimizePerformance ? 15 : 30;
+            
+            ctx.beginPath();
+            ctx.arc(jf.x, jf.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Electric arcs
+            const arcCount = 8;
+            for (let i = 0; i < arcCount; i++) {
+              const angle = (i / arcCount) * Math.PI * 2 + (jf.burstProgress * 2);
+              const x1 = jf.x + Math.cos(angle) * (radius * 0.5);
+              const y1 = jf.y + Math.sin(angle) * (radius * 0.5);
+              const x2 = jf.x + Math.cos(angle) * radius;
+              const y2 = jf.y + Math.sin(angle) * radius;
+              
+              ctx.beginPath();
+              ctx.moveTo(x1, y1);
+              ctx.lineTo(x2, y2);
+              ctx.stroke();
+            }
+          }
+          
+          // Telegraph warning
+          if (jf.isTelegraphing) {
+            ctx.globalAlpha = 0.3 + Math.sin(elapsed * 15) * 0.2;
+            ctx.fillStyle = '#ffff00';
+            ctx.shadowColor = '#ffff00';
+            ctx.shadowBlur = shouldOptimizePerformance ? 20 : 40;
+            
+            ctx.beginPath();
+            ctx.arc(jf.x, jf.y, bellRadius * 1.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        
+        ctx.restore();
+      }
+
       // Pads
       if (isCavernLevel) {
         const cavernData = terrain as CavernData;
@@ -4050,6 +4324,39 @@ export const GameEngine: React.FC<Props> = ({
             ctx.lineTo(3, 10);
             ctx.stroke();
           }
+          ctx.restore();
+        }
+        
+        // Draw electrified effect during paralysis
+        if (electrifiedTimer > 0 && !crashed) {
+          ctx.save();
+          ctx.strokeStyle = '#ffff00';
+          ctx.lineWidth = 2;
+          ctx.shadowColor = '#ffff00';
+          ctx.shadowBlur = shouldOptimizePerformance ? 10 : 20;
+          ctx.globalAlpha = 0.6;
+          
+          const arcCount = 4;
+          for (let i = 0; i < arcCount; i++) {
+            const angle1 = (elapsed * 10 + i * 1.5) % (Math.PI * 2);
+            const angle2 = (elapsed * 10 + i * 1.5 + 0.8) % (Math.PI * 2);
+            const r1 = 12;
+            const r2 = 18;
+            
+            const x1 = x + Math.cos(angle1) * r1;
+            const y1 = y + Math.sin(angle1) * r1;
+            const x2 = x + Math.cos(angle2) * r2;
+            const y2 = y + Math.sin(angle2) * r2;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * 10;
+            const midY = (y1 + y2) / 2 + (Math.random() - 0.5) * 10;
+            ctx.lineTo(midX, midY);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+          }
+          
           ctx.restore();
         }
         

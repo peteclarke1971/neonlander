@@ -60,6 +60,7 @@ export interface TerrainData {
   volcanoes?: Volcano[];
   collectibles?: CollectiblesData;
   coral?: CoralFormation[];
+  jellyfish?: Jellyfish[];
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
   getMovingPadAt?: (x: number, y: number, level?: number) => MovingPad | null;
@@ -172,4 +173,30 @@ export interface CoralFormation {
   seed: number;        // For deterministic rendering
   segments?: number;   // Number of branches/segments (for branching types)
   swayPhase: number;   // For animation phase offset
+}
+
+export interface Jellyfish {
+  id: string;
+  x: number;
+  y: number;
+  vx: number; // Horizontal drift velocity
+  vy: number; // Vertical bobbing velocity
+  size: number; // 20-60px (bell diameter)
+  targetY: number; // For bobbing motion
+  bobbingPhase: number; // Sine wave offset
+  bobbingSpeed: number; // How fast it bobs (0.3-0.8)
+  bobbingAmplitude: number; // How far it bobs (20-40px)
+  
+  // Electric burst state
+  burstTimer: number; // Countdown to next burst
+  burstInterval: number; // Time between bursts (4-8 seconds)
+  telegraphTimer: number; // 1.5s warning before burst
+  isTelegraphing: boolean; // Glowing brighter
+  isBursting: boolean; // Active shockwave
+  burstDuration: number; // How long burst lasts (0.3s)
+  burstProgress: number; // 0-1 for animation
+  
+  // Rendering
+  tentaclePhase: number; // Animation offset
+  glowIntensity: number; // 0.5-1.0 normal, 1.5+ when telegraphing
 }

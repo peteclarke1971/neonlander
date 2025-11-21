@@ -1,4 +1,4 @@
-import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation } from "./types";
+import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation, Jellyfish } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -72,6 +72,50 @@ export function generateCoral(
   }
   
   return coral;
+}
+
+export function generateJellyfish(
+  seed: number,
+  worldWidth: number,
+  worldHeight: number
+): Jellyfish[] {
+  const rand = mulberry32(seed ^ 0x4A454C4C); // "JELL" in hex
+  const jellyfish: Jellyfish[] = [];
+  
+  // Generate 5-10 jellyfish
+  const count = 5 + Math.floor(rand() * 6); // 5-10
+  
+  for (let i = 0; i < count; i++) {
+    const size = 20 + rand() * 40; // 20-60px diameter
+    
+    jellyfish.push({
+      id: `jellyfish-${i}`,
+      x: rand() * worldWidth,
+      y: 100 + rand() * (worldHeight - 300), // Keep away from surface and floor
+      vx: (rand() - 0.5) * 15, // -7.5 to +7.5 horizontal drift
+      vy: 0,
+      size,
+      targetY: 0, // Will be set in update
+      bobbingPhase: rand() * Math.PI * 2,
+      bobbingSpeed: 0.3 + rand() * 0.5, // 0.3-0.8
+      bobbingAmplitude: 20 + rand() * 20, // 20-40px
+      
+      // Electric burst timing
+      burstTimer: 2 + rand() * 6, // First burst in 2-8 seconds
+      burstInterval: 4 + rand() * 4, // 4-8 seconds between bursts
+      telegraphTimer: 0,
+      isTelegraphing: false,
+      isBursting: false,
+      burstDuration: 0.3, // 300ms shockwave
+      burstProgress: 0,
+      
+      // Rendering
+      tentaclePhase: rand() * Math.PI * 2,
+      glowIntensity: 0.5 + rand() * 0.5, // 0.5-1.0 base glow
+    });
+  }
+  
+  return jellyfish;
 }
 
 export function generateTerrain(
@@ -654,6 +698,11 @@ export function generateTerrain(
     ? generateCoral(seed, worldWidthLocal, getHeightAt, pads)
     : undefined;
 
+  // Generate jellyfish for level 5 (underwater)
+  const jellyfish = (mode === "classic" && level === 5)
+    ? generateJellyfish(seed, worldWidthLocal, 800)
+    : undefined;
+
   return { 
     worldWidth: worldWidthLocal, 
     points, 
@@ -662,6 +711,7 @@ export function generateTerrain(
     volcanoes, 
     collectibles,
     coral,
+    jellyfish,
     getHeightAt, 
     getPadAt, 
     getMovingPadAt,
