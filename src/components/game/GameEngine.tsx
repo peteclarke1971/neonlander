@@ -1698,18 +1698,21 @@ export const GameEngine: React.FC<Props> = ({
               const angleSpread = shouldOptimizePerformance ? 0.6 : 1.6;
               const pa = angle + (Math.random() - 0.5) * angleSpread + Math.PI;
               
-              if (isUnderwater) {
-                // UNDERWATER: Spawn bubbles instead of embers
-                const bubbleSize = Math.random() < 0.6 ? 
-                  (2 + Math.random() * 1.5) :  // 60%: small (2-3.5px)
-                  (3.5 + Math.random() * 2.5); // 40%: large (3.5-6px)
-                
-                // Reduced speed for water resistance
-                const sp = shouldOptimizePerformance ? 
-                  (40 + Math.random() * 80 * thrust) :     // Low GFX: 40-120 px/s
-                  (60 + Math.random() * 120 * thrust);     // High GFX: 60-180 px/s
-                
-                const lifespan = shouldOptimizePerformance ? 0.8 : 2.0;  // Bubbles live longer
+      if (isUnderwater) {
+        // UNDERWATER: Spawn bubbles instead of embers
+        const bubbleSize = Math.random() < 0.6 ? 
+          (4 + Math.random() * 6.5) :  // 60%: small (4-10.5px)
+          (7 + Math.random() * 11);    // 40%: large (7-18px)
+        
+        // Doubled initial speed for longer thrust trail
+        const sp = shouldOptimizePerformance ? 
+          (80 + Math.random() * 160 * thrust) :     // Low GFX: 80-240 px/s
+          (120 + Math.random() * 240 * thrust);     // High GFX: 120-360 px/s
+        
+        // Extended lifespan (2-6x longer)
+        const lifespanMultiplier = 2 + Math.random() * 4;  // 2-6x
+        const baseLifespan = shouldOptimizePerformance ? 0.8 : 2.0;
+        const lifespan = baseLifespan * lifespanMultiplier;
                 
                 particles.push({
                   x: nozzle.x,
@@ -2659,12 +2662,16 @@ export const GameEngine: React.FC<Props> = ({
       // Spawn ambient bubbles from cavern floor when underwater
       if (isUnderwater && Math.random() < 0.04 * dt * 60) {
         const bubbleSize = Math.random() < 0.7 ? 
-          (2 + Math.random() * 2) :    // 70% chance: small (2-4px)
-          (4 + Math.random() * 2);     // 30% chance: large (4-6px)
+          (4 + Math.random() * 8) :    // 70% chance: small (4-12px)
+          (8 + Math.random() * 10);    // 30% chance: large (8-18px)
         
         // Spawn bubbles across the world width
         const spawnX = Math.random() * WORLD_WIDTH;
         const spawnY = terrain.getHeightAt(spawnX) - 10; // Just above terrain floor
+        
+        // Extended lifespan (2-6x longer)
+        const lifespanMultiplier = 2 + Math.random() * 4;  // 2-6x
+        const baseLifespan = 4 + Math.random() * 3;        // Base: 4-7s
         
         particles.push({
           x: spawnX,
@@ -2672,7 +2679,7 @@ export const GameEngine: React.FC<Props> = ({
           vx: (Math.random() - 0.5) * 15,  // Gentle horizontal drift
           vy: -25 - Math.random() * 20,    // Float upward (25-45 px/s)
           life: 0,
-          max: 4 + Math.random() * 3,      // 4-7 second lifespan
+          max: baseLifespan * lifespanMultiplier,  // 8-42 second lifespan
           color: bubbleColors[Math.floor(Math.random() * bubbleColors.length)],
           isBubble: true,
           size: bubbleSize
@@ -2687,11 +2694,11 @@ export const GameEngine: React.FC<Props> = ({
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         
-        if (p.isBubble && isUnderwater) {
-          // BUBBLE PHYSICS
-          
-          // Strong upward buoyancy force
-          p.vy -= 85 * dt;
+      if (p.isBubble && isUnderwater) {
+        // BUBBLE PHYSICS
+        
+        // Increased upward buoyancy force
+        p.vy -= 170 * dt;
           
           // Horizontal wobble (sine wave oscillation)
           const wobbleFreq = 3 + (p.size || 3) * 0.5;  // Larger bubbles wobble slower
