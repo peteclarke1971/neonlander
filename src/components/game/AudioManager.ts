@@ -882,4 +882,42 @@ export class AudioManager {
   playLightningCrack() {
     this.playNoise(0.1, 0.9);
   }
+
+  jellyfishBurst() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Electric burst sound - use existing crash sound but pitched higher
+    if (this.crash1Buffer) {
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0.3;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.crash1Buffer;
+      src.playbackRate.value = 1.8; // Higher pitch for electric feel
+      src.connect(gain);
+      gain.connect(this.master);
+      src.start(0);
+    } else {
+      this.playNoise(0.08, 0.3);
+    }
+  }
+
+  jellyfishShock() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Electric shock on lander - short zap
+    if (this.crash2Buffer) {
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0.4;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.crash2Buffer;
+      src.playbackRate.value = 2.2; // Very high pitch
+      src.connect(gain);
+      gain.connect(this.master);
+      src.start(0);
+    } else {
+      this.playNoise(0.05, 0.4);
+    }
+  }
 }
