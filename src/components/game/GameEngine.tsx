@@ -33,6 +33,7 @@ function mulberry32(seed: number) {
 }
 import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
+import { isWaterLevel, isLightningLevel } from "./systems/levelConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
@@ -402,15 +403,17 @@ export const GameEngine: React.FC<Props> = ({
   // Style points tracking
   const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
   
-  // Lightning system state (Level 4 classic mode only)
+  // Lightning system state
   const lightningBolts = useRef<LightningBolt[]>([]);
   const lightningAfterglows = useRef<LightningAfterglow[]>([]);
   const lightningImpacts = useRef<LightningImpact[]>([]);
   const lightningDebris = useRef<any[]>([]);
   const nextLightningTime = useRef<number>(0.5 + Math.random() * 1.5);
   const screenFlashAlpha = useRef<number>(0);
-  const lightningEnabled = mode === "classic" && level === 4;
-  const isUnderwater = mode === "classic" && level === 5;
+  
+  // Level type detection
+  const lightningEnabled = isLightningLevel(mode, level);
+  const isUnderwater = isWaterLevel(mode, level);
   
   
   // Hint system: show rotation boost hint on first hard level
@@ -1783,12 +1786,14 @@ export const GameEngine: React.FC<Props> = ({
               y -= 2;    // nudge up a bit to avoid re-collision
             }
           }
-          const thrustPower = isUnderwater ? 0.6 : 1.0; // Reduced thrust underwater
+          const underwaterLevel = isWaterLevel(mode, level);
+          const thrustPower = underwaterLevel ? 0.6 : 1.0; // Reduced thrust underwater
           const ax = Math.sin(angle) * thrust * (9.8 * 0.7 * thrustPower) * dt;
           const ay = -Math.cos(angle) * thrust * (9.8 * 0.7 * thrustPower) * dt;
           vx += ax;
           vy += ay;
-          fuel -= fuelConsumption * thrust * dt;
+          const fuelMultiplier = underwaterLevel ? 0.25 : 1.0; // 25% fuel consumption underwater
+          fuel -= fuelConsumption * thrust * dt * fuelMultiplier;
           if (fuel <= 0) fuel = 0;
           // Spectacular multi-nozzle thruster effect - incredibly impressive for high graphics
           const nozzlePositions = shouldOptimizePerformance ? [
@@ -1979,10 +1984,18 @@ export const GameEngine: React.FC<Props> = ({
             x <= (terrain as CavernData).startPad.xEnd &&
             !(keys.current.thrust || thrustAnalog.current > 0.05);
 
+        const underwaterLevel = isWaterLevel(mode, level);
+        
         if (!onStartPad) {
           // Apply gravity only when not resting on start pad
-          const gravityMultiplier = isUnderwater ? 0.4 : 1.0; // Buoyancy underwater
+          const gravityMultiplier = underwaterLevel ? 0.4 : 1.0; // Buoyancy underwater
           vy += gravity * 60 * dt * gravityMultiplier;
+        } else if (underwaterLevel && !(keys.current.thrust || thrustAnalog.current > 0.05)) {
+          // Even on start pad, apply gentle gravity when not thrusting underwater
+          vy += gravity * 60 * dt * 0.2; // 20% of normal gravity
+        }
+        
+        if (!onStartPad) {
           
           // Apply anomaly acceleration (gravity wells) if not disabled
           if (!anomaliesDisabled && anomalies.length > 0) {
@@ -1992,7 +2005,7 @@ export const GameEngine: React.FC<Props> = ({
           }
           
           // Air resistance (much stronger underwater)
-          const drag = isUnderwater ? 0.985 : 0.998;
+          const drag = underwaterLevel ? 0.985 : 0.998;
           vx *= Math.pow(drag, dt * 60);
           vy *= Math.pow(drag, dt * 60);
 

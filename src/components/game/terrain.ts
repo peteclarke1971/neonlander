@@ -1,4 +1,5 @@
 import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation, Jellyfish } from "./types";
+import { isWaterLevel } from "./systems/levelConfig";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -77,7 +78,8 @@ export function generateCoral(
 export function generateJellyfish(
   seed: number,
   worldWidth: number,
-  worldHeight: number
+  worldHeight: number,
+  getHeightAt: (x: number) => number
 ): Jellyfish[] {
   const rand = mulberry32(seed ^ 0x4A454C4C); // "JELL" in hex
   const jellyfish: Jellyfish[] = [];
@@ -87,11 +89,13 @@ export function generateJellyfish(
   
   for (let i = 0; i < count; i++) {
     const size = 20 + rand() * 40; // 20-60px diameter
+    const x = rand() * worldWidth;
+    const terrainY = getHeightAt(x);
     
     jellyfish.push({
       id: `jellyfish-${i}`,
-      x: rand() * worldWidth,
-      y: 50 + rand() * (worldHeight - 150), // Spread from near surface to near floor
+      x,
+      y: 50 + rand() * (terrainY - 50), // Spawn above terrain (from y=50 to terrain line)
       vx: (rand() - 0.5) * 60, // -30 to +30 horizontal drift (4x speed variation)
       vy: 0,
       size,
@@ -693,14 +697,14 @@ export function generateTerrain(
     console.log(`[TimeTrial] ✅ Final validation: All ${sequencedPads.length} sequenced pads present after post-processing`);
   }
 
-  // Generate coral for level 5 (underwater)
-  const coral = (mode === "classic" && level === 5) 
+  // Generate coral for water levels
+  const coral = isWaterLevel(mode, level)
     ? generateCoral(seed, worldWidthLocal, getHeightAt, pads)
     : undefined;
 
-  // Generate jellyfish for level 5 (underwater)
-  const jellyfish = (mode === "classic" && level === 5)
-    ? generateJellyfish(seed, worldWidthLocal, 800)
+  // Generate jellyfish for water levels (above terrain)
+  const jellyfish = isWaterLevel(mode, level)
+    ? generateJellyfish(seed, worldWidthLocal, 800, getHeightAt)
     : undefined;
 
   return { 
