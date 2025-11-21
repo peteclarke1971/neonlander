@@ -2169,11 +2169,11 @@ export const GameEngine: React.FC<Props> = ({
             electrifiedTimer = 3.0;
             lastShockwaveSource = { x: shockwaveHit.x, y: shockwaveHit.y };
             
-            // Knockback away from jellyfish
-            const dx = x - shockwaveHit.x;
-            const dy = y - shockwaveHit.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const knockbackForce = 150; // Strong knockback
+      // Knockback away from jellyfish
+      const dx = x - shockwaveHit.x;
+      const dy = y - shockwaveHit.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const knockbackForce = 15; // Reduced knockback (10% of original)
             
             if (dist > 0) {
               vx += (dx / dist) * knockbackForce;

@@ -82,8 +82,8 @@ export function generateJellyfish(
   const rand = mulberry32(seed ^ 0x4A454C4C); // "JELL" in hex
   const jellyfish: Jellyfish[] = [];
   
-  // Generate 5-10 jellyfish
-  const count = 5 + Math.floor(rand() * 6); // 5-10
+  // Generate 15-25 jellyfish
+  const count = 15 + Math.floor(rand() * 11); // 15-25
   
   for (let i = 0; i < count; i++) {
     const size = 20 + rand() * 40; // 20-60px diameter
@@ -91,8 +91,8 @@ export function generateJellyfish(
     jellyfish.push({
       id: `jellyfish-${i}`,
       x: rand() * worldWidth,
-      y: 100 + rand() * (worldHeight - 300), // Keep away from surface and floor
-      vx: (rand() - 0.5) * 15, // -7.5 to +7.5 horizontal drift
+      y: 50 + rand() * (worldHeight - 150), // Spread from near surface to near floor
+      vx: (rand() - 0.5) * 60, // -30 to +30 horizontal drift (4x speed variation)
       vy: 0,
       size,
       targetY: 0, // Will be set in update
