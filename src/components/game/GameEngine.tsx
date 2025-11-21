@@ -3470,6 +3470,141 @@ export const GameEngine: React.FC<Props> = ({
         drawTerrain(terrain.worldWidth);
       }
 
+      // Render coral (Level 5 underwater only)
+      if (isUnderwater && !isCavernLevel && 'coral' in terrain && terrain.coral) {
+        ctx.save();
+        
+        for (const c of terrain.coral) {
+          // Viewport culling
+          if (c.x < viewLeft - 100 || c.x > viewRight + 100) continue;
+          
+          // Animate sway with elapsed time
+          const sway = Math.sin(elapsed * 1.5 + c.swayPhase) * 3; // ±3px horizontal sway
+          
+          const baseX = c.x + sway;
+          const baseY = c.y;
+          
+          // Set coral color and glow
+          ctx.strokeStyle = c.color;
+          ctx.fillStyle = c.color;
+          ctx.lineWidth = shouldOptimizePerformance ? 2 : 3;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          
+          // Render based on coral type
+          switch (c.type) {
+            case 'branch': {
+              // Branching coral with multiple stems
+              const segments = c.segments || 5;
+              ctx.shadowColor = c.color;
+              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+              
+              for (let i = 0; i < segments; i++) {
+                const angle = -Math.PI / 2 + (i / segments - 0.5) * 0.8; // Spread branches
+                const branchHeight = c.height * (0.6 + Math.random() * 0.4);
+                const endX = baseX + Math.cos(angle) * c.width * 0.4;
+                const endY = baseY - branchHeight;
+                
+                ctx.beginPath();
+                ctx.moveTo(baseX, baseY);
+                ctx.quadraticCurveTo(
+                  baseX + Math.cos(angle) * c.width * 0.2,
+                  baseY - branchHeight * 0.5,
+                  endX,
+                  endY
+                );
+                ctx.stroke();
+              }
+              break;
+            }
+            
+            case 'frond': {
+              // Wavy frond-like structure
+              ctx.shadowColor = c.color;
+              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+              ctx.beginPath();
+              ctx.moveTo(baseX, baseY);
+              
+              const steps = 8;
+              for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const wave = Math.sin(t * Math.PI * 4) * (c.width * 0.3);
+                const x = baseX + wave;
+                const y = baseY - t * c.height;
+                ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+              break;
+            }
+            
+            case 'fan': {
+              // Fan-shaped coral
+              ctx.shadowColor = c.color;
+              ctx.shadowBlur = shouldOptimizePerformance ? 10 : 20;
+              ctx.globalAlpha = 0.4;
+              ctx.beginPath();
+              ctx.moveTo(baseX, baseY);
+              ctx.lineTo(baseX - c.width / 2, baseY - c.height);
+              ctx.lineTo(baseX + c.width / 2, baseY - c.height);
+              ctx.closePath();
+              ctx.fill();
+              ctx.globalAlpha = 1;
+              ctx.stroke();
+              break;
+            }
+            
+            case 'tube': {
+              // Tube clusters
+              const tubes = c.segments || 4;
+              ctx.shadowColor = c.color;
+              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+              
+              for (let i = 0; i < tubes; i++) {
+                const offset = (i - tubes / 2) * (c.width / tubes);
+                const tubeHeight = c.height * (0.7 + Math.random() * 0.3);
+                
+                ctx.beginPath();
+                ctx.moveTo(baseX + offset, baseY);
+                ctx.lineTo(baseX + offset, baseY - tubeHeight);
+                ctx.stroke();
+                
+                // Cap on top
+                ctx.beginPath();
+                ctx.arc(baseX + offset, baseY - tubeHeight, 3, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              break;
+            }
+            
+            case 'anemone': {
+              // Anemone-like tentacles
+              const tentacles = c.segments || 6;
+              ctx.shadowColor = c.color;
+              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+              
+              for (let i = 0; i < tentacles; i++) {
+                const angle = (i / tentacles) * Math.PI * 2 - Math.PI / 2;
+                const tentacleLength = c.height * (0.5 + Math.random() * 0.5);
+                const curve = Math.sin(elapsed * 2 + i) * 8; // Waving motion
+                
+                ctx.beginPath();
+                ctx.moveTo(baseX, baseY);
+                ctx.quadraticCurveTo(
+                  baseX + Math.cos(angle) * c.width * 0.3 + curve,
+                  baseY - tentacleLength * 0.5,
+                  baseX + Math.cos(angle) * c.width * 0.5,
+                  baseY - tentacleLength
+                );
+                ctx.stroke();
+              }
+              break;
+            }
+          }
+        }
+        
+        ctx.restore();
+      }
+
       // Pads
       if (isCavernLevel) {
         const cavernData = terrain as CavernData;

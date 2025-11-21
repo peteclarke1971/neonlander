@@ -59,6 +59,7 @@ export interface TerrainData {
   movingPads?: MovingPad[];
   volcanoes?: Volcano[];
   collectibles?: CollectiblesData;
+  coral?: CoralFormation[];
   getHeightAt: (x: number) => number;
   getPadAt: (x: number) => Pad | null;
   getMovingPadAt?: (x: number, y: number, level?: number) => MovingPad | null;
@@ -159,4 +160,16 @@ export interface CollectiblesData {
   collected: Set<string>;
   totalCollected: number;
   setComplete: boolean;
+}
+
+export interface CoralFormation {
+  x: number;           // World X position (base on terrain)
+  y: number;           // World Y position (base on terrain)
+  type: 'branch' | 'frond' | 'fan' | 'tube' | 'anemone';
+  height: number;      // 30-120px
+  width: number;       // 20-80px
+  color: string;       // Neon coral colors
+  seed: number;        // For deterministic rendering
+  segments?: number;   // Number of branches/segments (for branching types)
+  swayPhase: number;   // For animation phase offset
 }

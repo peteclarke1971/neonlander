@@ -1,4 +1,4 @@
-import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode } from "./types";
+import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation } from "./types";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -12,6 +12,66 @@ function mulberry32(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// Generate coral formations for Level 5 (underwater)
+export function generateCoral(
+  seed: number,
+  worldWidth: number,
+  getHeightAt: (x: number) => number,
+  pads: Pad[]
+): CoralFormation[] {
+  const rand = mulberry32(seed ^ 0xC04A1); // "CORAL" in hex
+  const coral: CoralFormation[] = [];
+  
+  // Coral colors: bright neon underwater palette
+  const colors = [
+    '#00ffff', // cyan
+    '#ff00ff', // magenta
+    '#00ff88', // lime-cyan
+    '#ff0088', // hot pink
+    '#ffaa00', // orange-yellow
+  ];
+  
+  const types: CoralFormation['type'][] = ['branch', 'frond', 'fan', 'tube', 'anemone'];
+  
+  // Generate ~20 coral clusters across the world
+  const clusterCount = 18 + Math.floor(rand() * 6); // 18-23 clusters
+  
+  for (let i = 0; i < clusterCount; i++) {
+    const x = rand() * worldWidth;
+    const terrainY = getHeightAt(x);
+    
+    // Check if too close to any landing pad (150px clearance)
+    let tooClose = false;
+    for (const pad of pads) {
+      const padCenterX = (pad.xStart + pad.xEnd) / 2;
+      const dx = Math.abs(x - padCenterX);
+      const wrappedDx = Math.min(dx, worldWidth - dx);
+      
+      if (wrappedDx < 150 && Math.abs(terrainY - pad.y) < 80) {
+        tooClose = true;
+        break;
+      }
+    }
+    
+    if (tooClose) continue;
+    
+    // Create coral formation
+    coral.push({
+      x,
+      y: terrainY,
+      type: types[Math.floor(rand() * types.length)],
+      height: 30 + rand() * 90, // 30-120px
+      width: 20 + rand() * 60,  // 20-80px
+      color: colors[Math.floor(rand() * colors.length)],
+      seed: seed ^ (i * 0x1234),
+      segments: 3 + Math.floor(rand() * 5), // 3-7 segments/branches
+      swayPhase: rand() * Math.PI * 2, // Random animation phase
+    });
+  }
+  
+  return coral;
 }
 
 export function generateTerrain(
@@ -589,6 +649,11 @@ export function generateTerrain(
     console.log(`[TimeTrial] ✅ Final validation: All ${sequencedPads.length} sequenced pads present after post-processing`);
   }
 
+  // Generate coral for level 5 (underwater)
+  const coral = (mode === "classic" && level === 5) 
+    ? generateCoral(seed, worldWidthLocal, getHeightAt, pads)
+    : undefined;
+
   return { 
     worldWidth: worldWidthLocal, 
     points, 
@@ -596,6 +661,7 @@ export function generateTerrain(
     movingPads, 
     volcanoes, 
     collectibles,
+    coral,
     getHeightAt, 
     getPadAt, 
     getMovingPadAt,
