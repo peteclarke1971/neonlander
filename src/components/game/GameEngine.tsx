@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { HUD } from "./HUD";
 import { AudioManager } from "./AudioManager";
 import { CavernFXRenderer } from "./CavernFXRenderer";
+import { WaterFXRenderer } from "./WaterFXRenderer";
 import { createCountdownIntro, IntroHandle, mix } from "./intro/CountdownIntro";
 import { CountdownOverlay } from "./intro/CountdownOverlay";
 import { CavernFXParams } from "./systems/cavernFX";
@@ -4049,50 +4050,7 @@ export const GameEngine: React.FC<Props> = ({
         ctx.translate(-cameraX + shakeX, anchor);
       }
 
-      // ============= UNDERWATER WATER RIPPLE EFFECT (Level 5 Classic Mode Only) =============
-      if (isUnderwater && !isCavernLevel && !crashed) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        
-        // Create water caustics/ripple pattern
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = w;
-        tempCanvas.height = h;
-        const tempCtx = tempCanvas.getContext('2d')!;
-        tempCtx.putImageData(imageData, 0, 0);
-        
-        // Apply sine wave distortion for water ripple
-        ctx.clearRect(0, 0, w, h);
-        for (let y = 0; y < h; y += 2) {
-          const offsetX = Math.sin(y * 0.02 + elapsed * 2) * 3 + Math.sin(y * 0.05 + elapsed * 1.5) * 2;
-          ctx.drawImage(tempCanvas, 0, y, w, 2, offsetX, y, w, 2);
-        }
-        
-        // Add animated caustics light patterns
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = 0.08;
-        
-        for (let i = 0; i < 8; i++) {
-          const x = (w * (i / 8) + elapsed * 50 * (i % 2 === 0 ? 1 : -1)) % w;
-          const y = (h * 0.3 + Math.sin(elapsed * 0.8 + i) * h * 0.2);
-          const size = 80 + Math.sin(elapsed * 1.5 + i) * 40;
-          
-          const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
-          gradient.addColorStop(0, 'rgba(100, 200, 255, 0.6)');
-          gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.2)');
-          gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(x - size, y - size, size * 2, size * 2);
-        }
-        
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-      // ============= END UNDERWATER WATER RIPPLE EFFECT =============
+      // ============= END OF TERRAIN RENDERING =============
 
       // Screen-space overlays removed - now handled by BonusMessageDisplay component
 
@@ -4226,6 +4184,8 @@ export const GameEngine: React.FC<Props> = ({
             params={randomEffectParams || cavernFXParams}
           />
         )}
+        
+        <WaterFXRenderer enabled={isUnderwater && !paused} />
       </div>
 
       {isTouch && (
