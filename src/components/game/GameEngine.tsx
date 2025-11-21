@@ -304,6 +304,7 @@ export const GameEngine: React.FC<Props> = ({
   const nextLightningTime = useRef<number>(0.5 + Math.random() * 1.5);
   const screenFlashAlpha = useRef<number>(0);
   const lightningEnabled = mode === "classic" && level === 4;
+  const isUnderwater = mode === "classic" && level === 5;
   
   
   // Hint system: show rotation boost hint on first hard level
@@ -1652,8 +1653,9 @@ export const GameEngine: React.FC<Props> = ({
               y -= 2;    // nudge up a bit to avoid re-collision
             }
           }
-          const ax = Math.sin(angle) * thrust * (9.8 * 0.7) * dt;
-          const ay = -Math.cos(angle) * thrust * (9.8 * 0.7) * dt;
+          const thrustPower = isUnderwater ? 0.6 : 1.0; // Reduced thrust underwater
+          const ax = Math.sin(angle) * thrust * (9.8 * 0.7 * thrustPower) * dt;
+          const ay = -Math.cos(angle) * thrust * (9.8 * 0.7 * thrustPower) * dt;
           vx += ax;
           vy += ay;
           fuel -= fuelConsumption * thrust * dt;
@@ -1714,8 +1716,9 @@ export const GameEngine: React.FC<Props> = ({
         anomaliesDisabled = true;
       }
       // Apply rotation modifier to rotation physics
+      const rotationMultiplier = isUnderwater ? 0.7 : 1.0; // Slower rotation underwater
       const { angularAccel: modifiedRotAccel, maxAngularVel } = applyRotationModifier(
-        rotAccel,
+        rotAccel * rotationMultiplier,
         8.0, // base max angular velocity
         rotBoostActive.current,
         rotModConfig
@@ -1821,7 +1824,8 @@ export const GameEngine: React.FC<Props> = ({
 
         if (!onStartPad) {
           // Apply gravity only when not resting on start pad
-          vy += gravity * 60 * dt;
+          const gravityMultiplier = isUnderwater ? 0.4 : 1.0; // Buoyancy underwater
+          vy += gravity * 60 * dt * gravityMultiplier;
           
           // Apply anomaly acceleration (gravity wells) if not disabled
           if (!anomaliesDisabled && anomalies.length > 0) {
@@ -1830,8 +1834,8 @@ export const GameEngine: React.FC<Props> = ({
             vy += ay * dt;
           }
           
-          // Air resistance
-          const drag = 0.998;
+          // Air resistance (much stronger underwater)
+          const drag = isUnderwater ? 0.985 : 0.998;
           vx *= Math.pow(drag, dt * 60);
           vy *= Math.pow(drag, dt * 60);
 
@@ -2956,14 +2960,25 @@ export const GameEngine: React.FC<Props> = ({
       const viewWCull = w / (zoom * dpr);
       const viewLeft = cameraX - viewWCull / 2;
       const viewRight = cameraX + viewWCull / 2;
+      
+      // Underwater background fill
+      if (isUnderwater && !isCavernLevel) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#001a33'; // Deep water blue background
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      }
 
-      // Background stars: only for non-cavern levels
+      // Background stars: only for non-cavern levels (not underwater)
       if (!isCavernLevel) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         
-        // Draw stars WITHOUT clipping (they'll be masked by terrain fill)
-        drawStars(ctx, 0, 0, 0);
+        // Draw stars WITHOUT clipping (they'll be masked by terrain fill) - skip underwater
+        if (!isUnderwater) {
+          drawStars(ctx, 0, 0, 0);
+        }
         
         // Render background decorations (planets, nebulas, etc.) in screen-space
         if (bgDecorationsRef.current.length > 0) {
@@ -2983,8 +2998,8 @@ export const GameEngine: React.FC<Props> = ({
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shakeX, anchor + shakeY);
         
-        // Fill terrain shape with solid black
-        ctx.fillStyle = '#000000';
+        // Fill terrain shape with solid black (or deep water blue if underwater)
+        ctx.fillStyle = isUnderwater ? '#003366' : '#000000';
         
         // Sample terrain points across viewport width
         const numSamples = 120;
@@ -4033,6 +4048,51 @@ export const GameEngine: React.FC<Props> = ({
         ctx.scale(zoom, zoom);
         ctx.translate(-cameraX + shakeX, anchor);
       }
+
+      // ============= UNDERWATER WATER RIPPLE EFFECT (Level 5 Classic Mode Only) =============
+      if (isUnderwater && !isCavernLevel && !crashed) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // Create water caustics/ripple pattern
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d')!;
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // Apply sine wave distortion for water ripple
+        ctx.clearRect(0, 0, w, h);
+        for (let y = 0; y < h; y += 2) {
+          const offsetX = Math.sin(y * 0.02 + elapsed * 2) * 3 + Math.sin(y * 0.05 + elapsed * 1.5) * 2;
+          ctx.drawImage(tempCanvas, 0, y, w, 2, offsetX, y, w, 2);
+        }
+        
+        // Add animated caustics light patterns
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.08;
+        
+        for (let i = 0; i < 8; i++) {
+          const x = (w * (i / 8) + elapsed * 50 * (i % 2 === 0 ? 1 : -1)) % w;
+          const y = (h * 0.3 + Math.sin(elapsed * 0.8 + i) * h * 0.2);
+          const size = 80 + Math.sin(elapsed * 1.5 + i) * 40;
+          
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+          gradient.addColorStop(0, 'rgba(100, 200, 255, 0.6)');
+          gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.2)');
+          gradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x - size, y - size, size * 2, size * 2);
+        }
+        
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      // ============= END UNDERWATER WATER RIPPLE EFFECT =============
 
       // Screen-space overlays removed - now handled by BonusMessageDisplay component
 
