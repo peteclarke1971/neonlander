@@ -84,11 +84,13 @@ export function generateJellyfish(
   const rand = mulberry32(seed ^ 0x4A454C4C); // "JELL" in hex
   const jellyfish: Jellyfish[] = [];
   
-  // Generate 15-25 jellyfish
-  const count = 15 + Math.floor(rand() * 11); // 15-25
+  // Generate 30-50 jellyfish (doubled from original 15-25)
+  const count = 30 + Math.floor(rand() * 21); // 30-50
   
   for (let i = 0; i < count; i++) {
-    const size = 20 + rand() * 40; // 20-60px diameter
+    // 30% chance of tiny jellyfish (10-25px), otherwise normal size (20-60px)
+    const isTiny = rand() < 0.3;
+    const size = isTiny ? (10 + rand() * 15) : (20 + rand() * 40);
     const x = rand() * worldWidth;
     const terrainY = getHeightAt(x);
     
