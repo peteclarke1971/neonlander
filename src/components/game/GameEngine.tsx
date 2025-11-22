@@ -1816,8 +1816,8 @@ export const GameEngine: React.FC<Props> = ({
               
       if (isUnderwater) {
         // UNDERWATER: Spawn bubbles instead of embers
-        // Reduce spawn rate by 50% in high GFX mode
-        if (shouldOptimizePerformance || Math.random() < 0.5) {
+        // Reduce spawn rate by 75% in high GFX mode for performance
+        if (shouldOptimizePerformance || Math.random() < 0.25) {
           const bubbleSize = Math.random() < 0.6 ? 
             (2 + Math.random() * 3.25) :  // 60%: small (2-5.25px)
             (3.5 + Math.random() * 5.5);  // 40%: large (3.5-9px)
@@ -1827,9 +1827,9 @@ export const GameEngine: React.FC<Props> = ({
             (80 + Math.random() * 160 * thrust) :     // Low GFX: 80-240 px/s
             (120 + Math.random() * 240 * thrust);     // High GFX: 120-360 px/s
           
-          // Extended lifespan (2-6x longer)
-          const lifespanMultiplier = 2 + Math.random() * 4;  // 2-6x
-          const baseLifespan = shouldOptimizePerformance ? 0.8 : 2.0;
+          // Shortened lifespan for performance (0.6-1.8s)
+          const lifespanMultiplier = 0.5 + Math.random() * 1.0;  // 0.5-1.5x
+          const baseLifespan = shouldOptimizePerformance ? 0.6 : 1.2;
           const lifespan = baseLifespan * lifespanMultiplier;
                   
                   particles.push({
@@ -2881,7 +2881,7 @@ export const GameEngine: React.FC<Props> = ({
       }
       
       // Enhanced particles update with thruster-friendly limits
-      const maxParticles = shouldOptimizePerformance ? 30 : 300; // Allow 300 particles for spectacular thruster effects
+      const maxParticles = shouldOptimizePerformance ? 30 : (isUnderwater ? 150 : 300); // Lower limit for water levels
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += dt;
@@ -2906,12 +2906,16 @@ export const GameEngine: React.FC<Props> = ({
           p.vx *= 0.97;
           p.vy *= 0.99;
           
-          // Remove if bubble floated above visible screen area
+          // Aggressive culling - remove bubbles off-screen in any direction
           const canvasH = c.height;
           const dpr = Math.min(2, window.devicePixelRatio || 1);
           const viewHeight = canvasH / (dpr * zoom);
+          const viewWidth = c.width / (dpr * zoom);
           const screenTopY = y - (viewHeight / 2);
-          if (p.y < screenTopY - 100) {  // 100px buffer above screen
+          const screenLeftX = x - (viewWidth / 2);
+          const screenRightX = x + (viewWidth / 2);
+          
+          if (p.y < screenTopY - 50 || p.x < screenLeftX - 50 || p.x > screenRightX + 50) {  // 50px buffer
             // Spawn pop effect (high graphics only)
             if (!shouldOptimizePerformance) {
               for (let j = 0; j < 4; j++) {
@@ -4402,7 +4406,7 @@ export const GameEngine: React.FC<Props> = ({
           const ageRatio = p.life / p.max;
           
           if (p.isBubble) {
-            // === BUBBLE RENDERING (CIRCLES) ===
+            // === BUBBLE RENDERING (CIRCLES) - OPTIMIZED ===
             const bubbleSize = p.size || 3;
             
             // Fade out near end of life
@@ -4411,34 +4415,21 @@ export const GameEngine: React.FC<Props> = ({
             ctx.save();
             ctx.globalAlpha = alpha;
             
-            // HIGH GRAPHICS: Full neon glow effect
+            // HIGH GRAPHICS: Simplified 2-layer neon glow (removed 3rd layer for performance)
             if (!shouldOptimizePerformance) {
-              // Outer glow (large blur)
-              ctx.shadowBlur = bubbleSize * 4;
+              // Outer glow (reduced blur)
+              ctx.shadowBlur = bubbleSize * 3;  // Reduced from 4x to 3x
               ctx.shadowColor = p.color;
               ctx.fillStyle = p.color;
               ctx.beginPath();
               ctx.arc(p.x, p.y, bubbleSize, 0, Math.PI * 2);
               ctx.fill();
               
-              // Inner bright core
-              ctx.shadowBlur = bubbleSize * 2;
+              // Inner bright core (reduced blur)
+              ctx.shadowBlur = bubbleSize * 1.5;  // Reduced from 2x to 1.5x
               ctx.fillStyle = p.color.replace(/[\d.]+\)$/g, '1.0)');  // Full opacity
               ctx.beginPath();
               ctx.arc(p.x, p.y, bubbleSize * 0.7, 0, Math.PI * 2);
-              ctx.fill();
-              
-              // Highlight shimmer (top-left)
-              ctx.shadowBlur = 0;
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-              ctx.beginPath();
-              ctx.arc(
-                p.x - bubbleSize * 0.35,
-                p.y - bubbleSize * 0.35,
-                bubbleSize * 0.35,
-                0,
-                Math.PI * 2
-              );
               ctx.fill();
               
             } else {
