@@ -1816,31 +1816,34 @@ export const GameEngine: React.FC<Props> = ({
               
       if (isUnderwater) {
         // UNDERWATER: Spawn bubbles instead of embers
-        const bubbleSize = Math.random() < 0.6 ? 
-          (2 + Math.random() * 3.25) :  // 60%: small (2-5.25px)
-          (3.5 + Math.random() * 5.5);  // 40%: large (3.5-9px)
-        
-        // Doubled initial speed for longer thrust trail
-        const sp = shouldOptimizePerformance ? 
-          (80 + Math.random() * 160 * thrust) :     // Low GFX: 80-240 px/s
-          (120 + Math.random() * 240 * thrust);     // High GFX: 120-360 px/s
-        
-        // Extended lifespan (2-6x longer)
-        const lifespanMultiplier = 2 + Math.random() * 4;  // 2-6x
-        const baseLifespan = shouldOptimizePerformance ? 0.8 : 2.0;
-        const lifespan = baseLifespan * lifespanMultiplier;
-                
-                particles.push({
-                  x: nozzle.x,
-                  y: nozzle.y,
-                  vx: Math.sin(pa) * sp,
-                  vy: -Math.cos(pa) * sp,
-                  life: 0,
-                  max: lifespan,
-                  color: bubbleColors[Math.floor(Math.random() * bubbleColors.length)],
-                  isBubble: true,
-                  size: bubbleSize
-                });
+        // Reduce spawn rate by 50% in high GFX mode
+        if (shouldOptimizePerformance || Math.random() < 0.5) {
+          const bubbleSize = Math.random() < 0.6 ? 
+            (2 + Math.random() * 3.25) :  // 60%: small (2-5.25px)
+            (3.5 + Math.random() * 5.5);  // 40%: large (3.5-9px)
+          
+          // Doubled initial speed for longer thrust trail
+          const sp = shouldOptimizePerformance ? 
+            (80 + Math.random() * 160 * thrust) :     // Low GFX: 80-240 px/s
+            (120 + Math.random() * 240 * thrust);     // High GFX: 120-360 px/s
+          
+          // Extended lifespan (2-6x longer)
+          const lifespanMultiplier = 2 + Math.random() * 4;  // 2-6x
+          const baseLifespan = shouldOptimizePerformance ? 0.8 : 2.0;
+          const lifespan = baseLifespan * lifespanMultiplier;
+                  
+                  particles.push({
+                    x: nozzle.x,
+                    y: nozzle.y,
+                    vx: Math.sin(pa) * sp,
+                    vy: -Math.cos(pa) * sp,
+                    life: 0,
+                    max: lifespan,
+                    color: bubbleColors[Math.floor(Math.random() * bubbleColors.length)],
+                    isBubble: true,
+                    size: bubbleSize
+                  });
+        }
               } else {
                 // REGULAR AIR: Keep existing thruster particle code
                 const sp = shouldOptimizePerformance ? 
@@ -1988,11 +1991,11 @@ export const GameEngine: React.FC<Props> = ({
         
         if (!onStartPad) {
           // Apply gravity only when not resting on start pad
-          const gravityMultiplier = underwaterLevel ? 0.4 : 1.0; // Buoyancy underwater
+          const gravityMultiplier = underwaterLevel ? 0.7 : 1.0; // Increased underwater gravity for faster sinking
           vy += gravity * 60 * dt * gravityMultiplier;
         } else if (underwaterLevel && !(keys.current.thrust || thrustAnalog.current > 0.05)) {
           // Even on start pad, apply gentle gravity when not thrusting underwater
-          vy += gravity * 60 * dt * 0.2; // 20% of normal gravity
+          vy += gravity * 60 * dt * 0.5; // 50% of normal gravity for noticeable sinking
         }
         
         if (!onStartPad) {
@@ -3807,9 +3810,25 @@ export const GameEngine: React.FC<Props> = ({
           const bellRadius = jf.size * 0.6;
           const tentacleLength = jf.size * 1.2;
           
-          // Jellyfish color
-          const baseColor = '#00ddff';
-          const glowColor = '#00ffff';
+          // Jellyfish color - shifts from cyan to neon pink-orange when charging
+          let baseColor = '#00ddff';
+          let glowColor = '#00ffff';
+          
+          if (jf.isTelegraphing) {
+            // Calculate charge progress (0 to 1)
+            const chargeProgress = Math.min(1, (1.5 - jf.telegraphTimer) / 1.5);
+            
+            // Interpolate from cyan (#00ddff) to neon pink-orange (#ff6400)
+            const r = Math.floor(0 + (255 - 0) * chargeProgress);
+            const g = Math.floor(221 - (221 - 100) * chargeProgress);
+            const b = Math.floor(255 - (255 - 0) * chargeProgress);
+            baseColor = `rgb(${r}, ${g}, ${b})`;
+            glowColor = baseColor;
+            
+            // Pulsing intensity
+            const pulseIntensity = 0.5 + Math.sin(elapsed * 20) * 0.5;
+            jf.glowIntensity = Math.max(jf.glowIntensity, pulseIntensity);
+          }
           
           ctx.shadowColor = glowColor;
           ctx.shadowBlur = shouldOptimizePerformance ? 10 : (20 * jf.glowIntensity);
@@ -3876,17 +3895,7 @@ export const GameEngine: React.FC<Props> = ({
             }
           }
           
-          // Telegraph warning
-          if (jf.isTelegraphing) {
-            ctx.globalAlpha = 0.3 + Math.sin(elapsed * 15) * 0.2;
-            ctx.fillStyle = '#ffff00';
-            ctx.shadowColor = '#ffff00';
-            ctx.shadowBlur = shouldOptimizePerformance ? 20 : 40;
-            
-            ctx.beginPath();
-            ctx.arc(jf.x, jf.y, bellRadius * 1.2, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          // Telegraph warning removed - color shift handles the visual cue
         }
         
         ctx.restore();
