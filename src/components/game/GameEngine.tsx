@@ -4813,7 +4813,7 @@ export const GameEngine: React.FC<Props> = ({
         <WaterFXRenderer enabled={isUnderwater && !paused} />
       </div>
 
-      {isTouch && (
+      {isTouch && !isDemo && (
         <div
           className="absolute inset-0 z-10 touch-none select-none"
           onTouchStart={(e) => { 
@@ -4844,8 +4844,8 @@ export const GameEngine: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Controls overlay - Only show if not using PC controls */}
-      {!isUsingPCControls && (
+      {/* Controls overlay - Only show if not using PC controls and not in demo mode */}
+      {!isUsingPCControls && !isDemo && (
         <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           <div className="flex gap-2">
             <Button 
