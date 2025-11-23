@@ -845,6 +845,7 @@ const retryGame = () => {
                 showGhost={false}
                 isDemo={true}
                 nebulaFxEnabled={false}
+                showFullHUD={false}
               />
             </div>
           </div>
