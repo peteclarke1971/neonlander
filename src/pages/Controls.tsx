@@ -82,6 +82,14 @@ export default function ControlsSettings() {
       return 10;
     }
   });
+  const [musicMuted, setMusicMuted] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-music-muted');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -596,6 +604,24 @@ export default function ControlsSettings() {
               <Switch 
                 checked={showFullHUD}
                 onCheckedChange={setShowFullHUD}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Mute Music</Label>
+                <div className="text-xs text-muted-foreground">Mute all background music (sound effects still play)</div>
+              </div>
+              <Switch 
+                checked={musicMuted}
+                onCheckedChange={(checked) => {
+                  setMusicMuted(checked);
+                  try {
+                    localStorage.setItem('ll-music-muted', JSON.stringify(checked));
+                  } catch {}
+                  if (audioManagerRef.current) {
+                    audioManagerRef.current.setGlobalMusicMute(checked);
+                  }
+                }}
               />
             </div>
             
