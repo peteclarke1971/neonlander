@@ -41,6 +41,16 @@ import { generateHazards, updateHazards, drawHazards, checkHazardCollision } fro
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, getVolcanoWarningState, VolcanoParticle } from "./systems/volcano";
 import { updateCavernVolcanoParticles, createCavernVolcanoParticles } from "./systems/cavernVolcanoParticles";
 import { getCavernVolcanoConfigForLevel } from "./systems/cavernVolcano";
+import { 
+  spawnUFO, 
+  updateUFO, 
+  updateProjectiles, 
+  checkUFOCollision, 
+  checkProjectileCollision,
+  DEFAULT_UFO_CONFIG 
+} from "./systems/landerUFO";
+import { drawAllUFOs } from "./systems/landerUFORender";
+import type { LanderUFO, UFOProjectile } from "./types/landerUFO";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
 import { CursorManager } from "@/lib/cursorManager";
@@ -415,6 +425,11 @@ export const GameEngine: React.FC<Props> = ({
   const lightningEnabled = isLightningLevel(mode, level);
   const isUnderwater = isWaterLevel(mode, level);
   
+  // UFO enemy system (classic mode only)
+  const ufoListRef = useRef<LanderUFO[]>([]);
+  const ufoProjectilesRef = useRef<UFOProjectile[]>([]);
+  const ufoSpawnTimerRef = useRef<number>(0);
+  const ufoSpawnIntervalRef = useRef<number>(0);
   
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
@@ -872,6 +887,20 @@ export const GameEngine: React.FC<Props> = ({
     // Moving hazards — appear from level 3, start at 1, +1 every 5 levels, capped at 4. Disabled in caverns.
     const hazardCount = isCavernLevel ? 0 : (levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 5), 4) : 0);
     const hazards = generateHazards(seed, terrain.worldWidth, BASE_HEIGHT).slice(0, hazardCount);
+    
+    // UFO spawn system (classic mode, level 0 only for testing)
+    if (mode === "classic" && level === 0) {
+      // Clear UFO state
+      ufoListRef.current = [];
+      ufoProjectilesRef.current = [];
+      
+      // Set initial spawn timer (10-15 seconds after level start)
+      ufoSpawnTimerRef.current = 10 + Math.random() * 5;
+      ufoSpawnIntervalRef.current = 0;
+      
+      console.log("🛸 UFO system initialized for Classic Mode Level 0");
+    }
+    
     // Choose a safe spawn not over pads and with altitude above terrain
     const pickSpawn = () => {
       if (isCavernLevel) {
@@ -2035,6 +2064,63 @@ export const GameEngine: React.FC<Props> = ({
         updateHazards(nearbyHazards, dt, terrain.worldWidth, BASE_HEIGHT);
       }
       
+      // UFO system update (classic mode, level 0 only)
+      if (running && mode === "classic" && level === 0) {
+        // Update spawn timer
+        ufoSpawnTimerRef.current -= dt;
+        
+        // Spawn new UFO if timer expired and no active UFOs
+        if (ufoSpawnTimerRef.current <= 0 && ufoListRef.current.length === 0) {
+          const ufo = spawnUFO(
+            levelSeed + Math.floor(elapsed * 1000), // Unique seed per spawn
+            1, // Difficulty = 1 for Level 0
+            terrain.worldWidth,
+            BASE_HEIGHT,
+            x,
+            y,
+            elapsed,
+            DEFAULT_UFO_CONFIG
+          );
+          ufoListRef.current.push(ufo);
+          ufoSpawnTimerRef.current = 20 + Math.random() * 15; // Next spawn in 20-35 seconds
+          
+          console.log("🛸 UFO spawned:", ufo);
+        }
+        
+        // Update all active UFOs
+        const newProjectiles: UFOProjectile[] = [];
+        for (let i = ufoListRef.current.length - 1; i >= 0; i--) {
+          const ufo = ufoListRef.current[i];
+          
+          // Update UFO (may fire projectile)
+          const projectile = updateUFO(
+            ufo,
+            dt,
+            elapsed,
+            x,
+            y,
+            terrain.worldWidth,
+            DEFAULT_UFO_CONFIG
+          );
+          
+          if (projectile) {
+            newProjectiles.push(projectile);
+          }
+          
+          // Remove inactive UFOs
+          if (!ufo.active || ufo.hasExited) {
+            ufoListRef.current.splice(i, 1);
+            console.log("🛸 UFO removed (exited)");
+          }
+        }
+        
+        // Add new projectiles
+        ufoProjectilesRef.current.push(...newProjectiles);
+        
+        // Update projectiles
+        updateProjectiles(ufoProjectilesRef.current, dt);
+      }
+      
       // Update moving pads
       if (running) {
         const terrainData = terrain as TerrainData;
@@ -2133,6 +2219,56 @@ export const GameEngine: React.FC<Props> = ({
               setTimeout(() => {
                 onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
               }, 700);
+      }
+      
+      // UFO collision checks (classic mode, level 0)
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && mode === "classic" && level === 0) {
+        // Check UFO body collision
+        const ufoHit = checkUFOCollision(ufoListRef.current, x, y, 10);
+        if (ufoHit) {
+          running = false;
+          crashed = true;
+          spawnExplosion();
+          spawnDebris();
+          audio.current.explosion();
+          audio.current.stopThruster();
+          try { audio.current.stopFuelAlarm(); } catch {}
+          cameraShake = 22;
+          if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+          
+          // Clear UFO on crash
+          ufoListRef.current = [];
+          ufoProjectilesRef.current = [];
+          
+          console.log("💥 Crashed into UFO!");
+          setTimeout(() => {
+            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+          }, 700);
+        }
+        
+        // Check UFO projectile collision
+        if (running && !crashed) {
+          const projectileHit = checkProjectileCollision(ufoProjectilesRef.current, x, y, 10);
+          if (projectileHit) {
+            running = false;
+            crashed = true;
+            spawnExplosion();
+            spawnDebris();
+            audio.current.explosion();
+            audio.current.stopThruster();
+            try { audio.current.stopFuelAlarm(); } catch {}
+            cameraShake = 18;
+            if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+            
+            // Remove hit projectile
+            projectileHit.active = false;
+            
+            console.log("💥 Hit by UFO projectile!");
+            setTimeout(() => {
+              onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+            }, 700);
+          }
+        }
       }
       
       // Volcano particle collisions (airborne)
@@ -4055,6 +4191,17 @@ export const GameEngine: React.FC<Props> = ({
         return wrappedDx < viewWCull / 2 + 400;
       });
       drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
+      
+      // UFO rendering (classic mode, level 0)
+      if (mode === "classic" && level === 0) {
+        drawAllUFOs(
+          ctx,
+          ufoListRef.current,
+          ufoProjectilesRef.current,
+          neonColor,
+          shouldOptimizePerformance ? 4 : 8
+        );
+      }
       
       // Volcanoes and their particles
       if (isCavernLevel) {
