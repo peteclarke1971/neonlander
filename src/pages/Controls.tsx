@@ -90,6 +90,14 @@ export default function ControlsSettings() {
       return false;
     }
   });
+  const [ufoDifficulty, setUfoDifficulty] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-difficulty');
+      return saved ? JSON.parse(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
   
   // Audio testing state
   const audioManagerRef = useRef<AudioManager | null>(null);
@@ -175,6 +183,14 @@ export default function ControlsSettings() {
       // Silently fail if localStorage is unavailable
     }
   }, [touchOpacity]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-difficulty', JSON.stringify(ufoDifficulty));
+    } catch (e) {
+      console.warn('Failed to save UFO difficulty:', e);
+    }
+  }, [ufoDifficulty]);
 
   // SEO
   useEffect(() => {
@@ -623,6 +639,28 @@ export default function ControlsSettings() {
                   }
                 }}
               />
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label>UFO Difficulty (Level 0 Testing)</Label>
+                <span className="text-sm text-muted-foreground">{ufoDifficulty}</span>
+              </div>
+              <div className="text-xs text-muted-foreground mb-2">
+                Controls UFO speed, accuracy, and behavior in Classic Mode Level 0
+              </div>
+              <Slider
+                value={[ufoDifficulty]}
+                onValueChange={(values) => setUfoDifficulty(values[0])}
+                min={1}
+                max={10}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Slow & Inaccurate</span>
+                <span>Fast & Deadly</span>
+              </div>
             </div>
             
             <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
