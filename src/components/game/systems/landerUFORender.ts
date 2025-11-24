@@ -11,9 +11,19 @@ export function drawUFO(
   ctx.save();
   ctx.translate(ufo.x, ufo.y);
   
+  // Apply scale
+  ctx.scale(ufo.scale, ufo.scale);
+  
+  // Apply charging glow for large UFO
+  let effectiveShadowBlur = shadowBlur;
+  if (ufo.type === "large" && ufo.isCharging) {
+    const chargeProgress = Math.min(1.0, (Date.now() / 1000 - ufo.chargeStartTime) / ufo.chargeDuration);
+    effectiveShadowBlur = shadowBlur + chargeProgress * 20;
+  }
+  
   // Apply glow effect
   ctx.shadowColor = neonColor;
-  ctx.shadowBlur = shadowBlur;
+  ctx.shadowBlur = effectiveShadowBlur;
   ctx.strokeStyle = neonColor;
   ctx.lineWidth = 2;
   

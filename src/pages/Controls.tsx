@@ -90,9 +90,51 @@ export default function ControlsSettings() {
       return false;
     }
   });
-  const [ufoDifficulty, setUfoDifficulty] = useState<number>(() => {
+  const [smallUFOEnabled, setSmallUFOEnabled] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem('ll-ufo-difficulty');
+      const saved = localStorage.getItem('ll-ufo-small-enabled');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [smallUFODifficulty, setSmallUFODifficulty] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-small-difficulty');
+      return saved ? JSON.parse(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
+  
+  const [mediumUFOEnabled, setMediumUFOEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-medium-enabled');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [mediumUFODifficulty, setMediumUFODifficulty] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-medium-difficulty');
+      return saved ? JSON.parse(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
+  
+  const [largeUFOEnabled, setLargeUFOEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-large-enabled');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [largeUFODifficulty, setLargeUFODifficulty] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-ufo-large-difficulty');
       return saved ? JSON.parse(saved) : 1;
     } catch {
       return 1;
@@ -186,11 +228,51 @@ export default function ControlsSettings() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('ll-ufo-difficulty', JSON.stringify(ufoDifficulty));
+      localStorage.setItem('ll-ufo-small-enabled', JSON.stringify(smallUFOEnabled));
     } catch (e) {
-      console.warn('Failed to save UFO difficulty:', e);
+      console.warn('Failed to save small UFO enabled:', e);
     }
-  }, [ufoDifficulty]);
+  }, [smallUFOEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-small-difficulty', JSON.stringify(smallUFODifficulty));
+    } catch (e) {
+      console.warn('Failed to save small UFO difficulty:', e);
+    }
+  }, [smallUFODifficulty]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-medium-enabled', JSON.stringify(mediumUFOEnabled));
+    } catch (e) {
+      console.warn('Failed to save medium UFO enabled:', e);
+    }
+  }, [mediumUFOEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-medium-difficulty', JSON.stringify(mediumUFODifficulty));
+    } catch (e) {
+      console.warn('Failed to save medium UFO difficulty:', e);
+    }
+  }, [mediumUFODifficulty]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-large-enabled', JSON.stringify(largeUFOEnabled));
+    } catch (e) {
+      console.warn('Failed to save large UFO enabled:', e);
+    }
+  }, [largeUFOEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-ufo-large-difficulty', JSON.stringify(largeUFODifficulty));
+    } catch (e) {
+      console.warn('Failed to save large UFO difficulty:', e);
+    }
+  }, [largeUFODifficulty]);
 
   // SEO
   useEffect(() => {
@@ -641,26 +723,109 @@ export default function ControlsSettings() {
               />
             </div>
             
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label>UFO Difficulty (Level 0 Testing)</Label>
-                <span className="text-sm text-muted-foreground">{ufoDifficulty}</span>
+            {/* Small UFO Section */}
+            <div className="space-y-3 p-4 border border-border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold">Small UFO (Scout)</Label>
+                  <div className="text-xs text-muted-foreground">Fast, agile, no weapons - dives at lander</div>
+                </div>
+                <Switch 
+                  checked={smallUFOEnabled}
+                  onCheckedChange={setSmallUFOEnabled}
+                />
               </div>
-              <div className="text-xs text-muted-foreground mb-2">
-                Controls UFO speed, accuracy, and behavior in Classic Mode Level 0
+              
+              {smallUFOEnabled && (
+                <div className="space-y-2 pl-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Difficulty</Label>
+                    <span className="text-sm text-muted-foreground">{smallUFODifficulty}</span>
+                  </div>
+                  <Slider
+                    value={[smallUFODifficulty]}
+                    onValueChange={(values) => setSmallUFODifficulty(values[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Slow dive, 1 attack</span>
+                    <span>Fast dive, 2 attacks</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Medium UFO Section */}
+            <div className="space-y-3 p-4 border border-border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold">Medium UFO (Fighter)</Label>
+                  <div className="text-xs text-muted-foreground">Balanced speed, fires projectiles, weaves horizontally</div>
+                </div>
+                <Switch 
+                  checked={mediumUFOEnabled}
+                  onCheckedChange={setMediumUFOEnabled}
+                />
               </div>
-              <Slider
-                value={[ufoDifficulty]}
-                onValueChange={(values) => setUfoDifficulty(values[0])}
-                min={1}
-                max={10}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Slow & Inaccurate</span>
-                <span>Fast & Deadly</span>
+              
+              {mediumUFOEnabled && (
+                <div className="space-y-2 pl-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Difficulty</Label>
+                    <span className="text-sm text-muted-foreground">{mediumUFODifficulty}</span>
+                  </div>
+                  <Slider
+                    value={[mediumUFODifficulty]}
+                    onValueChange={(values) => setMediumUFODifficulty(values[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Slow & inaccurate</span>
+                    <span>Fast & tracking</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Large UFO Section */}
+            <div className="space-y-3 p-4 border border-border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold">Large UFO (Mothership)</Label>
+                  <div className="text-xs text-muted-foreground">Slow, hovers, fires bullet spray patterns</div>
+                </div>
+                <Switch 
+                  checked={largeUFOEnabled}
+                  onCheckedChange={setLargeUFOEnabled}
+                />
               </div>
+              
+              {largeUFOEnabled && (
+                <div className="space-y-2 pl-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Difficulty</Label>
+                    <span className="text-sm text-muted-foreground">{largeUFODifficulty}</span>
+                  </div>
+                  <Slider
+                    value={[largeUFODifficulty]}
+                    onValueChange={(values) => setLargeUFODifficulty(values[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Simple spread, slow</span>
+                    <span>Spirals, fast bursts</span>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
