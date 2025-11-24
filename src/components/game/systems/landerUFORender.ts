@@ -17,15 +17,28 @@ export function drawUFO(
   ctx.strokeStyle = neonColor;
   ctx.lineWidth = 2;
   
-  // === TOP SECTION (Dome) ===
+  // Band dimensions (used for all sections)
+  const bandWidth = 32;
+  const bandHeight = 10;
+  
+  // === TOP SECTION (Mirror of bottom) ===
   ctx.beginPath();
-  // Simple curved top (ellipse arc)
-  ctx.ellipse(0, -8, 16, 6, 0, Math.PI, 0, false);
+  // Angled upper hull (trapezoid top - mirror of bottom)
+  ctx.moveTo(-16, -2);  // Start at middle band edge
+  ctx.lineTo(-10, -6);  // Angle outward (mirror of bottom)
+  ctx.lineTo(10, -6);   // Top edge
+  ctx.lineTo(16, -2);   // Angle back to middle band edge
+  ctx.stroke();
+  
+  // Connect middle to top (ensure no gaps)
+  ctx.beginPath();
+  ctx.moveTo(-bandWidth / 2, -2);  // Left edge of middle band
+  ctx.lineTo(-16, -2);              // Connect to left top section
+  ctx.moveTo(bandWidth / 2, -2);   // Right edge of middle band  
+  ctx.lineTo(16, -2);               // Connect to right top section
   ctx.stroke();
   
   // === MIDDLE SECTION (Rotating Band with Slits) ===
-  const bandWidth = 32;
-  const bandHeight = 10;
   const slitCount = 6;
   const slitWidth = 2;
   

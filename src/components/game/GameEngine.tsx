@@ -2069,11 +2069,21 @@ export const GameEngine: React.FC<Props> = ({
         // Update spawn timer
         ufoSpawnTimerRef.current -= dt;
         
-        // Spawn new UFO if timer expired and no active UFOs
-        if (ufoSpawnTimerRef.current <= 0 && ufoListRef.current.length === 0) {
-          const ufo = spawnUFO(
-            levelSeed + Math.floor(elapsed * 1000), // Unique seed per spawn
-            1, // Difficulty = 1 for Level 0
+  // Spawn new UFO if timer expired and no active UFOs
+  if (ufoSpawnTimerRef.current <= 0 && ufoListRef.current.length === 0) {
+    // Read UFO difficulty from settings
+    const savedDifficulty = (() => {
+      try {
+        const saved = localStorage.getItem('ll-ufo-difficulty');
+        return saved ? JSON.parse(saved) : 1;
+      } catch {
+        return 1;
+      }
+    })();
+    
+    const ufo = spawnUFO(
+      levelSeed + Math.floor(elapsed * 1000), // Unique seed per spawn
+      savedDifficulty, // Use difficulty from settings
             terrain.worldWidth,
             BASE_HEIGHT,
             x,
