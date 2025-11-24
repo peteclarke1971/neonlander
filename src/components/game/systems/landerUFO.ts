@@ -67,24 +67,40 @@ export function spawnUFO(
   
   return {
     id: `ufo_${Date.now()}_${Math.random()}`,
+    type: "medium",
     x: spawnX,
     y: spawnY,
     vx,
     vy: 0,
     difficulty,
+    scale: 1.0,
     baseY: spawnY,
     weaveAmplitude,
     weaveFrequency,
     weavePhase: rng() * Math.PI * 2,
     bandRotation: rng(),
-    bandRotationSpeed: 2.0 + difficulty * 0.2, // Faster rotation at higher difficulty
+    bandRotationSpeed: 2.0 + difficulty * 0.2,
     lastShotTime: currentTime,
     nextShotTime: currentTime + shotIntervalScaled,
+    canShoot: true,
     active: true,
     spawnSide,
     hasExited: false,
     canTrack,
-    trackingStrength
+    trackingStrength,
+    attackPhase: "done",
+    attackCount: 0,
+    maxAttacks: 0,
+    targetX: 0,
+    targetY: 0,
+    isHovering: false,
+    hoverX: 0,
+    hoverY: 0,
+    nextBurstTime: 0,
+    burstCooldown: 0,
+    isCharging: false,
+    chargeStartTime: 0,
+    chargeDuration: 0
   };
 }
 
@@ -201,20 +217,20 @@ export function updateProjectiles(
 
 // Collision detection
 export function checkUFOCollision(
-  ufos: LanderUFO[],
+  ufos: (LanderUFO | null)[],
   landerX: number,
   landerY: number,
   landerRadius: number
 ): LanderUFO | null {
   for (const ufo of ufos) {
-    if (!ufo.active) continue;
+    if (!ufo || !ufo.active) continue;
     
     const dx = ufo.x - landerX;
     const dy = ufo.y - landerY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // UFO hitbox (approximate size based on visual design)
-    const ufoRadius = 20;
+    // UFO hitbox scales with type
+    const ufoRadius = ufo.type === "small" ? 8 : ufo.type === "medium" ? 20 : 60;
     
     if (dist < landerRadius + ufoRadius) {
       return ufo;
