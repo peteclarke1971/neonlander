@@ -11,9 +11,9 @@ export interface UFOSpawnState {
 
 export function initUFOSpawnState(): UFOSpawnState {
   return {
-    smallSpawnTimer: 10 + Math.random() * 5,
-    mediumSpawnTimer: 15 + Math.random() * 5,
-    largeSpawnTimer: 30 + Math.random() * 10,
+    smallSpawnTimer: 0,
+    mediumSpawnTimer: 0,
+    largeSpawnTimer: 0,
     activeSmall: null,
     activeMedium: null,
     activeLarge: null

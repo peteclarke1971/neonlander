@@ -16,9 +16,9 @@ export const UFO_CONFIGS: Record<"small" | "medium" | "large", UFOTypeConfig> = 
     enabled: true,
     difficulty: 1,
     baseSpeed: 120,
-    scale: 0.33,
+    scale: 0.66,
     spawnInterval: { min: 15, max: 25 },
-    hitboxRadius: 8,
+    hitboxRadius: 16,
     diveSpeed: 200,
     turnRate: 180,
     maxAttacks: 1
@@ -156,9 +156,8 @@ export function spawnLargeUFO(
   const vx = (dx / dist) * speed;
   const vy = (dy / dist) * speed;
   
-  const burstMin = config.burstCooldown!.min / (1 + (difficulty - 1) * 0.1);
-  const burstMax = config.burstCooldown!.max / (1 + (difficulty - 1) * 0.1);
-  const burstCooldown = burstMin + rng() * (burstMax - burstMin);
+  // Scale from 10s at difficulty 1 to 5s at difficulty 10
+  const burstCooldown = 10 - ((difficulty - 1) / 9) * 5;
   
   return {
     id: `ufo_large_${Date.now()}_${Math.random()}`,
