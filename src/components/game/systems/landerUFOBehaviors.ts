@@ -16,9 +16,9 @@ export const UFO_CONFIGS: Record<"small" | "medium" | "large", UFOTypeConfig> = 
     enabled: true,
     difficulty: 1,
     baseSpeed: 120,
-    scale: 0.66,
+    scale: 0.462,  // 30% smaller than before (0.66 * 0.7)
     spawnInterval: { min: 15, max: 25 },
-    hitboxRadius: 16,
+    hitboxRadius: 11,  // Proportionally smaller (16 * 0.7)
     diveSpeed: 200,
     turnRate: 180,
     maxAttacks: 1
@@ -141,34 +141,32 @@ export function spawnLargeUFO(
 ): LanderUFO {
   const rng = mulberry32(seed);
   
+  // Choose hover position (away from lander)
   const hoverHeight = config.hoverHeight!;
-  const hoverX = worldWidth * 0.3 + rng() * worldWidth * 0.4;
-  const hoverY = hoverHeight;
+  let hoverX = worldWidth * 0.3 + rng() * worldWidth * 0.4; // Middle 40% of screen
   
-  const spawnSide: "left" | "right" = rng() > 0.5 ? "right" : "left";
-  const spawnX = spawnSide === "left" ? -100 : worldWidth + 100;
-  const spawnY = hoverY;
+  // Make sure not too close to lander
+  if (Math.abs(hoverX - landerX) < 300) {
+    hoverX = landerX > worldWidth / 2 ? worldWidth * 0.2 : worldWidth * 0.8;
+  }
   
-  const speed = config.baseSpeed!;
-  const dx = hoverX - spawnX;
-  const dy = hoverY - spawnY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const vx = (dx / dist) * speed;
-  const vy = (dy / dist) * speed;
+  let hoverY = hoverHeight;
   
   // Scale from 10s at difficulty 1 to 5s at difficulty 10
   const burstCooldown = 10 - ((difficulty - 1) / 9) * 5;
   
+  console.log(`🚀 MOTHERSHIP: Spawning directly at hover position (${hoverX.toFixed(0)}, ${hoverY.toFixed(0)}) at t=${currentTime.toFixed(2)}s with difficulty=${difficulty}, burstCooldown=${burstCooldown.toFixed(1)}s`);
+  
   return {
     id: `ufo_large_${Date.now()}_${Math.random()}`,
     type: "large",
-    x: spawnX,
-    y: spawnY,
-    vx,
-    vy,
+    x: hoverX,  // Spawn directly at hover position
+    y: hoverY,
+    vx: 0,  // No movement
+    vy: 0,
     difficulty,
     scale: config.scale,
-    baseY: spawnY,
+    baseY: hoverY,
     weaveAmplitude: 0,
     weaveFrequency: 0,
     weavePhase: 0,
@@ -178,7 +176,7 @@ export function spawnLargeUFO(
     nextShotTime: currentTime + burstCooldown,
     canShoot: true,
     active: true,
-    spawnSide,
+    spawnSide: rng() > 0.5 ? "right" : "left",
     hasExited: false,
     canTrack: false,
     trackingStrength: 0,
@@ -187,10 +185,10 @@ export function spawnLargeUFO(
     maxAttacks: 0,
     targetX: hoverX,
     targetY: hoverY,
-    isHovering: false,
+    isHovering: true,  // Already hovering!
     hoverX,
     hoverY,
-    nextBurstTime: currentTime + burstCooldown,
+    nextBurstTime: currentTime + burstCooldown,  // Schedule first burst immediately
     burstCooldown,
     isCharging: false,
     chargeStartTime: 0,
@@ -312,34 +310,30 @@ export function updateLargeUFO(
   
   const newProjectiles: UFOProjectile[] = [];
   
-  if (!ufo.isHovering) {
-    const dx = ufo.hoverX - ufo.x;
-    const dy = ufo.hoverY - ufo.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist < 10) {
-      ufo.isHovering = true;
-      ufo.vx = 0;
-      ufo.vy = 0;
-    } else {
-      ufo.x += ufo.vx * dt;
-      ufo.y += ufo.vy * dt;
-    }
-  } else {
-    if (!ufo.isCharging && currentTime >= ufo.nextBurstTime - ufo.chargeDuration) {
-      ufo.isCharging = true;
-      ufo.chargeStartTime = currentTime;
-    }
-    
-    if (ufo.isCharging && currentTime >= ufo.nextBurstTime) {
-      const burst = createBulletBurst(ufo, landerX, landerY, config);
-      newProjectiles.push(...burst);
-      
-      ufo.isCharging = false;
-      ufo.nextBurstTime = currentTime + ufo.burstCooldown;
-    }
+  // Mothership is always hovering (spawned at hover position) - no movement needed
+  
+  // Check if should start charging
+  if (!ufo.isCharging && currentTime >= ufo.nextBurstTime - ufo.chargeDuration) {
+    ufo.isCharging = true;
+    ufo.chargeStartTime = currentTime;
+    console.log(`⚡ MOTHERSHIP: Charging started at t=${currentTime.toFixed(2)}s. Will fire at t=${ufo.nextBurstTime.toFixed(2)}s (in ${(ufo.nextBurstTime - currentTime).toFixed(1)}s)`);
   }
   
+  // Check if should fire
+  if (ufo.isCharging && currentTime >= ufo.nextBurstTime) {
+    // Fire bullet burst
+    const burst = createBulletBurst(ufo, landerX, landerY, config);
+    newProjectiles.push(...burst);
+    
+    // Reset charging and schedule next burst
+    ufo.isCharging = false;
+    const oldBurstTime = ufo.nextBurstTime;
+    ufo.nextBurstTime = currentTime + ufo.burstCooldown;
+    
+    console.log(`🔫 MOTHERSHIP: FIRED ${burst.length} bullets at t=${currentTime.toFixed(2)}s! Next burst at t=${ufo.nextBurstTime.toFixed(2)}s (in ${ufo.burstCooldown.toFixed(1)}s). Previous burst was at t=${oldBurstTime.toFixed(2)}s`);
+  }
+  
+  // Update band rotation (visual only)
   ufo.bandRotation = (ufo.bandRotation + ufo.bandRotationSpeed * dt) % 1.0;
   
   return newProjectiles;
@@ -372,6 +366,9 @@ function createBulletBurst(
     bulletCount = 20 + difficulty * 3;
     spreadAngle = 360;
   }
+  
+  console.log(`  📊 BURST: Pattern=${pattern}, Bullets=${bulletCount}, Spread=${spreadAngle}°, Difficulty=${difficulty}, UFO pos=(${ufo.x.toFixed(0)}, ${ufo.y.toFixed(0)})`);
+
   
   const baseSpeed = config.bulletSpeedRange!.min + 
                     Math.random() * (config.bulletSpeedRange!.max - config.bulletSpeedRange!.min);
@@ -482,5 +479,6 @@ function createBulletBurst(
       break;
   }
   
+  console.log(`  ✅ BURST: Generated ${projectiles.length} projectiles with speed ~${baseSpeed.toFixed(0)}`);
   return projectiles;
 }
