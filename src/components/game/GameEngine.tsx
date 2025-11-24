@@ -2264,6 +2264,9 @@ export const GameEngine: React.FC<Props> = ({
         }
         
         // Add new projectiles
+        if (newProjectiles.length > 0) {
+          console.log(`  🎯 Adding ${newProjectiles.length} new projectiles to pool (current: ${allProjectilesRef.current.length}, new total: ${allProjectilesRef.current.length + newProjectiles.length})`);
+        }
         allProjectilesRef.current.push(...newProjectiles);
         
         // Update all projectiles
