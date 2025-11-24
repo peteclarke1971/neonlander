@@ -14,6 +14,14 @@ export function drawUFO(
   // Apply scale
   ctx.scale(ufo.scale, ufo.scale);
   
+  // Determine color: small UFO gets red/green for visibility
+  let drawColor = neonColor;
+  if (ufo.type === "small") {
+    // Check if level color is close to red
+    const isRedLevel = neonColor.includes("hsl(0") || neonColor.includes("hsl(360");
+    drawColor = isRedLevel ? "hsl(120, 100%, 50%)" : "hsl(0, 100%, 50%)"; // Green if red level, else red
+  }
+  
   // Apply charging glow for large UFO
   let effectiveShadowBlur = shadowBlur;
   if (ufo.type === "large" && ufo.isCharging) {
@@ -22,9 +30,9 @@ export function drawUFO(
   }
   
   // Apply glow effect
-  ctx.shadowColor = neonColor;
+  ctx.shadowColor = drawColor;
   ctx.shadowBlur = effectiveShadowBlur;
-  ctx.strokeStyle = neonColor;
+  ctx.strokeStyle = drawColor;
   ctx.lineWidth = 2;
   
   // Band dimensions (used for all sections)
