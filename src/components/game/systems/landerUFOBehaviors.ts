@@ -152,15 +152,19 @@ export function spawnLargeUFO(
   
   let hoverY = hoverHeight;
   
+  // Spawn off-screen (random side)
+  const spawnSide = rng() > 0.5 ? "right" : "left";
+  const spawnX = spawnSide === "left" ? -150 : worldWidth + 150;
+  
   // Scale from 10s at difficulty 1 to 5s at difficulty 10
   const burstCooldown = 10 - ((difficulty - 1) / 9) * 5;
   
-  console.log(`🚀 MOTHERSHIP: Spawning directly at hover position (${hoverX.toFixed(0)}, ${hoverY.toFixed(0)}) at t=${currentTime.toFixed(2)}s with difficulty=${difficulty}, burstCooldown=${burstCooldown.toFixed(1)}s`);
+  console.log(`🚀 MOTHERSHIP: Spawning off-screen at (${spawnX.toFixed(0)}, ${hoverY.toFixed(0)}) [hover target: (${hoverX.toFixed(0)}, ${hoverY.toFixed(0)})] at t=${currentTime.toFixed(2)}s with difficulty=${difficulty}, burstCooldown=${burstCooldown.toFixed(1)}s`);
   
   return {
     id: `ufo_large_${Date.now()}_${Math.random()}`,
     type: "large",
-    x: hoverX,  // Spawn directly at hover position
+    x: spawnX,  // Spawn off-screen
     y: hoverY,
     vx: 0,  // No movement
     vy: 0,
@@ -176,7 +180,7 @@ export function spawnLargeUFO(
     nextShotTime: currentTime + burstCooldown,
     canShoot: true,
     active: true,
-    spawnSide: rng() > 0.5 ? "right" : "left",
+    spawnSide,
     hasExited: false,
     canTrack: false,
     trackingStrength: 0,
@@ -352,16 +356,24 @@ function createBulletBurst(
   let bulletCount: number;
   let spreadAngle: number;
   
+  // Pattern selection based on difficulty
   if (difficulty <= 3) {
-    pattern = "simple_spread";
-    bulletCount = 5 + difficulty;
+    const patterns: BulletPattern[] = ["simple_spread", "double_fan", "starburst_cross"];
+    pattern = patterns[Math.floor(Math.random() * patterns.length)];
+    bulletCount = 5 + difficulty * 2;
     spreadAngle = 45;
   } else if (difficulty <= 6) {
-    pattern = "multi_arc";
+    const patterns: BulletPattern[] = ["multi_arc", "concentric_rings", "spiral_helix"];
+    pattern = patterns[Math.floor(Math.random() * patterns.length)];
     bulletCount = 10 + difficulty * 2;
     spreadAngle = 90;
   } else {
-    const patterns: BulletPattern[] = ["spiral", "double_ring", "alternating"];
+    // All 10 patterns available at high difficulty
+    const patterns: BulletPattern[] = [
+      "spiral", "double_ring", "alternating", 
+      "spiral_helix", "double_fan", "concentric_rings", 
+      "starburst_cross", "scatter_drop"
+    ];
     pattern = patterns[Math.floor(Math.random() * patterns.length)];
     bulletCount = 20 + difficulty * 3;
     spreadAngle = 360;
@@ -466,6 +478,132 @@ function createBulletBurst(
       for (let i = 0; i < bulletCount; i++) {
         const angle = (i / bulletCount) * Math.PI * 2;
         const speed = i % 2 === 0 ? baseSpeed * 0.6 : baseSpeed * 1.3;
+        projectiles.push({
+          id: `proj_${Date.now()}_${i}`,
+          x: ufo.x,
+          y: ufo.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          lifetime: 4.0,
+          active: true
+        });
+      }
+      break;
+      
+    // === NEW PATTERNS ===
+      
+    case "spiral_helix":
+      // Expanding radius spiral
+      const rotations = difficulty <= 3 ? 0.5 : difficulty <= 6 ? 1.5 : 3;
+      for (let i = 0; i < bulletCount; i++) {
+        const progress = i / bulletCount;
+        const angle = progress * Math.PI * 2 * rotations;
+        const radius = progress * 0.6; // Expanding radius multiplier
+        const speed = baseSpeed * (0.7 + radius * 0.6);
+        projectiles.push({
+          id: `proj_${Date.now()}_${i}`,
+          x: ufo.x,
+          y: ufo.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          lifetime: 4.0,
+          active: true
+        });
+      }
+      break;
+      
+    case "double_fan":
+      // Two opposite-facing V-shaped fans
+      const fanSpread = difficulty <= 3 ? 45 : difficulty <= 6 ? 35 : 30;
+      const fanAngle = Math.atan2(landerY - ufo.y, landerX - ufo.x);
+      const bulletsPerFan = Math.floor(bulletCount / 2);
+      const tracking = difficulty >= 4 ? 0.1 : 0;
+      
+      // Fan 1
+      for (let i = 0; i < bulletsPerFan; i++) {
+        const spreadOffset = (i / (bulletsPerFan - 1) - 0.5) * fanSpread * (Math.PI / 180);
+        const angle = fanAngle + spreadOffset + tracking * (Math.random() - 0.5);
+        projectiles.push({
+          id: `proj_${Date.now()}_fan1_${i}`,
+          x: ufo.x,
+          y: ufo.y,
+          vx: Math.cos(angle) * baseSpeed,
+          vy: Math.sin(angle) * baseSpeed,
+          lifetime: 4.0,
+          active: true
+        });
+      }
+      
+      // Fan 2 (opposite direction)
+      for (let i = 0; i < bulletsPerFan; i++) {
+        const spreadOffset = (i / (bulletsPerFan - 1) - 0.5) * fanSpread * (Math.PI / 180);
+        const angle = fanAngle + Math.PI + spreadOffset + tracking * (Math.random() - 0.5);
+        projectiles.push({
+          id: `proj_${Date.now()}_fan2_${i}`,
+          x: ufo.x,
+          y: ufo.y,
+          vx: Math.cos(angle) * baseSpeed,
+          vy: Math.sin(angle) * baseSpeed,
+          lifetime: 4.0,
+          active: true
+        });
+      }
+      break;
+      
+    case "concentric_rings":
+      // Multiple expanding circles
+      const ringCount = difficulty <= 3 ? 2 : difficulty <= 6 ? 3 : 4;
+      const bulletsPerRing = Math.floor(bulletCount / ringCount);
+      
+      for (let ring = 0; ring < ringCount; ring++) {
+        const ringSpeed = baseSpeed * (1.2 - ring * 0.2); // Inner rings faster
+        for (let i = 0; i < bulletsPerRing; i++) {
+          const angle = (i / bulletsPerRing) * Math.PI * 2 + (ring * Math.PI / bulletsPerRing);
+          projectiles.push({
+            id: `proj_${Date.now()}_ring${ring}_${i}`,
+            x: ufo.x,
+            y: ufo.y,
+            vx: Math.cos(angle) * ringSpeed,
+            vy: Math.sin(angle) * ringSpeed,
+            lifetime: 4.0,
+            active: true
+          });
+        }
+      }
+      break;
+      
+    case "starburst_cross":
+      // Clean cardinal/diagonal directions
+      const directions = difficulty <= 3 ? 4 : 8;
+      const bulletsPerDirection = difficulty <= 3 ? 2 : difficulty <= 6 ? 3 : 5;
+      
+      for (let dir = 0; dir < directions; dir++) {
+        const angle = (dir / directions) * Math.PI * 2;
+        for (let i = 0; i < bulletsPerDirection; i++) {
+          const speed = baseSpeed * (0.8 + i * 0.15);
+          projectiles.push({
+            id: `proj_${Date.now()}_dir${dir}_${i}`,
+            x: ufo.x,
+            y: ufo.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            lifetime: 4.0,
+            active: true
+          });
+        }
+      }
+      break;
+      
+    case "scatter_drop":
+      // Chaotic random spread
+      const randomness = difficulty <= 3 ? 15 : difficulty <= 6 ? 25 : 30;
+      const speedVariation = difficulty >= 7 ? 0.4 : 0;
+      
+      for (let i = 0; i < bulletCount; i++) {
+        const baseRadialAngle = (i / bulletCount) * Math.PI * 2;
+        const randomOffset = (Math.random() - 0.5) * randomness * (Math.PI / 180);
+        const angle = baseRadialAngle + randomOffset;
+        const speed = baseSpeed * (1 - speedVariation / 2 + Math.random() * speedVariation);
         projectiles.push({
           id: `proj_${Date.now()}_${i}`,
           x: ufo.x,

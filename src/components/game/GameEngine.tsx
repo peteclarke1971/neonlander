@@ -47,6 +47,7 @@ import {
   updateProjectiles, 
   checkUFOCollision, 
   checkProjectileCollision,
+  checkUFOToUFOCollisions,
   DEFAULT_UFO_CONFIG 
 } from "./systems/landerUFO";
 import { 
@@ -2271,6 +2272,41 @@ export const GameEngine: React.FC<Props> = ({
         
         // Update all projectiles
         updateProjectiles(allProjectilesRef.current, dt);
+        
+        // Check UFO-to-UFO collisions
+        const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge];
+        const collisionResult = checkUFOToUFOCollisions(activeUFOs);
+        
+        if (collisionResult.destroyed.length > 0) {
+          console.log(`💥 UFO Collision! Destroyed ${collisionResult.destroyed.length} UFO(s)`);
+          
+          // Create flash effects for destroyed UFOs
+          for (const ufo of collisionResult.destroyed) {
+            // Small flash effect using existing particle system
+            const flashParticles = 8 + Math.floor(Math.random() * 8);
+            for (let i = 0; i < flashParticles; i++) {
+              const angle = (i / flashParticles) * Math.PI * 2;
+              const speed = 80 + Math.random() * 60;
+              const particle = particlePool.get();
+              particle.x = ufo.x;
+              particle.y = ufo.y;
+              particle.vx = Math.cos(angle) * speed;
+              particle.vy = Math.sin(angle) * speed;
+              particle.life = 0;
+              particle.max = 0.4 + Math.random() * 0.3;
+              particle.color = neonColor;
+              particles.push(particle);
+            }
+            
+            // Deactivate destroyed UFO
+            ufo.active = false;
+            
+            // Clear from state
+            if (ufo === state.activeSmall) state.activeSmall = null;
+            if (ufo === state.activeMedium) state.activeMedium = null;
+            if (ufo === state.activeLarge) state.activeLarge = null;
+          }
+        }
       }
       
       // Update moving pads
