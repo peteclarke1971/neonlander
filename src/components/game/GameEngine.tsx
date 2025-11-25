@@ -4395,7 +4395,8 @@ export const GameEngine: React.FC<Props> = ({
           activeUFOs,
           allProjectilesRef.current,
           neonColor,
-          shouldOptimizePerformance ? 4 : 8
+          shouldOptimizePerformance ? 4 : 8,
+          terrain.worldWidth
         );
       }
       

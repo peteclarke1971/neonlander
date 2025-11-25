@@ -145,15 +145,25 @@ export function drawAllUFOs(
   ufos: LanderUFO[],
   projectiles: UFOProjectile[],
   neonColor: string,
-  shadowBlur: number = 8
+  shadowBlur: number = 8,
+  worldWidth: number = 3000
 ): void {
-  // Draw all UFOs
+  // Draw at three positions to handle world wrapping (same as terrain)
+  const offsets = [-worldWidth, 0, worldWidth];
+  
+  // Draw all UFOs with world wrapping
   for (const ufo of ufos) {
-    drawUFO(ctx, ufo, neonColor, shadowBlur);
+    for (const offset of offsets) {
+      const wrappedUFO = { ...ufo, x: ufo.x + offset };
+      drawUFO(ctx, wrappedUFO, neonColor, shadowBlur);
+    }
   }
   
-  // Draw all projectiles
+  // Draw all projectiles with world wrapping
   for (const projectile of projectiles) {
-    drawUFOProjectile(ctx, projectile, neonColor);
+    for (const offset of offsets) {
+      const wrappedProjectile = { ...projectile, x: projectile.x + offset };
+      drawUFOProjectile(ctx, wrappedProjectile, neonColor);
+    }
   }
 }
