@@ -323,7 +323,16 @@ export function updateLargeUFO(
   
   const newProjectiles: UFOProjectile[] = [];
   
-  // Mothership is always hovering (spawned at hover position) - no movement needed
+  // Add gentle hovering movement around spawn position
+  const hoverRadius = 40; // Max distance from center point
+  const hoverSpeed = 0.3; // Slow hovering
+  
+  // Use different frequencies for X and Y to create organic movement
+  const offsetX = Math.sin(currentTime * hoverSpeed) * hoverRadius;
+  const offsetY = Math.cos(currentTime * hoverSpeed * 0.7) * (hoverRadius * 0.6);
+  
+  ufo.x = ufo.hoverX + offsetX;
+  ufo.y = ufo.hoverY + offsetY;
   
   // Check if should start charging
   if (!ufo.isCharging && currentTime >= ufo.nextBurstTime - ufo.chargeDuration) {
