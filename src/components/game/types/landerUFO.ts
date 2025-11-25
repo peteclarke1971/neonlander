@@ -92,6 +92,11 @@ export type BulletPattern =
   | "spiral"           // Difficulty 7-10: Rotating spiral
   | "double_ring"      // Difficulty 7-10: Two concentric rings
   | "alternating"      // Difficulty 7-10: Alternating bursts
+  | "spiral_helix"     // Expanding radius spiral
+  | "double_fan"       // Two opposite V-shaped fans
+  | "concentric_rings" // Multiple expanding circles
+  | "starburst_cross"  // Cardinal/diagonal directions
+  | "scatter_drop"     // Chaotic random spread
 
 export interface UFOTypeConfig {
   enabled: boolean;

@@ -263,3 +263,60 @@ export function checkProjectileCollision(
   
   return null;
 }
+
+// UFO-to-UFO collision detection
+export function checkUFOToUFOCollisions(
+  activeUFOs: (LanderUFO | null)[]
+): { destroyed: LanderUFO[], collisions: Array<{ ufo1: LanderUFO, ufo2: LanderUFO }> } {
+  const destroyed: LanderUFO[] = [];
+  const collisions: Array<{ ufo1: LanderUFO, ufo2: LanderUFO }> = [];
+  
+  const active = activeUFOs.filter(u => u?.active) as LanderUFO[];
+  
+  for (let i = 0; i < active.length; i++) {
+    for (let j = i + 1; j < active.length; j++) {
+      const ufo1 = active[i];
+      const ufo2 = active[j];
+      
+      const dx = ufo1.x - ufo2.x;
+      const dy = ufo1.y - ufo2.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Get collision radii (approximation based on scale)
+      const radius1 = ufo1.type === "small" ? 11 : ufo1.type === "medium" ? 20 : 60;
+      const radius2 = ufo2.type === "small" ? 11 : ufo2.type === "medium" ? 20 : 60;
+      
+      if (distance < radius1 + radius2) {
+        // Collision detected!
+        collisions.push({ ufo1, ufo2 });
+        
+        // Determine what gets destroyed
+        if (ufo1.type === "small" && ufo2.type === "large") {
+          // Small destroyed, Large survives
+          if (!destroyed.includes(ufo1)) destroyed.push(ufo1);
+        } else if (ufo1.type === "large" && ufo2.type === "small") {
+          // Small destroyed, Large survives
+          if (!destroyed.includes(ufo2)) destroyed.push(ufo2);
+        } else if (ufo1.type === "small" && ufo2.type === "medium") {
+          // Both destroyed
+          if (!destroyed.includes(ufo1)) destroyed.push(ufo1);
+          if (!destroyed.includes(ufo2)) destroyed.push(ufo2);
+        } else if (ufo1.type === "medium" && ufo2.type === "small") {
+          // Both destroyed
+          if (!destroyed.includes(ufo1)) destroyed.push(ufo1);
+          if (!destroyed.includes(ufo2)) destroyed.push(ufo2);
+        } else if (ufo1.type === "medium" && ufo2.type === "large") {
+          // Both destroyed
+          if (!destroyed.includes(ufo1)) destroyed.push(ufo1);
+          if (!destroyed.includes(ufo2)) destroyed.push(ufo2);
+        } else if (ufo1.type === "large" && ufo2.type === "medium") {
+          // Both destroyed
+          if (!destroyed.includes(ufo1)) destroyed.push(ufo1);
+          if (!destroyed.includes(ufo2)) destroyed.push(ufo2);
+        }
+      }
+    }
+  }
+  
+  return { destroyed, collisions };
+}

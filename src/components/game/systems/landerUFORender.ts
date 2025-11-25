@@ -33,7 +33,7 @@ export function drawUFO(
   ctx.shadowColor = drawColor;
   ctx.shadowBlur = effectiveShadowBlur;
   ctx.strokeStyle = drawColor;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 / ufo.scale; // Counter-scale for consistent thickness across all sizes
   
   // Band dimensions (used for all sections)
   const bandWidth = 32;
