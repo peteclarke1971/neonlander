@@ -47,11 +47,20 @@ export const UFO_CONFIGS: Record<"small" | "medium" | "large", UFOTypeConfig> = 
   }
 };
 
-// Helper function
+// Helper function with world wrapping support
 function getTerrainHeight(terrain: { x: number; y: number }[], x: number): number {
+  if (terrain.length < 2) return 1000;
+  
+  // Get world width from terrain
+  const worldWidth = terrain[terrain.length - 1].x;
+  
+  // Wrap x coordinate to be within world bounds
+  let wrappedX = x % worldWidth;
+  if (wrappedX < 0) wrappedX += worldWidth;
+  
   for (let i = 0; i < terrain.length - 1; i++) {
-    if (terrain[i].x <= x && terrain[i + 1].x > x) {
-      const t = (x - terrain[i].x) / (terrain[i + 1].x - terrain[i].x);
+    if (terrain[i].x <= wrappedX && terrain[i + 1].x > wrappedX) {
+      const t = (wrappedX - terrain[i].x) / (terrain[i + 1].x - terrain[i].x);
       return terrain[i].y + (terrain[i + 1].y - terrain[i].y) * t;
     }
   }
