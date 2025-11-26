@@ -737,7 +737,7 @@ export const GameEngine: React.FC<Props> = ({
       ? generateCavern(seed, level, difficulty)
       : (() => {
           const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
-          const isTimeTrialMode = mode === "timetrial";
+          const isTimeTrialMode = isTimeTrial; // Use the correct check that includes medley time trial levels
           const timeTrialPadCount = timeTrialConfig?.padCount;
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount, mode, timeTrialConfig);
          })();
@@ -1765,8 +1765,8 @@ export const GameEngine: React.FC<Props> = ({
         rumbleNext = now;
       }
 
-      // Style points tracking (only in classic and fixed modes)
-      if ((mode === "classic" || mode === "fixed") && running && !crashed && !playerLockedRef.current) {
+      // Style points tracking (for classic, fixed, and medley modes)
+      if ((mode === "classic" || mode === "fixed" || mode === "medley") && running && !crashed && !playerLockedRef.current) {
         // Update 360° rotation tracking
         const rotation360Result = update360Tracking(
           stylePointsStateRef.current,
