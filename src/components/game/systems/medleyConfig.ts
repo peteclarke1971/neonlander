@@ -36,7 +36,9 @@ export const MEDLEY_CYCLE: MedleyLevelType[] = [
  * Get the level type for a specific medley stage (1-indexed)
  */
 export function getMedleyLevelType(medleyStage: number): MedleyLevelType {
-  const cycleIndex = (medleyStage - 1) % MEDLEY_CYCLE.length;
+  // Normalize 0-indexed level to 1-indexed stage
+  const normalizedStage = Math.max(1, medleyStage);
+  const cycleIndex = (normalizedStage - 1) % MEDLEY_CYCLE.length;
   return MEDLEY_CYCLE[cycleIndex];
 }
 
@@ -45,7 +47,7 @@ export function getMedleyLevelType(medleyStage: number): MedleyLevelType {
  * Stage 1 = difficulty 1, stage 15 = difficulty 15, etc.
  */
 export function getMedleyDifficulty(medleyStage: number): number {
-  return medleyStage;
+  return Math.max(1, medleyStage);
 }
 
 /**
@@ -53,22 +55,25 @@ export function getMedleyDifficulty(medleyStage: number): number {
  * Stages 1-14 = cycle 1, stages 15-28 = cycle 2, etc.
  */
 export function getMedleyCycle(medleyStage: number): number {
-  return Math.floor((medleyStage - 1) / MEDLEY_CYCLE.length) + 1;
+  const normalizedStage = Math.max(1, medleyStage);
+  return Math.floor((normalizedStage - 1) / MEDLEY_CYCLE.length) + 1;
 }
 
 /**
  * Get the stage within the current cycle (1-14)
  */
 export function getMedleyCycleStage(medleyStage: number): number {
-  return ((medleyStage - 1) % MEDLEY_CYCLE.length) + 1;
+  const normalizedStage = Math.max(1, medleyStage);
+  return ((normalizedStage - 1) % MEDLEY_CYCLE.length) + 1;
 }
 
 /**
  * Count how many 'normal' levels have been completed before this stage
  */
 export function countNormalLevelsCompleted(currentStage: number): number {
+  const normalizedStage = Math.max(1, currentStage);
   let count = 0;
-  for (let stage = 1; stage < currentStage; stage++) {
+  for (let stage = 1; stage < normalizedStage; stage++) {
     if (getMedleyLevelType(stage) === 'normal') {
       count++;
     }
@@ -150,7 +155,8 @@ export function shouldSpawnUFOsInMedley(medleyStage: number): boolean {
  * Generate a deterministic seed for a medley stage
  */
 export function getMedleySeed(medleyStage: number, difficulty: Difficulty): number {
+  const normalizedStage = Math.max(1, medleyStage);
   const baseSeed = 942735; // Medley-specific base seed
   const difficultyOffset = difficulty === "hard" ? 200000 : 0;
-  return baseSeed + difficultyOffset + medleyStage * 7919;
+  return baseSeed + difficultyOffset + normalizedStage * 7919;
 }
