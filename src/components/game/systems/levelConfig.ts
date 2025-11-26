@@ -3,7 +3,7 @@
 
 import { Mode } from '../types';
 
-export type LevelType = "water" | "lightning" | "volcanic" | "normal";
+export type LevelType = "water" | "lightning" | "volcanic" | "collection" | "normal";
 
 export interface LevelConfig {
   type: LevelType;
@@ -11,6 +11,7 @@ export interface LevelConfig {
 
 // Define which levels have special types
 export const LEVEL_CONFIGURATIONS: Record<number, LevelConfig> = {
+  1: { type: "collection" }, // Collection level for testing
   4: { type: "lightning" },
   5: { type: "water" },
   6: { type: "water" },
@@ -46,4 +47,11 @@ export function isLightningLevel(mode: Mode, level: number): boolean {
  */
 export function isVolcanicLevel(mode: Mode, level: number): boolean {
   return getLevelConfig(mode, level).type === "volcanic";
+}
+
+/**
+ * Check if the current level is a collection level
+ */
+export function isCollectionLevel(mode: Mode, level: number): boolean {
+  return getLevelConfig(mode, level).type === "collection";
 }
