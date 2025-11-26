@@ -615,8 +615,8 @@ export const GameEngine: React.FC<Props> = ({
     if (introType === 'darkside') levelType = 'blackout';
     else if (introType === 'search') levelType = 'lightbeam';
     
-    // Only show special messages for non-normal level types
-    const isSpecialLevel = introType && introType !== 'normal' && introType !== 'timetrial' && introType !== 'collection';
+    // Show intro names for all level types (null means no intro, e.g., caverns mode)
+    const isSpecialLevel = introType !== null;
     
     // If we have a special intro type and haven't shown the message yet, STOP and show message
     if (isSpecialLevel && messageShownForLevel.current !== level && !waitingForSpecialMessage) {
