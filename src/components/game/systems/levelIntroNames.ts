@@ -3,6 +3,7 @@
 
 import { Mode } from '../types';
 import { isWaterLevel, isLightningLevel, isCollectionLevel } from './levelConfig';
+import { getMedleyLevelType } from './medleyConfig';
 
 export type IntroLevelType = 'normal' | 'timetrial' | 'darkside' | 'search' | 'storm' | 'underwater' | 'collection' | null;
 
@@ -100,7 +101,6 @@ const ROSTERS: Record<Exclude<IntroLevelType, null>, string[]> = {
 export function getIntroLevelType(mode: Mode, level: number): IntroLevelType {
   // Check medley mode first - uses its own level type system
   if (mode === "medley") {
-    const { getMedleyLevelType } = require('./medleyConfig');
     const medleyType = getMedleyLevelType(level);
     
     // Map medley types to intro types
