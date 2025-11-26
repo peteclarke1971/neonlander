@@ -34,6 +34,7 @@ function mulberry32(seed: number) {
 import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { isWaterLevel, isLightningLevel, isCollectionLevel } from "./systems/levelConfig";
+import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
@@ -605,35 +606,33 @@ export const GameEngine: React.FC<Props> = ({
     console.log("🎮 GameEngine mounting with:", { difficulty, mode, level, seedOverride, isDemo });
     mountedRef.current = true; // Reset on mount
     
-    // Helper function to determine special level type
-    const getSpecialLevelType = (level: number): 'normal' | 'blackout' | 'lightbeam' => {
-      if (level % 10 === 9 && level >= 9) return 'blackout';
-      if (level % 10 === 4 && level >= 14) return 'lightbeam';
-      return 'normal';
-    };
+    // Determine intro level type using the new system
+    const introType = getIntroLevelType(mode, level);
     
-    // Check for special levels BEFORE initializing game
-    const isClassicMode = mode === "classic";
-    const levelType = (isClassicMode || mode === "fixed") ? getSpecialLevelType(level) : 'normal';
+    // Map intro types back to special level type for internal use
+    let levelType: 'normal' | 'blackout' | 'lightbeam' = 'normal';
+    if (introType === 'darkside') levelType = 'blackout';
+    else if (introType === 'search') levelType = 'lightbeam';
     
-    // If it's a special level and we haven't shown the message yet, STOP and show message
-    if (levelType !== 'normal' && messageShownForLevel.current !== level && !waitingForSpecialMessage) {
+    // If we have an intro type and haven't shown the message yet, STOP and show message
+    if (introType && messageShownForLevel.current !== level && !waitingForSpecialMessage) {
       messageShownForLevel.current = level;
       specialLevelType.current = levelType;
       
-      // Set flags for the level type
-      if (levelType === 'blackout') {
+      // Set flags for special level types
+      if (introType === 'darkside') {
         blackoutActive.current = true;
-        setSpecialLevelMessage("DARK SIDE");
-      } else if (levelType === 'lightbeam') {
+      } else if (introType === 'search') {
         lightStormActive.current = true;
         sweepTimerRef.current = 0;
         sweepXRef.current = 0;
         sweepActiveRef.current = true;
         currentBeamWidthRef.current = LIGHT_STORM_INITIAL_BEAM_WIDTH;
-        setSpecialLevelMessage("SEARCH IN PROGRESS");
       }
       
+      // Get the rotating intro name for this level type
+      const introName = getNextIntroName(introType);
+      setSpecialLevelMessage(introName);
       setShowSpecialMessage(true);
       setWaitingForSpecialMessage(true);
       return; // Don't call initializeGame yet - wait for message to complete
