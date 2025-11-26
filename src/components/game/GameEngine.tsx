@@ -33,7 +33,7 @@ function mulberry32(seed: number) {
 }
 import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
-import { isWaterLevel, isLightningLevel } from "./systems/levelConfig";
+import { isWaterLevel, isLightningLevel, isCollectionLevel } from "./systems/levelConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
@@ -2559,6 +2559,13 @@ export const GameEngine: React.FC<Props> = ({
             if (result.points > 0) score += result.points;
             if (result.setComplete) {
               audio.current.junkSetComplete();
+              
+              // For collection levels, add visual feedback that pads are now available
+              if (isCollectionLevel(mode, level)) {
+                setBonusMessages(["LANDING PADS ACTIVATED"]);
+                screenFlashAlpha.current = 0.5; // Brief flash effect
+              }
+              
               // Generate wormhole door
               if (!collectiblesRef.current.wormholeDoor) {
                 const context = {
@@ -2617,8 +2624,12 @@ export const GameEngine: React.FC<Props> = ({
             movingPadLanding = terrainData.getMovingPadAt(x, y, level);
           }
           if (!isCavernLevel) {
-            const t = terrain as TerrainData;
-            const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
+            const collectionLevel = isCollectionLevel(mode, level);
+            const padsActive = !collectionLevel || (collectiblesRef.current?.setComplete ?? false);
+            
+            if (padsActive) {
+              const t = terrain as TerrainData;
+              const xx = ((x % t.worldWidth) + t.worldWidth) % t.worldWidth;
             // Lander feet positions (feet are 24px wide total, ±12px from center)
             const leftFoot = ((xx - 12) % t.worldWidth + t.worldWidth) % t.worldWidth;
             const rightFoot = ((xx + 12) % t.worldWidth + t.worldWidth) % t.worldWidth;
@@ -2643,6 +2654,7 @@ export const GameEngine: React.FC<Props> = ({
               }
               
               if (bothFeetOnPad) { nearPad = p; break; }
+            }
             }
           }
           const okAngle = Math.abs(angle) < (difficulty === "easy" ? 0.18 : 0.12); // ~10deg or ~7deg
@@ -4267,7 +4279,11 @@ export const GameEngine: React.FC<Props> = ({
         }
       } else {
         // Pads (mobile-optimized rendering)
-        for (const pad of terrain.pads) {
+        const collectionLevel = isCollectionLevel(mode, level);
+        const padsVisible = !collectionLevel || (collectiblesRef.current?.setComplete ?? false);
+        
+        if (padsVisible) {
+          for (const pad of terrain.pads) {
           const pulse = 1 + 0.6 * Math.sin(elapsed * 4 + pad.xStart * 0.01);
           const width = pad.width ?? (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
           const center = (pad.xEnd >= pad.xStart)
@@ -4354,6 +4370,7 @@ export const GameEngine: React.FC<Props> = ({
             }
             ctx.restore();
           }
+        }
         }
       }
 
