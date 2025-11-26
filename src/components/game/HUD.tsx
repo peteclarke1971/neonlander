@@ -2,6 +2,7 @@ import { HUDSnapshot, CollectiblesData, Difficulty, Mode } from "./types";
 import { useEffect, useState } from "react";
 import { GhostManager } from "./GhostManager";
 import { fetchGlobalGhost } from "@/lib/leaderboard";
+import { getMedleyCycle, getMedleyCycleStage } from "./systems/medleyConfig";
 
 interface Props extends HUDSnapshot {
   collectibles?: CollectiblesData;
@@ -69,7 +70,11 @@ export const HUD: React.FC<Props> = ({ altitude, vx, vy, fuel, fuelCap, score, t
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          {timeTrialTarget ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}
+          {mode === "medley" ? (
+            <>Medley Mode — Cycle {getMedleyCycle(Math.floor(time))} • Stage {getMedleyCycleStage(Math.floor(time))}</>
+          ) : (
+            <>{timeTrialTarget ? 'Time Trial HUD' : 'Flight HUD'} — {difficulty}</>
+          )}
         </div>
         
   {timeTrialTarget !== undefined ? (

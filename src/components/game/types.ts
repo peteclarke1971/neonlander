@@ -1,5 +1,5 @@
 export type Difficulty = "easy" | "hard";
-export type Mode = "classic" | "fixed" | "caverns" | "survival" | "timetrial";
+export type Mode = "classic" | "fixed" | "caverns" | "survival" | "timetrial" | "medley";
 
 export interface MovingPad extends Pad {
   motion: "shuttle" | "elevator" | "arc";

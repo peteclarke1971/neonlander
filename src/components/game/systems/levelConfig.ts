@@ -18,9 +18,30 @@ export const LEVEL_CONFIGURATIONS: Record<number, LevelConfig> = {
 };
 
 /**
+ * Get the configuration for a medley stage
+ */
+export function getMedleyLevelConfig(stage: number): LevelConfig {
+  const { getMedleyLevelType } = require('./medleyConfig');
+  const medleyType = getMedleyLevelType(stage);
+  
+  // Map medley types to level config types
+  switch (medleyType) {
+    case 'storm': return { type: 'lightning' };
+    case 'underwater': return { type: 'water' };
+    case 'collection': return { type: 'collection' };
+    default: return { type: 'normal' };
+  }
+}
+
+/**
  * Get the configuration for a specific level
  */
 export function getLevelConfig(mode: Mode, level: number): LevelConfig {
+  // Handle medley mode
+  if (mode === "medley") {
+    return getMedleyLevelConfig(level);
+  }
+  
   // Only apply special configs in classic mode
   if (mode === "classic") {
     return LEVEL_CONFIGURATIONS[level] || { type: "normal" };
@@ -32,6 +53,10 @@ export function getLevelConfig(mode: Mode, level: number): LevelConfig {
  * Check if the current level is a water level
  */
 export function isWaterLevel(mode: Mode, level: number): boolean {
+  if (mode === "medley") {
+    const { getMedleyLevelType } = require('./medleyConfig');
+    return getMedleyLevelType(level) === 'underwater';
+  }
   return getLevelConfig(mode, level).type === "water";
 }
 
@@ -39,6 +64,10 @@ export function isWaterLevel(mode: Mode, level: number): boolean {
  * Check if the current level is a lightning level
  */
 export function isLightningLevel(mode: Mode, level: number): boolean {
+  if (mode === "medley") {
+    const { getMedleyLevelType } = require('./medleyConfig');
+    return getMedleyLevelType(level) === 'storm';
+  }
   return getLevelConfig(mode, level).type === "lightning";
 }
 
@@ -53,5 +82,9 @@ export function isVolcanicLevel(mode: Mode, level: number): boolean {
  * Check if the current level is a collection level
  */
 export function isCollectionLevel(mode: Mode, level: number): boolean {
+  if (mode === "medley") {
+    const { getMedleyLevelType } = require('./medleyConfig');
+    return getMedleyLevelType(level) === 'collection';
+  }
   return getLevelConfig(mode, level).type === "collection";
 }
