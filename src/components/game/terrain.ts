@@ -1,5 +1,5 @@
 import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation, Jellyfish } from "./types";
-import { isWaterLevel } from "./systems/levelConfig";
+import { isWaterLevel, isCollectionLevel } from "./systems/levelConfig";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -418,8 +418,9 @@ export function generateTerrain(
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];
   
-  // Never generate moving pads (mega pads) in Time Trial mode
-  const allowMovingPads = !isTimeTrial;
+  // Never generate moving pads (mega pads) in Time Trial mode or Collection levels
+  const isCollection = mode ? isCollectionLevel(mode, level) : false;
+  const allowMovingPads = !isTimeTrial && !isCollection;
   
   if (allowMovingPads) {
     let movingPad = movingPadSystem.generateMovingPad(
