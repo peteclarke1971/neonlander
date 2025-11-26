@@ -879,7 +879,7 @@ export const GameEngine: React.FC<Props> = ({
 
     // Anomalies (gravity wells) — appear from level 3, start at 1, +1 every 3 levels, capped at 5.
     // In Time Trial mode, limit to 1 anomaly maximum
-    const isTimeTrialMode = mode === "timetrial";
+    const isTimeTrialMode = isTimeTrial;
     let anomalyCount = levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 3), 5) : 0;
     if (isTimeTrialMode) {
       anomalyCount = Math.min(anomalyCount, 1);
@@ -1323,7 +1323,7 @@ export const GameEngine: React.FC<Props> = ({
       
       // Calculate time trial data
       const ttState = timeTrialStateRef.current;
-      const timeTrialData = mode === "timetrial" ? {
+      const timeTrialData = isTimeTrial ? {
         currentTarget: ttState.currentTarget,
         totalPads: ttState.totalPadsRequired,
         raceTime: ttState.raceActive ? (performance.now() - ttState.raceStartTime) : 0,
@@ -1346,7 +1346,7 @@ export const GameEngine: React.FC<Props> = ({
         timeTrialTotalPads: timeTrialData?.totalPads,
         timeTrialRaceTime: timeTrialData?.raceTime,
         timeTrialRaceActive: timeTrialData?.raceActive,
-        timeTrialLevel: mode === "timetrial" ? level : undefined
+        timeTrialLevel: isTimeTrial ? level : undefined
       });
     };
 
@@ -1531,7 +1531,7 @@ export const GameEngine: React.FC<Props> = ({
           invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
           
           // Start Time Trial timer immediately after countdown
-          if (mode === "timetrial") {
+          if (isTimeTrial) {
             setTimeTrialState(prev => ({
               ...prev,
               raceStartTime: performance.now(),
@@ -2913,7 +2913,7 @@ export const GameEngine: React.FC<Props> = ({
             }, 500);
           } else if (nearPad && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
-            if (mode === "timetrial" && !isCavernLevel) {
+            if (isTimeTrial && !isCavernLevel) {
               const landedPad = (pad || nearPad)!;
               const ttState = timeTrialStateRef.current;
               
@@ -4371,7 +4371,7 @@ export const GameEngine: React.FC<Props> = ({
               ctx.stroke();
             }
             // Bonus label or Time Trial sequence number
-            if (mode === "timetrial" && !isCavernLevel) {
+            if (isTimeTrial && !isCavernLevel) {
               // Draw sequence number for Time Trial pads
               const ttState = timeTrialStateRef.current;
               const sequencedPad = ttState.sequencedPads.find(p => 
