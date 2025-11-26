@@ -2,6 +2,7 @@
 // Allows any level to be configured as water, lightning, volcanic, etc.
 
 import { Mode } from '../types';
+import { getMedleyLevelType } from './medleyConfig';
 
 export type LevelType = "water" | "lightning" | "volcanic" | "collection" | "normal";
 
@@ -21,7 +22,6 @@ export const LEVEL_CONFIGURATIONS: Record<number, LevelConfig> = {
  * Get the configuration for a medley stage
  */
 export function getMedleyLevelConfig(stage: number): LevelConfig {
-  const { getMedleyLevelType } = require('./medleyConfig');
   const medleyType = getMedleyLevelType(stage);
   
   // Map medley types to level config types
@@ -54,7 +54,6 @@ export function getLevelConfig(mode: Mode, level: number): LevelConfig {
  */
 export function isWaterLevel(mode: Mode, level: number): boolean {
   if (mode === "medley") {
-    const { getMedleyLevelType } = require('./medleyConfig');
     return getMedleyLevelType(level) === 'underwater';
   }
   return getLevelConfig(mode, level).type === "water";
@@ -65,7 +64,6 @@ export function isWaterLevel(mode: Mode, level: number): boolean {
  */
 export function isLightningLevel(mode: Mode, level: number): boolean {
   if (mode === "medley") {
-    const { getMedleyLevelType } = require('./medleyConfig');
     return getMedleyLevelType(level) === 'storm';
   }
   return getLevelConfig(mode, level).type === "lightning";
@@ -83,7 +81,6 @@ export function isVolcanicLevel(mode: Mode, level: number): boolean {
  */
 export function isCollectionLevel(mode: Mode, level: number): boolean {
   if (mode === "medley") {
-    const { getMedleyLevelType } = require('./medleyConfig');
     return getMedleyLevelType(level) === 'collection';
   }
   return getLevelConfig(mode, level).type === "collection";
