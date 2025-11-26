@@ -718,6 +718,7 @@ export const HomeScreen: React.FC<Props> = ({
             lastModeFocus.current = "classic";
           }}>Classic</ToggleGroupItem>
     <ToggleGroupItem value="timetrial" variant="outline" aria-label="Time Trial mode">⏱️ Time Trial</ToggleGroupItem>
+    <ToggleGroupItem value="medley" variant="outline" aria-label="Medley mode">🎭 Medley</ToggleGroupItem>
   </ToggleGroup>
         </div>
 

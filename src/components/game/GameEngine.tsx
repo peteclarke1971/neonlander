@@ -35,6 +35,7 @@ import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { isWaterLevel, isLightningLevel, isCollectionLevel } from "./systems/levelConfig";
 import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
+import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley } from "./systems/medleyConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
@@ -671,7 +672,14 @@ export const GameEngine: React.FC<Props> = ({
     // Physics state
     const baseSeed = 873421;
     const fixedSeed = baseSeed + (difficulty === "hard" ? 100000 : 0) + (level | 0) * 9973;
-    let levelVar = Math.min(Math.max(0, level), 20);
+    
+    // For medley mode, use effective difficulty (linear with stage)
+    let effectiveLevel = level;
+    if (mode === "medley") {
+      effectiveLevel = getMedleyDifficulty(level);
+    }
+    
+    let levelVar = Math.min(Math.max(0, effectiveLevel), 20);
     
     // Reduce terrain complexity for special levels (make them slightly easier)
     if (specialLevelType.current === 'blackout' || specialLevelType.current === 'lightbeam') {
@@ -683,14 +691,16 @@ export const GameEngine: React.FC<Props> = ({
     
     // Determine seed based on override/mode and level type
     let seed: number;
-    let isTimeTrial = mode === "timetrial";
+    let isTimeTrial = mode === "timetrial" || (mode === "medley" && getMedleyLevelType(level) === 'timetrial');
     let timeTrialConfig;
     
-    // ALWAYS retrieve Time Trial config if in Time Trial mode (regardless of seed override)
-    if (isTimeTrial) {
+    // ALWAYS retrieve Time Trial config if in Time Trial mode OR medley timetrial stage
+    if (mode === "timetrial" || (mode === "medley" && getMedleyLevelType(level) === 'timetrial')) {
       timeTrialConfig = getTimeTrialLevelConfig(level);
       console.log("⏱️ Time Trial level config loaded:", {
         level,
+        mode,
+        medleyType: mode === "medley" ? getMedleyLevelType(level) : 'N/A',
         configSeed: timeTrialConfig.seed,
         padCount: timeTrialConfig.padCount,
         hasOverride: typeof seedOverride === "number"
@@ -704,6 +714,10 @@ export const GameEngine: React.FC<Props> = ({
     } else if (isCavernLevel) {
       seed = getCavernSeed(mode, level, difficulty, baseSeed);
       console.log("🕳️ Using cavern seed:", seed, "for level", level);
+    } else if (mode === "medley") {
+      // Medley mode uses deterministic seeds
+      seed = getMedleySeed(level, difficulty);
+      console.log("🎭 Using Medley seed:", seed, "for stage", level, "type:", getMedleyLevelType(level));
     } else if (isTimeTrial && timeTrialConfig) {
       // Use Time Trial's deterministic seed
       seed = timeTrialConfig.seed;
@@ -902,12 +916,23 @@ export const GameEngine: React.FC<Props> = ({
     const hazardCount = isCavernLevel ? 0 : (levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 5), 4) : 0);
     const hazards = generateHazards(seed, terrain.worldWidth, BASE_HEIGHT).slice(0, hazardCount);
     
-    // UFO spawn system (classic mode, level 0 only for testing)
-    if (mode === "classic" && level === 0) {
+    // UFO spawn system (classic mode level 0, or medley mode normal levels)
+    if ((mode === "classic" && level === 0) || (mode === "medley" && shouldSpawnUFOsInMedley(level))) {
       // Initialize UFO spawn state
       ufoSpawnStateRef.current = initUFOSpawnState();
       allProjectilesRef.current = [];
-      console.log("🛸 Multi-UFO system initialized for Classic Mode Level 0");
+      
+      if (mode === "medley") {
+        const normalCount = countNormalLevelsCompleted(level);
+        const ufoConfig = getMedleyUFOConfig(normalCount, effectiveLevel);
+        console.log("🛸 Medley UFO system initialized:", {
+          stage: level,
+          normalCompleted: normalCount,
+          config: ufoConfig
+        });
+      } else {
+        console.log("🛸 Multi-UFO system initialized for Classic Mode Level 0");
+      }
     }
     
     // Choose a safe spawn not over pads and with altitude above terrain
@@ -922,7 +947,7 @@ export const GameEngine: React.FC<Props> = ({
       
       
       
-      if (mode === "fixed" || mode === "timetrial") {
+      if (mode === "fixed" || mode === "timetrial" || mode === "medley") {
         const cx = WORLD_WIDTH / 2;
         const gy = terrain.getHeightAt(cx);
         const sy = gy - 520; // fixed safe altitude above ground
@@ -2073,48 +2098,71 @@ export const GameEngine: React.FC<Props> = ({
         updateHazards(nearbyHazards, dt, terrain.worldWidth, BASE_HEIGHT);
       }
       
-      // UFO system update (classic mode, level 0 only)
-      if (running && mode === "classic" && level === 0) {
-        // Load configs from settings
-        const configs: Record<UFOType, UFOTypeConfig> = {
-          small: {
-            ...UFO_CONFIGS.small,
-            enabled: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-small-enabled');
-                return saved ? JSON.parse(saved) : true;
-              } catch {
-                return true;
-              }
-            })(),
-            difficulty: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-small-difficulty');
-                return saved ? JSON.parse(saved) : 1;
-              } catch {
-                return 1;
-              }
-            })()
-          },
-          medium: {
-            ...UFO_CONFIGS.medium,
-            enabled: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-medium-enabled');
-                return saved ? JSON.parse(saved) : true;
-              } catch {
-                return true;
-              }
-            })(),
-            difficulty: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-medium-difficulty');
-                return saved ? JSON.parse(saved) : 1;
-              } catch {
-                return 1;
-              }
-            })()
-          },
+      // UFO system update (classic mode level 0, or medley mode normal levels)
+      if (running && ((mode === "classic" && level === 0) || (mode === "medley" && shouldSpawnUFOsInMedley(level)))) {
+        // Load configs from settings (or use medley config for medley mode)
+        let configs: Record<UFOType, UFOTypeConfig>;
+        
+        if (mode === "medley") {
+          // Get medley UFO configuration
+          const normalCount = countNormalLevelsCompleted(level);
+          const medleyUFOConfig = getMedleyUFOConfig(normalCount, effectiveLevel);
+          
+          configs = {
+            small: {
+              ...UFO_CONFIGS.small,
+              enabled: medleyUFOConfig.smallEnabled
+            },
+            medium: {
+              ...UFO_CONFIGS.medium,
+              enabled: medleyUFOConfig.mediumEnabled
+            },
+            large: {
+              ...UFO_CONFIGS.large,
+              enabled: medleyUFOConfig.largeEnabled
+            }
+          };
+        } else {
+          // Classic mode - load from settings
+          configs = {
+            small: {
+              ...UFO_CONFIGS.small,
+              enabled: (() => {
+                try {
+                  const saved = localStorage.getItem('ll-ufo-small-enabled');
+                  return saved ? JSON.parse(saved) : true;
+                } catch {
+                  return true;
+                }
+              })(),
+              difficulty: (() => {
+                try {
+                  const saved = localStorage.getItem('ll-ufo-small-difficulty');
+                  return saved ? JSON.parse(saved) : 1;
+                } catch {
+                  return 1;
+                }
+              })()
+            },
+            medium: {
+              ...UFO_CONFIGS.medium,
+              enabled: (() => {
+                try {
+                  const saved = localStorage.getItem('ll-ufo-medium-enabled');
+                  return saved ? JSON.parse(saved) : true;
+                } catch {
+                  return true;
+                }
+              })(),
+              difficulty: (() => {
+                try {
+                  const saved = localStorage.getItem('ll-ufo-medium-difficulty');
+                  return saved ? JSON.parse(saved) : 1;
+                } catch {
+                  return 1;
+                }
+              })()
+            },
           large: {
             ...UFO_CONFIGS.large,
             enabled: (() => {
@@ -2135,6 +2183,7 @@ export const GameEngine: React.FC<Props> = ({
             })()
           }
         };
+      }
         
         const state = ufoSpawnStateRef.current;
         

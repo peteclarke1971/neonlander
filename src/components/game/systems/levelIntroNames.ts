@@ -98,7 +98,26 @@ const ROSTERS: Record<Exclude<IntroLevelType, null>, string[]> = {
  * Determines the intro level type based on mode and level configuration
  */
 export function getIntroLevelType(mode: Mode, level: number): IntroLevelType {
-  // Check time trial first
+  // Check medley mode first - uses its own level type system
+  if (mode === "medley") {
+    const { getMedleyLevelType } = require('./medleyConfig');
+    const medleyType = getMedleyLevelType(level);
+    
+    // Map medley types to intro types
+    const typeMap: Record<string, IntroLevelType> = {
+      'normal': 'normal',
+      'timetrial': 'timetrial',
+      'darkside': 'darkside',
+      'storm': 'storm',
+      'collection': 'collection',
+      'search': 'search',
+      'underwater': 'underwater'
+    };
+    
+    return typeMap[medleyType] || 'normal';
+  }
+  
+  // Check time trial
   if (mode === "timetrial") return 'timetrial';
   
   // Check blackout/lightbeam levels (classic and fixed modes)
