@@ -152,6 +152,28 @@ export function shouldSpawnUFOsInMedley(medleyStage: number): boolean {
 }
 
 /**
+ * Get which Regular Landing level number this is within the current cycle (1-7)
+ * Returns 0 if not a normal level
+ */
+export function getMedleyNormalLevelNumber(medleyStage: number): number {
+  if (getMedleyLevelType(medleyStage) !== 'normal') return 0;
+  
+  const cycleStage = getMedleyCycleStage(medleyStage);
+  // Map cycle positions to normal level numbers: 1→1, 2→2, 4→3, 6→4, 8→5, 10→6, 13→7
+  const normalPositions = [1, 2, 4, 6, 8, 10, 13];
+  return normalPositions.indexOf(cycleStage) + 1;
+}
+
+/**
+ * Check if this is one of the first 5 Regular Landing levels in cycle 1
+ */
+export function isEarlyMedleyNormalLevel(medleyStage: number): boolean {
+  const cycle = getMedleyCycle(medleyStage);
+  const normalNum = getMedleyNormalLevelNumber(medleyStage);
+  return cycle === 1 && normalNum >= 1 && normalNum <= 5;
+}
+
+/**
  * Generate a deterministic seed for a medley stage
  */
 export function getMedleySeed(medleyStage: number, difficulty: Difficulty): number {

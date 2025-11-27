@@ -35,7 +35,7 @@ import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { isWaterLevel, isLightningLevel, isCollectionLevel } from "./systems/levelConfig";
 import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
-import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley } from "./systems/medleyConfig";
+import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley, isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./systems/medleyConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
 import { createStylePointsState, update360Tracking, updateNearMiss, checkPerfectLanding, resetStylePoints, StylePointsState } from "./systems/stylePoints";
 import { generateAnomalies, anomalyAccelAt, drawAnomaliesField } from "./systems/anomalies";
@@ -736,7 +736,16 @@ export const GameEngine: React.FC<Props> = ({
     const terrain: TerrainData | CavernData = isCavernLevel 
       ? generateCavern(seed, level, difficulty)
       : (() => {
-          const terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
+          let terrainAmp = AMPLITUDE * (1 + 0.2 * levelVar);
+          
+          // MEDLEY MODE: Increase terrain height variation for Regular Landing #2 and #3 in cycle 1
+          if (mode === "medley" && isEarlyMedleyNormalLevel(level)) {
+            const normalNum = getMedleyNormalLevelNumber(level);
+            if (normalNum === 2 || normalNum === 3) {
+              terrainAmp *= 1.15; // 15% more height variation for visual interest
+            }
+          }
+          
           const isTimeTrialMode = isTimeTrial; // Use the correct check that includes medley time trial levels
           const timeTrialPadCount = timeTrialConfig?.padCount;
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount, mode, timeTrialConfig);
