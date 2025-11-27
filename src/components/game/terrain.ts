@@ -4,6 +4,7 @@ import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
 import { TimeTrialLevelConfig } from "./systems/timeTrialLevels";
+import { isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./systems/medleyConfig";
 
 // Simple seeded PRNG (Mulberry32)
 function mulberry32(seed: number) {
@@ -307,7 +308,14 @@ export function generateTerrain(
     // Choose width category
     const r = rand();
     let width: number;
-    if (r < 0.35) {
+    
+    // MEDLEY MODE: Force first pad to be large for first 5 Regular Landing levels in cycle 1
+    const isFirstPadInEarlyMedley = mode === "medley" && isEarlyMedleyNormalLevel(level) && i === 0;
+    
+    if (isFirstPadInEarlyMedley) {
+      // Force large pad for beginner-friendly early levels
+      width = step * (1.6 + rand() * 1.8); // ~80-170 if step≈50
+    } else if (r < 0.35) {
       // Small pads: ~1.5x lander width (lander ~16px wide)
       width = 28 + rand() * 8; // 28-36
     } else if (r < 0.75) {
@@ -413,7 +421,7 @@ export function generateTerrain(
     const x1 = (i + 1) * step;
     const t = (xx - x0) / (x1 - x0);
     return points[i].y * (1 - t) + points[i + 1].y * t;
-  }, points, pads, isTimeTrial);
+  }, points, pads, isTimeTrial, mode);
 
   // Generate moving pads for this level
   const movingPads: MovingPad[] = [];

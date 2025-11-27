@@ -1,4 +1,5 @@
-import { Volcano } from "../types";
+import { Volcano, Mode } from "../types";
+import { isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./medleyConfig";
 
 export interface VolcanoParticle {
   x: number;
@@ -108,8 +109,17 @@ export function generateVolcanoes(
   getHeightAt: (x: number) => number,
   terrainPoints: { x: number; y: number }[],
   pads: { xStart: number; xEnd: number; y: number }[],
-  isTimeTrial: boolean = false
+  isTimeTrial: boolean = false,
+  mode?: Mode
 ): Volcano[] {
+  // MEDLEY MODE: Skip volcanoes for Regular Landing #1 and #2 in cycle 1
+  if (mode === "medley" && isEarlyMedleyNormalLevel(level)) {
+    const normalNum = getMedleyNormalLevelNumber(level);
+    if (normalNum <= 2) {
+      return []; // No volcanoes for first 2 Regular Landing levels
+    }
+  }
+  
   const config = getVolcanoConfigForLevel(level);
   const rng = mulberry32(seed ^ 0xC0DE);
   const volcanoes: Volcano[] = [];
@@ -198,7 +208,15 @@ export function generateVolcanoes(
         // Mega volcano chance for level 40+
         const isMegaVolcano = level > 40 && rng() < 0.3;
         const finalSize = isMegaVolcano ? size * 1.5 : size;
-        const finalPower = isMegaVolcano ? config.power * 2 : config.power;
+        let finalPower = isMegaVolcano ? config.power * 2 : config.power;
+        
+        // MEDLEY MODE: Boost power by 20% for first volcano appearances (Regular Landing #3-4 in cycle 1)
+        if (mode === "medley" && isEarlyMedleyNormalLevel(level)) {
+          const normalNum = getMedleyNormalLevelNumber(level);
+          if (normalNum === 3 || normalNum === 4) {
+            finalPower *= 1.2; // 20% power boost for first appearances
+          }
+        }
         
         volcanoes.push({
           x: candidate.x,
