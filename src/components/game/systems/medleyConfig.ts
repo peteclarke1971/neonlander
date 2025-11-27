@@ -170,7 +170,9 @@ export function getMedleyNormalLevelNumber(medleyStage: number): number {
 export function isEarlyMedleyNormalLevel(medleyStage: number): boolean {
   const cycle = getMedleyCycle(medleyStage);
   const normalNum = getMedleyNormalLevelNumber(medleyStage);
-  return cycle === 1 && normalNum >= 1 && normalNum <= 5;
+  const result = cycle === 1 && normalNum >= 1 && normalNum <= 5;
+  console.log('🔍 Early Medley Check:', { medleyStage, cycle, normalNum, result });
+  return result;
 }
 
 /**
@@ -180,5 +182,12 @@ export function getMedleySeed(medleyStage: number, difficulty: Difficulty): numb
   const normalizedStage = Math.max(1, medleyStage);
   const baseSeed = 942735; // Medley-specific base seed
   const difficultyOffset = difficulty === "hard" ? 200000 : 0;
-  return baseSeed + difficultyOffset + normalizedStage * 7919;
+  
+  // Add unique offset for early cycle 1 levels to force new terrain generation
+  const earlyMedleyOffset = isEarlyMedleyNormalLevel(normalizedStage) ? 500000 : 0;
+  
+  const finalSeed = baseSeed + difficultyOffset + earlyMedleyOffset + normalizedStage * 7919;
+  console.log('🌱 Medley Seed:', { medleyStage, normalizedStage, earlyMedleyOffset, finalSeed });
+  
+  return finalSeed;
 }
