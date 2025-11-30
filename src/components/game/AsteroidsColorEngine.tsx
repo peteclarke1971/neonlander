@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AsteroidsColorHUD } from "./AsteroidsColorHUD";
-import { AudioManager } from "@/components/game/AudioManager";
+import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { ColorOrderGameOverData, ColorOrderHUDSnapshot, ColorOrderGameState, ColorProjectile } from "./types/asteroidsColor";
 import {
   generateAsteroidField,
@@ -99,7 +99,7 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
   const thrustAnalog = useRef(0);
   const lastThrust = useRef(0);
   const lastFire = useRef(false);
-  const audio = useRef<AudioManager>(new AudioManager());
+  const audio = useRef(getGlobalAudioManager());
   // Gamepad profile/device state
   const gpProfileRef = useRef(loadProfile(getLastDeviceId()));
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
@@ -897,10 +897,10 @@ export const AsteroidsColorEngine: React.FC<Props> = ({ difficulty, onExit, onGa
     game.current.asteroids = generateAsteroidField(1, REFERENCE_WIDTH, REFERENCE_HEIGHT, worldSeed.current);
     game.current.gameStarted = true;
 
-    // Preload SFX and start level music
-    try { (audio.current as any).preloadSFX(); } catch {}
-    try { (audio.current as any).stopAllAudio(); } catch {}
-    try { (audio.current as any).playLevelTrackByIndex(0); } catch {}
+    // Reset audio and preload SFX, then start level music
+    try { audio.current.resetForNewGame(); } catch {}
+    try { audio.current.preloadSFX(); } catch {}
+    try { audio.current.playLevelTrackByIndex(0); } catch {}
 
     raf = requestAnimationFrame(loop);
 

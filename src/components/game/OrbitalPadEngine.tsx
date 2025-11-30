@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { HUD } from "./HUD";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 import { CavernStarfield } from "./CavernStarfield";
 import { 
   OrbitalDockingGameOverData, 
@@ -73,7 +73,7 @@ const generateLevelConfig = (level: number, seed: number): LevelConfig => {
 export const OrbitalPadEngine: React.FC<Props> = ({ level, showGhost = false, onExit, onGameOver }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const audio = useRef(new AudioManager());
+  const audio = useRef(getGlobalAudioManager());
   
   // Ghost management
   const ghostManager = useRef(new GhostManager());
@@ -180,7 +180,7 @@ export const OrbitalPadEngine: React.FC<Props> = ({ level, showGhost = false, on
     lastRecordTime.current = 0;
     
     // Setup audio
-    audio.current.stopAllAudio();
+    audio.current.resetForNewGame();
     audio.current.playLevelTrackForLevel(level);
     
     // Setup UI mode

@@ -9,7 +9,7 @@ import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepa
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import { AudioManager } from "@/components/game/AudioManager";
+import { getGlobalAudioManager } from "@/components/game/AudioManager";
 
 export default function ControlsSettings() {
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
@@ -142,7 +142,7 @@ export default function ControlsSettings() {
   });
   
   // Audio testing state
-  const audioManagerRef = useRef<AudioManager | null>(null);
+  const audioManagerRef = useRef(getGlobalAudioManager());
   const [selectedMusic, setSelectedMusic] = useState<string>("title.mp3");
   const [selectedSFX, setSelectedSFX] = useState<string>("thruster.mp3");
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
@@ -150,8 +150,7 @@ export default function ControlsSettings() {
   
   // Initialize AudioManager
   useEffect(() => {
-    if (!audioManagerRef.current) {
-      audioManagerRef.current = new AudioManager();
+    if (audioManagerRef.current) {
       audioManagerRef.current.resume();
       audioManagerRef.current.preloadSFX();
     }

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Difficulty, HighScore, Mode } from "./types";
 import { InitialsBadge } from "./InitialsBadge";
 import { HomeStarfield } from "./HomeStarfield";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 import FireworksDisplay from "./FireworksDisplay";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fetchTop, submitScore } from "@/lib/leaderboard";
@@ -59,7 +59,7 @@ export const HomeScreen: React.FC<Props> = ({
   onInteraction,
   recentlySubmittedScore
 }) => {
-  const audioRef = useRef(new AudioManager());
+  const audioRef = useRef(getGlobalAudioManager());
 
   // Detect iOS/iPad devices
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);

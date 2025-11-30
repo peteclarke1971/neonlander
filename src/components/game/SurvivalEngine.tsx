@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SurvivalHUD } from "./SurvivalHUD";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 import { SurvivalGameOverData } from "./types/survival";
 import { EndlessTerrainGenerator, TerrainChunk } from "./systems/endlessTerrain";
 import { movingPadSystem } from "./systems/movingPads";
@@ -209,7 +209,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const fuelBeforeLandingRef = useRef(50);
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
-  const audio = useRef(new AudioManager());
+  const audio = useRef(getGlobalAudioManager());
   
   // Gamepad state
   const gamepadRef = useRef<Gamepad | null>(null);
@@ -469,9 +469,9 @@ export const SurvivalEngine: React.FC<Props> = ({
     let clearanceEMA = 220;
     let prevTargetZoom = 1.0;
     
-    // Start level audio
+    // Reset audio for new game and start level music
+    try { audio.current.resetForNewGame(); } catch {}
     try { audio.current.preloadSFX(); } catch {}
-    audio.current.stopAllAudio();
     audio.current.playLevelTrackForLevel(0);
     
     // Physics constants matching main game (EASY MODE)

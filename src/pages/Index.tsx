@@ -16,7 +16,7 @@ import { VectorWormhole } from "@/components/game/VectorWormhole";
 import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
 import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
 import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave";
-import { AudioManager } from "@/components/game/AudioManager";
+import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import { DemoTransition } from "@/components/game/DemoTransition";
@@ -40,7 +40,7 @@ const Index = () => {
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
-  const audioRef = useRef(new AudioManager());
+  const audioRef = useRef(getGlobalAudioManager());
   // Removed demoCrashed state - was causing conflicts with timer logic
   const [classicScores, setClassicScores] = useState<HighScore[]>(() => {
     const now = Date.now();
