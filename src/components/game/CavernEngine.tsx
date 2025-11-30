@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HUD } from "./HUD";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 import { CavernFXRenderer } from "./CavernFXRenderer";
 import { CavernFXParams } from "./systems/cavernFX";
 import { CavernBakeResult } from "./systems/cavernBake";
@@ -76,7 +76,7 @@ export const CavernEngine: React.FC<Props> = ({
   const keys = useRef<{ left: boolean; right: boolean; thrust: boolean; abort: boolean }>({ left: false, right: false, thrust: false, abort: false });
   const thrustAnalog = useRef(0);
   const lastThrust = useRef(0);
-  const audio = useRef(new AudioManager());
+  const audio = useRef(getGlobalAudioManager());
   const abortAssist = useRef(false);
   // Gamepad profile/device state
   const gpProfileRef = useRef(loadProfile(getLastDeviceId()));
@@ -192,9 +192,9 @@ export const CavernEngine: React.FC<Props> = ({
       setRandomEffectParams(undefined);
     }
 
-    // Stop all audio before starting level music
+    // Reset audio for new game and start level music
+    try { audio.current.resetForNewGame(); } catch {}
     try { audio.current.preloadSFX(); } catch {}
-    try { audio.current.stopAllAudio(); } catch {}
     try { audio.current.playLevelTrackForLevel(level || 0); } catch {}
     
     // Ensure thruster is properly initialized after audio reset

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
 import { createCountdownIntro, IntroHandle } from "./intro/CountdownIntro";
 import { CountdownOverlay } from "./intro/CountdownOverlay";
@@ -97,7 +97,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
   const gameStateRef = useRef<RemixGameState | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const lastTimeRef = useRef<number>(0);
-  const audioRef = useRef<AudioManager | null>(null);
+  const audioRef = useRef(getGlobalAudioManager());
   const cursorManagerRef = useRef<CursorManager | null>(null);
   const [fps, setFps] = useState(0);
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
@@ -883,7 +883,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
 
   // Initialize audio, cursor management, and game state
   useEffect(() => {
-    audioRef.current = new AudioManager();
+    audioRef.current.resetForNewGame();
+    audioRef.current.preloadSFX();
     gameStateRef.current = initGameState();
     
     // Initialize cursor management

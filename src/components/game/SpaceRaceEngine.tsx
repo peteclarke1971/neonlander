@@ -17,7 +17,7 @@ import { generateTrack } from "./systems/raceTrack";
 import { updateAI, createAI } from "./systems/raceAI";
 import { WireframeRenderer } from "./systems/spaceRaceRenderer";
 import { anyGamepad, loadProfile, readGamepad, setUiMode } from "@/hooks/use-gamepad";
-import { AudioManager } from "./AudioManager";
+import { getGlobalAudioManager } from "./AudioManager";
 
 interface Props {
   difficulty: SpaceRaceDifficulty;
@@ -46,7 +46,7 @@ export const SpaceRaceEngine: React.FC<Props> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<WireframeRenderer | null>(null);
-  const audioRef = useRef(new AudioManager());
+  const audioRef = useRef(getGlobalAudioManager());
   
   const [hud, setHud] = useState<SpaceRaceHUDSnapshot>({
     score: 0,

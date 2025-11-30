@@ -82,9 +82,22 @@ export class AudioManager {
     }
   }
 
-  resume() {
+  async resume(): Promise<void> {
     this.ensureCtx();
-    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") {
+        try {
+          await this.ctx.resume();
+        } catch (e) {
+          console.warn("AudioContext resume failed:", e);
+        }
+      }
+      // iOS sometimes needs a tiny silent buffer played to truly unlock
+      if ((navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) && !this._iosUnlocked) {
+        this.playUnlockBuffer();
+        this._iosUnlocked = true;
+      }
+    }
   }
 
   pause() {
@@ -111,6 +124,8 @@ export class AudioManager {
     }
 
     this.preloadPromise = (async () => {
+      // Ensure context is resumed before loading
+      await this.resume();
       this.ensureCtx();
       if (!this.ctx) return;
 
@@ -956,4 +971,56 @@ export class AudioManager {
       this.playNoise(0.05, 0.4);
     }
   }
+
+  // iOS AudioContext unlock helper
+  private _iosUnlocked = false;
+  
+  private playUnlockBuffer() {
+    if (!this.ctx || !this.master) return;
+    const buffer = this.ctx.createBuffer(1, 1, 22050);
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.master);
+    source.start(0);
+  }
+
+  // Reset audio state between games without destroying context or buffers
+  resetForNewGame() {
+    // Resume context if iOS suspended it
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+    
+    // Stop all active sounds but preserve buffers
+    this.stopThruster();
+    this.stopFuelAlarm();
+    this.stopLevelMusic();
+    this.stopMissionSuccess();
+    this.stopTitleMusic();
+    try { this.stopWeatherAmbient(); } catch {}
+    
+    // Reset state flags
+    this.fuelAlarmOn = false;
+    this.crashToggle = false;
+    this.titleMuted = false;
+    
+    // Clear thruster tracking
+    (this as any)._thrusterLastSet = 0;
+    (this as any)._thrusterLastTarget = 0;
+    
+    // Clear references to allow new sources to be created
+    this.thrusterSource = null;
+    this.landingSoundSource = null;
+    this.landingSoundGain = null;
+  }
+}
+
+// Singleton instance - shared across entire app
+let globalAudioManager: AudioManager | null = null;
+
+export function getGlobalAudioManager(): AudioManager {
+  if (!globalAudioManager) {
+    globalAudioManager = new AudioManager();
+  }
+  return globalAudioManager;
 }

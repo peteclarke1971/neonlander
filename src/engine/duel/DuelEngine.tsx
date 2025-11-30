@@ -7,7 +7,7 @@ import { updateVolcanoVents, checkVolcanoCollision, renderVolcanoVents } from ".
 import { DuelHUD } from "@/ui/duel/DuelHUD";
 import { createCountdownIntro } from "@/components/game/intro/CountdownIntro";
 import { CountdownOverlay } from "@/components/game/intro/CountdownOverlay";
-import { AudioManager } from "@/components/game/AudioManager";
+import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -20,7 +20,7 @@ interface DuelEngineProps {
 export const DuelEngine: React.FC<DuelEngineProps> = ({ options, onMatchEnd }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameStateRef = useRef<DuelGameState | null>(null);
-  const audioRef = useRef(new AudioManager());
+  const audioRef = useRef(getGlobalAudioManager());
   const countdownRef = useRef(createCountdownIntro());
   const lastTimeRef = useRef(0);
 const animationFrameRef = useRef<number | null>(null);
