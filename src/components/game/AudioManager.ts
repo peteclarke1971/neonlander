@@ -23,6 +23,9 @@ export class AudioManager {
   private crash2Buffer?: AudioBuffer | null;
   private landingBuffer?: AudioBuffer | null;
   private fuelLoopBuffer?: AudioBuffer | null;
+  private introTickBuffer?: AudioBuffer | null;
+  private introGoBuffer?: AudioBuffer | null;
+  private introWarpBuffer?: AudioBuffer | null;
   private sfxGain?: GainNode;
   private fuelGain?: GainNode;
   private fuelSource?: AudioBufferSourceNode | null;
@@ -111,19 +114,30 @@ export class AudioManager {
       this.ensureCtx();
       if (!this.ctx) return;
 
-      // Load critical SFX in parallel
-      const [crash1, crash2, landing, fuel] = await Promise.all([
+      // Load ALL critical SFX in parallel for instant playback
+      const [crash1, crash2, landing, fuel, thruster, introTick, introGo, introWarp, missionSuccess] = await Promise.all([
         this.loadBuffer("/audio/crash1.mp3"),
         this.loadBuffer("/audio/crash2.mp3"),
         this.loadBuffer("/audio/landing_on_pad.mp3"),
-        this.loadBuffer("/audio/fuel_10_percent_loop.mp3")
+        this.loadBuffer("/audio/fuel_10_percent_loop.mp3"),
+        this.loadBuffer("/audio/thruster.mp3"),
+        this.loadBuffer("/audio/intro_tick.mp3"),
+        this.loadBuffer("/audio/intro_go.mp3"),
+        this.loadBuffer("/audio/intro_warp.mp3"),
+        this.loadBuffer("/audio/mission_success.mp3")
       ]);
 
       this.crash1Buffer = crash1;
       this.crash2Buffer = crash2;
       this.landingBuffer = landing;
       this.fuelLoopBuffer = fuel;
+      this.thrusterBuffer = thruster;
+      this.introTickBuffer = introTick;
+      this.introGoBuffer = introGo;
+      this.introWarpBuffer = introWarp;
+      this.missionSuccessBuffer = missionSuccess;
       this.isPreloaded = true;
+      console.log('🔊 All sound effects preloaded and ready');
     })();
 
     return this.preloadPromise;
@@ -199,6 +213,7 @@ export class AudioManager {
       hp.connect(this.thrusterGain);
       (this as any)._thrusterFilter = hp;
     }
+    // Use preloaded buffer if available, otherwise load on demand
     if (!this.thrusterBuffer) {
       this.thrusterBuffer = await this.loadBuffer(this.thrusterUrl);
     }
@@ -714,7 +729,10 @@ export class AudioManager {
       this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
     }
     
-    if (!this.missionSuccessBuffer) this.missionSuccessBuffer = await this.loadBuffer("/audio/mission_success.mp3");
+    // Use preloaded buffer if available
+    if (!this.missionSuccessBuffer) {
+      this.missionSuccessBuffer = await this.loadBuffer("/audio/mission_success.mp3");
+    }
     if (this.missionSuccessBuffer && this.musicGain) {
       // Stop any previous mission success music
       this.stopMissionSuccess();
@@ -794,49 +812,67 @@ export class AudioManager {
     this.playNoise(0.8, 0.6);
   }
 
-  // Intro countdown sound effects
+  // Intro countdown sound effects - uses preloaded buffers for instant playback
   async playIntroTick() {
     if (!this.ctx || !this.master) return;
     
-    try {
-      const buffer = await this.loadBuffer(this.introSounds.tick);
-      if (buffer) {
-        this.playOneShot(buffer, 0.6);
+    // Use preloaded buffer for instant playback
+    if (this.introTickBuffer) {
+      this.playOneShot(this.introTickBuffer, 0.6);
+    } else {
+      // Fallback: load on demand if not preloaded
+      try {
+        const buffer = await this.loadBuffer(this.introSounds.tick);
+        if (buffer) {
+          this.introTickBuffer = buffer;
+          this.playOneShot(buffer, 0.6);
+        }
+      } catch (error) {
+        console.warn('Failed to play intro tick sound:', error);
+        this.click();
       }
-    } catch (error) {
-      console.warn('Failed to play intro tick sound:', error);
-      // Fallback to synthesized tick
-      this.click();
     }
   }
 
   async playIntroGo() {
     if (!this.ctx || !this.master) return;
     
-    try {
-      const buffer = await this.loadBuffer(this.introSounds.go);
-      if (buffer) {
-        this.playOneShot(buffer, 0.8);
+    // Use preloaded buffer for instant playback
+    if (this.introGoBuffer) {
+      this.playOneShot(this.introGoBuffer, 0.8);
+    } else {
+      // Fallback: load on demand if not preloaded
+      try {
+        const buffer = await this.loadBuffer(this.introSounds.go);
+        if (buffer) {
+          this.introGoBuffer = buffer;
+          this.playOneShot(buffer, 0.8);
+        }
+      } catch (error) {
+        console.warn('Failed to play intro go sound:', error);
+        this.playNoise(0.25, 0.7);
       }
-    } catch (error) {
-      console.warn('Failed to play intro go sound:', error);
-      // Fallback to synthesized sound
-      this.playNoise(0.25, 0.7);
     }
   }
 
   async playIntroWarp() {
     if (!this.ctx || !this.master) return;
     
-    try {
-      const buffer = await this.loadBuffer(this.introSounds.warp);
-      if (buffer) {
-        this.playOneShot(buffer, 0.7);
+    // Use preloaded buffer for instant playback
+    if (this.introWarpBuffer) {
+      this.playOneShot(this.introWarpBuffer, 0.7);
+    } else {
+      // Fallback: load on demand if not preloaded
+      try {
+        const buffer = await this.loadBuffer(this.introSounds.warp);
+        if (buffer) {
+          this.introWarpBuffer = buffer;
+          this.playOneShot(buffer, 0.7);
+        }
+      } catch (error) {
+        console.warn('Failed to play intro warp sound:', error);
+        this.playNoise(0.5, 0.6);
       }
-    } catch (error) {
-      console.warn('Failed to play intro warp sound:', error);
-      // Fallback to shimmer effect
-      this.playNoise(0.5, 0.6);
     }
   }
 

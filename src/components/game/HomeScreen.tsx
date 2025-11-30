@@ -543,6 +543,8 @@ export const HomeScreen: React.FC<Props> = ({
     tryStart();
     const startOnInteract = () => {
       tryStart();
+      // Preload all sound effects on first user interaction for instant playback
+      audioRef.current.preloadSFX();
     };
     window.addEventListener("pointerdown", startOnInteract, {
       once: true
