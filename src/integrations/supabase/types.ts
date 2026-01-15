@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      audio_config: {
+        Row: {
+          audio_file_id: string | null
+          event_key: string
+          id: string
+          is_active: boolean | null
+          soundtrack: string
+          updated_at: string | null
+          volume: number | null
+        }
+        Insert: {
+          audio_file_id?: string | null
+          event_key: string
+          id?: string
+          is_active?: boolean | null
+          soundtrack?: string
+          updated_at?: string | null
+          volume?: number | null
+        }
+        Update: {
+          audio_file_id?: string | null
+          event_key?: string
+          id?: string
+          is_active?: boolean | null
+          soundtrack?: string
+          updated_at?: string | null
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_config_audio_file_id_fkey"
+            columns: ["audio_file_id"]
+            isOneToOne: false
+            referencedRelation: "audio_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audio_library: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          duration_seconds: number | null
+          file_path: string
+          filename: string
+          id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          duration_seconds?: number | null
+          file_path: string
+          filename: string
+          id?: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          duration_seconds?: number | null
+          file_path?: string
+          filename?: string
+          id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       ghost_records: {
         Row: {
           completion_time: number

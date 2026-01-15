@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ControlsSettings from "./pages/Controls";
+import AudioSettings from "./pages/AudioSettings";
 import Asteroids from "./pages/Asteroids";
 import AsteroidsColor from "./pages/AsteroidsColor";
 import AsteroidsRemix from "./pages/AsteroidsRemix";
@@ -100,6 +101,7 @@ const App = () => {
           <Route path="/survival" element={<Survival />} />
           <Route path="/cavern-fx-demo" element={<CavernFXDemo />} />
           <Route path="/settings/controls" element={<ControlsSettings />} />
+          <Route path="/settings/audio" element={<AudioSettings />} />
           <Route path="/seed-validation" element={<SeedValidation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

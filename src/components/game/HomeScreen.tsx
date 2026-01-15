@@ -698,6 +698,9 @@ export const HomeScreen: React.FC<Props> = ({
           {!isIOS && <a href="/settings/controls" className="inline-block">
               <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
             </a>}
+          <a href="/settings/audio" className="inline-block">
+            <Button variant="outline">Settings ▸ Audio</Button>
+          </a>
           {showFullscreenBtn && <Button ref={fullscreenBtnRef} variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle fullscreen mode (F11)" className="text-xs">
               {isFullscreen ? "Exit Full Screen" : "Full Screen"}
             </Button>}
@@ -756,6 +759,9 @@ export const HomeScreen: React.FC<Props> = ({
           <div className="flex gap-2 justify-center flex-wrap">
             {isIOS && <a href="/settings/controls" className="inline-block">
                 <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
+              </a>}
+            {isIOS && <a href="/settings/audio" className="inline-block">
+                <Button variant="outline">Settings ▸ Audio</Button>
               </a>}
             <button className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${nebulaFxEnabled ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"}`} onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}>
               🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
