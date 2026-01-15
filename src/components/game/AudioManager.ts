@@ -45,10 +45,17 @@ export class AudioManager {
   private isPreloaded = false;
   private preloadPromise?: Promise<void>;
 
-  // Level music playlist
+  // Level music playlist (20 tracks)
   private musicGain?: GainNode;
   private musicSource?: AudioBufferSourceNode | null;
-  private musicBuffers: (AudioBuffer | null)[] = [null, null, null, null, null, null, null, null];
+  private musicBuffers: (AudioBuffer | null)[] = new Array(20).fill(null);
+  
+  // Endless mode music (5 tracks, shuffled playlist)
+  private endlessBuffers: (AudioBuffer | null)[] = new Array(5).fill(null);
+  private endlessPlaylist: number[] = []; // Shuffled order of indices 0-4
+  private endlessCurrentIndex = 0;
+  private endlessSource?: AudioBufferSourceNode | null;
+  private endlessGain?: GainNode;
   
   // Mission success music
   private missionSuccessBuffer?: AudioBuffer | null;
@@ -111,7 +118,10 @@ export class AudioManager {
     this.introGoBuffer = null;
     this.introWarpBuffer = null;
     this.missionSuccessBuffer = null;
-    this.musicBuffers = [null, null, null, null, null, null, null, null];
+    this.musicBuffers = new Array(20).fill(null);
+    this.endlessBuffers = new Array(5).fill(null);
+    this.endlessPlaylist = [];
+    this.endlessCurrentIndex = 0;
     this.isPreloaded = false;
     this.preloadPromise = undefined;
     
@@ -794,18 +804,20 @@ export class AudioManager {
       this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
     }
     
-    // Get the level key (level1 through level8, cycling)
-    const levelNum = ((index % 8) + 8) % 8 + 1;
+    // Get the level key (level1 through level20, cycling)
+    const levelNum = ((index % 20) + 20) % 20 + 1;
     const levelKey = `level${levelNum}`;
     
     // Get URL from config with fallback
     let url = this.getConfigPath('music', levelKey) as string;
     if (!url) {
-      url = `/audio/level${levelNum}.mp3`;
+      // Fallback to cycling through original 8 tracks
+      const fallbackNum = ((index % 8) + 8) % 8 + 1;
+      url = `/audio/level${fallbackNum}.mp3`;
     }
     
     // Check if buffer needs to be loaded (or reloaded with new URL)
-    const bufferIndex = ((index % 8) + 8) % 8;
+    const bufferIndex = ((index % 20) + 20) % 20;
     if (!this.musicBuffers[bufferIndex]) {
       this.musicBuffers[bufferIndex] = await this.loadBuffer(url);
     }
@@ -827,6 +839,131 @@ export class AudioManager {
     src.connect(this.musicGain);
     src.start(0);
     this.musicSource = src;
+  }
+
+  // ========== Endless Mode Music ==========
+  private shuffleEndlessPlaylist() {
+    // Fisher-Yates shuffle of indices 0-4
+    this.endlessPlaylist = [0, 1, 2, 3, 4];
+    for (let i = this.endlessPlaylist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.endlessPlaylist[i], this.endlessPlaylist[j]] = [this.endlessPlaylist[j], this.endlessPlaylist[i]];
+    }
+    this.endlessCurrentIndex = 0;
+  }
+
+  private async ensureEndlessGain() {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    if (!this.endlessGain) {
+      this.endlessGain = this.ctx.createGain();
+      this.endlessGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
+      this.endlessGain.connect(this.master);
+    }
+  }
+
+  async playEndlessMusic() {
+    // Ensure config is loaded
+    await this.initializeConfig();
+    
+    this.ensureCtx();
+    if (!this.ctx) return;
+    await this.ensureEndlessGain();
+    
+    // Apply global mute state
+    if (this.endlessGain) {
+      this.endlessGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
+    }
+    
+    // Shuffle playlist on first call
+    if (this.endlessPlaylist.length === 0) {
+      this.shuffleEndlessPlaylist();
+    }
+    
+    // Play the first track in shuffled playlist
+    await this.playEndlessTrack(this.endlessPlaylist[this.endlessCurrentIndex]);
+  }
+
+  private async playEndlessTrack(trackIndex: number) {
+    this.ensureCtx();
+    if (!this.ctx || !this.endlessGain) return;
+    
+    // Get URL from config (endless1 through endless5)
+    const trackNum = trackIndex + 1;
+    const trackKey = `endless${trackNum}`;
+    let url = this.getConfigPath('music', trackKey) as string;
+    if (!url) {
+      url = `/audio/Endless_Music_${trackNum}.mp3`;
+    }
+    
+    // Load buffer if needed
+    if (!this.endlessBuffers[trackIndex]) {
+      this.endlessBuffers[trackIndex] = await this.loadBuffer(url);
+    }
+    
+    const buf = this.endlessBuffers[trackIndex];
+    if (!buf) {
+      console.warn(`Failed to load endless track ${trackNum}`);
+      // Try next track
+      this.advanceEndlessPlaylist();
+      return;
+    }
+    
+    const now = this.ctx.currentTime;
+    
+    // Stop previous endless source
+    if (this.endlessSource) {
+      try { this.endlessSource.stop(now); } catch {}
+      try { this.endlessSource.disconnect(); } catch {}
+      this.endlessSource = null;
+    }
+    
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = false; // Don't loop - chain to next track when ended
+    src.connect(this.endlessGain);
+    
+    // Set up ended listener to chain to next track
+    src.onended = () => {
+      if (this.endlessSource === src) {
+        this.advanceEndlessPlaylist();
+      }
+    };
+    
+    src.start(0);
+    this.endlessSource = src;
+  }
+
+  private advanceEndlessPlaylist() {
+    this.endlessCurrentIndex++;
+    
+    // If we've played all 5 tracks, reshuffle and start over
+    if (this.endlessCurrentIndex >= this.endlessPlaylist.length) {
+      this.shuffleEndlessPlaylist();
+    }
+    
+    // Play next track
+    this.playEndlessTrack(this.endlessPlaylist[this.endlessCurrentIndex]);
+  }
+
+  stopEndlessMusic() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    
+    if (this.endlessGain) {
+      this.endlessGain.gain.cancelScheduledValues(now);
+      this.endlessGain.gain.linearRampToValueAtTime(0, now + 0.1);
+    }
+    
+    if (this.endlessSource) {
+      try { this.endlessSource.stop(now + 0.12); } catch {}
+      try { this.endlessSource.disconnect(); } catch {}
+      this.endlessSource = null;
+    }
+    
+    // Reset playlist state
+    this.endlessPlaylist = [];
+    this.endlessCurrentIndex = 0;
   }
 
   async playLevelTrackForLevel(level: number) {
@@ -945,6 +1082,7 @@ export class AudioManager {
     this.stopThruster();
     this.stopFuelAlarm();
     this.stopLevelMusic();
+    this.stopEndlessMusic();
     this.stopMissionSuccess();
   }
 

@@ -469,10 +469,10 @@ export const SurvivalEngine: React.FC<Props> = ({
     let clearanceEMA = 220;
     let prevTargetZoom = 1.0;
     
-    // Reset audio for new game and start level music
+    // Reset audio for new game and start endless mode music (shuffled playlist of 5 tracks)
     try { audio.current.resetForNewGame(); } catch {}
     try { audio.current.preloadSFX(); } catch {}
-    audio.current.playLevelTrackForLevel(0);
+    audio.current.playEndlessMusic();
     
     // Physics constants matching main game (EASY MODE)
     const GRAVITY = 0.02 * 0.75; // 0.015

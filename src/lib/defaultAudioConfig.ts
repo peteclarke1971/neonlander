@@ -18,6 +18,7 @@ export interface AudioEventConfig {
 
 export interface MusicConfig {
   title: AudioEventConfig;
+  // 20 level tracks (cycle through these for Fixed, Classic, Medley modes)
   level1: AudioEventConfig;
   level2: AudioEventConfig;
   level3: AudioEventConfig;
@@ -26,6 +27,24 @@ export interface MusicConfig {
   level6: AudioEventConfig;
   level7: AudioEventConfig;
   level8: AudioEventConfig;
+  level9: AudioEventConfig;
+  level10: AudioEventConfig;
+  level11: AudioEventConfig;
+  level12: AudioEventConfig;
+  level13: AudioEventConfig;
+  level14: AudioEventConfig;
+  level15: AudioEventConfig;
+  level16: AudioEventConfig;
+  level17: AudioEventConfig;
+  level18: AudioEventConfig;
+  level19: AudioEventConfig;
+  level20: AudioEventConfig;
+  // 5 Endless mode tracks (shuffled playlist)
+  endless1: AudioEventConfig;
+  endless2: AudioEventConfig;
+  endless3: AudioEventConfig;
+  endless4: AudioEventConfig;
+  endless5: AudioEventConfig;
   missionSuccess: AudioEventConfig;
   missionFail: AudioEventConfig;
   highScore: AudioEventConfig;
@@ -71,6 +90,7 @@ export type AudioEventKey = MusicEventKey | SfxEventKey;
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   music: {
     title: { path: '/audio/title.mp3', volume: 0.5 },
+    // 20 level tracks - levels 9-20 fallback to cycling through 1-8
     level1: { path: '/audio/level1.mp3', volume: 0.5 },
     level2: { path: '/audio/level2.mp3', volume: 0.5 },
     level3: { path: '/audio/level3.mp3', volume: 0.5 },
@@ -79,6 +99,24 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     level6: { path: '/audio/level6.mp3', volume: 0.5 },
     level7: { path: '/audio/level7.mp3', volume: 0.5 },
     level8: { path: '/audio/level8.mp3', volume: 0.5 },
+    level9: { path: '/audio/level1.mp3', volume: 0.5 },
+    level10: { path: '/audio/level2.mp3', volume: 0.5 },
+    level11: { path: '/audio/level3.mp3', volume: 0.5 },
+    level12: { path: '/audio/level4.mp3', volume: 0.5 },
+    level13: { path: '/audio/level5.mp3', volume: 0.5 },
+    level14: { path: '/audio/level6.mp3', volume: 0.5 },
+    level15: { path: '/audio/level7.mp3', volume: 0.5 },
+    level16: { path: '/audio/level8.mp3', volume: 0.5 },
+    level17: { path: '/audio/level1.mp3', volume: 0.5 },
+    level18: { path: '/audio/level2.mp3', volume: 0.5 },
+    level19: { path: '/audio/level3.mp3', volume: 0.5 },
+    level20: { path: '/audio/level4.mp3', volume: 0.5 },
+    // 5 Endless mode tracks - assign unique tracks for survival/endless mode
+    endless1: { path: '/audio/Endless_Music_1.mp3', volume: 0.5 },
+    endless2: { path: '/audio/Endless_Music_2.mp3', volume: 0.5 },
+    endless3: { path: '/audio/Endless_Music_3.mp3', volume: 0.5 },
+    endless4: { path: '/audio/Endless_Music_4.mp3', volume: 0.5 },
+    endless5: { path: '/audio/Endless_Music_5.mp3', volume: 0.5 },
     missionSuccess: { path: '/audio/mission_success.mp3', volume: 0.5 },
     missionFail: { path: null, volume: 0.5 },
     highScore: { path: null, volume: 0.5 },
@@ -112,8 +150,9 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
  * Human-readable labels for audio events
  */
 export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
-  // Music
+  // Music - Title & Menus
   title: 'Title Screen',
+  // Music - Level Tracks (1-20)
   level1: 'Level 1',
   level2: 'Level 2',
   level3: 'Level 3',
@@ -122,6 +161,25 @@ export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
   level6: 'Level 6',
   level7: 'Level 7',
   level8: 'Level 8',
+  level9: 'Level 9',
+  level10: 'Level 10',
+  level11: 'Level 11',
+  level12: 'Level 12',
+  level13: 'Level 13',
+  level14: 'Level 14',
+  level15: 'Level 15',
+  level16: 'Level 16',
+  level17: 'Level 17',
+  level18: 'Level 18',
+  level19: 'Level 19',
+  level20: 'Level 20',
+  // Music - Endless Mode
+  endless1: 'Endless 1',
+  endless2: 'Endless 2',
+  endless3: 'Endless 3',
+  endless4: 'Endless 4',
+  endless5: 'Endless 5',
+  // Music - Game Events
   missionSuccess: 'Mission Success',
   missionFail: 'Mission Fail',
   highScore: 'High Score',
@@ -153,8 +211,12 @@ export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
  * Lists of keys for iteration
  */
 export const MUSIC_EVENT_KEYS: MusicEventKey[] = [
-  'title', 'level1', 'level2', 'level3', 'level4', 
-  'level5', 'level6', 'level7', 'level8', 
+  'title', 
+  'level1', 'level2', 'level3', 'level4', 'level5', 
+  'level6', 'level7', 'level8', 'level9', 'level10',
+  'level11', 'level12', 'level13', 'level14', 'level15',
+  'level16', 'level17', 'level18', 'level19', 'level20',
+  'endless1', 'endless2', 'endless3', 'endless4', 'endless5',
   'missionSuccess', 'missionFail', 'highScore'
 ];
 
