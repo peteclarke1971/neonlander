@@ -1,6 +1,13 @@
+import { audioConfigService } from '@/lib/audioConfigService';
+import type { AudioConfig } from '@/lib/defaultAudioConfig';
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master?: GainNode;
+
+  // Audio configuration (loaded once at start)
+  private audioConfig: AudioConfig | null = null;
+  private configInitPromise: Promise<void> | null = null;
 
   // Global music mute state (persistent across all modes)
   private musicGloballyMuted = false;
@@ -10,13 +17,11 @@ export class AudioManager {
   private titleSource?: AudioBufferSourceNode | null;
   private titleBuffer?: AudioBuffer | null;
   private titleMuted = false;
-  private readonly titleUrl = "/audio/title.mp3";
 
   // Thruster sample loop
   private thrusterGain?: GainNode;
   private thrusterSource?: AudioBufferSourceNode | null;
   private thrusterBuffer?: AudioBuffer | null;
-  private readonly thrusterUrl = "/audio/thruster.mp3";
 
   // SFX buffers and state
   private crash1Buffer?: AudioBuffer | null;
@@ -40,18 +45,10 @@ export class AudioManager {
   private isPreloaded = false;
   private preloadPromise?: Promise<void>;
 
-  // Intro sound effect sources - will be loaded on demand
-  private introSounds = {
-    tick: '/audio/intro_tick.mp3',
-    go: '/audio/intro_go.mp3', 
-    warp: '/audio/intro_warp.mp3'
-  };
-
   // Level music playlist
   private musicGain?: GainNode;
   private musicSource?: AudioBufferSourceNode | null;
   private musicBuffers: (AudioBuffer | null)[] = [null, null, null, null, null, null, null, null];
-  private readonly musicUrls = ["/audio/level1.mp3","/audio/level2.mp3","/audio/level3.mp3","/audio/level4.mp3","/audio/level5.mp3","/audio/level6.mp3","/audio/level7.mp3","/audio/level8.mp3"];
   
   // Mission success music
   private missionSuccessBuffer?: AudioBuffer | null;
@@ -70,6 +67,87 @@ export class AudioManager {
       this.musicGloballyMuted = stored ? JSON.parse(stored) : false;
     } catch {
       this.musicGloballyMuted = false;
+    }
+
+    // Listen for soundtrack changes to reload config
+    window.addEventListener('soundtrackChanged', () => {
+      this.handleSoundtrackChange();
+    });
+  }
+
+  /**
+   * Initialize audio configuration from cloud/defaults
+   * Call once at game start to avoid per-level DB calls
+   */
+  async initializeConfig(): Promise<void> {
+    if (this.audioConfig) return;
+    if (this.configInitPromise) return this.configInitPromise;
+
+    this.configInitPromise = (async () => {
+      this.audioConfig = await audioConfigService.loadConfig();
+      console.log('🔊 Audio configuration loaded');
+    })();
+
+    return this.configInitPromise;
+  }
+
+  /**
+   * Handle soundtrack change - clear buffers and reload config
+   */
+  private async handleSoundtrackChange() {
+    console.log('🔊 Soundtrack changed, reloading audio config...');
+    
+    // Stop all playing audio
+    this.stopAllAudio();
+    
+    // Clear all preloaded buffers
+    this.titleBuffer = null;
+    this.thrusterBuffer = null;
+    this.crash1Buffer = null;
+    this.crash2Buffer = null;
+    this.landingBuffer = null;
+    this.fuelLoopBuffer = null;
+    this.introTickBuffer = null;
+    this.introGoBuffer = null;
+    this.introWarpBuffer = null;
+    this.missionSuccessBuffer = null;
+    this.musicBuffers = [null, null, null, null, null, null, null, null];
+    this.isPreloaded = false;
+    this.preloadPromise = undefined;
+    
+    // Reload config
+    this.audioConfig = null;
+    this.configInitPromise = null;
+    await this.initializeConfig();
+  }
+
+  /**
+   * Get a path from config with fallback
+   */
+  private getConfigPath(category: 'music' | 'sfx', key: string): string | string[] | null {
+    if (!this.audioConfig) return null;
+    
+    if (category === 'music') {
+      const config = (this.audioConfig.music as any)[key];
+      return config?.path ?? null;
+    } else {
+      const config = (this.audioConfig.sfx as any)[key];
+      return config?.path ?? null;
+    }
+  }
+
+  /**
+   * Get volume from config with fallback
+   */
+  private getConfigVolume(category: 'music' | 'sfx', key: string): number {
+    if (!this.audioConfig) return 1.0;
+    
+    if (category === 'music') {
+      const config = (this.audioConfig.music as any)[key];
+      return config?.volume ?? 0.5;
+    } else {
+      const config = (this.audioConfig.sfx as any)[key];
+      return config?.volume ?? 1.0;
     }
   }
 
@@ -117,29 +195,44 @@ export class AudioManager {
     }
   }
 
-  // Preload critical SFX to eliminate lag
+  // Preload critical SFX to eliminate lag - uses config paths
   async preloadSFX(): Promise<void> {
     if (this.isPreloaded || this.preloadPromise) {
       return this.preloadPromise;
     }
 
     this.preloadPromise = (async () => {
+      // Ensure config is loaded first
+      await this.initializeConfig();
+      
       // Ensure context is resumed before loading
       await this.resume();
       this.ensureCtx();
       if (!this.ctx) return;
 
+      // Get paths from config with fallbacks
+      const crashPath = this.getConfigPath('sfx', 'crash');
+      const crash1Url = Array.isArray(crashPath) ? crashPath[0] : (crashPath || '/audio/crash1.mp3');
+      const crash2Url = Array.isArray(crashPath) && crashPath[1] ? crashPath[1] : '/audio/crash2.mp3';
+      const landingUrl = this.getConfigPath('sfx', 'landing') as string || '/audio/landing_on_pad.mp3';
+      const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
+      const thrusterUrl = this.getConfigPath('sfx', 'thruster') as string || '/audio/thruster.mp3';
+      const tickUrl = this.getConfigPath('sfx', 'introTick') as string || '/audio/intro_tick.mp3';
+      const goUrl = this.getConfigPath('sfx', 'introGo') as string || '/audio/intro_go.mp3';
+      const warpUrl = this.getConfigPath('sfx', 'introWarp') as string || '/audio/intro_warp.mp3';
+      const successUrl = this.getConfigPath('music', 'missionSuccess') as string || '/audio/mission_success.mp3';
+
       // Load ALL critical SFX in parallel for instant playback
       const [crash1, crash2, landing, fuel, thruster, introTick, introGo, introWarp, missionSuccess] = await Promise.all([
-        this.loadBuffer("/audio/crash1.mp3"),
-        this.loadBuffer("/audio/crash2.mp3"),
-        this.loadBuffer("/audio/landing_on_pad.mp3"),
-        this.loadBuffer("/audio/fuel_10_percent_loop.mp3"),
-        this.loadBuffer("/audio/thruster.mp3"),
-        this.loadBuffer("/audio/intro_tick.mp3"),
-        this.loadBuffer("/audio/intro_go.mp3"),
-        this.loadBuffer("/audio/intro_warp.mp3"),
-        this.loadBuffer("/audio/mission_success.mp3")
+        this.loadBuffer(crash1Url),
+        this.loadBuffer(crash2Url),
+        this.loadBuffer(landingUrl),
+        this.loadBuffer(fuelUrl),
+        this.loadBuffer(thrusterUrl),
+        this.loadBuffer(tickUrl),
+        this.loadBuffer(goUrl),
+        this.loadBuffer(warpUrl),
+        this.loadBuffer(successUrl)
       ]);
 
       this.crash1Buffer = crash1;
@@ -171,15 +264,22 @@ export class AudioManager {
 
   // ========== Title Music API ==========
   async playTitleMusic() {
+    // Ensure config is loaded
+    await this.initializeConfig();
+    
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
+    
+    const volume = this.getConfigVolume('music', 'title');
+    
     if (!this.titleGain) {
       this.titleGain = this.ctx.createGain();
-      this.titleGain.gain.value = (this.titleMuted || this.musicGloballyMuted) ? 0 : 0.5;
+      this.titleGain.gain.value = (this.titleMuted || this.musicGloballyMuted) ? 0 : volume;
       this.titleGain.connect(this.master);
     }
     if (!this.titleBuffer) {
-      this.titleBuffer = await this.loadBuffer(this.titleUrl);
+      const titleUrl = this.getConfigPath('music', 'title') as string || '/audio/title.mp3';
+      this.titleBuffer = await this.loadBuffer(titleUrl);
     }
     if (this.titleBuffer && !this.titleSource) {
       this.titleSource = this.createLoopingSource(this.titleBuffer, this.titleGain!);
@@ -191,7 +291,8 @@ export class AudioManager {
     this.titleMuted = muted;
     if (!this.ctx || !this.titleGain) return;
     const now = this.ctx.currentTime;
-    const target = muted ? 0 : 0.5;
+    const volume = this.getConfigVolume('music', 'title');
+    const target = muted ? 0 : volume;
     this.titleGain.gain.cancelScheduledValues(now);
     this.titleGain.gain.linearRampToValueAtTime(target, now + 0.08);
   }
@@ -230,7 +331,8 @@ export class AudioManager {
     }
     // Use preloaded buffer if available, otherwise load on demand
     if (!this.thrusterBuffer) {
-      this.thrusterBuffer = await this.loadBuffer(this.thrusterUrl);
+      const thrusterUrl = this.getConfigPath('sfx', 'thruster') as string || '/audio/thruster.mp3';
+      this.thrusterBuffer = await this.loadBuffer(thrusterUrl);
     }
     if (this.thrusterBuffer && !this.thrusterSource) {
       this.thrusterSource = this.createLoopingSource(this.thrusterBuffer, (this as any)._thrusterFilter);
@@ -411,16 +513,20 @@ export class AudioManager {
     
     // Now plays crash sounds for successful landing
     if (!this.crash1Buffer && !this.crash2Buffer) {
-      // Load buffers if not available
+      // Load buffers if not available - use config paths
+      const crashPath = this.getConfigPath('sfx', 'crash');
+      const crash1Url = Array.isArray(crashPath) ? crashPath[0] : (crashPath || '/audio/crash1.mp3');
+      const crash2Url = Array.isArray(crashPath) && crashPath[1] ? crashPath[1] : '/audio/crash2.mp3';
       await Promise.all([
-        this.loadBuffer("/audio/crash1.mp3").then(buf => this.crash1Buffer = buf),
-        this.loadBuffer("/audio/crash2.mp3").then(buf => this.crash2Buffer = buf)
+        this.loadBuffer(crash1Url).then(buf => this.crash1Buffer = buf),
+        this.loadBuffer(crash2Url).then(buf => this.crash2Buffer = buf)
       ]);
     }
     
     const useFirst = (this.crashToggle = !this.crashToggle);
     const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
-    if (buf) this.playOneShot(buf, 0.7); else this.playNoise(0.2, 0.4);
+    const volume = this.getConfigVolume('sfx', 'crash');
+    if (buf) this.playOneShot(buf, volume); else this.playNoise(0.2, 0.4);
   }
 
   async landingCrash() {
@@ -441,7 +547,8 @@ export class AudioManager {
     
     // Use fuel loop sound for successful landings
     if (!this.fuelLoopBuffer) {
-      this.fuelLoopBuffer = await this.loadBuffer("/audio/fuel_10_percent_loop.mp3");
+      const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
+      this.fuelLoopBuffer = await this.loadBuffer(fuelUrl);
     }
     
     if (this.fuelLoopBuffer) {
@@ -524,7 +631,8 @@ export class AudioManager {
     const gain = this.ctx.createGain();
     osc.type = "square";
     osc.frequency.value = 880;
-    gain.gain.value = 0.1;
+    const volume = this.getConfigVolume('sfx', 'click');
+    gain.gain.value = volume;
     osc.connect(gain);
     gain.connect(this.master);
     osc.start();
@@ -559,7 +667,8 @@ export class AudioManager {
     
     osc.type = "sine";
     osc.frequency.value = 1200;
-    gain.gain.value = 0.2;
+    const volume = this.getConfigVolume('sfx', 'shieldBreak');
+    gain.gain.value = volume;
     
     osc.connect(gain);
     gain.connect(this.master);
@@ -606,9 +715,10 @@ export class AudioManager {
     filter.frequency.setValueAtTime(2000, now);
     filter.frequency.exponentialRampToValueAtTime(400, now + duration);
     
+    const volume = this.getConfigVolume('sfx', 'abort');
     // Quick fade in and gradual fade out
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.4, now + 0.05);
+    gain.gain.linearRampToValueAtTime(volume, now + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
     
     src.start(now);
@@ -626,9 +736,11 @@ export class AudioManager {
     }
     if (!this.fuelLoopBuffer && this.isPreloaded) {
       // Should be preloaded, but fallback just in case
-      this.fuelLoopBuffer = await this.loadBuffer("/audio/fuel_10_percent_loop.mp3");
+      const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
+      this.fuelLoopBuffer = await this.loadBuffer(fuelUrl);
     } else if (!this.fuelLoopBuffer) {
-      this.fuelLoopBuffer = await this.loadBuffer("/audio/fuel_10_percent_loop.mp3");
+      const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
+      this.fuelLoopBuffer = await this.loadBuffer(fuelUrl);
     }
     if (!this.fuelLoopBuffer) return;
     this.fuelSource = this.ctx.createBufferSource();
@@ -637,8 +749,9 @@ export class AudioManager {
     this.fuelSource.connect(this.fuelGain);
     this.fuelSource.start(0);
     const now = this.ctx.currentTime;
+    const volume = this.getConfigVolume('sfx', 'fuelAlarm');
     this.fuelGain.gain.cancelScheduledValues(now);
-    this.fuelGain.gain.linearRampToValueAtTime(0.6, now + 0.2);
+    this.fuelGain.gain.linearRampToValueAtTime(volume, now + 0.2);
     this.fuelAlarmOn = true;
   }
 
@@ -657,7 +770,7 @@ export class AudioManager {
     this.fuelAlarmOn = false;
   }
 
-  // ===== Level music (simple playlist) =====
+  // ===== Level music (uses config paths) =====
   private async ensureMusicGain() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
@@ -669,6 +782,9 @@ export class AudioManager {
   }
 
   async playLevelTrackByIndex(index: number) {
+    // Ensure config is loaded
+    await this.initializeConfig();
+    
     this.ensureCtx();
     if (!this.ctx) return;
     await this.ensureMusicGain();
@@ -678,17 +794,33 @@ export class AudioManager {
       this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
     }
     
-    const i = ((index % this.musicUrls.length) + this.musicUrls.length) % this.musicUrls.length;
-    if (!this.musicBuffers[i]) this.musicBuffers[i] = await this.loadBuffer(this.musicUrls[i]);
-    const buf = this.musicBuffers[i];
+    // Get the level key (level1 through level8, cycling)
+    const levelNum = ((index % 8) + 8) % 8 + 1;
+    const levelKey = `level${levelNum}`;
+    
+    // Get URL from config with fallback
+    let url = this.getConfigPath('music', levelKey) as string;
+    if (!url) {
+      url = `/audio/level${levelNum}.mp3`;
+    }
+    
+    // Check if buffer needs to be loaded (or reloaded with new URL)
+    const bufferIndex = ((index % 8) + 8) % 8;
+    if (!this.musicBuffers[bufferIndex]) {
+      this.musicBuffers[bufferIndex] = await this.loadBuffer(url);
+    }
+    
+    const buf = this.musicBuffers[bufferIndex];
     if (!buf || !this.musicGain) return;
     const now = this.ctx.currentTime;
+    
     // Stop previous
     if (this.musicSource) {
       try { this.musicSource.stop(now); } catch {}
       try { this.musicSource.disconnect(); } catch {}
       this.musicSource = null;
     }
+    
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
@@ -735,6 +867,9 @@ export class AudioManager {
   private missionSuccessSource?: AudioBufferSourceNode | null;
 
   async playMissionSuccess() {
+    // Ensure config is loaded
+    await this.initializeConfig();
+    
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     await this.ensureMusicGain();
@@ -744,9 +879,10 @@ export class AudioManager {
       this.musicGain.gain.value = this.musicGloballyMuted ? 0 : 0.5;
     }
     
-    // Use preloaded buffer if available
+    // Use preloaded buffer if available, otherwise load from config
     if (!this.missionSuccessBuffer) {
-      this.missionSuccessBuffer = await this.loadBuffer("/audio/mission_success.mp3");
+      const url = this.getConfigPath('music', 'missionSuccess') as string || '/audio/mission_success.mp3';
+      this.missionSuccessBuffer = await this.loadBuffer(url);
     }
     if (this.missionSuccessBuffer && this.musicGain) {
       // Stop any previous mission success music
@@ -782,11 +918,13 @@ export class AudioManager {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     
+    const titleVolume = this.getConfigVolume('music', 'title');
+    
     // Title music
     if (this.titleGain) {
       this.titleGain.gain.cancelScheduledValues(now);
       this.titleGain.gain.setValueAtTime(this.titleGain.gain.value, now);
-      this.titleGain.gain.linearRampToValueAtTime(muted ? 0 : 0.5, now + 0.3);
+      this.titleGain.gain.linearRampToValueAtTime(muted ? 0 : titleVolume, now + 0.3);
     }
     
     // Level music
@@ -812,35 +950,41 @@ export class AudioManager {
 
   // ===== Collectibles audio =====
   junkPickup() {
-    this.playNoise(0.15, Math.random() < 0.5 ? 0.5 : 0.7);
+    const volume = this.getConfigVolume('sfx', 'junkPickup');
+    this.playNoise(0.15, volume);
   }
 
   junkSetComplete() {
     // Play a special success stinger for completing the set
-    this.playNoise(0.4, 0.8);
-    setTimeout(() => this.playNoise(0.4, 0.8), 100);
-    setTimeout(() => this.playNoise(0.4, 0.8), 200);
+    const volume = this.getConfigVolume('sfx', 'junkSetComplete');
+    this.playNoise(0.4, volume);
+    setTimeout(() => this.playNoise(0.4, volume), 100);
+    setTimeout(() => this.playNoise(0.4, volume), 200);
   }
 
   wormholeOpen() {
     // Play a mysterious portal opening sound
-    this.playNoise(0.8, 0.6);
+    const volume = this.getConfigVolume('sfx', 'wormholeOpen');
+    this.playNoise(0.8, volume);
   }
 
   // Intro countdown sound effects - uses preloaded buffers for instant playback
   async playIntroTick() {
     if (!this.ctx || !this.master) return;
     
+    const volume = this.getConfigVolume('sfx', 'introTick');
+    
     // Use preloaded buffer for instant playback
     if (this.introTickBuffer) {
-      this.playOneShot(this.introTickBuffer, 0.6);
+      this.playOneShot(this.introTickBuffer, volume);
     } else {
       // Fallback: load on demand if not preloaded
       try {
-        const buffer = await this.loadBuffer(this.introSounds.tick);
+        const url = this.getConfigPath('sfx', 'introTick') as string || '/audio/intro_tick.mp3';
+        const buffer = await this.loadBuffer(url);
         if (buffer) {
           this.introTickBuffer = buffer;
-          this.playOneShot(buffer, 0.6);
+          this.playOneShot(buffer, volume);
         }
       } catch (error) {
         console.warn('Failed to play intro tick sound:', error);
@@ -852,16 +996,19 @@ export class AudioManager {
   async playIntroGo() {
     if (!this.ctx || !this.master) return;
     
+    const volume = this.getConfigVolume('sfx', 'introGo');
+    
     // Use preloaded buffer for instant playback
     if (this.introGoBuffer) {
-      this.playOneShot(this.introGoBuffer, 0.8);
+      this.playOneShot(this.introGoBuffer, volume);
     } else {
       // Fallback: load on demand if not preloaded
       try {
-        const buffer = await this.loadBuffer(this.introSounds.go);
+        const url = this.getConfigPath('sfx', 'introGo') as string || '/audio/intro_go.mp3';
+        const buffer = await this.loadBuffer(url);
         if (buffer) {
           this.introGoBuffer = buffer;
-          this.playOneShot(buffer, 0.8);
+          this.playOneShot(buffer, volume);
         }
       } catch (error) {
         console.warn('Failed to play intro go sound:', error);
@@ -873,16 +1020,19 @@ export class AudioManager {
   async playIntroWarp() {
     if (!this.ctx || !this.master) return;
     
+    const volume = this.getConfigVolume('sfx', 'introWarp');
+    
     // Use preloaded buffer for instant playback
     if (this.introWarpBuffer) {
-      this.playOneShot(this.introWarpBuffer, 0.7);
+      this.playOneShot(this.introWarpBuffer, volume);
     } else {
       // Fallback: load on demand if not preloaded
       try {
-        const buffer = await this.loadBuffer(this.introSounds.warp);
+        const url = this.getConfigPath('sfx', 'introWarp') as string || '/audio/intro_warp.mp3';
+        const buffer = await this.loadBuffer(url);
         if (buffer) {
           this.introWarpBuffer = buffer;
-          this.playOneShot(buffer, 0.7);
+          this.playOneShot(buffer, volume);
         }
       } catch (error) {
         console.warn('Failed to play intro warp sound:', error);
@@ -893,7 +1043,8 @@ export class AudioManager {
 
   wormholeEnter() {
     // Play a warping sound effect
-    this.playNoise(1.2, 0.7);
+    const volume = this.getConfigVolume('sfx', 'wormholeEnter');
+    this.playNoise(1.2, volume);
   }
 
   // Weather audio
@@ -931,17 +1082,20 @@ export class AudioManager {
   }
   
   playLightningCrack() {
-    this.playNoise(0.1, 0.9);
+    const volume = this.getConfigVolume('sfx', 'lightningCrack');
+    this.playNoise(0.1, volume);
   }
 
   jellyfishBurst() {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
+    const volume = this.getConfigVolume('sfx', 'jellyfishBurst');
+    
     // Electric burst sound - use existing crash sound but pitched higher
     if (this.crash1Buffer) {
       const gain = this.ctx.createGain();
-      gain.gain.value = 0.3;
+      gain.gain.value = volume;
       const src = this.ctx.createBufferSource();
       src.buffer = this.crash1Buffer;
       src.playbackRate.value = 1.8; // Higher pitch for electric feel
@@ -949,7 +1103,7 @@ export class AudioManager {
       gain.connect(this.master);
       src.start(0);
     } else {
-      this.playNoise(0.08, 0.3);
+      this.playNoise(0.08, volume);
     }
   }
 
@@ -957,10 +1111,12 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
+    const volume = this.getConfigVolume('sfx', 'jellyfishShock');
+    
     // Electric shock on lander - short zap
     if (this.crash2Buffer) {
       const gain = this.ctx.createGain();
-      gain.gain.value = 0.4;
+      gain.gain.value = volume;
       const src = this.ctx.createBufferSource();
       src.buffer = this.crash2Buffer;
       src.playbackRate.value = 2.2; // Very high pitch
@@ -968,7 +1124,7 @@ export class AudioManager {
       gain.connect(this.master);
       src.start(0);
     } else {
-      this.playNoise(0.05, 0.4);
+      this.playNoise(0.05, volume);
     }
   }
 
