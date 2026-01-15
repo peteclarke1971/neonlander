@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from './logger';
 import { 
   DEFAULT_AUDIO_CONFIG, 
   type AudioConfig, 
@@ -132,7 +133,7 @@ class AudioConfigService {
         .eq('is_active', true);
 
       if (error || !data || data.length === 0) {
-        console.log('Using default audio config (no cloud config found)');
+        logger.debug('Using default audio config (no cloud config found)');
         this.config = structuredClone(DEFAULT_AUDIO_CONFIG);
         this.configLoaded = true;
         return this.config;
@@ -141,10 +142,10 @@ class AudioConfigService {
       // Merge cloud config with defaults
       this.config = this.mergeWithDefaults(data as AudioConfigRow[]);
       this.configLoaded = true;
-      console.log(`Loaded audio config for soundtrack: ${this.soundtrack}`);
+      logger.debug(`Loaded audio config for soundtrack: ${this.soundtrack}`);
       return this.config;
     } catch (err) {
-      console.warn('Failed to load audio config from cloud:', err);
+      logger.warn('Failed to load audio config from cloud:', err);
       this.config = structuredClone(DEFAULT_AUDIO_CONFIG);
       this.configLoaded = true;
       return this.config;
@@ -235,7 +236,7 @@ class AudioConfigService {
         .order('display_name', { ascending: true });
 
       if (error) {
-        console.warn('Failed to fetch audio library:', error);
+        logger.warn('Failed to fetch audio library:', error);
         return [];
       }
 
@@ -243,7 +244,7 @@ class AudioConfigService {
       this.audioLibrary = (data || []) as unknown as AudioLibraryRow[];
       return this.audioLibrary;
     } catch (err) {
-      console.warn('Failed to fetch audio library:', err);
+      logger.warn('Failed to fetch audio library:', err);
       return [];
     }
   }
@@ -277,7 +278,7 @@ class AudioConfigService {
         });
 
       if (error) {
-        console.error('Failed to save audio assignment:', error);
+        logger.error('Failed to save audio assignment:', error);
         return false;
       }
 
@@ -288,7 +289,7 @@ class AudioConfigService {
 
       return true;
     } catch (err) {
-      console.error('Failed to save audio assignment:', err);
+      logger.error('Failed to save audio assignment:', err);
       return false;
     }
   }
@@ -304,7 +305,7 @@ class AudioConfigService {
         .eq('soundtrack', this.soundtrack);
 
       if (error) {
-        console.error('Failed to clear assignments:', error);
+        logger.error('Failed to clear assignments:', error);
         return false;
       }
 
@@ -315,7 +316,7 @@ class AudioConfigService {
 
       return true;
     } catch (err) {
-      console.error('Failed to clear assignments:', err);
+      logger.error('Failed to clear assignments:', err);
       return false;
     }
   }

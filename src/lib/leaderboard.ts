@@ -1,12 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Difficulty, Mode } from "@/components/game/types";
-
-// Diagnostic: Check if Supabase client is properly initialized
-console.log('🔧 Leaderboard module loaded', {
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? '✓' : '❌',
-  supabaseKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? '✓' : '❌',
-  clientInitialized: !!supabase
-});
+import { logger } from "./logger";
 
 export type ScoreRow = {
   id?: string;
@@ -36,14 +30,15 @@ export async function submitScore(row: ScoreRow): Promise<{ ok: boolean; error?:
       });
 
     if (error) {
-      console.error('Error submitting score:', error);
+      logger.error('Error submitting score:', error);
       return { ok: false, error: error.message };
     }
 
     return { ok: true };
-  } catch (e: any) {
-    console.error('Error submitting score:', e);
-    return { ok: false, error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error submitting score:', err);
+    return { ok: false, error: err?.message || "Network error" };
   }
 }
 
@@ -63,14 +58,15 @@ export async function fetchTop(
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching scores:', error);
+      logger.error('Error fetching scores:', error);
       return { rows: [], error: error.message };
     }
 
     return { rows: (data || []) as ScoreRow[] };
-  } catch (e: any) {
-    console.error('Error fetching scores:', e);
-    return { rows: [], error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error fetching scores:', err);
+    return { rows: [], error: err?.message || "Network error" };
   }
 }
 
@@ -92,18 +88,23 @@ export async function fetchTopByDifficulty(
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching scores:', error);
+      logger.error('Error fetching scores:', error);
       return { rows: [], error: error.message };
     }
 
     return { rows: (data || []) as ScoreRow[] };
-  } catch (e: any) {
-    console.error('Error fetching scores:', e);
-    return { rows: [], error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error fetching scores:', err);
+    return { rows: [], error: err?.message || "Network error" };
   }
 }
 
 // ============= Global Ghost System =============
+
+// Use a flexible type for ghost data to accommodate various recording formats
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type GhostData = any;
 
 export interface GlobalGhostRecord {
   id?: string;
@@ -111,7 +112,7 @@ export interface GlobalGhostRecord {
   difficulty: Difficulty;
   mode: Mode;
   completion_time: number;
-  ghost_data: any; // GhostRecording
+  ghost_data: GhostData; // eslint-disable-line @typescript-eslint/no-explicit-any
   initials: string;
   created_at?: string;
 }
@@ -126,7 +127,7 @@ export async function checkGlobalRecord(
   completionTime: number
 ): Promise<{ isRecord: boolean; currentRecord: GlobalGhostRecord | null; error?: string }> {
   try {
-    console.log('🔍 Checking global record...', { level, difficulty, mode, completionTime });
+    logger.debug('Checking global record...', { level, difficulty, mode, completionTime });
     
     const { data, error } = await supabase
       .from('ghost_records')
@@ -136,32 +137,28 @@ export async function checkGlobalRecord(
       .eq('mode', mode)
       .single();
 
-    console.log('🔍 Supabase query result:', { data, error, errorCode: error?.code });
+    logger.debug('Query result:', { hasData: !!data, errorCode: error?.code });
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('❌ Database error in checkGlobalRecord:', error);
+      logger.error('Database error in checkGlobalRecord:', error);
       return { isRecord: false, currentRecord: null, error: error.message };
     }
 
     // No existing record = new record!
     if (!data) {
-      console.log('✨ No existing record found - this will be a new world record!');
+      logger.debug('No existing record found - new world record');
       return { isRecord: true, currentRecord: null };
     }
 
     // Check if new time is faster
     const isRecord = completionTime < data.completion_time;
-    console.log('📊 Existing record comparison:', {
-      existingTime: data.completion_time,
-      newTime: completionTime,
-      isRecord,
-      existingInitials: data.initials
-    });
+    logger.debug('Record comparison:', { existingTime: data.completion_time, newTime: completionTime, isRecord });
     
     return { isRecord, currentRecord: data as GlobalGhostRecord };
-  } catch (e: any) {
-    console.error('💥 Exception in checkGlobalRecord:', e);
-    return { isRecord: false, currentRecord: null, error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Exception in checkGlobalRecord:', err);
+    return { isRecord: false, currentRecord: null, error: err?.message || "Network error" };
   }
 }
 
@@ -170,51 +167,39 @@ export async function checkGlobalRecord(
  */
 export async function submitGlobalGhost(
   level: number,
-  difficulty: Difficulty,
-  mode: Mode,
+  difficulty: Difficulty | string,
+  mode: Mode | string,
   completionTime: number,
-  ghostData: any,
+  ghostData: GhostData,
   initials: string = ""
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    console.log('📤 Submitting global ghost...', {
-      level,
-      difficulty,
-      mode,
-      completionTime,
-      initials: initials || "(none)",
-      dataSize: JSON.stringify(ghostData).length
-    });
+    logger.debug('Submitting global ghost...', { level, difficulty, mode, completionTime });
     
     const { error } = await supabase
       .from('ghost_records')
       .upsert({
         level,
-        difficulty,
-        mode,
+        difficulty: difficulty as string,
+        mode: mode as string,
         completion_time: completionTime,
-        ghost_data: ghostData,
+        ghost_data: ghostData as GhostData,
         initials: initials ? initials.toUpperCase().slice(0, 3) : null
       }, {
         onConflict: 'level,difficulty,mode'
       });
 
     if (error) {
-      console.error('❌ Database error in submitGlobalGhost:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      logger.error('Database error in submitGlobalGhost:', error);
       return { ok: false, error: error.message };
     }
 
-    console.log('✅ Global ghost submitted successfully!');
+    logger.debug('Global ghost submitted successfully');
     return { ok: true };
-  } catch (e: any) {
-    console.error('💥 Exception in submitGlobalGhost:', e);
-    return { ok: false, error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Exception in submitGlobalGhost:', err);
+    return { ok: false, error: err?.message || "Network error" };
   }
 }
 
@@ -227,7 +212,7 @@ export async function fetchGlobalGhost(
   mode: Mode
 ): Promise<{ record: GlobalGhostRecord | null; error?: string }> {
   try {
-    console.log('📥 Fetching global ghost:', { level, difficulty, mode });
+    logger.debug('Fetching global ghost:', { level, difficulty, mode });
     
     const { data, error } = await supabase
       .from('ghost_records')
@@ -239,22 +224,18 @@ export async function fetchGlobalGhost(
       .limit(1)
       .maybeSingle();
 
-    console.log('📦 Fetch result:', { 
-      hasData: !!data, 
-      hasGhostData: !!data?.ghost_data,
-      ghostDataType: typeof data?.ghost_data,
-      error: error?.message 
-    });
+    logger.debug('Fetch result:', { hasData: !!data, hasGhostData: !!data?.ghost_data });
 
     if (error) {
-      console.error('Error fetching global ghost:', error);
+      logger.error('Error fetching global ghost:', error);
       return { record: null, error: error.message };
     }
 
     return { record: data as GlobalGhostRecord | null };
-  } catch (e: any) {
-    console.error('Error fetching global ghost:', e);
-    return { record: null, error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error fetching global ghost:', err);
+    return { record: null, error: err?.message || "Network error" };
   }
 }
 
@@ -277,17 +258,18 @@ export async function submitTimeTrialScore(
         mode: 'timetrial' as Mode,
         level,
         completion_time: Math.round(completionTime)
-      } as any);
+      });
 
     if (error) {
-      console.error('Error submitting time trial score:', error);
+      logger.error('Error submitting time trial score:', error);
       return { ok: false, error: error.message };
     }
 
     return { ok: true };
-  } catch (e: any) {
-    console.error('Error submitting time trial score:', e);
-    return { ok: false, error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error submitting time trial score:', err);
+    return { ok: false, error: err?.message || "Network error" };
   }
 }
 
@@ -300,11 +282,9 @@ export async function fetchTimeTrialLeaderboard(
   limit = 10
 ): Promise<{ rows: ScoreRow[]; error?: string }> {
   try {
-    const query: any = supabase
+    const { data, error } = await supabase
       .from('scores')
-      .select('*');
-    
-    const { data, error } = await query
+      .select('*')
       .eq('mode', 'timetrial')
       .eq('level', level)
       .eq('difficulty', difficulty)
@@ -312,13 +292,14 @@ export async function fetchTimeTrialLeaderboard(
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching time trial leaderboard:', error);
+      logger.error('Error fetching time trial leaderboard:', error);
       return { rows: [], error: error.message };
     }
 
     return { rows: (data as ScoreRow[]) || [] };
-  } catch (e: any) {
-    console.error('Error fetching time trial leaderboard:', e);
-    return { rows: [], error: e?.message || "Network error" };
+  } catch (e: unknown) {
+    const err = e as Error;
+    logger.error('Error fetching time trial leaderboard:', err);
+    return { rows: [], error: err?.message || "Network error" };
   }
 }
