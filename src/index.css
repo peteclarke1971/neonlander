@@ -191,8 +191,8 @@ All colors MUST be HSL.
   .player-menu-btn {
     border: 2px solid hsl(var(--neon));
     border-radius: 8px;
-    padding: 14px 32px;
-    font-size: 1.1rem;
+    padding: 10px 24px;
+    font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -205,6 +205,27 @@ All colors MUST be HSL.
     transition: all 0.2s ease;
     cursor: pointer;
     outline: none;
+  }
+
+  /* Larger buttons on bigger screens */
+  @media (min-width: 640px) {
+    .player-menu-btn {
+      padding: 14px 32px;
+      font-size: 1.1rem;
+    }
+  }
+
+  /* Extra compact for landscape mobile */
+  @media (max-height: 450px) and (orientation: landscape) {
+    .player-menu-btn {
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+    }
+    
+    .player-menu-logo {
+      font-size: 2rem !important;
+    }
   }
 
   .player-menu-btn:hover,
