@@ -223,8 +223,8 @@ All colors MUST be HSL.
       letter-spacing: 0.1em;
     }
     
-    .player-menu-logo {
-      font-size: 2rem !important;
+    .player-menu-logo-img {
+      max-width: 180px !important;
     }
   }
 
