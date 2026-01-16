@@ -170,4 +170,54 @@ All colors MUST be HSL.
   .hide-cursor * { 
     cursor: none !important; 
   }
+
+  /* Player Menu Styles */
+  .player-menu-logo {
+    color: hsl(var(--neon));
+    text-shadow: 
+      0 0 20px hsl(var(--neon) / 0.6),
+      0 0 40px hsl(var(--neon) / 0.4),
+      0 0 60px hsl(var(--neon) / 0.2);
+    animation: neonPulseSoft 2.6s ease-in-out infinite;
+  }
+
+  .player-menu-lander-a {
+    display: inline-block;
+    transform: translateY(-0.05em);
+    font-size: 0.85em;
+    filter: drop-shadow(0 0 8px hsl(var(--neon) / 0.8));
+  }
+
+  .player-menu-btn {
+    border: 2px solid hsl(var(--neon));
+    border-radius: 8px;
+    padding: 14px 32px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: transparent;
+    color: hsl(var(--neon));
+    box-shadow: 
+      0 0 10px hsl(var(--neon) / 0.25),
+      0 0 20px hsl(var(--neon) / 0.15),
+      inset 0 0 10px hsl(var(--neon) / 0.08);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .player-menu-btn:hover,
+  .player-menu-btn:focus {
+    box-shadow: 
+      0 0 15px hsl(var(--neon) / 0.5),
+      0 0 30px hsl(var(--neon) / 0.3),
+      inset 0 0 15px hsl(var(--neon) / 0.15);
+    background: hsl(var(--neon) / 0.1);
+    text-shadow: 0 0 8px hsl(var(--neon) / 0.6);
+  }
+
+  .player-menu-btn:focus {
+    border-color: hsl(var(--neon-2));
+  }
 }
