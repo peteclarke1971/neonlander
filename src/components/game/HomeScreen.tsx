@@ -42,6 +42,7 @@ interface Props {
   lastPlayedSeed?: number;
   lastPlayedLevel?: number;
   onInteraction?: () => void;
+  onPlayerMenu?: () => void;
   recentlySubmittedScore?: {
     score: number;
     initials: string;
@@ -57,6 +58,7 @@ export const HomeScreen: React.FC<Props> = ({
   lastPlayedSeed,
   lastPlayedLevel,
   onInteraction,
+  onPlayerMenu,
   recentlySubmittedScore
 }) => {
   const audioRef = useRef(getGlobalAudioManager());
@@ -701,6 +703,9 @@ export const HomeScreen: React.FC<Props> = ({
           <a href="/settings/audio" className="inline-block">
             <Button variant="outline">Settings ▸ Audio</Button>
           </a>
+          {onPlayerMenu && (
+            <Button variant="neon" onClick={onPlayerMenu}>🎮 Player Menu</Button>
+          )}
           {showFullscreenBtn && <Button ref={fullscreenBtnRef} variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle fullscreen mode (F11)" className="text-xs">
               {isFullscreen ? "Exit Full Screen" : "Full Screen"}
             </Button>}

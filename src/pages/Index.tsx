@@ -21,11 +21,12 @@ import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import { DemoTransition } from "@/components/game/DemoTransition";
 import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
+import { PlayerMenu } from "@/components/game/PlayerMenu";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
 const Index = () => {
-  const [view, setView] = useState<"home" | "game" | "gameover" | "demo">("home");
+  const [view, setView] = useState<"home" | "playermenu" | "game" | "gameover" | "demo">("home");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionReady, setTransitionReady] = useState(false);
   const transitionRef = useRef<GameTransitionHandle>(null);
@@ -768,9 +769,19 @@ const retryGame = () => {
             lastPlayedSeed={lastPlayedSeed ?? undefined}
             lastPlayedLevel={lastPlayedLevel}
             onInteraction={() => setLastInteractionTime(Date.now())}
+            onPlayerMenu={() => setView("playermenu")}
             recentlySubmittedScore={recentlySubmittedScore}
           />
         </DemoTransition>
+      )}
+      {view === "playermenu" && (
+        <PlayerMenu
+          onStartGame={() => startGame("easy", undefined, "fixed", lowGraphics, undefined, { showGhost: true, nebulaFxEnabled: true, largeRotateButtons: true, showFullHUD: true })}
+          onGameModes={() => { /* TODO: Game modes sub-menu */ }}
+          onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
+          onSettings={() => { window.location.href = "/settings/controls"; }}
+          onDevPortal={() => setView("home")}
+        />
       )}
       {view === "game" && (
         <GameEngine
