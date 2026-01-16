@@ -31,6 +31,9 @@ export class AudioManager {
   private introTickBuffer?: AudioBuffer | null;
   private introGoBuffer?: AudioBuffer | null;
   private introWarpBuffer?: AudioBuffer | null;
+  private junkPickupBuffer?: AudioBuffer | null;
+  private junkSetCompleteBuffer?: AudioBuffer | null;
+  private wormholeOpenBuffer?: AudioBuffer | null;
   private sfxGain?: GainNode;
   private fuelGain?: GainNode;
   private fuelSource?: AudioBufferSourceNode | null;
@@ -117,6 +120,9 @@ export class AudioManager {
     this.introTickBuffer = null;
     this.introGoBuffer = null;
     this.introWarpBuffer = null;
+    this.junkPickupBuffer = null;
+    this.junkSetCompleteBuffer = null;
+    this.wormholeOpenBuffer = null;
     this.missionSuccessBuffer = null;
     this.musicBuffers = new Array(20).fill(null);
     this.endlessBuffers = new Array(5).fill(null);
@@ -232,10 +238,13 @@ export class AudioManager {
       const goUrl = this.getConfigPath('sfx', 'introGo') as string || '/audio/intro_go.mp3';
       const warpUrl = this.getConfigPath('sfx', 'introWarp') as string || '/audio/intro_warp.mp3';
       const successUrl = this.getConfigPath('music', 'missionSuccess') as string || '/audio/mission_success.mp3';
+      const junkPickupUrl = this.getConfigPath('sfx', 'junkPickup') as string || null;
+      const junkSetCompleteUrl = this.getConfigPath('sfx', 'junkSetComplete') as string || null;
+      const wormholeOpenUrl = this.getConfigPath('sfx', 'wormholeOpen') as string || null;
 
       // Load ALL critical SFX in parallel for instant playback
       // crash1Buffer now holds explosion sound, landingBuffer holds landing sounds
-      const [crash, landing1, landing2, fuel, thruster, introTick, introGo, introWarp, missionSuccess] = await Promise.all([
+      const [crash, landing1, landing2, fuel, thruster, introTick, introGo, introWarp, missionSuccess, junkPickup, junkSetComplete, wormholeOpen] = await Promise.all([
         this.loadBuffer(crashUrl),
         this.loadBuffer(landing1Url),
         this.loadBuffer(landing2Url),
@@ -244,7 +253,10 @@ export class AudioManager {
         this.loadBuffer(tickUrl),
         this.loadBuffer(goUrl),
         this.loadBuffer(warpUrl),
-        this.loadBuffer(successUrl)
+        this.loadBuffer(successUrl),
+        junkPickupUrl ? this.loadBuffer(junkPickupUrl) : Promise.resolve(null),
+        junkSetCompleteUrl ? this.loadBuffer(junkSetCompleteUrl) : Promise.resolve(null),
+        wormholeOpenUrl ? this.loadBuffer(wormholeOpenUrl) : Promise.resolve(null)
       ]);
 
       this.crash1Buffer = crash;  // Now contains explosion sound
@@ -256,6 +268,9 @@ export class AudioManager {
       this.introTickBuffer = introTick;
       this.introGoBuffer = introGo;
       this.introWarpBuffer = introWarp;
+      this.junkPickupBuffer = junkPickup;
+      this.junkSetCompleteBuffer = junkSetComplete;
+      this.wormholeOpenBuffer = wormholeOpen;
       this.missionSuccessBuffer = missionSuccess;
       this.isPreloaded = true;
       console.log('🔊 All sound effects preloaded and ready');
@@ -1083,21 +1098,82 @@ export class AudioManager {
   // ===== Collectibles audio =====
   junkPickup() {
     const volume = this.getConfigVolume('sfx', 'junkPickup');
-    this.playNoise(0.15, volume);
+    
+    // Use preloaded buffer if available
+    if (this.junkPickupBuffer) {
+      this.playOneShot(this.junkPickupBuffer, volume);
+    } else {
+      // Try to load on demand if path is configured
+      const path = this.getConfigPath('sfx', 'junkPickup');
+      if (path && typeof path === 'string') {
+        this.loadBuffer(path).then(buffer => {
+          if (buffer) {
+            this.junkPickupBuffer = buffer;
+            this.playOneShot(buffer, volume);
+          } else {
+            this.playNoise(0.15, volume); // Fallback
+          }
+        });
+      } else {
+        this.playNoise(0.15, volume); // Fallback for no configured path
+      }
+    }
   }
 
   junkSetComplete() {
     // Play a special success stinger for completing the set
     const volume = this.getConfigVolume('sfx', 'junkSetComplete');
-    this.playNoise(0.4, volume);
-    setTimeout(() => this.playNoise(0.4, volume), 100);
-    setTimeout(() => this.playNoise(0.4, volume), 200);
+    
+    // Use preloaded buffer if available
+    if (this.junkSetCompleteBuffer) {
+      this.playOneShot(this.junkSetCompleteBuffer, volume);
+    } else {
+      // Try to load on demand if path is configured
+      const path = this.getConfigPath('sfx', 'junkSetComplete');
+      if (path && typeof path === 'string') {
+        this.loadBuffer(path).then(buffer => {
+          if (buffer) {
+            this.junkSetCompleteBuffer = buffer;
+            this.playOneShot(buffer, volume);
+          } else {
+            // Fallback to triple noise
+            this.playNoise(0.4, volume);
+            setTimeout(() => this.playNoise(0.4, volume), 100);
+            setTimeout(() => this.playNoise(0.4, volume), 200);
+          }
+        });
+      } else {
+        // Fallback for no configured path
+        this.playNoise(0.4, volume);
+        setTimeout(() => this.playNoise(0.4, volume), 100);
+        setTimeout(() => this.playNoise(0.4, volume), 200);
+      }
+    }
   }
 
   wormholeOpen() {
     // Play a mysterious portal opening sound
     const volume = this.getConfigVolume('sfx', 'wormholeOpen');
-    this.playNoise(0.8, volume);
+    
+    // Use preloaded buffer if available
+    if (this.wormholeOpenBuffer) {
+      this.playOneShot(this.wormholeOpenBuffer, volume);
+    } else {
+      // Try to load on demand if path is configured
+      const path = this.getConfigPath('sfx', 'wormholeOpen');
+      if (path && typeof path === 'string') {
+        this.loadBuffer(path).then(buffer => {
+          if (buffer) {
+            this.wormholeOpenBuffer = buffer;
+            this.playOneShot(buffer, volume);
+          } else {
+            this.playNoise(0.8, volume); // Fallback
+          }
+        });
+      } else {
+        this.playNoise(0.8, volume); // Fallback for no configured path
+      }
+    }
   }
 
   // Intro countdown sound effects - uses preloaded buffers for instant playback
