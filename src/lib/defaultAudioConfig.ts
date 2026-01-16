@@ -123,8 +123,9 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   },
   sfx: {
     thruster: { path: '/audio/thruster.mp3', volume: 1.0 },
-    crash: { path: ['/audio/crash1.mp3', '/audio/crash2.mp3'], volume: 0.7 },
-    landing: { path: '/audio/landing_on_pad.mp3', volume: 0.9 },
+    // Note: landing_on_pad.mp3 contains explosion sound, crash files contain landing sounds
+    crash: { path: '/audio/landing_on_pad.mp3', volume: 0.7 },
+    landing: { path: ['/audio/crash1.mp3', '/audio/crash2.mp3'], volume: 0.9 },
     fuelAlarm: { path: '/audio/fuel_10_percent_loop.mp3', volume: 0.6 },
     introTick: { path: '/audio/intro_tick.mp3', volume: 1.0 },
     introGo: { path: '/audio/intro_go.mp3', volume: 1.0 },
