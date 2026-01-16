@@ -703,9 +703,6 @@ export const HomeScreen: React.FC<Props> = ({
           <a href="/settings/audio" className="inline-block">
             <Button variant="outline">Settings ▸ Audio</Button>
           </a>
-          {onPlayerMenu && (
-            <Button variant="neon" onClick={onPlayerMenu}>🎮 Player Menu</Button>
-          )}
           {showFullscreenBtn && <Button ref={fullscreenBtnRef} variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle fullscreen mode (F11)" className="text-xs">
               {isFullscreen ? "Exit Full Screen" : "Full Screen"}
             </Button>}
@@ -771,6 +768,11 @@ export const HomeScreen: React.FC<Props> = ({
             <button className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${nebulaFxEnabled ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"}`} onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}>
               🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
             </button>
+            {onPlayerMenu && (
+              <button className="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium bg-accent/20 hover:bg-accent/40 text-accent border border-accent/40 hover:border-accent/60" onClick={onPlayerMenu}>
+                🎮 Player Menu
+              </button>
+            )}
             <button className="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40 hover:text-accent hover:border-accent/40" onClick={() => {
             const config = fireworksCycleOrder.current[fireworksCycle.current];
             setFireworksConfig({
