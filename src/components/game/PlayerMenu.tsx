@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { HomeStarfield } from "./HomeStarfield";
+import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 
 interface PlayerMenuProps {
@@ -123,9 +123,16 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       className="fixed inset-0 bg-background overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      {/* Starfield background - must be absolutely positioned */}
+      {/* Hyperspace starfield - classic into-the-screen effect */}
       <div className="absolute inset-0 z-0">
-        <HomeStarfield />
+        <HyperspaceStarfield 
+          speed={0.28}
+          density={1600}
+          focalLength={480}
+          trail={0.55}
+          style="glow"
+          allowBoost={true}
+        />
       </div>
       
       {/* Subtle gradient overlay */}
