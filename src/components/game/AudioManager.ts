@@ -221,10 +221,11 @@ export class AudioManager {
       if (!this.ctx) return;
 
       // Get paths from config with fallbacks
-      const crashPath = this.getConfigPath('sfx', 'crash');
-      const crash1Url = Array.isArray(crashPath) ? crashPath[0] : (crashPath || '/audio/crash1.mp3');
-      const crash2Url = Array.isArray(crashPath) && crashPath[1] ? crashPath[1] : '/audio/crash2.mp3';
-      const landingUrl = this.getConfigPath('sfx', 'landing') as string || '/audio/landing_on_pad.mp3';
+      // crash is now a single file (explosion sound), landing is now an array (landing sounds)
+      const crashUrl = this.getConfigPath('sfx', 'crash') as string || '/audio/landing_on_pad.mp3';
+      const landingPath = this.getConfigPath('sfx', 'landing');
+      const landing1Url = Array.isArray(landingPath) ? landingPath[0] : (landingPath || '/audio/crash1.mp3');
+      const landing2Url = Array.isArray(landingPath) && landingPath[1] ? landingPath[1] : '/audio/crash2.mp3';
       const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
       const thrusterUrl = this.getConfigPath('sfx', 'thruster') as string || '/audio/thruster.mp3';
       const tickUrl = this.getConfigPath('sfx', 'introTick') as string || '/audio/intro_tick.mp3';
@@ -233,10 +234,11 @@ export class AudioManager {
       const successUrl = this.getConfigPath('music', 'missionSuccess') as string || '/audio/mission_success.mp3';
 
       // Load ALL critical SFX in parallel for instant playback
-      const [crash1, crash2, landing, fuel, thruster, introTick, introGo, introWarp, missionSuccess] = await Promise.all([
-        this.loadBuffer(crash1Url),
-        this.loadBuffer(crash2Url),
-        this.loadBuffer(landingUrl),
+      // crash1Buffer now holds explosion sound, landingBuffer holds landing sounds
+      const [crash, landing1, landing2, fuel, thruster, introTick, introGo, introWarp, missionSuccess] = await Promise.all([
+        this.loadBuffer(crashUrl),
+        this.loadBuffer(landing1Url),
+        this.loadBuffer(landing2Url),
         this.loadBuffer(fuelUrl),
         this.loadBuffer(thrusterUrl),
         this.loadBuffer(tickUrl),
@@ -245,9 +247,10 @@ export class AudioManager {
         this.loadBuffer(successUrl)
       ]);
 
-      this.crash1Buffer = crash1;
-      this.crash2Buffer = crash2;
-      this.landingBuffer = landing;
+      this.crash1Buffer = crash;  // Now contains explosion sound
+      this.crash2Buffer = null;   // Not needed for explosions anymore
+      this.landingBuffer = landing1;  // Now contains landing sound
+      // landing2 available as backup if needed
       this.fuelLoopBuffer = fuel;
       this.thrusterBuffer = thruster;
       this.introTickBuffer = introTick;
@@ -497,8 +500,9 @@ export class AudioManager {
     const distanceRatio = Math.min(1, wrappedDistance / maxHearingDistance);
     const volume = Math.max(0.1, 1 - distanceRatio * 0.8) * 2; // Keep minimum 10% volume
     
-    if (this.landingBuffer) {
-      this.playSpatialOneShot(this.landingBuffer, volume, panValue);
+    // Use crash buffer for explosion sounds (now correctly mapped)
+    if (this.crash1Buffer) {
+      this.playSpatialOneShot(this.crash1Buffer, volume, panValue);
     } else {
       this.playSpatialNoise(0.35, volume * 1.6, panValue);
     }
@@ -508,9 +512,10 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Now plays landing sound for explosion events - use preloaded buffer for instant playback
-    if (this.landingBuffer) {
-      this.playOneShot(this.landingBuffer, 0.9);
+    // Play crash/explosion sound from crashBuffer (now correctly mapped to explosion audio)
+    const volume = this.getConfigVolume('sfx', 'crash');
+    if (this.crash1Buffer) {
+      this.playOneShot(this.crash1Buffer, volume);
     } else {
       // Fallback to noise if buffer not available
       this.playNoise(0.35, 0.8);
@@ -521,22 +526,13 @@ export class AudioManager {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
-    // Now plays crash sounds for successful landing
-    if (!this.crash1Buffer && !this.crash2Buffer) {
-      // Load buffers if not available - use config paths
-      const crashPath = this.getConfigPath('sfx', 'crash');
-      const crash1Url = Array.isArray(crashPath) ? crashPath[0] : (crashPath || '/audio/crash1.mp3');
-      const crash2Url = Array.isArray(crashPath) && crashPath[1] ? crashPath[1] : '/audio/crash2.mp3';
-      await Promise.all([
-        this.loadBuffer(crash1Url).then(buf => this.crash1Buffer = buf),
-        this.loadBuffer(crash2Url).then(buf => this.crash2Buffer = buf)
-      ]);
+    // Play landing success sound from landingBuffer (now correctly mapped to landing audio)
+    const volume = this.getConfigVolume('sfx', 'landing');
+    if (this.landingBuffer) {
+      this.playOneShot(this.landingBuffer, volume);
+    } else {
+      this.playNoise(0.2, 0.4);
     }
-    
-    const useFirst = (this.crashToggle = !this.crashToggle);
-    const buf = useFirst ? (this.crash1Buffer || this.crash2Buffer) : (this.crash2Buffer || this.crash1Buffer);
-    const volume = this.getConfigVolume('sfx', 'crash');
-    if (buf) this.playOneShot(buf, volume); else this.playNoise(0.2, 0.4);
   }
 
   async landingCrash() {
@@ -555,19 +551,15 @@ export class AudioManager {
       this.sfxGain.connect(this.master);
     }
     
-    // Use fuel loop sound for successful landings
-    if (!this.fuelLoopBuffer) {
-      const fuelUrl = this.getConfigPath('sfx', 'fuelAlarm') as string || '/audio/fuel_10_percent_loop.mp3';
-      this.fuelLoopBuffer = await this.loadBuffer(fuelUrl);
-    }
-    
-    if (this.fuelLoopBuffer) {
+    // Use landing buffer for landing sounds (now correctly mapped)
+    const volume = this.getConfigVolume('sfx', 'landing');
+    if (this.landingBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
-      this.landingSoundGain.gain.value = 1.4;
+      this.landingSoundGain.gain.value = volume * 1.5;
       
       const src = this.ctx.createBufferSource();
-      src.buffer = this.fuelLoopBuffer;
+      src.buffer = this.landingBuffer;
       src.connect(this.landingSoundGain);
       this.landingSoundGain.connect(this.sfxGain);
       src.start(0);
@@ -600,13 +592,15 @@ export class AudioManager {
       this.sfxGain.connect(this.master);
     }
     
-    if (this.fuelLoopBuffer) {
+    // Use landing buffer for landing sounds (now correctly mapped)
+    const volume = this.getConfigVolume('sfx', 'landing');
+    if (this.landingBuffer) {
       // Create dedicated gain node for fading
       this.landingSoundGain = this.ctx.createGain();
-      this.landingSoundGain.gain.value = 1.8;
+      this.landingSoundGain.gain.value = volume * 2;
       
       const src = this.ctx.createBufferSource();
-      src.buffer = this.fuelLoopBuffer;
+      src.buffer = this.landingBuffer;
       src.connect(this.landingSoundGain);
       this.landingSoundGain.connect(this.sfxGain);
       src.start(0);
