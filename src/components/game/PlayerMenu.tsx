@@ -123,8 +123,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       className="fixed inset-0 bg-background overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      {/* Starfield background */}
-      <HomeStarfield />
+      {/* Starfield background - must be absolutely positioned */}
+      <div className="absolute inset-0 z-0">
+        <HomeStarfield />
+      </div>
       
       {/* Subtle gradient overlay */}
       <div 
@@ -136,8 +138,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
       {/* Main content - responsive sizing for mobile */}
       <section className="relative z-10 flex flex-col items-center gap-4 sm:gap-6 md:gap-8 px-4 py-4 max-h-[100dvh] overflow-y-auto">
-        {/* LANDER Logo - scales down for mobile/landscape */}
-        <h1 className="player-menu-logo text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold tracking-[0.12em] sm:tracking-[0.15em] select-none">
+        {/* LANDER Logo - scales down for mobile/landscape, prevent wrap */}
+        <h1 className="player-menu-logo text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold tracking-[0.12em] sm:tracking-[0.15em] select-none whitespace-nowrap">
           L<span className="player-menu-lander-a">▲</span>NDER
         </h1>
 
