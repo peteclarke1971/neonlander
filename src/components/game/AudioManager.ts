@@ -34,6 +34,8 @@ export class AudioManager {
   private junkPickupBuffer?: AudioBuffer | null;
   private junkSetCompleteBuffer?: AudioBuffer | null;
   private wormholeOpenBuffer?: AudioBuffer | null;
+  private shieldPickupBuffer?: AudioBuffer | null;
+  private shieldBreakBuffer?: AudioBuffer | null;
   private sfxGain?: GainNode;
   private fuelGain?: GainNode;
   private fuelSource?: AudioBufferSourceNode | null;
@@ -123,6 +125,8 @@ export class AudioManager {
     this.junkPickupBuffer = null;
     this.junkSetCompleteBuffer = null;
     this.wormholeOpenBuffer = null;
+    this.shieldPickupBuffer = null;
+    this.shieldBreakBuffer = null;
     this.missionSuccessBuffer = null;
     this.musicBuffers = new Array(20).fill(null);
     this.endlessBuffers = new Array(5).fill(null);
@@ -241,10 +245,12 @@ export class AudioManager {
       const junkPickupUrl = this.getConfigPath('sfx', 'junkPickup') as string || null;
       const junkSetCompleteUrl = this.getConfigPath('sfx', 'junkSetComplete') as string || null;
       const wormholeOpenUrl = this.getConfigPath('sfx', 'wormholeOpen') as string || null;
+      const shieldPickupUrl = this.getConfigPath('sfx', 'shieldPickup') as string || null;
+      const shieldBreakUrl = this.getConfigPath('sfx', 'shieldBreak') as string || null;
 
       // Load ALL critical SFX in parallel for instant playback
       // crash1Buffer now holds explosion sound, landingBuffer holds landing sounds
-      const [crash, landing1, landing2, fuel, thruster, introTick, introGo, introWarp, missionSuccess, junkPickup, junkSetComplete, wormholeOpen] = await Promise.all([
+      const [crash, landing1, landing2, fuel, thruster, introTick, introGo, introWarp, missionSuccess, junkPickup, junkSetComplete, wormholeOpen, shieldPickup, shieldBreak] = await Promise.all([
         this.loadBuffer(crashUrl),
         this.loadBuffer(landing1Url),
         this.loadBuffer(landing2Url),
@@ -256,7 +262,9 @@ export class AudioManager {
         this.loadBuffer(successUrl),
         junkPickupUrl ? this.loadBuffer(junkPickupUrl) : Promise.resolve(null),
         junkSetCompleteUrl ? this.loadBuffer(junkSetCompleteUrl) : Promise.resolve(null),
-        wormholeOpenUrl ? this.loadBuffer(wormholeOpenUrl) : Promise.resolve(null)
+        wormholeOpenUrl ? this.loadBuffer(wormholeOpenUrl) : Promise.resolve(null),
+        shieldPickupUrl ? this.loadBuffer(shieldPickupUrl) : Promise.resolve(null),
+        shieldBreakUrl ? this.loadBuffer(shieldBreakUrl) : Promise.resolve(null)
       ]);
 
       this.crash1Buffer = crash;  // Now contains explosion sound
@@ -271,6 +279,8 @@ export class AudioManager {
       this.junkPickupBuffer = junkPickup;
       this.junkSetCompleteBuffer = junkSetComplete;
       this.wormholeOpenBuffer = wormholeOpen;
+      this.shieldPickupBuffer = shieldPickup;
+      this.shieldBreakBuffer = shieldBreak;
       this.missionSuccessBuffer = missionSuccess;
       this.isPreloaded = true;
       console.log('🔊 All sound effects preloaded and ready');
@@ -673,11 +683,62 @@ export class AudioManager {
 
   // ===== Shield sounds =====
   shieldPickup() {
-    this.success();
-    setTimeout(() => this.click(), 50);
+    const volume = this.getConfigVolume('sfx', 'shieldPickup');
+    
+    // Use preloaded buffer if available
+    if (this.shieldPickupBuffer) {
+      this.playOneShot(this.shieldPickupBuffer, volume);
+      return;
+    }
+    
+    // Try to load on demand if path is configured
+    const path = this.getConfigPath('sfx', 'shieldPickup');
+    if (path && typeof path === 'string') {
+      this.loadBuffer(path).then(buffer => {
+        if (buffer) {
+          this.shieldPickupBuffer = buffer;
+          this.playOneShot(buffer, volume);
+        } else {
+          // Fallback to original synthesized sound
+          this.success();
+          setTimeout(() => this.click(), 50);
+        }
+      });
+    } else {
+      // Fallback for no configured path
+      this.success();
+      setTimeout(() => this.click(), 50);
+    }
   }
 
   shieldBreak() {
+    const volume = this.getConfigVolume('sfx', 'shieldBreak');
+    
+    // Use preloaded buffer if available
+    if (this.shieldBreakBuffer) {
+      this.playOneShot(this.shieldBreakBuffer, volume);
+      return;
+    }
+    
+    // Try to load on demand if path is configured
+    const path = this.getConfigPath('sfx', 'shieldBreak');
+    if (path && typeof path === 'string') {
+      this.loadBuffer(path).then(buffer => {
+        if (buffer) {
+          this.shieldBreakBuffer = buffer;
+          this.playOneShot(buffer, volume);
+        } else {
+          // Fallback to synthesized oscillator sweep
+          this.playShieldBreakFallback(volume);
+        }
+      });
+    } else {
+      // Fallback for no configured path
+      this.playShieldBreakFallback(volume);
+    }
+  }
+  
+  private playShieldBreakFallback(volume: number) {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
     
@@ -686,7 +747,6 @@ export class AudioManager {
     
     osc.type = "sine";
     osc.frequency.value = 1200;
-    const volume = this.getConfigVolume('sfx', 'shieldBreak');
     gain.gain.value = volume;
     
     osc.connect(gain);
