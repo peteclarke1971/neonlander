@@ -567,7 +567,8 @@ export const HomeScreen: React.FC<Props> = ({
         window.removeEventListener("pointerdown", startOnInteract as any);
         window.removeEventListener("touchstart", startOnInteract as any);
         window.removeEventListener("keydown", startOnInteract as any);
-        audioRef.current.stopTitleMusic();
+        // Note: Don't stop title music here - it should continue during demo mode
+        // Music is stopped explicitly when starting a game or navigating away
         removed = true;
       }
     };

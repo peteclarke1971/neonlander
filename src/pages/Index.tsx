@@ -191,6 +191,10 @@ const Index = () => {
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean; largeRotateButtons?: boolean; showFullHUD?: boolean }) => {
     console.log("🚀 Starting game with:", { difficulty: d, mode, seedOverride: seedOverrideParam, startLevel, isTransitioning });
     
+    // Stop title music when starting an actual game
+    const audio = getGlobalAudioManager();
+    audio.stopTitleMusic();
+    
     // Clear recently submitted score and leaderboard display when starting a new game
     setRecentlySubmittedScore(null);
     setShowLeaderboardsAfterInitials(false);
