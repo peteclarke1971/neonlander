@@ -22,6 +22,7 @@ import { loadCursorConfig } from "@/lib/cursorConfig";
 import { DemoTransition } from "@/components/game/DemoTransition";
 import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
 import { PlayerMenu } from "@/components/game/PlayerMenu";
+import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
@@ -80,14 +81,7 @@ const Index = () => {
   const [carry, setCarry] = useState<{ score: number; landings: number; level: number } | null>(null);
   const [successCount, setSuccessCount] = useState(0);
   const [needsInitials, setNeedsInitials] = useState(false);
-  const [lowGraphics, setLowGraphics] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ll-graphics-settings');
-      return saved ? JSON.parse(saved).lowGraphics : true;
-    } catch {
-      return true; // Default to low-gfx
-    }
-  });
+  const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
 
   const [goIndex, setGoIndex] = useState(0);
   const [seedOverride, setSeedOverride] = useState<number | null>(null);
@@ -207,18 +201,18 @@ const Index = () => {
     const executeTransition = () => {
       setDifficulty(d);
       setMode(mode);
-      const finalLowGfx = lowGfx ?? lowGraphics;
-      setLowGraphics(finalLowGfx);
+      // Handle graphics level - lowGfx param is legacy boolean for compatibility
+      if (lowGfx !== undefined) {
+        const newLevel: GraphicsLevel = lowGfx ? "low" : "high";
+        setGraphicsLevel(newLevel);
+        saveGraphicsSettings(newLevel);
+      }
       setSeedOverride(seedOverrideParam ?? null);
       setShowGhost(gameSettings?.showGhost ?? false);
       setNebulaFxEnabled(gameSettings?.nebulaFxEnabled ?? true);
       setLargeRotateButtons(gameSettings?.largeRotateButtons ?? true);
       setShowFullHUD(gameSettings?.showFullHUD ?? true);
       setGameKey(prev => prev + 1);
-      
-      try {
-        localStorage.setItem('ll-graphics-settings', JSON.stringify({ lowGraphics: finalLowGfx }));
-      } catch {}
       
       if (startLevel && startLevel > 1) {
         const lvlIndex = Math.max(0, Math.floor(startLevel - 1));
@@ -273,7 +267,7 @@ const Index = () => {
     setDemoLevel(level);
     setDifficulty("easy"); // Always use easy for demos
     setMode("fixed"); // Use fixed mode for consistent demos
-    setLowGraphics(true); // Force low graphics for demos
+    setGraphicsLevel("low"); // Force low graphics for demos
     setSeedOverride(level * 1000); // Consistent seed for each demo level
     setDemoStartTime(Date.now()); // Track when demo actually starts
     
@@ -776,7 +770,7 @@ const retryGame = () => {
       )}
       {view === "playermenu" && (
         <PlayerMenu
-          onStartGame={() => startGame("easy", undefined, "fixed", lowGraphics, undefined, { showGhost: true, nebulaFxEnabled: true, largeRotateButtons: true, showFullHUD: true })}
+          onStartGame={() => startGame("easy", undefined, "fixed", graphicsLevel === "low", undefined, { showGhost: true, nebulaFxEnabled: true, largeRotateButtons: true, showFullHUD: true })}
           onGameModes={() => { /* TODO: Game modes sub-menu */ }}
           onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
           onSettings={() => { window.location.href = "/settings/controls"; }}
@@ -797,7 +791,7 @@ const retryGame = () => {
           initialLandings={carry?.landings}
           level={carry?.level ?? successCount}
           mode={mode}
-          lowGraphics={lowGraphics}
+          graphicsLevel={graphicsLevel}
           seedOverride={seedOverride ?? undefined}
           showGhost={showGhost}
           ghostLevel={carry?.level ?? successCount}
@@ -851,7 +845,7 @@ const retryGame = () => {
                 onGameOver={handleGameOver} // Use main game over handler for demo
                 level={demoLevel}
                 mode="fixed"
-                lowGraphics={true}
+                graphicsLevel="low"
                 seedOverride={demoLevel * 1000}
                 showGhost={false}
                 isDemo={true}
@@ -866,7 +860,7 @@ const retryGame = () => {
         <main className="min-h-screen relative flex items-center justify-center">
           {lastResult.cause === "success" ? (
             <>
-              {lowGraphics ? (
+              {graphicsLevel === "low" ? (
                 <div className="absolute inset-0 z-0">
                   <HomeStarfield />
                 </div>
@@ -905,7 +899,7 @@ const retryGame = () => {
             </>
           ) : (
             <>
-              {lowGraphics ? (
+              {graphicsLevel === "low" ? (
                 <div className="absolute inset-0 z-0">
                   <HomeStarfield />
                 </div>

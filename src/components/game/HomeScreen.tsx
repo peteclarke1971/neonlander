@@ -12,6 +12,7 @@ import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, setLastDeviceId,
 import { useNavigate } from "react-router-dom";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { shouldShowFullscreenButton } from "@/lib/deviceDetection";
+import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 const difficulties: {
   key: Difficulty;
   label: string;
@@ -74,17 +75,7 @@ export const HomeScreen: React.FC<Props> = ({
       return true;
     }
   });
-  const [lowGraphics, setLowGraphics] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ll-graphics-settings");
-      if (saved) {
-        return JSON.parse(saved).lowGraphics ?? true;
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  });
+  const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
 
   // Countdown intro settings
   const [introVariant, setIntroVariant] = useState<"auto" | "freeze" | "warp">(() => {
@@ -665,16 +656,12 @@ export const HomeScreen: React.FC<Props> = ({
         }}>
             {musicOn ? "Mute Music" : "Unmute Music"}
           </Button>
-          {!isIOS && <Button ref={lowGfxBtnRef} variant={lowGraphics ? "neon" : "outline"} onClick={() => {
-          const newValue = !lowGraphics;
-          setLowGraphics(newValue);
-          try {
-            localStorage.setItem("ll-graphics-settings", JSON.stringify({
-              lowGraphics: newValue
-            }));
-          } catch {}
+          {!isIOS && <Button ref={lowGfxBtnRef} variant={graphicsLevel !== "high" ? "neon" : "outline"} onClick={() => {
+          const newLevel = cycleGraphicsLevel(graphicsLevel);
+          setGraphicsLevel(newLevel);
+          saveGraphicsSettings(newLevel);
         }}>
-              {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
+              {getGraphicsLabel(graphicsLevel)} ✓
             </Button>}
           <a href="/duel" className="inline-block">
             <Button variant="neon">⚔️ LANDER DUEL</Button>
@@ -790,16 +777,12 @@ export const HomeScreen: React.FC<Props> = ({
             <button className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${largeRotateButtons ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"}`} onClick={() => setLargeRotateButtons(!largeRotateButtons)}>
               🎮 Large Buttons {largeRotateButtons ? "ON" : "OFF"}
             </button>
-            {isIOS && <Button ref={lowGfxBtnRef} variant={lowGraphics ? "neon" : "outline"} onClick={() => {
-            const newValue = !lowGraphics;
-            setLowGraphics(newValue);
-            try {
-              localStorage.setItem("ll-graphics-settings", JSON.stringify({
-                lowGraphics: newValue
-              }));
-            } catch {}
+            {isIOS && <Button ref={lowGfxBtnRef} variant={graphicsLevel !== "high" ? "neon" : "outline"} onClick={() => {
+            const newLevel = cycleGraphicsLevel(graphicsLevel);
+            setGraphicsLevel(newLevel);
+            saveGraphicsSettings(newLevel);
           }}>
-                {lowGraphics ? "Low-GFX ✓" : "Low-GFX"}
+                {getGraphicsLabel(graphicsLevel)} ✓
               </Button>}
           </div>
         </div>
@@ -823,11 +806,11 @@ export const HomeScreen: React.FC<Props> = ({
           } else {
             seedNum = Math.random() * 0xffffffff >>> 0;
           }
-          onStart("easy", lastPlayedLevel && lastPlayedLevel > 0 ? lastPlayedLevel + 1 : undefined, mode, lowGraphics, seedNum, {
+          onStart("easy", lastPlayedLevel && lastPlayedLevel > 0 ? lastPlayedLevel + 1 : undefined, mode, graphicsLevel === "low", seedNum, {
             introVariant,
             skipCountdowns,
             photosensitive,
-            lowGraphics,
+            lowGraphics: graphicsLevel === "low",
             showGhost: false,
             nebulaFxEnabled,
             largeRotateButtons,
@@ -843,11 +826,11 @@ export const HomeScreen: React.FC<Props> = ({
             {difficulties.map(d => <div key={d.key} className="border border-border/60 rounded-lg p-4 w-44 bg-card/50">
                 <div className="text-lg font-semibold">{d.label}</div>
                 <div className="text-xs text-muted-foreground mt-1">{d.desc}</div>
-                <Button ref={d.key === "easy" ? easyStartRef : hardStartRef} variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart(d.key, undefined, mode, lowGraphics, undefined, {
+                <Button ref={d.key === "easy" ? easyStartRef : hardStartRef} variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart(d.key, undefined, mode, graphicsLevel === "low", undefined, {
               introVariant,
               skipCountdowns,
               photosensitive,
-              lowGraphics,
+              lowGraphics: graphicsLevel === "low",
               showGhost,
               nebulaFxEnabled,
               largeRotateButtons,
@@ -862,11 +845,11 @@ export const HomeScreen: React.FC<Props> = ({
                   const arr = levelRefs.current[d.key];
                   arr[idx] = el;
                 }
-              }} variant="outline" size="sm" className="w-full" onClick={() => onStart(d.key, L, mode, lowGraphics, undefined, {
+              }} variant="outline" size="sm" className="w-full" onClick={() => onStart(d.key, L, mode, graphicsLevel === "low", undefined, {
                 introVariant,
                 skipCountdowns,
                 photosensitive,
-                lowGraphics,
+                lowGraphics: graphicsLevel === "low",
                 showGhost,
                 nebulaFxEnabled,
                 largeRotateButtons,
@@ -881,19 +864,19 @@ export const HomeScreen: React.FC<Props> = ({
             <div className="border border-border/60 rounded-lg p-4 w-44 bg-card/50">
               <div className="text-lg font-semibold">Caverns</div>
               <div className="text-xs text-muted-foreground mt-1">Navigate through underground caverns</div>
-              <Button variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart("easy", undefined, "caverns", lowGraphics)}>
+              <Button variant="hero" size="lg" className="w-full mt-3" onClick={() => onStart("easy", undefined, "caverns", graphicsLevel === "low")}>
                 Start Easy
               </Button>
-              <Button variant="outline" size="lg" className="w-full mt-2" onClick={() => onStart("hard", undefined, "caverns", lowGraphics)}>
+              <Button variant="outline" size="lg" className="w-full mt-2" onClick={() => onStart("hard", undefined, "caverns", graphicsLevel === "low")}>
                 Start Hard
               </Button>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mt-3">Start at level</div>
               <div className="mt-2 grid grid-cols-6 gap-2">
-                {startLevels.map(L => <Button key={L} variant="outline" size="sm" className="w-full" onClick={() => onStart("easy", L, "caverns", lowGraphics, undefined, {
+                {startLevels.map(L => <Button key={L} variant="outline" size="sm" className="w-full" onClick={() => onStart("easy", L, "caverns", graphicsLevel === "low", undefined, {
                 introVariant,
                 skipCountdowns,
                 photosensitive,
-                lowGraphics,
+                lowGraphics: graphicsLevel === "low",
                 showGhost: false,
                 nebulaFxEnabled,
                 largeRotateButtons,
