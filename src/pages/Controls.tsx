@@ -10,6 +10,7 @@ import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/l
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
+import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
 
 export default function ControlsSettings() {
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
@@ -140,6 +141,9 @@ export default function ControlsSettings() {
       return 1;
     }
   });
+  
+  // Graphics quality setting
+  const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   
   // Audio testing state
   const audioManagerRef = useRef(getGlobalAudioManager());
@@ -924,6 +928,30 @@ export default function ControlsSettings() {
                 </div>
               </div>
             )}
+            
+            {/* Graphics Quality */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Graphics Quality</Label>
+                <div className="text-xs text-muted-foreground">
+                  Adjust particle count, glow effects, and visual fidelity
+                </div>
+              </div>
+              <Select value={graphicsLevel} onValueChange={(v) => {
+                const newLevel = v as GraphicsLevel;
+                setGraphicsLevel(newLevel);
+                saveGraphicsSettings(newLevel);
+              }}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="mid">Mid</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

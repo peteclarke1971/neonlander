@@ -858,18 +858,20 @@ export const GameEngine: React.FC<Props> = ({
     } else {
       setRandomEffectParams(undefined);
     }
-    // Reset audio for new game and start level music
-    try { audio.current.resetForNewGame(); } catch {}
-    try { audio.current.preloadSFX(); } catch {}
-    try { audio.current.playLevelTrackForLevel(level || 0); } catch {}
-    
-    // Ensure thruster is properly initialized after audio reset
-    try { 
-      // Give audio context a moment to stabilize, then pre-initialize thruster
-      setTimeout(() => {
-        audio.current.setThruster(0);
-      }, 50);
-    } catch {}
+    // Reset audio for new game and start level music (skip in demo mode - title music keeps playing)
+    if (!isDemo) {
+      try { audio.current.resetForNewGame(); } catch {}
+      try { audio.current.preloadSFX(); } catch {}
+      try { audio.current.playLevelTrackForLevel(level || 0); } catch {}
+      
+      // Ensure thruster is properly initialized after audio reset
+      try { 
+        // Give audio context a moment to stabilize, then pre-initialize thruster
+        setTimeout(() => {
+          audio.current.setThruster(0);
+        }, 50);
+      } catch {}
+    }
 
     // After level 10, keep only small pads (skip for cavern levels AND time trial)
     if (levelVar >= 10 && !isCavernLevel && !isTimeTrial) {
@@ -1534,7 +1536,7 @@ export const GameEngine: React.FC<Props> = ({
       introRef.current.start({
         variant: "freeze",
         seed: introSeed,
-        onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+        onTick: () => { if (!isDemo) { try { audio.current.playIntroTick(); } catch {} } },
         onGo: () => { 
           setWorldPaused(false); worldPausedRef.current = false;
           setPlayerLocked(false); playerLockedRef.current = false;
@@ -1557,9 +1559,9 @@ export const GameEngine: React.FC<Props> = ({
             setTimerActive(true);
             timerActiveRef.current = true;
           }, 2000);
-          try { audio.current.playIntroGo(); } catch {} 
+          if (!isDemo) { try { audio.current.playIntroGo(); } catch {} }
         },
-        onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
+        onWarp: () => { if (!isDemo) { try { audio.current.playIntroWarp(); } catch {} } }
       });
       setWorldPaused(true); worldPausedRef.current = true;
       setPlayerLocked(true); playerLockedRef.current = true;
@@ -1945,9 +1947,11 @@ export const GameEngine: React.FC<Props> = ({
           }
         }
       }
-      audio.current.setThruster(thrust * (fuel > 0 ? 1 : 0));
+      if (!isDemo) {
+        audio.current.setThruster(thrust * (fuel > 0 ? 1 : 0));
+      }
       lastThrust.current = thrust;
-      if (!fuelAlarmLatched && fuel <= 10) { try { audio.current.startFuelAlarm(); } catch {} fuelAlarmLatched = true; }
+      if (!isDemo && !fuelAlarmLatched && fuel <= 10) { try { audio.current.startFuelAlarm(); } catch {} fuelAlarmLatched = true; }
       
       // Track when fuel first hits 0 and disable anomalies after 3 seconds
       if (fuel <= 0 && fuelDepletedTime < 0) {
@@ -2003,7 +2007,7 @@ export const GameEngine: React.FC<Props> = ({
           abortPenaltyCharged.current = true;
           
           cameraShake = Math.max(cameraShake, ABORT_CAMERA_SHAKE);
-          audio.current.abort();
+          if (!isDemo) { audio.current.abort(); }
         }
         
         // Animate rotation smoothly with cubic ease-out
@@ -2222,7 +2226,7 @@ export const GameEngine: React.FC<Props> = ({
                   configs.small
                 );
                 state.activeSmall = newUFO;
-                audio.current.startUfoSmallSound();
+                if (!isDemo) { audio.current.startUfoSmallSound(); }
                 break;
                 
               case "medium":
@@ -2240,7 +2244,7 @@ export const GameEngine: React.FC<Props> = ({
                 newUFO.scale = 1.0;
                 newUFO.canShoot = true;
                 state.activeMedium = newUFO;
-                audio.current.startUfoMediumSound();
+                if (!isDemo) { audio.current.startUfoMediumSound(); }
                 break;
                 
               case "large":
@@ -2256,7 +2260,7 @@ export const GameEngine: React.FC<Props> = ({
                   terrain.points
                 );
                 state.activeLarge = newUFO;
-                audio.current.startUfoLargeSound();
+                if (!isDemo) { audio.current.startUfoLargeSound(); }
                 break;
             }
             
@@ -2285,7 +2289,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeSmall.active) {
             console.log("🛸 Small UFO deactivated");
-            audio.current.stopUfoSmallSound();
+            if (!isDemo) { audio.current.stopUfoSmallSound(); }
           }
         }
         
@@ -2307,7 +2311,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeMedium.active) {
             console.log("🛸 Medium UFO deactivated");
-            audio.current.stopUfoMediumSound();
+            if (!isDemo) { audio.current.stopUfoMediumSound(); }
           }
         }
         
@@ -2327,7 +2331,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeLarge.active) {
             console.log("🛸 Large UFO deactivated");
-            audio.current.stopUfoLargeSound();
+            if (!isDemo) { audio.current.stopUfoLargeSound(); }
           }
         }
         
@@ -2400,7 +2404,7 @@ export const GameEngine: React.FC<Props> = ({
           const viewRight = cameraX + viewWidth / 2;
           
           const volcanoUpdate = updateVolcanoes(terrainData.volcanoes, volcanoParticles, dt, level, viewLeft, viewRight);
-          if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0) {
+          if (volcanoUpdate.shouldPlayEruptionSound && volcanoUpdate.eruptingVolcanoes.length > 0 && !isDemo) {
             // Play spatial audio for each erupting volcano
             for (const volcano of volcanoUpdate.eruptingVolcanoes) {
               try { 
@@ -2443,7 +2447,7 @@ export const GameEngine: React.FC<Props> = ({
           }
           // Cavern-specific particle physics with wall collision
           updateCavernVolcanoParticles(volcanoParticles, dt, cavernData);
-          if (playSound) {
+          if (playSound && !isDemo) {
             try {
               const eruptingX = cavernData.volcanoes.reduce((acc, vv) => vv.isErupting ? vv.x : acc, x);
               audio.current.spatialExplosion(eruptingX, x, cavernData.worldWidth);
@@ -2466,9 +2470,11 @@ export const GameEngine: React.FC<Props> = ({
         crashed = true;
         spawnExplosion();
         spawnDebris();
-        audio.current.explosion();
-        audio.current.stopThruster();
-        try { audio.current.stopFuelAlarm(); } catch {}
+        if (!isDemo) {
+          audio.current.explosion();
+          audio.current.stopThruster();
+          try { audio.current.stopFuelAlarm(); } catch {}
+        }
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
@@ -2488,9 +2494,11 @@ export const GameEngine: React.FC<Props> = ({
           crashed = true;
           spawnExplosion();
           spawnDebris();
-          audio.current.explosion();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
+          if (!isDemo) {
+            audio.current.explosion();
+            audio.current.stopThruster();
+            try { audio.current.stopFuelAlarm(); } catch {}
+          }
           cameraShake = 22;
           if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
           
@@ -2514,9 +2522,11 @@ export const GameEngine: React.FC<Props> = ({
             crashed = true;
             spawnExplosion();
             spawnDebris();
-            audio.current.explosion();
-            audio.current.stopThruster();
-            try { audio.current.stopFuelAlarm(); } catch {}
+            if (!isDemo) {
+              audio.current.explosion();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+            }
             cameraShake = 18;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             
@@ -2537,9 +2547,11 @@ export const GameEngine: React.FC<Props> = ({
         crashed = true;
         spawnExplosion();
         spawnDebris();
-        audio.current.explosion();
-        audio.current.stopThruster();
-        try { audio.current.stopFuelAlarm(); } catch {}
+        if (!isDemo) {
+          audio.current.explosion();
+          audio.current.stopThruster();
+          try { audio.current.stopFuelAlarm(); } catch {}
+        }
         cameraShake = 24;
         if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
@@ -2566,8 +2578,10 @@ export const GameEngine: React.FC<Props> = ({
             crashed = true;
             spawnExplosion();
             spawnDebris();
-            audio.current.explosion();
-            audio.current.stopThruster();
+            if (!isDemo) {
+              audio.current.explosion();
+              audio.current.stopThruster();
+            }
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             setTimeout(() => {
@@ -2593,7 +2607,7 @@ export const GameEngine: React.FC<Props> = ({
             }
             
             cameraShake = 12;
-            audio.current.jellyfishShock();
+            if (!isDemo) { audio.current.jellyfishShock(); }
             if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.8); } catch {} }
           }
         }
@@ -2621,11 +2635,11 @@ export const GameEngine: React.FC<Props> = ({
             const result = collectJunk(collectiblesRef.current, junk.id);
             if (result.fuelReward > 0) {
               fuel += result.fuelReward;
-              audio.current.junkPickup();
+              if (!isDemo) { audio.current.junkPickup(); }
             }
             if (result.points > 0) score += result.points;
             if (result.setComplete) {
-              audio.current.junkSetComplete();
+              if (!isDemo) { audio.current.junkSetComplete(); }
               
               // For collection levels, add visual feedback that pads are now available
               if (isCollectionLevel(mode, level)) {
@@ -2650,7 +2664,7 @@ export const GameEngine: React.FC<Props> = ({
                 };
                 collectiblesRef.current.wormholeDoor = generateWormholeDoor(seed, context);
                 if (collectiblesRef.current.wormholeDoor) {
-                  audio.current.wormholeOpen();
+                  if (!isDemo) { audio.current.wormholeOpen(); }
                 }
               }
             }
@@ -2659,7 +2673,7 @@ export const GameEngine: React.FC<Props> = ({
         
         // Check wormhole entry
         if (collectiblesRef.current.wormholeDoor && checkWormholeEntry({ x, y }, 16, collectiblesRef.current.wormholeDoor)) {
-          audio.current.wormholeEnter();
+          if (!isDemo) { audio.current.wormholeEnter(); }
           // TODO: Launch bonus game
           score += 2000; // Temporary bonus
         }
@@ -2842,17 +2856,19 @@ export const GameEngine: React.FC<Props> = ({
                  }
                  
                  // Precache next level's music in background
-                 audio.current.precacheLevelTrack(level);
-               }, 500);
+                 if (!isDemo) { audio.current.precacheLevelTrack(level); }
+                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
               running = false;
               crashed = true;
               spawnExplosion();
               spawnDebris();
-              audio.current.explosion();
-              audio.current.stopThruster();
-              try { audio.current.stopFuelAlarm(); } catch {}
+              if (!isDemo) {
+                audio.current.explosion();
+                audio.current.stopThruster();
+                try { audio.current.stopFuelAlarm(); } catch {}
+              }
               cameraShake = 24;
               if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
@@ -2916,9 +2932,11 @@ export const GameEngine: React.FC<Props> = ({
               resetStylePoints(stylePointsStateRef.current);
             
             cameraShake = 8; // Extra camera shake for MEGA landing
-            audio.current.landing();
-            audio.current.stopThruster();
-            try { audio.current.stopFuelAlarm(); } catch {}
+            if (!isDemo) {
+              audio.current.landing();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+            }
             if (gpProfileRef.current?.vibration) { try { void vibrate(200, 0.3, 0.9); } catch {} } // Extra vibration
             running = false;
             setTimeout(() => {
@@ -2931,7 +2949,7 @@ export const GameEngine: React.FC<Props> = ({
               }
               
               // Precache next level's music in background
-              audio.current.precacheLevelTrack(level);
+              if (!isDemo) { audio.current.precacheLevelTrack(level); }
             }, 500);
           } else if (nearPad && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
@@ -2997,9 +3015,11 @@ export const GameEngine: React.FC<Props> = ({
                     };
                     
                     cameraShake = 6;
-                    audio.current.landingCrash();
-                    audio.current.stopThruster();
-                    try { audio.current.stopFuelAlarm(); } catch {}
+                    if (!isDemo) {
+                      audio.current.landingCrash();
+                      audio.current.stopThruster();
+                      try { audio.current.stopFuelAlarm(); } catch {}
+                    }
                     running = false;
                     
                     setTimeout(() => {
@@ -3007,11 +3027,11 @@ export const GameEngine: React.FC<Props> = ({
                       setShowFireworks(true);
                       
                       // Precache next level's music in background
-                      audio.current.precacheLevelTrack(level);
+                      if (!isDemo) { audio.current.precacheLevelTrack(level); }
                     }, 500);
                   } else {
                     // More pads to go - play landing sound once and continue
-                    if (!hasPlayedLandingSoundRef.current) {
+                    if (!hasPlayedLandingSoundRef.current && !isDemo) {
                       audio.current.landingCrash();
                       hasPlayedLandingSoundRef.current = true;
                       cameraShake = 3;
@@ -3023,7 +3043,7 @@ export const GameEngine: React.FC<Props> = ({
                     const checkInterval = setInterval(() => {
                       // Detect takeoff from pad
                       if (Math.abs(vy - lastVy) > 0.1 || Math.abs(vx - lastVx) > 0.1) {
-                        audio.current.fadeLandingSound(2.0);
+                        if (!isDemo) { audio.current.fadeLandingSound(2.0); }
                         clearInterval(checkInterval);
                       }
                     }, 100);
@@ -3038,7 +3058,7 @@ export const GameEngine: React.FC<Props> = ({
                   y = landedPad.y - 8;
                   vy = 0; vx = 0; av = 0; angle = 0;
                   
-                  if (!hasPlayedLandingSoundRef.current) {
+                  if (!hasPlayedLandingSoundRef.current && !isDemo) {
                     audio.current.landingCrash();
                     hasPlayedLandingSoundRef.current = true;
                     cameraShake = 2;
@@ -3104,9 +3124,11 @@ export const GameEngine: React.FC<Props> = ({
               resetStylePoints(stylePointsStateRef.current);
               
               cameraShake = 6;
-              audio.current.landing();
-              audio.current.stopThruster();
-              try { audio.current.stopFuelAlarm(); } catch {}
+              if (!isDemo) {
+                audio.current.landing();
+                audio.current.stopThruster();
+                try { audio.current.stopFuelAlarm(); } catch {}
+              }
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
               running = false;
               setTimeout(() => {
@@ -3125,7 +3147,7 @@ export const GameEngine: React.FC<Props> = ({
                 }
                 
                 // Precache next level's music in background
-                audio.current.precacheLevelTrack(level);
+                if (!isDemo) { audio.current.precacheLevelTrack(level); }
               }, 500);
             }
           } else {
@@ -3134,9 +3156,11 @@ export const GameEngine: React.FC<Props> = ({
             crashed = true;
             spawnExplosion();
             spawnDebris();
-            audio.current.explosion();
-            audio.current.stopThruster();
-            try { audio.current.stopFuelAlarm(); } catch {}
+            if (!isDemo) {
+              audio.current.explosion();
+              audio.current.stopThruster();
+              try { audio.current.stopFuelAlarm(); } catch {}
+            }
             cameraShake = 24;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
@@ -5226,10 +5250,12 @@ export const GameEngine: React.FC<Props> = ({
 
     return () => { 
       mountedRef.current = false; // Prevent initializeGame from starting loop
-      cancelAnimationFrame(rafRef.current); 
-      audio.current.stopThruster(); 
-      try { audio.current.stopFuelAlarm(); } catch {} 
-      try { audio.current.stopLevelMusic(); } catch {} 
+      cancelAnimationFrame(rafRef.current);
+      if (!isDemo) {
+        audio.current.stopThruster(); 
+        try { audio.current.stopFuelAlarm(); } catch {} 
+        try { audio.current.stopLevelMusic(); } catch {}
+      }
     };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride, waitingForSpecialMessage]);
 

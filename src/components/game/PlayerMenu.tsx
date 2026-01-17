@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
+import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 
 interface PlayerMenuProps {
   onStartGame: () => void;
@@ -26,6 +27,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
 
   // Focus management
   useEffect(() => {
@@ -169,8 +171,21 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         </nav>
       </section>
 
-      {/* Dev Portal link - bottom right */}
-      <footer className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+      {/* Footer - GFX toggle and Dev Portal link */}
+      <footer className="absolute bottom-4 right-4 flex items-center gap-4 z-10">
+        {/* GFX Toggle */}
+        <button
+          className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
+          onClick={() => {
+            const newLevel = cycleGraphicsLevel(graphicsLevel);
+            setGraphicsLevel(newLevel);
+            saveGraphicsSettings(newLevel);
+          }}
+          style={{ color: "hsl(var(--neon))" }}
+        >
+          {getGraphicsLabel(graphicsLevel)}
+        </button>
+        
         <button
           className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
           onClick={onDevPortal}
