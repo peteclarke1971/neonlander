@@ -791,8 +791,26 @@ const retryGame = () => {
       )}
       {view === "playermenu" && (
         <PlayerMenu
-          onStartGame={() => startGame("easy", undefined, "fixed", graphicsLevel === "low", undefined, { showGhost: true, nebulaFxEnabled: true, largeRotateButtons: true, showFullHUD: true })}
-          onGameModes={() => { /* TODO: Game modes sub-menu */ }}
+          onStartGame={(selectedMode) => {
+            // Map mode selection to the game Mode type
+            const modeMap: Record<string, Mode> = {
+              fixed: "fixed",
+              classic: "classic",
+              timetrial: "timetrial",
+              medley: "medley",
+            };
+            const gameMode = modeMap[selectedMode] || "fixed";
+            const isTimeTrial = selectedMode === "timetrial";
+            startGame("easy", undefined, gameMode, graphicsLevel === "low", undefined, { 
+              showGhost: isTimeTrial, 
+              nebulaFxEnabled: true, 
+              largeRotateButtons: true, 
+              showFullHUD: true 
+            });
+          }}
+          onSurvival={() => {
+            window.location.href = "/survival";
+          }}
           onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
           onSettings={() => { window.location.href = "/settings/controls"; }}
           onDevPortal={() => setView("home")}
