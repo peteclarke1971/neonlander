@@ -910,6 +910,48 @@ export class AudioManager {
     this.musicSource = src;
   }
 
+  /**
+   * Precache the next level's music track in the background (non-blocking).
+   * Call this after a successful landing to ensure the next level's music is ready.
+   * @param currentLevelIndex - The current level index (0-based). Will precache currentLevelIndex + 1.
+   */
+  async precacheLevelTrack(currentLevelIndex: number): Promise<void> {
+    // Ensure config is loaded
+    await this.initializeConfig();
+    
+    const nextIndex = currentLevelIndex + 1;
+    
+    // Get the level key (level1 through level20, cycling)
+    const levelNum = ((nextIndex % 20) + 20) % 20 + 1;
+    const levelKey = `level${levelNum}`;
+    
+    // Get URL from config with fallback
+    let url = this.getConfigPath('music', levelKey) as string;
+    if (!url) {
+      // Fallback to cycling through original 8 tracks
+      const fallbackNum = ((nextIndex % 8) + 8) % 8 + 1;
+      url = `/audio/level${fallbackNum}.mp3`;
+    }
+    
+    // Check if already cached
+    const bufferIndex = ((nextIndex % 20) + 20) % 20;
+    if (this.musicBuffers[bufferIndex]) {
+      console.log(`🎵 Level ${levelNum} track already cached`);
+      return;
+    }
+    
+    // Load in background
+    console.log(`🎵 Precaching level ${levelNum} track...`);
+    try {
+      this.musicBuffers[bufferIndex] = await this.loadBuffer(url);
+      if (this.musicBuffers[bufferIndex]) {
+        console.log(`🎵 Level ${levelNum} track cached successfully`);
+      }
+    } catch (e) {
+      console.warn(`🎵 Failed to precache level ${levelNum} track:`, e);
+    }
+  }
+
   // ========== Endless Mode Music ==========
   private shuffleEndlessPlaylist() {
     // Fisher-Yates shuffle of indices 0-4

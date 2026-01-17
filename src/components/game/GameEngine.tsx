@@ -2823,7 +2823,7 @@ export const GameEngine: React.FC<Props> = ({
               try { audio.current.stopFuelAlarm(); } catch {}
               if (gpProfileRef.current?.vibration && bullseye) { try { void vibrate(140, 0.2, 0.7); } catch {} }
               running = false;
-               setTimeout(() => {
+              setTimeout(() => {
                  // For cavern mode, don't check ghost beating (ghosts are only in fixed mode)
                  const padType = applied2x ? '2x' : 'regular';
                  setLandingType(padType);
@@ -2833,6 +2833,9 @@ export const GameEngine: React.FC<Props> = ({
                  if (messages.length > 0) {
                    setShowBonusMessages(true);
                  }
+                 
+                 // Precache next level's music in background
+                 audio.current.precacheLevelTrack(level);
                }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
@@ -2919,6 +2922,9 @@ export const GameEngine: React.FC<Props> = ({
               if (messages.length > 0) {
                 setShowBonusMessages(true);
               }
+              
+              // Precache next level's music in background
+              audio.current.precacheLevelTrack(level);
             }, 500);
           } else if (nearPad && okAngle && okVy && okVx && fuel >= 0) {
             // Time Trial Mode: Check for sequenced landing
@@ -2992,6 +2998,9 @@ export const GameEngine: React.FC<Props> = ({
                     setTimeout(() => {
                       setLandingType('regular');
                       setShowFireworks(true);
+                      
+                      // Precache next level's music in background
+                      audio.current.precacheLevelTrack(level);
                     }, 500);
                   } else {
                     // More pads to go - play landing sound once and continue
@@ -3107,6 +3116,9 @@ export const GameEngine: React.FC<Props> = ({
                 if (messages.length > 0) {
                   setShowBonusMessages(true);
                 }
+                
+                // Precache next level's music in background
+                audio.current.precacheLevelTrack(level);
               }, 500);
             }
           } else {
