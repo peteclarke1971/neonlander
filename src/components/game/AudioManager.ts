@@ -422,6 +422,23 @@ export class AudioManager {
     }
   }
 
+  /**
+   * Pre-warm the thruster buffer without starting playback.
+   * Call this before demo mode to ensure smooth audio without user interaction.
+   */
+  async prewarmThruster(): Promise<void> {
+    await this.initializeConfig();
+    this.ensureCtx();
+    if (!this.ctx) return;
+    
+    // Preload thruster buffer if not already loaded
+    if (!this.thrusterBuffer) {
+      const thrusterUrl = this.getConfigPath('sfx', 'thruster') as string || '/audio/thruster.mp3';
+      this.thrusterBuffer = await this.loadBuffer(thrusterUrl);
+      console.log('🔊 Thruster buffer pre-warmed for demo mode');
+    }
+  }
+
   private playNoise(duration = 0.25, volume = 0.5) {
     this.ensureCtx();
     if (!this.ctx || !this.master) return;
