@@ -120,7 +120,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
   return (
     <main
-      className="fixed inset-0 bg-background overflow-hidden flex items-center justify-center"
+      className="fixed inset-0 overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
       {/* Hyperspace starfield - classic into-the-screen effect */}
