@@ -87,6 +87,10 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   const [performanceStats, setPerformanceStats] = useState({ fps: 60, quality: 'high' });
   const lastFrameTime = useRef(0);
   
+  // Track active timeouts and flash elements for cleanup on skip/unmount
+  const activeTimeouts = useRef<number[]>([]);
+  const flashElements = useRef<HTMLDivElement[]>([]);
+  
   // Debug cycling state for F key
   const [debugCycleIndex, setDebugCycleIndex] = useState(0);
   const debugCycleOrder = useRef([
@@ -158,6 +162,16 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         };
     }
   }, [landingType, neonColor]);
+
+  // Safe setTimeout that tracks for cleanup
+  const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
+    const id = window.setTimeout(() => {
+      activeTimeouts.current = activeTimeouts.current.filter(t => t !== id);
+      callback();
+    }, delay);
+    activeTimeouts.current.push(id);
+    return id;
+  }, []);
 
   // Create spectacular launch with comet trail
   const createLaunch = useCallback((x: number, y: number, targetY: number, colors: any) => {
@@ -1255,10 +1269,17 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
             flash.style.opacity = '0.2';
             flash.style.zIndex = '100';
             document.body.appendChild(flash);
-            setTimeout(() => {
+            flashElements.current.push(flash);
+            
+            safeSetTimeout(() => {
               flash.style.opacity = '0';
               flash.style.transition = 'opacity 0.3s';
-              setTimeout(() => document.body.removeChild(flash), 300);
+              safeSetTimeout(() => {
+                if (document.body.contains(flash)) {
+                  document.body.removeChild(flash);
+                }
+                flashElements.current = flashElements.current.filter(f => f !== flash);
+              }, 300);
             }, 100);
           }
         }, 800 + Math.random() * 400);
@@ -1313,7 +1334,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         }
       }, launchCount * timing + 1000);
     }
-  }, [landingType, getColors, createLaunch, createBurst, qualitySettings.particleMultiplier]);
+  }, [landingType, getColors, createLaunch, createBurst, qualitySettings.particleMultiplier, safeSetTimeout]);
 
   // Enhanced animation loop with trails and effects
   useEffect(() => {
@@ -1431,6 +1452,23 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+    };
+  }, []);
+
+  // Cleanup effect for timeouts and flash elements on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all pending timeouts
+      activeTimeouts.current.forEach(id => window.clearTimeout(id));
+      activeTimeouts.current = [];
+      
+      // Remove any lingering flash elements from the DOM
+      flashElements.current.forEach(flash => {
+        if (document.body.contains(flash)) {
+          document.body.removeChild(flash);
+        }
+      });
+      flashElements.current = [];
     };
   }, []);
 
