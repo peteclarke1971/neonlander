@@ -77,6 +77,7 @@ import { loadCursorConfig } from "@/lib/cursorConfig";
 import { PerformanceManager } from "./utils/performanceManager";
 import { particlePool, debrisPool } from "./utils/objectPool";
 import { GhostManager, LunarLanderGhostFrame, LunarLanderGhostState } from "./GhostManager";
+import { GraphicsLevel, getGraphicsValue, isOptimizedGraphics } from "@/lib/graphicsConfig";
 import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
@@ -90,7 +91,7 @@ interface Props {
   initialLandings?: number;
   level?: number;
   mode: Mode;
-  lowGraphics?: boolean;
+  graphicsLevel?: GraphicsLevel;
   showCavernFX?: boolean;
   cavernFXParams?: CavernFXParams;
   seedOverride?: number;
@@ -228,7 +229,7 @@ export const GameEngine: React.FC<Props> = ({
   initialLandings, 
   level = 0, 
   mode, 
-  lowGraphics, 
+  graphicsLevel = "low", 
   showCavernFX = false, 
   cavernFXParams, 
   seedOverride, 
@@ -345,7 +346,7 @@ export const GameEngine: React.FC<Props> = ({
   // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isIPhone = /iPhone/i.test(navigator.userAgent);
-  const shouldOptimizePerformance = lowGraphics;
+  const shouldOptimizePerformance = isOptimizedGraphics(graphicsLevel);
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
@@ -3488,7 +3489,7 @@ export const GameEngine: React.FC<Props> = ({
         const canvasWidth = c.width;
         const canvasHeight = c.height;
         const dpr = Math.min(2, window.devicePixelRatio || 1);
-        const maxConcurrent = lowGraphics ? LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW : LEVEL4_CONSTANTS.MAX_CONCURRENT;
+        const maxConcurrent = getGraphicsValue(graphicsLevel, LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW, LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW, LEVEL4_CONSTANTS.MAX_CONCURRENT);
         
         // Update existing bolts
         updateLightningBolts(lightningBolts.current, dt);
@@ -3554,7 +3555,7 @@ export const GameEngine: React.FC<Props> = ({
             lightningImpacts.current.push(impact);
             
             // Spawn debris
-            const debrisCount = lowGraphics ? 12 : 20;
+            const debrisCount = getGraphicsValue(graphicsLevel, 12, 16, 20);
             for (let i = 0; i < debrisCount; i++) {
               const debris = debrisPool.get();
               debris.x = worldX;
@@ -4709,11 +4710,11 @@ export const GameEngine: React.FC<Props> = ({
         
         // 3. Render afterglows
         for (const glow of lightningAfterglows.current) {
-          renderLightningAfterglow(ctx, glow, dpr, lowGraphics);
+          renderLightningAfterglow(ctx, glow, dpr, graphicsLevel === "low");
         }
         
         // 4. Render active lightning bolts
-        renderLightningBolts(ctx, lightningBolts.current, dpr, lowGraphics);
+        renderLightningBolts(ctx, lightningBolts.current, dpr, graphicsLevel === "low");
         
         // 5. Render ozone glow
         renderOzoneGlow(ctx, lightningBolts.current.length, w / dpr, h / dpr, dpr);
@@ -5343,7 +5344,7 @@ export const GameEngine: React.FC<Props> = ({
       <CountdownOverlay 
         state={introState} 
         canvasRef={canvasRef}
-        lowGraphics={lowGraphics}
+        lowGraphics={graphicsLevel === "low"}
         shipPosition={shipScreenPos ?? undefined}
       />
       
@@ -5354,7 +5355,7 @@ export const GameEngine: React.FC<Props> = ({
           neonColor={neonColor}
           isWorldRecord={isWorldRecord}
           isHighScore={isWorldRecord}
-          lowGraphics={lowGraphics}
+          lowGraphics={graphicsLevel === "low"}
         onComplete={async () => {
           setShowFireworks(false);
           
