@@ -261,9 +261,16 @@ const Index = () => {
     }
   };
 
-  const startDemo = (levelIndex: number) => {
+  const startDemo = async (levelIndex: number) => {
     const level = demoSequence[levelIndex];
     console.log("🎮 Starting demo for level:", level);
+    
+    // Ensure SFX are preloaded before demo starts (prevents poppy thruster sound)
+    const audio = getGlobalAudioManager();
+    try {
+      await audio.prewarmThruster();
+    } catch {}
+    
     setDemoLevel(level);
     setDifficulty("easy"); // Always use easy for demos
     setMode("fixed"); // Use fixed mode for consistent demos

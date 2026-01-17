@@ -236,6 +236,20 @@ export const HomeScreen: React.FC<Props> = ({
     }
   }, [lastPlayedSeed]);
 
+  // Proactively preload SFX for demo mode (doesn't require user interaction)
+  // This ensures the thruster and other sounds are cached before attract mode starts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Preload SFX in background after page settles
+      // This won't unlock AudioContext on iOS but will cache the buffers
+      audioRef.current.initializeConfig().then(() => {
+        audioRef.current.preloadSFX().catch(() => {});
+      }).catch(() => {});
+    }, 2000); // 2 second delay to let page render
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-enable ghost mode when switching to fixed mode or time trial
   useEffect(() => {
     if (mode === "fixed" || mode === "timetrial") {
