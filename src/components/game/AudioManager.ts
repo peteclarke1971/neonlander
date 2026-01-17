@@ -71,6 +71,26 @@ export class AudioManager {
     crack?: AudioBuffer | null;
     impact?: AudioBuffer | null;
   } = {};
+  
+  // Comet and UFO sound buffers
+  private cometArrivalBuffer?: AudioBuffer | null;
+  private ufoSmallBuffer?: AudioBuffer | null;
+  private ufoMediumBuffer?: AudioBuffer | null;
+  private ufoLargeBuffer?: AudioBuffer | null;
+  
+  // UFO looping sound state
+  private ufoSmallSource?: AudioBufferSourceNode | null;
+  private ufoMediumSource?: AudioBufferSourceNode | null;
+  private ufoLargeSource?: AudioBufferSourceNode | null;
+  private ufoSmallGain?: GainNode;
+  private ufoMediumGain?: GainNode;
+  private ufoLargeGain?: GainNode;
+  private ufoSmallActive = false;
+  private ufoMediumActive = false;
+  private ufoLargeActive = false;
+  private ufoSmallTimeout?: ReturnType<typeof setTimeout>;
+  private ufoMediumTimeout?: ReturnType<typeof setTimeout>;
+  private ufoLargeTimeout?: ReturnType<typeof setTimeout>;
 
   constructor() {
     // Load global music mute state from localStorage
@@ -128,12 +148,21 @@ export class AudioManager {
     this.shieldPickupBuffer = null;
     this.shieldBreakBuffer = null;
     this.missionSuccessBuffer = null;
+    this.cometArrivalBuffer = null;
+    this.ufoSmallBuffer = null;
+    this.ufoMediumBuffer = null;
+    this.ufoLargeBuffer = null;
     this.musicBuffers = new Array(20).fill(null);
     this.endlessBuffers = new Array(5).fill(null);
     this.endlessPlaylist = [];
     this.endlessCurrentIndex = 0;
     this.isPreloaded = false;
     this.preloadPromise = undefined;
+    
+    // Stop UFO sounds
+    this.stopUfoSmallSound();
+    this.stopUfoMediumSound();
+    this.stopUfoLargeSound();
     
     // Reload config
     this.audioConfig = null;
@@ -1481,6 +1510,9 @@ export class AudioManager {
     this.stopMissionSuccess();
     this.stopTitleMusic();
     try { this.stopWeatherAmbient(); } catch {}
+    this.stopUfoSmallSound();
+    this.stopUfoMediumSound();
+    this.stopUfoLargeSound();
     
     // Reset state flags
     this.fuelAlarmOn = false;
@@ -1495,6 +1527,220 @@ export class AudioManager {
     this.thrusterSource = null;
     this.landingSoundSource = null;
     this.landingSoundGain = null;
+  }
+  
+  // ========== Comet Sound (one-shot) ==========
+  async playCometArrival(): Promise<void> {
+    await this.initializeConfig();
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    const volume = this.getConfigVolume('sfx', 'cometArrival');
+    
+    // Load buffer if not already loaded
+    if (!this.cometArrivalBuffer) {
+      const url = this.getConfigPath('sfx', 'cometArrival') as string || '/audio/Comet_coming.mp3';
+      this.cometArrivalBuffer = await this.loadBuffer(url);
+    }
+    
+    if (this.cometArrivalBuffer) {
+      this.playOneShot(this.cometArrivalBuffer, volume);
+      console.log('☄️ Comet arrival sound playing');
+    } else {
+      // Fallback: synthesized whoosh
+      this.playNoise(0.8, volume * 0.5);
+    }
+  }
+  
+  // ========== UFO Sounds (looping with 3s pause) ==========
+  
+  /**
+   * Play UFO sound in a loop with a 3-second pause between plays
+   */
+  private playUfoSoundLoop(
+    type: 'small' | 'medium' | 'large',
+    buffer: AudioBuffer,
+    volume: number
+  ): void {
+    this.ensureCtx();
+    if (!this.ctx || !this.master) return;
+    
+    // Check if still active
+    const isActive = type === 'small' ? this.ufoSmallActive : 
+                     type === 'medium' ? this.ufoMediumActive : 
+                     this.ufoLargeActive;
+    if (!isActive) return;
+    
+    // Create gain node for this UFO type
+    let gainNode: GainNode;
+    switch (type) {
+      case 'small':
+        if (!this.ufoSmallGain) {
+          this.ufoSmallGain = this.ctx.createGain();
+          this.ufoSmallGain.connect(this.master);
+        }
+        gainNode = this.ufoSmallGain;
+        break;
+      case 'medium':
+        if (!this.ufoMediumGain) {
+          this.ufoMediumGain = this.ctx.createGain();
+          this.ufoMediumGain.connect(this.master);
+        }
+        gainNode = this.ufoMediumGain;
+        break;
+      case 'large':
+        if (!this.ufoLargeGain) {
+          this.ufoLargeGain = this.ctx.createGain();
+          this.ufoLargeGain.connect(this.master);
+        }
+        gainNode = this.ufoLargeGain;
+        break;
+    }
+    
+    gainNode.gain.value = volume;
+    
+    // Create and play the source
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(gainNode);
+    source.start(0);
+    
+    // Store reference
+    switch (type) {
+      case 'small': this.ufoSmallSource = source; break;
+      case 'medium': this.ufoMediumSource = source; break;
+      case 'large': this.ufoLargeSource = source; break;
+    }
+    
+    // Schedule next play after sound ends + 3 second pause
+    const duration = buffer.duration * 1000; // ms
+    const timeout = setTimeout(() => {
+      // Re-check if still active before replaying
+      const stillActive = type === 'small' ? this.ufoSmallActive : 
+                          type === 'medium' ? this.ufoMediumActive : 
+                          this.ufoLargeActive;
+      if (stillActive) {
+        this.playUfoSoundLoop(type, buffer, volume);
+      }
+    }, duration + 3000); // 3 second pause
+    
+    // Store timeout reference
+    switch (type) {
+      case 'small': this.ufoSmallTimeout = timeout; break;
+      case 'medium': this.ufoMediumTimeout = timeout; break;
+      case 'large': this.ufoLargeTimeout = timeout; break;
+    }
+  }
+  
+  async startUfoSmallSound(): Promise<void> {
+    if (this.ufoSmallActive) return; // Already playing
+    
+    await this.initializeConfig();
+    this.ensureCtx();
+    if (!this.ctx) return;
+    
+    // Load buffer if needed
+    if (!this.ufoSmallBuffer) {
+      const url = this.getConfigPath('sfx', 'ufoSmall') as string || '/audio/sfx_hovering_scifi_1.mp3';
+      this.ufoSmallBuffer = await this.loadBuffer(url);
+    }
+    
+    if (this.ufoSmallBuffer) {
+      this.ufoSmallActive = true;
+      const volume = this.getConfigVolume('sfx', 'ufoSmall');
+      this.playUfoSoundLoop('small', this.ufoSmallBuffer, volume);
+      console.log('🛸 Small UFO sound started');
+    }
+  }
+  
+  stopUfoSmallSound(): void {
+    this.ufoSmallActive = false;
+    if (this.ufoSmallTimeout) {
+      clearTimeout(this.ufoSmallTimeout);
+      this.ufoSmallTimeout = undefined;
+    }
+    if (this.ufoSmallSource) {
+      try { this.ufoSmallSource.stop(); } catch {}
+      this.ufoSmallSource.disconnect();
+      this.ufoSmallSource = null;
+    }
+  }
+  
+  async startUfoMediumSound(): Promise<void> {
+    if (this.ufoMediumActive) return; // Already playing
+    
+    await this.initializeConfig();
+    this.ensureCtx();
+    if (!this.ctx) return;
+    
+    // Load buffer if needed
+    if (!this.ufoMediumBuffer) {
+      const url = this.getConfigPath('sfx', 'ufoMedium') as string || '/audio/sfx_hovering_scifi_3.mp3';
+      this.ufoMediumBuffer = await this.loadBuffer(url);
+    }
+    
+    if (this.ufoMediumBuffer) {
+      this.ufoMediumActive = true;
+      const volume = this.getConfigVolume('sfx', 'ufoMedium');
+      this.playUfoSoundLoop('medium', this.ufoMediumBuffer, volume);
+      console.log('🛸 Medium UFO sound started');
+    }
+  }
+  
+  stopUfoMediumSound(): void {
+    this.ufoMediumActive = false;
+    if (this.ufoMediumTimeout) {
+      clearTimeout(this.ufoMediumTimeout);
+      this.ufoMediumTimeout = undefined;
+    }
+    if (this.ufoMediumSource) {
+      try { this.ufoMediumSource.stop(); } catch {}
+      this.ufoMediumSource.disconnect();
+      this.ufoMediumSource = null;
+    }
+  }
+  
+  async startUfoLargeSound(): Promise<void> {
+    if (this.ufoLargeActive) return; // Already playing
+    
+    await this.initializeConfig();
+    this.ensureCtx();
+    if (!this.ctx) return;
+    
+    // Load buffer if needed
+    if (!this.ufoLargeBuffer) {
+      const url = this.getConfigPath('sfx', 'ufoLarge') as string || '/audio/sfx_ominous_1.mp3';
+      this.ufoLargeBuffer = await this.loadBuffer(url);
+    }
+    
+    if (this.ufoLargeBuffer) {
+      this.ufoLargeActive = true;
+      const volume = this.getConfigVolume('sfx', 'ufoLarge');
+      this.playUfoSoundLoop('large', this.ufoLargeBuffer, volume);
+      console.log('🛸 Large UFO (Mothership) sound started');
+    }
+  }
+  
+  stopUfoLargeSound(): void {
+    this.ufoLargeActive = false;
+    if (this.ufoLargeTimeout) {
+      clearTimeout(this.ufoLargeTimeout);
+      this.ufoLargeTimeout = undefined;
+    }
+    if (this.ufoLargeSource) {
+      try { this.ufoLargeSource.stop(); } catch {}
+      this.ufoLargeSource.disconnect();
+      this.ufoLargeSource = null;
+    }
+  }
+  
+  /**
+   * Stop all UFO sounds (convenience method)
+   */
+  stopAllUfoSounds(): void {
+    this.stopUfoSmallSound();
+    this.stopUfoMediumSound();
+    this.stopUfoLargeSound();
   }
 }
 

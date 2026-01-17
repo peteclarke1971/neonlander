@@ -1462,6 +1462,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 cometTrailAlphaRef.current = 1.0;
                 cometPositionRef.current = { x: 0, y: 0, progress: 0 };
                 firstCometSpawnedRef.current = true;
+                audio.current.playCometArrival();
                 
                 // Set next comet target: 8-16 blocks from now
                 const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
@@ -1478,6 +1479,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 cometTrailAlphaRef.current = 1.0;
                 cometPositionRef.current = { x: 0, y: 0, progress: 0 };
                 firstCometSpawnedRef.current = true;
+                audio.current.playCometArrival();
                 
                 // Set next comet target
                 const gap = 8 + Math.floor(Math.random() * 9);
@@ -1504,6 +1506,7 @@ export const SurvivalEngine: React.FC<Props> = ({
                 cometTimerRef.current = 10.0;
                 cometTrailAlphaRef.current = 1.0;
                 cometPositionRef.current = { x: 0, y: 0, progress: 0 };
+                audio.current.playCometArrival();
                 
                 // Set next comet target: 8-16 blocks from now
                 const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
