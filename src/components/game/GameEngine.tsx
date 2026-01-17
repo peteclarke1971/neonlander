@@ -2222,6 +2222,7 @@ export const GameEngine: React.FC<Props> = ({
                   configs.small
                 );
                 state.activeSmall = newUFO;
+                audio.current.startUfoSmallSound();
                 break;
                 
               case "medium":
@@ -2239,6 +2240,7 @@ export const GameEngine: React.FC<Props> = ({
                 newUFO.scale = 1.0;
                 newUFO.canShoot = true;
                 state.activeMedium = newUFO;
+                audio.current.startUfoMediumSound();
                 break;
                 
               case "large":
@@ -2254,6 +2256,7 @@ export const GameEngine: React.FC<Props> = ({
                   terrain.points
                 );
                 state.activeLarge = newUFO;
+                audio.current.startUfoLargeSound();
                 break;
             }
             
@@ -2282,6 +2285,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeSmall.active) {
             console.log("🛸 Small UFO deactivated");
+            audio.current.stopUfoSmallSound();
           }
         }
         
@@ -2303,6 +2307,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeMedium.active) {
             console.log("🛸 Medium UFO deactivated");
+            audio.current.stopUfoMediumSound();
           }
         }
         
@@ -2322,6 +2327,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!state.activeLarge.active) {
             console.log("🛸 Large UFO deactivated");
+            audio.current.stopUfoLargeSound();
           }
         }
         

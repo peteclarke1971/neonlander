@@ -72,6 +72,10 @@ export interface SfxConfig {
   lightningImpact: AudioEventConfig;
   jellyfishBurst: AudioEventConfig;
   jellyfishShock: AudioEventConfig;
+  cometArrival: AudioEventConfig;
+  ufoSmall: AudioEventConfig;
+  ufoMedium: AudioEventConfig;
+  ufoLarge: AudioEventConfig;
 }
 
 export interface AudioConfig {
@@ -144,6 +148,10 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     lightningImpact: { path: null, volume: 0.8 },
     jellyfishBurst: { path: null, volume: 0.5 },
     jellyfishShock: { path: null, volume: 0.5 },
+    cometArrival: { path: '/audio/Comet_coming.mp3', volume: 0.7 },
+    ufoSmall: { path: '/audio/sfx_hovering_scifi_1.mp3', volume: 0.5 },
+    ufoMedium: { path: '/audio/sfx_hovering_scifi_3.mp3', volume: 0.5 },
+    ufoLarge: { path: '/audio/sfx_ominous_1.mp3', volume: 0.6 },
   }
 };
 
@@ -206,6 +214,10 @@ export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
   lightningImpact: 'Lightning Impact',
   jellyfishBurst: 'Jellyfish Burst',
   jellyfishShock: 'Jellyfish Shock',
+  cometArrival: 'Comet Arrival',
+  ufoSmall: 'Small UFO',
+  ufoMedium: 'Medium UFO',
+  ufoLarge: 'Large UFO (Mothership)',
 };
 
 /**
@@ -228,5 +240,6 @@ export const SFX_EVENT_KEYS: SfxEventKey[] = [
   'junkPickup', 'junkSetComplete', 'volcanoErupt',
   'wormholeOpen', 'wormholeEnter',
   'lightningRumble', 'lightningCrack', 'lightningImpact',
-  'jellyfishBurst', 'jellyfishShock'
+  'jellyfishBurst', 'jellyfishShock',
+  'cometArrival', 'ufoSmall', 'ufoMedium', 'ufoLarge'
 ];
