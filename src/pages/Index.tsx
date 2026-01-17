@@ -150,6 +150,16 @@ const Index = () => {
     if (meta) meta.setAttribute("content", "Pilot a neon-glow lunar lander. Master thrust and rotation to score precision landings on procedural terrain.");
   }, []);
 
+  // Cleanup on component unmount (handles navigation away from page)
+  // This ensures demo mode audio and intervals are properly terminated
+  useEffect(() => {
+    return () => {
+      console.log("🧹 Index unmounting - cleaning up demo mode and audio");
+      const audio = getGlobalAudioManager();
+      audio.stopAllAudio();
+    };
+  }, []);
+
   // Page-level cursor manager: hide cursor on app start, no pointer lock
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const pageCursorMgr = useRef<CursorManager | null>(null);
