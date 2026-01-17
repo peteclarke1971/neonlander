@@ -677,33 +677,42 @@ export const HomeScreen: React.FC<Props> = ({
         }}>
               {getGraphicsLabel(graphicsLevel)} ✓
             </Button>}
-          <a href="/duel" className="inline-block">
-            <Button variant="neon">⚔️ LANDER DUEL</Button>
-          </a>
-          <a href="/asteroids" className="inline-block">
-            <Button ref={asteroidsBtnRef} variant="neon">🚀 NEON ASTEROIDS</Button>
-          </a>
-          <a href="/lightcycles" className="inline-block">
-            <Button variant="neon">⚡ NEON LIGHT CYCLES</Button>
-          </a>
-          <a href="/neon-racing" className="inline-block">
-            <Button variant="neon">🏁 NEON RACING</Button>
-          </a>
-          <a href="/neon-docking" className="inline-block">
-            <Button variant="neon">🚀 NEON DOCKING</Button>
-          </a>
-          <a href="/survival" className="inline-block">
-            <Button variant="neon">🌌 SURVIVAL</Button>
-          </a>
-          <a href="/cavern-fx-demo" className="inline-block">
-            <Button variant="neon">🌟 CAVERN FX DEMO</Button>
-          </a>
-          {!isIOS && <a href="/settings/controls" className="inline-block">
-              <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
-            </a>}
-          <a href="/settings/audio" className="inline-block">
-            <Button variant="outline">Settings ▸ Audio</Button>
-          </a>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/duel");
+          }}>⚔️ LANDER DUEL</Button>
+          <Button ref={asteroidsBtnRef} variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/asteroids");
+          }}>🚀 NEON ASTEROIDS</Button>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/lightcycles");
+          }}>⚡ NEON LIGHT CYCLES</Button>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/neon-racing");
+          }}>🏁 NEON RACING</Button>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/neon-docking");
+          }}>🚀 NEON DOCKING</Button>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/survival");
+          }}>🌌 SURVIVAL</Button>
+          <Button variant="neon" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/cavern-fx-demo");
+          }}>🌟 CAVERN FX DEMO</Button>
+          {!isIOS && <Button ref={settingsBtnRef} variant="outline" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/settings/controls");
+          }}>Settings ▸ Controls</Button>}
+          <Button variant="outline" onClick={() => {
+            audioRef.current.stopAllAudio();
+            navigate("/settings/audio");
+          }}>Settings ▸ Audio</Button>
           {showFullscreenBtn && <Button ref={fullscreenBtnRef} variant="outline" size="sm" onClick={toggleFullscreen} title="Toggle fullscreen mode (F11)" className="text-xs">
               {isFullscreen ? "Exit Full Screen" : "Full Screen"}
             </Button>}
@@ -760,12 +769,14 @@ export const HomeScreen: React.FC<Props> = ({
         <div className="mt-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Visual Effects</div>
           <div className="flex gap-2 justify-center flex-wrap">
-            {isIOS && <a href="/settings/controls" className="inline-block">
-                <Button ref={settingsBtnRef} variant="outline">Settings ▸ Controls</Button>
-              </a>}
-            {isIOS && <a href="/settings/audio" className="inline-block">
-                <Button variant="outline">Settings ▸ Audio</Button>
-              </a>}
+            {isIOS && <Button ref={settingsBtnRef} variant="outline" onClick={() => {
+              audioRef.current.stopAllAudio();
+              navigate("/settings/controls");
+            }}>Settings ▸ Controls</Button>}
+            {isIOS && <Button variant="outline" onClick={() => {
+              audioRef.current.stopAllAudio();
+              navigate("/settings/audio");
+            }}>Settings ▸ Audio</Button>}
             <button className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${nebulaFxEnabled ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-card/40 hover:bg-card/60 text-muted-foreground border border-border/40"}`} onClick={() => setNebulaFxEnabled(!nebulaFxEnabled)}>
               🌌 Nebula FX {nebulaFxEnabled ? "ON" : "OFF"}
             </button>
