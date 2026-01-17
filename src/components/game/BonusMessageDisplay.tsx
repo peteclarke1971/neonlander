@@ -113,7 +113,6 @@ export const BonusMessageDisplay = ({
   // Adjust sizes for iPhone
   const textSize = isIPhone ? 'text-2xl' : 'text-5xl';
   const shadowBlur = isIPhone ? 14 : 28;
-  const strokeWidth = isIPhone ? 1 : 2;
 
   return (
     <div 
@@ -124,13 +123,11 @@ export const BonusMessageDisplay = ({
       }}
     >
       <div
-        className={`text-center font-black ${textSize}`}
+        className={`text-center font-bold ${textSize}`}
         style={{
           fontFamily: '"Orbitron", sans-serif',
           color: neonColor,
-          textShadow: `0 0 ${shadowBlur}px ${neonColor}, 0 0 ${shadowBlur * 2}px ${neonColor}`,
-          WebkitTextStroke: `${strokeWidth}px ${neonColor}`,
-          paintOrder: 'stroke fill',
+          textShadow: `0 0 ${shadowBlur * 0.7}px ${neonColor}, 0 0 ${shadowBlur * 1.4}px ${neonColor}`,
         }}
       >
         {messages[currentIndex]}
