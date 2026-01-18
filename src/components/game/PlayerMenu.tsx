@@ -3,15 +3,29 @@ import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 import { useFullscreen } from "@/hooks/use-fullscreen";
+import { Difficulty } from "./types";
 
-type GameModeId = "fixed" | "classic" | "timetrial" | "medley";
+export type GameModeId = "fixed" | "classic" | "timetrial" | "medley";
+
+export interface GameSettings {
+  introVariant: "auto" | "freeze" | "warp";
+  skipCountdowns: "never" | "first" | "always";
+  photosensitive: boolean;
+  showGhost: boolean;
+  nebulaFxEnabled: boolean;
+  largeRotateButtons: boolean;
+  showFullHUD: boolean;
+  graphicsLevel: GraphicsLevel;
+  difficulty: Difficulty;
+}
 
 interface PlayerMenuProps {
-  onStartGame: (mode: GameModeId) => void;
+  onStartGame: (mode: GameModeId, settings: GameSettings) => void;
   onSurvival: () => void;
   onLeaderboards: () => void;
   onSettings: () => void;
   onDevPortal: () => void;
+  onInteraction?: () => void;
 }
 
 const menuItems = [
@@ -29,12 +43,35 @@ const gameModeOptions: { id: GameModeId; label: string; description: string }[] 
   { id: "medley", label: "MEDLEY", description: "Mix of all game types in rotation" },
 ];
 
+/** Load all game settings from localStorage (same keys as Developer Menu) */
+function loadSettingsFromStorage(): GameSettings {
+  const getBool = (key: string, def: boolean) => {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
+  };
+  const getStr = <T extends string>(key: string, def: T): T => {
+    try { return (localStorage.getItem(key) as T) || def; } catch { return def; }
+  };
+  
+  return {
+    introVariant: getStr("ll-intro-variant", "auto") as "auto" | "freeze" | "warp",
+    skipCountdowns: getStr("ll-skip-countdowns", "never") as "never" | "first" | "always",
+    photosensitive: getBool("ll-photosensitive", false),
+    showGhost: getBool("ll-global-ghosts-enabled", false),
+    nebulaFxEnabled: getBool("ll-nebula-fx-enabled", true),
+    largeRotateButtons: getBool("ll-large-rotate-buttons", true),
+    showFullHUD: getBool("ll-show-full-hud", true),
+    graphicsLevel: loadGraphicsSettings(),
+    difficulty: getStr("ll-difficulty", "easy") as Difficulty,
+  };
+}
+
 export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   onStartGame,
   onSurvival,
   onLeaderboards,
   onSettings,
   onDevPortal,
+  onInteraction,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [showModeMenu, setShowModeMenu] = useState(false);
@@ -188,8 +225,20 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   };
 
   const handleAction = (id: string) => {
+    // Notify parent of user interaction (for demo timer reset)
+    onInteraction?.();
+    
     switch (id) {
-      case "start": onStartGame(selectedMode); break;
+      case "start": {
+        // Read all settings from localStorage (same as Developer Menu)
+        const settings = loadSettingsFromStorage();
+        // For time trial mode, always enable ghost
+        if (selectedMode === "timetrial" || selectedMode === "fixed") {
+          settings.showGhost = true;
+        }
+        onStartGame(selectedMode, settings);
+        break;
+      }
       case "survival": onSurvival(); break;
       case "modes": 
         setShowModeMenu(true); 
