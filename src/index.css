@@ -12,6 +12,13 @@
   -webkit-touch-callout: none;
 }
 
+/* iOS Safari canvas fixes - GPU acceleration */
+canvas {
+  display: block;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

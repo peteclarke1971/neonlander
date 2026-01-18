@@ -214,7 +214,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       onKeyDown={handleKeyDown}
     >
       {/* Hyperspace starfield - classic into-the-screen effect */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 w-full h-full" style={{ width: '100%', height: '100%' }}>
         <HyperspaceStarfield 
           speed={0.28}
           density={1600}
