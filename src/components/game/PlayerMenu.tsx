@@ -262,22 +262,21 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       className="fixed inset-0 overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      {/* Hyperspace starfield - fixed positioning for iOS Safari */}
-      <div className="fixed inset-0" style={{ zIndex: 0 }}>
-        <HyperspaceStarfield 
-          speed={0.28}
-          density={1600}
-          focalLength={480}
-          trail={0.55}
-          style="glow"
-          allowBoost={true}
-        />
-      </div>
+      {/* Hyperspace starfield - no wrapper, canvas is fixed via CSS */}
+      <HyperspaceStarfield 
+        speed={0.28}
+        density={1600}
+        focalLength={480}
+        trail={0.55}
+        style="glow"
+        allowBoost={true}
+      />
       
-      {/* Subtle gradient overlay */}
+      {/* Subtle gradient overlay - z-index 2 to sit above starfield but below content */}
       <div 
-        className="absolute inset-0 pointer-events-none"
+        className="fixed inset-0 pointer-events-none"
         style={{
+          zIndex: 2,
           background: "radial-gradient(ellipse at center, transparent 0%, hsl(var(--background)) 70%)"
         }}
       />

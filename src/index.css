@@ -21,13 +21,19 @@ canvas {
 
 /* iOS Safari HyperspaceStarfield fix - ensure canvas fills container */
 .hyperspace-canvas {
-  position: absolute !important;
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
   height: 100dvh !important;
   min-width: 100vw !important;
   min-height: 100dvh !important;
+  z-index: 1 !important;
+  /* Force GPU compositing on iOS Safari */
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
