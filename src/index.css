@@ -19,6 +19,17 @@ canvas {
   transform: translateZ(0);
 }
 
+/* iOS Safari HyperspaceStarfield fix - ensure canvas fills container */
+.hyperspace-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-width: 100vw !important;
+  min-height: 100dvh !important;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

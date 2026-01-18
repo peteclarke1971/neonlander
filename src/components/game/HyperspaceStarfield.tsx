@@ -58,15 +58,20 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       PulseWarp: (duration, peakSpeed = 1) => { boostRef.current = { t: 0, d: Math.max(0.1, duration), peak: Math.max(0.6, Math.min(1, peakSpeed)) }; },
     }));
 
-    // Helper to get dimensions with iOS fallback
+    // Helper to get dimensions with iOS fallback (multiple fallbacks)
     const getDimensions = (canvas: HTMLCanvasElement) => {
       let w = canvas.clientWidth;
       let h = canvas.clientHeight;
-      // iOS Safari fallback - clientWidth/Height can return 0 before layout
+      // Fallback 1: getBoundingClientRect (iOS Safari)
       if (w === 0 || h === 0) {
         const rect = canvas.getBoundingClientRect();
         w = rect.width;
         h = rect.height;
+      }
+      // Fallback 2: viewport dimensions (final iOS Safari fix)
+      if (w === 0 || h === 0) {
+        w = window.innerWidth;
+        h = window.innerHeight;
       }
       return { w, h };
     };
@@ -121,12 +126,23 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       const ctx = c.getContext("2d");
       if (!ctx) return;
       
+      let initTimeout: number;
+      let rafInit: number;
+      
       const resize = () => {
         const { w, h } = getDimensions(c);
         if (w === 0 || h === 0) return;
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         c.width = Math.floor(w * dpr);
         c.height = Math.floor(h * dpr);
+      };
+      
+      // Delayed initialization for iOS Safari layout timing
+      const delayedInit = () => {
+        rafInit = requestAnimationFrame(() => {
+          resize();
+          reinitStars(false);
+        });
       };
       
       // Use ResizeObserver for reliable sizing on iOS
@@ -147,8 +163,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       });
       resizeObserver.observe(c);
       
-      resize();
-      reinitStars(false); // initial mount - don't preserve speed
+      // Wait for iOS Safari layout to complete before initializing
+      initTimeout = window.setTimeout(delayedInit, 50);
 
       let last = performance.now();
       let fpsWindow: number[] = [];
@@ -357,11 +373,13 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       rafRef.current = requestAnimationFrame(loop);
       return () => {
         cancelAnimationFrame(rafRef.current);
+        cancelAnimationFrame(rafInit);
+        clearTimeout(initTimeout);
         window.removeEventListener("keydown", onKey);
         resizeObserver.disconnect();
       };
     }, []);
 
-    return <canvas ref={canvasRef} className={"absolute inset-0 w-full h-full " + (className || "")} aria-hidden />;
+    return <canvas ref={canvasRef} className={"hyperspace-canvas " + (className || "")} aria-hidden />;
   }
 );
