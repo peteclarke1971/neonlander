@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
+import { MobileStarfield } from "./MobileStarfield";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 import { useFullscreen } from "@/hooks/use-fullscreen";
+import { isIOSDevice } from "@/lib/deviceDetection";
 import { Difficulty } from "./types";
 
 export type GameModeId = "fixed" | "classic" | "timetrial" | "medley";
@@ -257,26 +259,34 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Get label for currently selected mode to display on main menu
   const selectedModeLabel = gameModeOptions.find(m => m.id === selectedMode)?.label || "CAMPAIGN";
 
+  // Detect iOS once on mount
+  const [isiOS] = useState(() => isIOSDevice());
+
   return (
     <main
       className="fixed inset-0 overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      {/* Hyperspace starfield - no wrapper, canvas is fixed via CSS */}
-      <HyperspaceStarfield 
-        speed={0.28}
-        density={1600}
-        focalLength={480}
-        trail={0.55}
-        style="glow"
-        allowBoost={true}
-      />
+      {/* Starfield background - iOS gets MobileStarfield, others get HyperspaceStarfield */}
+      <div className="absolute inset-0 overflow-hidden">
+        {isiOS ? (
+          <MobileStarfield starCount={180} speed={0.5} />
+        ) : (
+          <HyperspaceStarfield 
+            speed={0.28}
+            density={1600}
+            focalLength={480}
+            trail={0.55}
+            style="glow"
+            allowBoost={true}
+          />
+        )}
+      </div>
       
-      {/* Subtle gradient overlay - z-index 2 to sit above starfield but below content */}
+      {/* Subtle gradient overlay */}
       <div 
-        className="fixed inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          zIndex: 2,
           background: "radial-gradient(ellipse at center, transparent 0%, hsl(var(--background)) 70%)"
         }}
       />
