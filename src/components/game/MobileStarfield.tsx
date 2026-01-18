@@ -37,7 +37,7 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
           distance: Math.random(), // Start distributed across the screen
           speed: 0.15 + Math.random() * 0.35,
           size: 0.8 + Math.random() * 2,
-          brightness: 0.7 + Math.random() * 0.3,
+          brightness: 0.85 + Math.random() * 0.15,
         });
       }
     };
@@ -90,7 +90,7 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
 
         // Scale size and alpha based on distance (closer = larger + brighter)
         const scale = 0.6 + star.distance * 2.5;
-        const alpha = Math.min(1, star.brightness * (0.4 + star.distance * 0.6));
+        const alpha = Math.min(1, star.brightness * (0.5 + star.distance * 0.5));
 
         // Draw star with slight trail
         const trailLength = star.distance * 8 * speed;
