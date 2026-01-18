@@ -21,7 +21,7 @@ import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import { DemoTransition } from "@/components/game/DemoTransition";
 import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
-import { PlayerMenu } from "@/components/game/PlayerMenu";
+import { PlayerMenu, GameSettings as PlayerMenuSettings } from "@/components/game/PlayerMenu";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
@@ -38,6 +38,7 @@ const Index = () => {
   const [demoLevel, setDemoLevel] = useState(1);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
   const [demoStartTime, setDemoStartTime] = useState<number | null>(null);
+  const [demoOriginView, setDemoOriginView] = useState<"home" | "playermenu">("home"); // Track where demo started
   const demoSequence = [1, 4, 5, 6, 9, 10, 14, 19, 31, 50]; // Demo levels to cycle through
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [mode, setMode] = useState<Mode>("classic");
@@ -275,9 +276,9 @@ const Index = () => {
     }
   };
 
-  const startDemo = async (levelIndex: number) => {
+  const startDemo = async (levelIndex: number, originView: "home" | "playermenu" = "home") => {
     const level = demoSequence[levelIndex];
-    console.log("🎮 Starting demo for level:", level);
+    console.log("🎮 Starting demo for level:", level, "origin:", originView);
     
     // Ensure SFX are preloaded before demo starts (prevents poppy thruster sound)
     const audio = getGlobalAudioManager();
@@ -286,6 +287,7 @@ const Index = () => {
     } catch {}
     
     setDemoLevel(level);
+    setDemoOriginView(originView); // Remember where to return
     setDifficulty("easy"); // Always use easy for demos
     setMode("fixed"); // Use fixed mode for consistent demos
     setGraphicsLevel("low"); // Force low graphics for demos
@@ -318,8 +320,8 @@ const Index = () => {
   };
 
   const exitDemo = () => {
-    console.log("🏠 Exiting demo, returning to home");
-    setView("home");
+    console.log("🏠 Exiting demo, returning to origin:", demoOriginView);
+    setView(demoOriginView); // Return to the view that started the demo
     resetTimers();
   };
 
@@ -650,7 +652,7 @@ const retryGame = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [view, needsInitials, lastResult, goIndex]);
 
-  // Demo timer system - 60 seconds on menu, 15 seconds per demo
+  // Demo timer system - 60 seconds on menu (home or playermenu), 15 seconds per demo
   useEffect(() => {
     // Don't run demo timer during active gameplay
     if (view === "game" || view === "gameover") {
@@ -660,10 +662,10 @@ const retryGame = () => {
     const interval = setInterval(() => {
       const now = Date.now();
       
-      if (view === "home") {
+      if (view === "home" || view === "playermenu") {
         // Check if 60 seconds have passed since last interaction
         if (now - lastInteractionTime > 60000) {
-          startDemo(demoSequenceIndex);
+          startDemo(demoSequenceIndex, view as "home" | "playermenu");
         }
       } else if (view === "demo" && demoStartTime) {
         // Normal 15 second timeout for demo
@@ -680,11 +682,11 @@ const retryGame = () => {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [view, lastInteractionTime, demoSequenceIndex, demoStartTime]);
+  }, [view, lastInteractionTime, demoSequenceIndex, demoStartTime, demoOriginView]);
 
-  // User interaction detection for home screen (demo timer reset)
+  // User interaction detection for home/playermenu screens (demo timer reset)
   useEffect(() => {
-    if (view !== "home") return; // Only track interactions on home screen
+    if (view !== "home" && view !== "playermenu") return; // Track interactions on menu screens
     
     const resetHomeTimer = () => {
       setLastInteractionTime(Date.now());
@@ -791,7 +793,7 @@ const retryGame = () => {
       )}
       {view === "playermenu" && (
         <PlayerMenu
-          onStartGame={(selectedMode) => {
+          onStartGame={(selectedMode, settings) => {
             // Map mode selection to the game Mode type
             const modeMap: Record<string, Mode> = {
               fixed: "fixed",
@@ -800,13 +802,20 @@ const retryGame = () => {
               medley: "medley",
             };
             const gameMode = modeMap[selectedMode] || "fixed";
-            const isTimeTrial = selectedMode === "timetrial";
-            startGame("easy", undefined, gameMode, graphicsLevel === "low", undefined, { 
-              showGhost: isTimeTrial, 
-              nebulaFxEnabled: true, 
-              largeRotateButtons: true, 
-              showFullHUD: true 
-            });
+            // Use ALL settings from Developer Menu (passed from PlayerMenu via localStorage)
+            startGame(
+              settings.difficulty, 
+              undefined, 
+              gameMode, 
+              settings.graphicsLevel === "low", 
+              undefined, 
+              { 
+                showGhost: settings.showGhost, 
+                nebulaFxEnabled: settings.nebulaFxEnabled, 
+                largeRotateButtons: settings.largeRotateButtons, 
+                showFullHUD: settings.showFullHUD 
+              }
+            );
           }}
           onSurvival={() => {
             window.location.href = "/survival";
@@ -814,6 +823,7 @@ const retryGame = () => {
           onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
           onSettings={() => { window.location.href = "/settings/controls"; }}
           onDevPortal={() => setView("home")}
+          onInteraction={() => setLastInteractionTime(Date.now())}
         />
       )}
       {view === "game" && (
