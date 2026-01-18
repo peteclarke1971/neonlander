@@ -37,6 +37,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
     const rafRef = useRef<number>(0);
     const seedRef = useRef<number>(123456789);
     const boostRef = useRef<{ t: number; d: number; peak: number }>({ t: 0, d: 0, peak: 1 });
+    const startTimeRef = useRef<number>(performance.now());
     
     // Reduce initial density for low graphics mode
     const effectiveDensity = lowGraphics ? 400 : density;
@@ -45,9 +46,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
     // internal state
     const starCountRef = useRef(0);
     const arrRef = useRef<{ x: Float32Array; y: Float32Array; z: Float32Array; px: Float32Array; py: Float32Array; tw: Float32Array; ph: Float32Array } | null>(null);
-      const vpRef = useRef({ cx: 0.5, cy: 0.5 });
-      const perfRef = useRef({ lowMsFor: 0, highMsFor: 0, target: effectiveDensity, floor: 200, ceil: 3200 });
-      const smoothSpeedRef = useRef(0);
+    const vpRef = useRef({ cx: 0.5, cy: 0.5 });
+    const perfRef = useRef({ lowMsFor: 0, highMsFor: 0, target: effectiveDensity, floor: 200, ceil: 3200 });
+    const smoothSpeedRef = useRef(0);
 
     useImperativeHandle(ref, () => ({
       SetSpeed: (v) => { opts.current.speed = Math.max(0, Math.min(1, v)); },
@@ -58,7 +59,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
     }));
 
     // Resize and (re)init stars
-    const reinitStars = () => {
+    const reinitStars = (preserveSpeed = false) => {
       const c = canvasRef.current;
       if (!c) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -74,14 +75,27 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       const tw = new Float32Array(N);
       const ph = new Float32Array(N);
       arrRef.current = { x, y, z, px, py, tw, ph };
-      smoothSpeedRef.current = 0;
+      
+      // Only reset speed on initial mount, preserve during auto-tune/resize
+      if (!preserveSpeed) {
+        smoothSpeedRef.current = 0;
+      }
+      
       const rng = mulberry32(seedRef.current);
       const near = 0.05, far = 1.2; // normalized camera z-range
+      const w = c.clientWidth, h = c.clientHeight;
+      const cxPx = 0.5 * w, cyPx = 0.5 * h;
+      const fl = opts.current.focalLength;
+      
       for (let i = 0; i < N; i++) {
         x[i] = (rng() * 2 - 1) * 1.2; // spawn in generous cube
         y[i] = (rng() * 2 - 1) * 1.2;
         z[i] = near + rng() * (far - near);
-        px[i] = 0; py[i] = 0; tw[i] = 0.5 + rng() * 1.5; ph[i] = rng() * Math.PI * 2;
+        // Initialize previous positions to actual projected coords for smooth first-frame trails
+        px[i] = cxPx + (x[i] / z[i]) * fl;
+        py[i] = cyPx + (y[i] / z[i]) * fl;
+        tw[i] = 0.5 + rng() * 1.5;
+        ph[i] = rng() * Math.PI * 2;
       }
     };
 
@@ -96,9 +110,19 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         c.height = Math.floor(c.clientHeight * dpr);
       };
       resize();
-      window.addEventListener("resize", () => { resize(); reinitStars(); });
+      
+      // Debounced resize to prevent rapid reinits
+      let resizeRaf: number | undefined;
+      const debouncedResize = () => {
+        if (resizeRaf) cancelAnimationFrame(resizeRaf);
+        resizeRaf = requestAnimationFrame(() => {
+          resize();
+          reinitStars(true); // preserve speed on resize
+        });
+      };
+      window.addEventListener("resize", debouncedResize);
 
-      reinitStars();
+      reinitStars(false); // initial mount - don't preserve speed
 
       let last = performance.now();
       let fpsWindow: number[] = [];
@@ -140,19 +164,26 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         // We use key state via event listeners to keep code light
         // (handled below only on keydown)
 
-        // Performance auto-tune
+        // Performance auto-tune (with startup grace period)
         fpsWindow.push(dt);
         if (fpsWindow.length > 30) fpsWindow.shift();
-        const avgMs = (fpsWindow.reduce((a, b) => a + b, 0) / Math.max(1, fpsWindow.length)) * 1000;
-        const p = perfRef.current;
-        if (avgMs > 18.2) { // < ~55 fps
-          p.lowMsFor += dt;
-          p.highMsFor = Math.max(0, p.highMsFor - dt);
-          if (p.lowMsFor > 0.3 && p.target > p.floor) { p.target = Math.max(p.floor, Math.floor(p.target * 0.9)); reinitStars(); p.lowMsFor = 0; }
-        } else {
-          p.highMsFor += dt;
-          p.lowMsFor = Math.max(0, p.lowMsFor - dt * 2);
-          if (p.highMsFor > 1.2 && p.target < opts.current.density) { p.target = Math.min(opts.current.density, Math.floor(p.target * 1.08 + 12)); reinitStars(); p.highMsFor = 0; }
+        const timeSinceStart = now - startTimeRef.current;
+        
+        // Skip auto-tuning during startup grace period (first 1.5 seconds)
+        if (timeSinceStart > 1500) {
+          const avgMs = (fpsWindow.reduce((a, b) => a + b, 0) / Math.max(1, fpsWindow.length)) * 1000;
+          const p = perfRef.current;
+          if (avgMs > 18.2) { // < ~55 fps
+            p.lowMsFor += dt;
+            p.highMsFor = Math.max(0, p.highMsFor - dt);
+            // Less aggressive: wait 0.6s instead of 0.3s before reducing
+            if (p.lowMsFor > 0.6 && p.target > p.floor) { p.target = Math.max(p.floor, Math.floor(p.target * 0.9)); reinitStars(true); p.lowMsFor = 0; }
+          } else {
+            p.highMsFor += dt;
+            p.lowMsFor = Math.max(0, p.lowMsFor - dt * 2);
+            // Less aggressive: wait 2.0s instead of 1.2s before increasing
+            if (p.highMsFor > 2.0 && p.target < opts.current.density) { p.target = Math.min(opts.current.density, Math.floor(p.target * 1.08 + 12)); reinitStars(true); p.highMsFor = 0; }
+          }
         }
 
         const dpr = Math.min(2, window.devicePixelRatio || 1);
