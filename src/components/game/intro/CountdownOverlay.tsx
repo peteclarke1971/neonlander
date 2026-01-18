@@ -170,21 +170,49 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.restore();
         }
 
-        // Draw dotted circle around lander ONLY during countdown (do not show during GO)
+        // Draw shield bubble around lander ONLY during countdown (do not show during GO)
         if (shipPosition && !photosensitive && state.phase === "countdown") {
-          const circleRadius = 25; // Fixed radius around the lander
-          const circleYOffset = 8; // Downward adjustment to center on lander
+          const bubbleRadius = 25; // Fixed radius around the lander
+          const bubbleYOffset = 8; // Downward adjustment to center on lander
           const sp = shipPosRef.current ?? shipPosition;
+          const currentTime = performance.now() / 1000;
           
           ctx.save();
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = '#00ffff';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([3, 3]); // Dotted line pattern
+          ctx.translate(sp.x, sp.y + bubbleYOffset);
+          
+          // Shimmer animation
+          const shimmerPhase = currentTime * 3;
+          const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
+          
+          // Bubble outline with purple glow
+          ctx.strokeStyle = `hsla(280, 100%, 85%, ${shimmerAlpha + 0.3})`;
+          ctx.lineWidth = 2;
+          if (!isIOS && !lowGraphics) {
+            ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+            ctx.shadowBlur = 15;
+          }
           ctx.beginPath();
-          // Ship position is provided in CSS pixels; context is already scaled by dpr
-          ctx.arc(sp.x, sp.y + circleYOffset, circleRadius, 0, Math.PI * 2);
+          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
           ctx.stroke();
+          
+          // Prismatic sheen (skip on low graphics)
+          if (!lowGraphics) {
+            const sheenAngle = shimmerPhase * 0.5;
+            const grad = ctx.createLinearGradient(
+              Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
+              -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
+            );
+            grad.addColorStop(0, "hsla(260, 100%, 70%, 0.1)");
+            grad.addColorStop(0.5, "hsla(300, 100%, 80%, 0.25)");
+            grad.addColorStop(1, "hsla(260, 100%, 70%, 0.1)");
+            
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
           ctx.restore();
         }
 
