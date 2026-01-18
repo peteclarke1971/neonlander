@@ -876,6 +876,49 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
       if (gameState.player.invulnerable <= 0 || Math.floor(gameState.elapsed * 8) % 2 === 0) {
         drawPlayer(ctx, gameState.player, neonColor, gameState.player.thrust > 0);
       }
+      
+      // Draw shield bubble during invulnerability period
+      if (invulnerabilityTimer.current > 0) {
+        const currentTime = performance.now() / 1000;
+        const bubbleRadius = 25;
+        
+        ctx.save();
+        ctx.translate(gameState.player.x, gameState.player.y);
+        
+        // Shimmer animation
+        const shimmerPhase = currentTime * 3;
+        const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
+        
+        // Fade out as invulnerability expires (last 300ms)
+        const fadeAlpha = Math.min(1, invulnerabilityTimer.current / 300);
+        
+        // Bubble outline with purple glow
+        ctx.strokeStyle = `hsla(280, 100%, 85%, ${(shimmerAlpha + 0.3) * fadeAlpha})`;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Prismatic sheen
+        const sheenAngle = shimmerPhase * 0.5;
+        const grad = ctx.createLinearGradient(
+          Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
+          -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
+        );
+        grad.addColorStop(0, `hsla(260, 100%, 70%, ${0.1 * fadeAlpha})`);
+        grad.addColorStop(0.5, `hsla(300, 100%, 80%, ${0.25 * fadeAlpha})`);
+        grad.addColorStop(1, `hsla(260, 100%, 70%, ${0.1 * fadeAlpha})`);
+        
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
 
       // Draw particles
       ctx.globalCompositeOperation = "lighter";
@@ -1132,14 +1175,7 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
         shipPosition={{ x: 400, y: 300 }} // Will be updated with actual position
       />
       
-      {/* Invulnerability indicator */}
-      {invulnerabilityTimer.current > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-40">
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
-          </div>
-        </div>
-      )}
+      {/* Invulnerability shield bubble - rendered on canvas in game loop */}
     </div>
   );
 };

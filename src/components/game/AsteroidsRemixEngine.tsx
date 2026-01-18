@@ -784,13 +784,42 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
     // Use visual lean instead of rotation for subtle tilt
     ctx.rotate(player.visualLean * 0.1);
     
-    // Shield bubble
-    if (hasShield) {
-      ctx.strokeStyle = '#0066ff88';
+    // Shield bubble (power-up or invulnerability)
+    if (hasShield || invulnerabilityTimer.current > 0) {
+      const currentTime = performance.now() / 1000;
+      const bubbleRadius = 25;
+      
+      // Shimmer animation
+      const shimmerPhase = currentTime * 3;
+      const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
+      
+      // Fade out as invulnerability expires (last 300ms)
+      const fadeAlpha = hasShield ? 1 : Math.min(1, invulnerabilityTimer.current / 300);
+      
+      // Bubble outline with purple glow
+      ctx.strokeStyle = `hsla(280, 100%, 85%, ${(shimmerAlpha + 0.3) * fadeAlpha})`;
       ctx.lineWidth = 2;
+      ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+      ctx.shadowBlur = 15;
       ctx.beginPath();
-      ctx.arc(0, 0, 25, 0, Math.PI * 2);
+      ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
       ctx.stroke();
+      
+      // Prismatic sheen
+      const sheenAngle = shimmerPhase * 0.5;
+      const grad = ctx.createLinearGradient(
+        Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
+        -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
+      );
+      grad.addColorStop(0, `hsla(260, 100%, 70%, ${0.1 * fadeAlpha})`);
+      grad.addColorStop(0.5, `hsla(300, 100%, 80%, ${0.25 * fadeAlpha})`);
+      grad.addColorStop(1, `hsla(260, 100%, 70%, ${0.1 * fadeAlpha})`);
+      
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+      ctx.fill();
     }
     
     // Player ship
@@ -1176,14 +1205,7 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
         shipPosition={{ x: 960, y: 900 }} // Remix ship position
       />
       
-      {/* Invulnerability indicator */}
-      {invulnerabilityTimer.current > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-40">
-          <div className="absolute" style={{ left: '50%', top: '85%', transform: 'translate(-50%, -50%)' }}>
-            <div className="w-20 h-20 border-2 border-dashed border-accent/60 rounded-full animate-pulse" />
-          </div>
-        </div>
-      )}
+      {/* Invulnerability shield bubble - rendered on canvas in game loop */}
     </div>
   );
 };
