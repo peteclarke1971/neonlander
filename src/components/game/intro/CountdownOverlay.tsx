@@ -171,6 +171,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         }
 
         // Draw shield bubble around lander ONLY during countdown (do not show during GO)
+        // Shield bubble renders at full fidelity on ALL graphics tiers for visual consistency
         if (shipPosition && !photosensitive && state.phase === "countdown") {
           const bubbleRadius = 25; // Fixed radius around the lander
           const bubbleYOffset = 8; // Downward adjustment to center on lander
@@ -184,10 +185,11 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           const shimmerPhase = currentTime * 3;
           const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
           
-          // Bubble outline with purple glow
+          // Bubble outline with purple glow (always enabled for shield visibility)
           ctx.strokeStyle = `hsla(280, 100%, 85%, ${shimmerAlpha + 0.3})`;
           ctx.lineWidth = 2;
-          if (!isIOS && !lowGraphics) {
+          // Always apply glow for shield - it's important for gameplay visibility
+          if (!isIOS) {
             ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
             ctx.shadowBlur = 15;
           }
@@ -195,23 +197,21 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
           ctx.stroke();
           
-          // Prismatic sheen (skip on low graphics)
-          if (!lowGraphics) {
-            const sheenAngle = shimmerPhase * 0.5;
-            const grad = ctx.createLinearGradient(
-              Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
-              -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
-            );
-            grad.addColorStop(0, "hsla(260, 100%, 70%, 0.1)");
-            grad.addColorStop(0.5, "hsla(300, 100%, 80%, 0.25)");
-            grad.addColorStop(1, "hsla(260, 100%, 70%, 0.1)");
-            
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          // Prismatic sheen - always render for visual consistency
+          const sheenAngle = shimmerPhase * 0.5;
+          const grad = ctx.createLinearGradient(
+            Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
+            -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
+          );
+          grad.addColorStop(0, "hsla(260, 100%, 70%, 0.1)");
+          grad.addColorStop(0.5, "hsla(300, 100%, 80%, 0.25)");
+          grad.addColorStop(1, "hsla(260, 100%, 70%, 0.1)");
+          
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+          ctx.fill();
           
           ctx.restore();
         }

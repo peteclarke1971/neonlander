@@ -92,47 +92,47 @@ export function toLegacyLowGraphics(level: GraphicsLevel): boolean {
 // ============================================
 
 export const GRAPHICS_VALUES = {
-  // Thruster particles per burst
-  thrusterParticles: { low: 2, mid: 8, high: 25 },
+  // Thruster particles per burst (mid reduced from 8 to 4)
+  thrusterParticles: { low: 2, mid: 4, high: 25 },
   
-  // Max thruster particles in pool
-  maxThrusterParticles: { low: 30, mid: 100, high: 300 },
+  // Max thruster particles in pool (mid reduced from 100 to 50)
+  maxThrusterParticles: { low: 30, mid: 50, high: 300 },
   
-  // Star count for backgrounds
-  starCount: { low: 150, mid: 220, high: 320 },
+  // Star count for backgrounds (mid reduced from 220 to 170)
+  starCount: { low: 150, mid: 170, high: 320 },
   
-  // Hyperspace density
-  hyperspaceDensity: { low: 400, mid: 800, high: 1200 },
+  // Hyperspace density (mid reduced from 800 to 500)
+  hyperspaceDensity: { low: 400, mid: 500, high: 1200 },
   
-  // Nozzle count for thrust effect
+  // Nozzle count for thrust effect (mid stays at 2 for visual improvement over low)
   nozzleCount: { low: 1, mid: 2, high: 3 },
   
-  // Debris count for explosions
-  debrisCount: { low: 12, mid: 16, high: 20 },
+  // Debris count for explosions (mid reduced from 16 to 14)
+  debrisCount: { low: 12, mid: 14, high: 20 },
   
-  // Particle count per explosion
-  explosionParticles: { low: 2, mid: 3, high: 4 },
+  // Particle count per explosion (mid reduced from 3 to 2)
+  explosionParticles: { low: 2, mid: 2, high: 4 },
   
-  // Shadow blur radius
-  shadowBlur: { low: 0, mid: 8, high: 25 },
+  // Shadow blur radius (mid reduced from 8 to 4 - major perf impact)
+  shadowBlur: { low: 0, mid: 4, high: 25 },
   
-  // Particle lifespan multiplier
-  particleLifespan: { low: 0.5, mid: 1.0, high: 1.6 },
+  // Particle lifespan multiplier (mid reduced from 1.0 to 0.7)
+  particleLifespan: { low: 0.5, mid: 0.7, high: 1.6 },
   
-  // Shield break shards
-  shieldBreakShards: { low: 8, mid: 20, high: 40 },
+  // Shield break shards (mid reduced from 20 to 12)
+  shieldBreakShards: { low: 8, mid: 12, high: 40 },
   
-  // Max concurrent lightning
-  maxLightning: { low: 1, mid: 2, high: 3 },
+  // Max concurrent lightning (mid reduced from 2 to 1)
+  maxLightning: { low: 1, mid: 1, high: 3 },
   
-  // Fireworks particle scale
-  fireworksScale: { low: 0.5, mid: 0.75, high: 1.0 },
+  // Fireworks particle scale (mid reduced from 0.75 to 0.6)
+  fireworksScale: { low: 0.5, mid: 0.6, high: 1.0 },
   
-  // Background satellites
-  enableBackgroundSats: { low: false, mid: true, high: true },
+  // Background satellites (mid disabled - significant perf impact on mobile)
+  enableBackgroundSats: { low: false, mid: false, high: true },
   
-  // Glow effects
-  enableGlow: { low: false, mid: true, high: true },
+  // Glow effects (mid disabled - shadowBlur is expensive on mobile GPU)
+  enableGlow: { low: false, mid: false, high: true },
   
   // CRT scanlines
   enableScanlines: { low: false, mid: false, high: true },
