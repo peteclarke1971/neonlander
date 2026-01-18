@@ -262,8 +262,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       className="fixed inset-0 overflow-hidden flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      {/* Hyperspace starfield - classic into-the-screen effect */}
-      <div className="absolute inset-0 z-0 w-full h-full" style={{ width: '100%', height: '100%' }}>
+      {/* Hyperspace starfield - fixed positioning for iOS Safari */}
+      <div className="fixed inset-0" style={{ zIndex: 0 }}>
         <HyperspaceStarfield 
           speed={0.28}
           density={1600}
