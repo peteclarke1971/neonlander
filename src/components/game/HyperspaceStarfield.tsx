@@ -58,13 +58,30 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       PulseWarp: (duration, peakSpeed = 1) => { boostRef.current = { t: 0, d: Math.max(0.1, duration), peak: Math.max(0.6, Math.min(1, peakSpeed)) }; },
     }));
 
+    // Helper to get dimensions with iOS fallback
+    const getDimensions = (canvas: HTMLCanvasElement) => {
+      let w = canvas.clientWidth;
+      let h = canvas.clientHeight;
+      // iOS Safari fallback - clientWidth/Height can return 0 before layout
+      if (w === 0 || h === 0) {
+        const rect = canvas.getBoundingClientRect();
+        w = rect.width;
+        h = rect.height;
+      }
+      return { w, h };
+    };
+
     // Resize and (re)init stars
     const reinitStars = (preserveSpeed = false) => {
       const c = canvasRef.current;
       if (!c) return;
+      
+      const { w, h } = getDimensions(c);
+      if (w === 0 || h === 0) return; // Skip if no dimensions yet
+      
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      c.width = Math.floor(c.clientWidth * dpr);
-      c.height = Math.floor(c.clientHeight * dpr);
+      c.width = Math.floor(w * dpr);
+      c.height = Math.floor(h * dpr);
       const N = Math.max(50, Math.floor(perfRef.current.target));
       starCountRef.current = N;
       const x = new Float32Array(N);
@@ -83,7 +100,6 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       
       const rng = mulberry32(seedRef.current);
       const near = 0.05, far = 1.2; // normalized camera z-range
-      const w = c.clientWidth, h = c.clientHeight;
       const cxPx = 0.5 * w, cyPx = 0.5 * h;
       const fl = opts.current.focalLength;
       
@@ -104,24 +120,34 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       if (!c) return;
       const ctx = c.getContext("2d");
       if (!ctx) return;
-      const resize = () => {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        c.width = Math.floor(c.clientWidth * dpr);
-        c.height = Math.floor(c.clientHeight * dpr);
-      };
-      resize();
       
-      // Debounced resize to prevent rapid reinits
-      let resizeRaf: number | undefined;
-      const debouncedResize = () => {
-        if (resizeRaf) cancelAnimationFrame(resizeRaf);
-        resizeRaf = requestAnimationFrame(() => {
-          resize();
-          reinitStars(true); // preserve speed on resize
-        });
+      const resize = () => {
+        const { w, h } = getDimensions(c);
+        if (w === 0 || h === 0) return;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        c.width = Math.floor(w * dpr);
+        c.height = Math.floor(h * dpr);
       };
-      window.addEventListener("resize", debouncedResize);
-
+      
+      // Use ResizeObserver for reliable sizing on iOS
+      let currentWidth = 0;
+      let currentHeight = 0;
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          if (width > 0 && height > 0 && (width !== currentWidth || height !== currentHeight)) {
+            currentWidth = width;
+            currentHeight = height;
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            c.width = Math.floor(width * dpr);
+            c.height = Math.floor(height * dpr);
+            reinitStars(true); // preserve speed on resize
+          }
+        }
+      });
+      resizeObserver.observe(c);
+      
+      resize();
       reinitStars(false); // initial mount - don't preserve speed
 
       let last = performance.now();
@@ -188,7 +214,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const w = c.clientWidth, h = c.clientHeight;
+        const { w, h } = getDimensions(c);
+        if (w === 0 || h === 0) return; // Skip frame if no dimensions (iOS Safari)
         const cxPx = (opts.current.cx ?? vpRef.current.cx) * w;
         const cyPx = (opts.current.cy ?? vpRef.current.cy) * h;
 
@@ -331,6 +358,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       return () => {
         cancelAnimationFrame(rafRef.current);
         window.removeEventListener("keydown", onKey);
+        resizeObserver.disconnect();
       };
     }, []);
 
