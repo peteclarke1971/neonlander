@@ -14,7 +14,7 @@ interface MobileStarfieldProps {
 }
 
 export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
-  starCount = 200,
+  starCount = 400,
   speed = 0.4,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,8 +36,8 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
           angle: Math.random() * Math.PI * 2,
           distance: Math.random(), // Start distributed across the screen
           speed: 0.15 + Math.random() * 0.35,
-          size: 0.5 + Math.random() * 1.5,
-          brightness: 0.4 + Math.random() * 0.6,
+          size: 0.8 + Math.random() * 2,
+          brightness: 0.7 + Math.random() * 0.3,
         });
       }
     };
@@ -89,8 +89,8 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
         const y = centerY + Math.sin(star.angle) * star.distance * maxRadius;
 
         // Scale size and alpha based on distance (closer = larger + brighter)
-        const scale = 0.5 + star.distance * 2.5;
-        const alpha = Math.min(1, star.brightness * (0.2 + star.distance * 0.8));
+        const scale = 0.6 + star.distance * 2.5;
+        const alpha = Math.min(1, star.brightness * (0.4 + star.distance * 0.6));
 
         // Draw star with slight trail
         const trailLength = star.distance * 8 * speed;
@@ -101,7 +101,7 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
           ctx.beginPath();
           ctx.moveTo(trailX, trailY);
           ctx.lineTo(x, y);
-          ctx.strokeStyle = `rgba(200, 220, 255, ${alpha * 0.5})`;
+          ctx.strokeStyle = `rgba(220, 235, 255, ${alpha * 0.7})`;
           ctx.lineWidth = star.size * scale * 0.5;
           ctx.stroke();
         }
@@ -109,7 +109,7 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
         // Draw star point
         ctx.beginPath();
         ctx.arc(x, y, star.size * scale, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(220, 235, 255, ${alpha})`;
+        ctx.fillStyle = `rgba(240, 248, 255, ${alpha})`;
         ctx.fill();
 
         // Respawn at center when off-screen
