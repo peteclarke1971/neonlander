@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
+import { PlayerMenuLeaderboard } from "./PlayerMenuLeaderboard";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
 import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { isIOSDevice } from "@/lib/deviceDetection";
-import { Difficulty } from "./types";
+import { Difficulty, Mode } from "./types";
 
 export type GameModeId = "fixed" | "classic" | "timetrial" | "medley";
 
@@ -37,6 +38,14 @@ const menuItems = [
   { id: "leaderboards", label: "LEADERBOARDS" },
   { id: "settings", label: "SETTINGS" },
 ] as const;
+
+/** Leaderboard cycle configuration for idle display */
+const leaderboardCycle: { mode: Mode; label: string }[] = [
+  { mode: "fixed", label: "CAMPAIGN" },
+  { mode: "classic", label: "CLASSIC" },
+  { mode: "survival", label: "SURVIVAL" },
+  { mode: "medley", label: "MEDLEY" },
+];
 
 const gameModeOptions: { id: GameModeId; label: string; description: string }[] = [
   { id: "fixed", label: "CAMPAIGN", description: "Progressive levels with increasing difficulty" },
@@ -109,6 +118,14 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
   
+  // Loading state - wait for assets before showing UI
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  
+  // Idle leaderboard carousel state
+  const [idleTime, setIdleTime] = useState(0);
+  const [showLeaderboards, setShowLeaderboards] = useState(false);
+  const [leaderboardIndex, setLeaderboardIndex] = useState(0);
+  
   // Persist selected game mode
   const [selectedMode, setSelectedMode] = useState<GameModeId>(() => {
     try {
@@ -119,6 +136,68 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     } catch {}
     return "fixed";
   });
+  
+  // Reset idle state on any interaction
+  const resetIdle = useCallback(() => {
+    setIdleTime(0);
+    if (showLeaderboards) {
+      setShowLeaderboards(false);
+    }
+  }, [showLeaderboards]);
+  
+  // Preload assets before showing UI
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/images/lander-logo.png";
+    img.onload = () => setAssetsLoaded(true);
+    img.onerror = () => setAssetsLoaded(true); // Show UI even if image fails
+    
+    // Fallback timeout (3s max wait)
+    const timeout = setTimeout(() => setAssetsLoaded(true), 3000);
+    return () => clearTimeout(timeout);
+  }, []);
+  
+  // Idle timer - separate from demo timer
+  useEffect(() => {
+    // Don't run idle timer if mode menu is open, assets not loaded, or already showing leaderboards
+    if (showModeMenu || !assetsLoaded || showLeaderboards) {
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setIdleTime(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [showModeMenu, assetsLoaded, showLeaderboards]);
+  
+  // Trigger leaderboard display after 10s idle
+  useEffect(() => {
+    if (idleTime >= 10 && !showLeaderboards && !showModeMenu && assetsLoaded) {
+      setShowLeaderboards(true);
+      setLeaderboardIndex(0);
+    }
+  }, [idleTime, showLeaderboards, showModeMenu, assetsLoaded]);
+  
+  // Cycle through leaderboards every 5 seconds
+  useEffect(() => {
+    if (!showLeaderboards) return;
+    
+    const cycleInterval = setInterval(() => {
+      setLeaderboardIndex(prev => {
+        const next = prev + 1;
+        // After cycling through all, hide leaderboards and show menu again
+        if (next >= leaderboardCycle.length) {
+          setShowLeaderboards(false);
+          setIdleTime(0); // Reset idle timer
+          return 0;
+        }
+        return next;
+      });
+    }, 5000);
+    
+    return () => clearInterval(cycleInterval);
+  }, [showLeaderboards]);
 
   useEffect(() => {
     try {
@@ -185,6 +264,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       }
       const input = readGamepad(gp, profile);
       
+      // Any gamepad input resets idle
+      if (input.ui.up || input.ui.down || input.ui.select || input.ui.back) {
+        resetIdle();
+      }
+      
       if (showModeMenu) {
         // Navigate mode sub-menu
         if (input.ui.up && !prev.up && canFire("up")) {
@@ -213,8 +297,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           vibrate(40, 0.2, 0.4); // Medium haptic on back
           mark("back");
         }
-      } else {
-        // Navigate main menu
+      } else if (!showLeaderboards) {
+        // Navigate main menu (only when not showing leaderboards)
         if (input.ui.up && !prev.up && canFire("up")) {
           setFocusedIndex(i => Math.max(0, i - 1));
           vibrate(30, 0.15, 0.3); // Light haptic feedback
@@ -241,10 +325,13 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [focusedIndex, modeFocusedIndex, showModeMenu, onDevPortal]);
+  }, [focusedIndex, modeFocusedIndex, showModeMenu, showLeaderboards, onDevPortal, resetIdle]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Any keyboard input resets idle
+    resetIdle();
+    
     if (showModeMenu) {
       if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -257,7 +344,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         e.preventDefault();
         setShowModeMenu(false);
       }
-    } else {
+    } else if (!showLeaderboards) {
+      // Only handle menu navigation when not showing leaderboards
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setFocusedIndex(i => Math.max(0, i - 1));
@@ -272,7 +360,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   };
 
   const handleAction = (id: string) => {
-    // Notify parent of user interaction (for demo timer reset)
+    // Reset idle and notify parent of user interaction (for demo timer reset)
+    resetIdle();
     onInteraction?.();
     
     switch (id) {
@@ -310,8 +399,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
   return (
     <main
-      className="fixed inset-0 overflow-hidden flex items-center justify-center"
+      className={`fixed inset-0 overflow-hidden flex items-center justify-center transition-opacity duration-500 ${assetsLoaded ? 'opacity-100' : 'opacity-0'}`}
       onKeyDown={handleKeyDown}
+      onClick={resetIdle}
     >
       {/* Starfield background - iOS gets MobileStarfield, others get HyperspaceStarfield */}
       <div className="absolute inset-0 overflow-hidden">
@@ -340,7 +430,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
       {/* Main content - responsive sizing for mobile */}
       <section className="relative z-10 flex flex-col items-center gap-4 sm:gap-6 md:gap-8 px-4 py-4 max-h-[100dvh] overflow-y-auto">
-        {/* LANDER Logo - responsive image scaling */}
+        {/* LANDER Logo - responsive image scaling - ALWAYS visible */}
         <img 
           src="/images/lander-logo.png" 
           alt="LANDER"
@@ -348,27 +438,51 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           draggable={false}
         />
 
-        {/* Menu buttons - tighter spacing on mobile */}
-        <nav className="flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs">
-          {menuItems.map((item, index) => (
-            <button
-              key={item.id}
-              ref={el => { buttonRefs.current[index] = el; }}
-              className="player-menu-btn"
-              onClick={() => handleAction(item.id)}
-              onFocus={() => setFocusedIndex(index)}
-            >
-              {item.id === "start" ? (
-                <span className="flex flex-col items-center">
-                  <span>START GAME</span>
-                  <span className="text-xs opacity-60 tracking-wider">{selectedModeLabel}</span>
-                </span>
-              ) : (
-                item.label
-              )}
-            </button>
-          ))}
-        </nav>
+        {/* Fade between menu buttons and leaderboard carousel */}
+        {showLeaderboards ? (
+          <div className="animate-fade-in w-full flex flex-col items-center gap-4">
+            <PlayerMenuLeaderboard 
+              mode={leaderboardCycle[leaderboardIndex].mode} 
+              label={leaderboardCycle[leaderboardIndex].label}
+            />
+            {/* Cycle indicator dots */}
+            <div className="flex justify-center gap-2">
+              {leaderboardCycle.map((_, i) => (
+                <span 
+                  key={i}
+                  className="w-2 h-2 rounded-full transition-colors duration-300"
+                  style={{ 
+                    backgroundColor: i === leaderboardIndex 
+                      ? "hsl(var(--neon))" 
+                      : "hsl(var(--neon) / 0.3)"
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Menu buttons - tighter spacing on mobile */
+          <nav className="flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs animate-fade-in">
+            {menuItems.map((item, index) => (
+              <button
+                key={item.id}
+                ref={el => { buttonRefs.current[index] = el; }}
+                className="player-menu-btn"
+                onClick={() => handleAction(item.id)}
+                onFocus={() => setFocusedIndex(index)}
+              >
+                {item.id === "start" ? (
+                  <span className="flex flex-col items-center">
+                    <span>START GAME</span>
+                    <span className="text-xs opacity-60 tracking-wider">{selectedModeLabel}</span>
+                  </span>
+                ) : (
+                  item.label
+                )}
+              </button>
+            ))}
+          </nav>
+        )}
       </section>
 
       {/* Game Modes Sub-Menu Overlay */}
@@ -421,7 +535,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         {isSupported && (
           <button
             className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
-            onClick={toggleFullscreen}
+            onClick={() => { resetIdle(); toggleFullscreen(); }}
             style={{ color: "hsl(var(--neon))" }}
           >
             {isFullscreen ? "EXIT FS" : "FULLSCREEN"}
@@ -432,6 +546,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         <button
           className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
           onClick={() => {
+            resetIdle();
             const newLevel = cycleGraphicsLevel(graphicsLevel);
             setGraphicsLevel(newLevel);
             saveGraphicsSettings(newLevel);
@@ -443,7 +558,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         
         <button
           className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
-          onClick={onDevPortal}
+          onClick={() => { resetIdle(); onDevPortal(); }}
           style={{ color: "hsl(var(--neon))" }}
         >
           Dev Portal
