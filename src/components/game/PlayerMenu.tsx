@@ -105,6 +105,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [modeFocusedIndex, setModeFocusedIndex] = useState(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const modeButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const backButtonRef = useRef<HTMLButtonElement | null>(null);
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
   
@@ -132,10 +133,15 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }
   }, [focusedIndex, showModeMenu]);
 
-  // Focus management for mode sub-menu
+  // Focus management for mode sub-menu (includes BACK button)
   useEffect(() => {
     if (showModeMenu) {
-      modeButtonRefs.current[modeFocusedIndex]?.focus();
+      if (modeFocusedIndex < gameModeOptions.length) {
+        modeButtonRefs.current[modeFocusedIndex]?.focus();
+      } else {
+        // Focus the BACK button when index equals gameModeOptions.length
+        backButtonRef.current?.focus();
+      }
     }
   }, [modeFocusedIndex, showModeMenu]);
 
@@ -187,12 +193,17 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("up");
         }
         if (input.ui.down && !prev.down && canFire("down")) {
-          setModeFocusedIndex(i => Math.min(gameModeOptions.length - 1, i + 1));
+          // Include BACK button in navigation (gameModeOptions.length = index for BACK)
+          setModeFocusedIndex(i => Math.min(gameModeOptions.length, i + 1));
           vibrate(30, 0.15, 0.3); // Light haptic feedback
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
-          modeButtonRefs.current[modeFocusedIndex]?.click();
+          if (modeFocusedIndex < gameModeOptions.length) {
+            modeButtonRefs.current[modeFocusedIndex]?.click();
+          } else {
+            backButtonRef.current?.click();
+          }
           vibrate(50, 0.3, 0.5); // Stronger haptic on selection
           gateThrustUntilRelease();
           mark("select");
@@ -240,7 +251,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         setModeFocusedIndex(i => Math.max(0, i - 1));
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setModeFocusedIndex(i => Math.min(gameModeOptions.length - 1, i + 1));
+        // Include BACK button in keyboard navigation
+        setModeFocusedIndex(i => Math.min(gameModeOptions.length, i + 1));
       } else if (e.key === "Escape") {
         e.preventDefault();
         setShowModeMenu(false);
@@ -392,8 +404,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               {gameModeOptions.find(m => m.id === selectedMode)?.description}
             </p>
             <button
+              ref={backButtonRef}
               className="player-menu-back-btn"
               onClick={() => setShowModeMenu(false)}
+              onFocus={() => setModeFocusedIndex(gameModeOptions.length)}
             >
               ← BACK
             </button>

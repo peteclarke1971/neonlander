@@ -535,6 +535,15 @@ export const GameEngine: React.FC<Props> = ({
   // Ensure UI mode is off during gameplay
   useEffect(() => { try { setUiMode(false); } catch {} }, []);
 
+  // Sync neonColor state with CSS --neon variable when level changes
+  useEffect(() => {
+    const styles = getComputedStyle(document.documentElement);
+    const neonValue = styles.getPropertyValue('--neon').trim();
+    if (neonValue) {
+      setNeonColor(`hsl(${neonValue})`);
+    }
+  }, [level]);
+
   // Cursor management setup
   useEffect(() => {
     if (!containerRef.current) return;
