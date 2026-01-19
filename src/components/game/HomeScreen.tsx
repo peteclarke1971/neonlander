@@ -125,9 +125,9 @@ export const HomeScreen: React.FC<Props> = ({
   const [nebulaFxEnabled, setNebulaFxEnabled] = useState(() => {
     try {
       const saved = localStorage.getItem('ll-nebula-fx-enabled');
-      return saved ? JSON.parse(saved) : true; // Default ON
+      return saved ? JSON.parse(saved) : false; // Default OFF for new players
     } catch {
-      return true;
+      return false;
     }
   });
   const [largeRotateButtons, setLargeRotateButtons] = useState(() => {

@@ -6,6 +6,7 @@ import { Difficulty, GameOverData, HighScore, Mode } from "@/components/game/typ
 import { InitialsEntry } from "@/components/game/InitialsEntry";
 import { OnlineLeaderboard } from "@/components/game/OnlineLeaderboard";
 import { submitScore, fetchTop } from "@/lib/leaderboard";
+import { isMedleyHighScore, saveMedleyScore, getMedleyScoreRank } from "@/lib/medleyLeaderboard";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { HomeStarfield } from "@/components/game/HomeStarfield";
@@ -186,9 +187,21 @@ const Index = () => {
     isNewLocalRecord: boolean;
     isNewGlobalRecord: boolean;
   } | null>(null);
-  const [nebulaFxEnabled, setNebulaFxEnabled] = useState(true);
+  const [nebulaFxEnabled, setNebulaFxEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-nebula-fx-enabled');
+      return saved ? JSON.parse(saved) : false; // Default OFF for new players
+    } catch {
+      return false;
+    }
+  });
   const [largeRotateButtons, setLargeRotateButtons] = useState(true);
   const [showFullHUD, setShowFullHUD] = useState(true);
+  
+  // Medley high score state
+  const [showMedleyHighScoreEntry, setShowMedleyHighScoreEntry] = useState(false);
+  const [medleyFinalScore, setMedleyFinalScore] = useState(0);
+  const [medleyFurthestStage, setMedleyFurthestStage] = useState(0);
   // Global ghost loading now handled dynamically inside GameEngine
   
   const startGame = async (d: Difficulty, startLevel: number | undefined, mode: Mode, lowGfx?: boolean, seedOverrideParam?: number, gameSettings?: { showGhost?: boolean; nebulaFxEnabled?: boolean; largeRotateButtons?: boolean; showFullHUD?: boolean }) => {
@@ -406,6 +419,22 @@ const Index = () => {
     }
     // On failure, reset rotation order
     successBgCursorRef.current = 0;
+    
+    // Medley mode: Check for high score on game over (crash/fuel)
+    if (mode === "medley" && data.score > 0) {
+      const medleyStage = data.level ?? (carry?.level ?? 0);
+      if (isMedleyHighScore(data.score, medleyStage, difficulty)) {
+        console.log('🏆 Medley high score achieved!', { score: data.score, stage: medleyStage, difficulty });
+        setMedleyFinalScore(data.score);
+        setMedleyFurthestStage(medleyStage);
+        setShowMedleyHighScoreEntry(true);
+        // Play high score entry music (same as mission success)
+        try { audioRef.current.playMissionSuccess(); } catch {}
+        setView("gameover");
+        return;
+      }
+    }
+    
     // Failure path: check highscore eligibility first; allow initials entry
     const currentList = mode === "fixed" ? fixedScores : classicScores;
     const qualifies = currentList.length < 5 || data.score > Math.min(...currentList.slice(0, 5).map((s) => s.score));
@@ -1026,8 +1055,73 @@ const retryGame = () => {
               </div>
             )}
 
-            {/* Highscore initials entry after failure if eligible */}
-            {lastResult.cause !== "success" && needsInitials && (
+            {/* Medley mode high score entry */}
+            {showMedleyHighScoreEntry && mode === "medley" && (
+              <div className="mt-6 animate-enter">
+                <div className="mb-4 text-center">
+                  <span className="px-4 py-2 rounded-md border border-accent/70 shadow-neon-strong font-display text-accent text-lg font-bold animate-pulse">
+                    🏆 NEW HIGH SCORE! 🏆
+                  </span>
+                  <p className="mt-2 text-muted-foreground">
+                    Stage {medleyFurthestStage} · {medleyFinalScore.toLocaleString()} pts
+                  </p>
+                </div>
+                <InitialsEntry
+                  score={medleyFinalScore}
+                  neonColor={neonColor}
+                  onInitialsConfirmed={(initials) => {
+                    // Save to local medley leaderboard
+                    saveMedleyScore({
+                      initials,
+                      score: medleyFinalScore,
+                      furthestStage: medleyFurthestStage,
+                      difficulty,
+                      date: Date.now()
+                    });
+                    
+                    // Save player initials for future reference
+                    try { localStorage.setItem('ll-player-initials', initials.toUpperCase()); } catch {}
+                    
+                    // Track recently submitted score for highlighting
+                    setRecentlySubmittedScore({
+                      score: medleyFinalScore,
+                      initials: initials.toUpperCase(),
+                      mode: "medley",
+                      difficulty,
+                      timestamp: Date.now(),
+                    });
+                    
+                    // Submit to online leaderboard
+                    void (async () => {
+                      try {
+                        await submitScore({
+                          initials: initials.toUpperCase(),
+                          score: medleyFinalScore,
+                          difficulty,
+                          mode: "medley"
+                        });
+                        console.log('✅ Medley score submitted to online leaderboard');
+                      } catch (e) {
+                        console.error('❌ Failed to submit medley score:', e);
+                      }
+                    })();
+                    
+                    // Clear entry state
+                    setShowMedleyHighScoreEntry(false);
+                    
+                    // Auto-clear highlight after 60 seconds
+                    setTimeout(() => setRecentlySubmittedScore(null), 60000);
+                    
+                    // Focus home button
+                    setTimeout(() => { setGoIndex(0); homeRef.current?.focus(); }, 0);
+                  }}
+                  onSubmit={() => {}}
+                />
+              </div>
+            )}
+
+            {/* Highscore initials entry after failure if eligible (non-Medley modes) */}
+            {lastResult.cause !== "success" && needsInitials && !showMedleyHighScoreEntry && (
               <InitialsEntry
                 score={lastResult.score}
                 neonColor={neonColor}
@@ -1293,11 +1387,12 @@ const retryGame = () => {
                   <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
                     console.log("🏠 Home button clicked from gameover");
                     setShowLeaderboardsAfterInitials(false);
+                    setShowMedleyHighScoreEntry(false);
                     setView("home");
                     resetTimers();
-                  }} disabled={needsInitials}>Home</Button>
-                  <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials}>Retry Current Level</Button>
-                  <Button ref={retryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryGame} disabled={needsInitials}>Retry From Start</Button>
+                  }} disabled={needsInitials || showMedleyHighScoreEntry}>Home</Button>
+                  <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials || showMedleyHighScoreEntry}>Retry Current Level</Button>
+                  <Button ref={retryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryGame} disabled={needsInitials || showMedleyHighScoreEntry}>Retry From Start</Button>
                 </>
               )}
             </div>

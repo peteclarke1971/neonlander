@@ -26,9 +26,15 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
     return () => { mounted = false; };
   }, [mode]);
 
+  // Always render 5 rows for consistent height (real or placeholder)
+  const displayRows = [...rows];
+  while (displayRows.length < 5) {
+    displayRows.push({ initials: "---", score: 0, difficulty: "easy", mode } as ScoreRow);
+  }
+
   return (
     <div 
-      className="w-full max-w-xs p-5 border-2 rounded-lg bg-background/70 backdrop-blur-sm"
+      className="w-full max-w-xs p-5 border-2 rounded-lg bg-background/70 backdrop-blur-sm min-h-[280px] flex flex-col"
       style={{ borderColor: "hsl(var(--neon) / 0.4)" }}
     >
       <h2 
@@ -40,50 +46,46 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
       
       {loading ? (
         <div 
-          className="text-center text-sm opacity-50 py-8"
+          className="flex-1 flex items-center justify-center text-sm opacity-50"
           style={{ color: "hsl(var(--neon))" }}
         >
           Loading...
         </div>
-      ) : rows.length === 0 ? (
-        <div 
-          className="text-center text-sm opacity-50 py-8"
-          style={{ color: "hsl(var(--neon))" }}
-        >
-          No scores yet
-        </div>
       ) : (
-        <ol className="space-y-3">
-          {rows.map((r, i) => (
-            <li 
-              key={`${r.id}-${i}`}
-              className="flex items-center justify-between text-sm"
-            >
-              <div className="flex items-center gap-3">
+        <ol className="space-y-3 flex-1">
+          {displayRows.map((r, i) => {
+            const isEmpty = r.initials === "---" || !r.score;
+            return (
+              <li 
+                key={`${r.id || 'empty'}-${i}`}
+                className={`flex items-center justify-between text-sm h-8 ${isEmpty ? 'opacity-30' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span 
+                    className="w-5 text-right font-mono opacity-60"
+                    style={{ color: "hsl(var(--foreground))" }}
+                  >
+                    {i + 1}.
+                  </span>
+                  <span 
+                    className="font-display tracking-wider uppercase"
+                    style={{ 
+                      color: "hsl(var(--neon))",
+                      textShadow: isEmpty ? "none" : "0 0 8px hsl(var(--neon) / 0.5)"
+                    }}
+                  >
+                    {r.initials || "---"}
+                  </span>
+                </div>
                 <span 
-                  className="w-5 text-right font-mono opacity-60"
+                  className="font-semibold font-mono"
                   style={{ color: "hsl(var(--foreground))" }}
                 >
-                  {i + 1}.
+                  {isEmpty ? "---" : r.score.toLocaleString()}
                 </span>
-                <span 
-                  className="font-display tracking-wider uppercase"
-                  style={{ 
-                    color: "hsl(var(--neon))",
-                    textShadow: "0 0 8px hsl(var(--neon) / 0.5)"
-                  }}
-                >
-                  {r.initials || "???"}
-                </span>
-              </div>
-              <span 
-                className="font-semibold font-mono"
-                style={{ color: "hsl(var(--foreground))" }}
-              >
-                {r.score.toLocaleString()}
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
     </div>
