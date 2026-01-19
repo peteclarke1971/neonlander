@@ -690,7 +690,7 @@ const retryGame = () => {
   // Enter key: activate default action when not entering initials (only when no button is focused)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || view !== "gameover" || needsInitials) return;
+      if (e.key !== "Enter" || view !== "gameover" || needsInitials || showMedleyHighScoreEntry) return;
       const active = document.activeElement as HTMLElement | null;
       if (active && (active.tagName === "BUTTON" || active.closest("button,[role='button']"))) {
         return;
@@ -705,7 +705,7 @@ const retryGame = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, needsInitials, lastResult, goIndex]);
+  }, [view, needsInitials, showMedleyHighScoreEntry, lastResult, goIndex]);
 
   // Demo timer system - 60 seconds on menu (home or playermenu), 15 seconds per demo
   useEffect(() => {
