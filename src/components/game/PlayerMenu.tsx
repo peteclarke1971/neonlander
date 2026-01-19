@@ -472,7 +472,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           </div>
           
           {/* Menu buttons - ALWAYS absolute positioned */}
-          <nav className={`absolute inset-x-0 top-0 flex flex-col gap-2 sm:gap-3 md:gap-4 items-center transition-opacity duration-1000 ${showLeaderboards ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <nav className={`absolute inset-x-0 top-0 flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs items-center mx-auto transition-opacity duration-1000 ${showLeaderboards ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             {menuItems.map((item, index) => (
               <button
                 key={item.id}
