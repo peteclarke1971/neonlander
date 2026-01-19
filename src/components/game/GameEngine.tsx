@@ -652,8 +652,11 @@ export const GameEngine: React.FC<Props> = ({
       const c = canvasRef.current!;
       const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
-    const neonColor = `hsl(${styles.getPropertyValue('--neon')})`;
+    const currentNeonColor = `hsl(${styles.getPropertyValue('--neon')})`;
     const bgColor = `hsl(${styles.getPropertyValue('--background')})`;
+    
+    // Update React state so CountdownOverlay receives the correct level-specific color
+    setNeonColor(currentNeonColor);
     // Clear volcano particles at start of each level
     setVolcanoParticles([]);
     
