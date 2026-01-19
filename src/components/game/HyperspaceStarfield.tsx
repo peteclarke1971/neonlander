@@ -20,6 +20,7 @@ export type HyperspaceStarfieldProps = {
   allowBoost?: boolean; // allow gamepad/keyboard to trigger warp boost
   className?: string;
   lowGraphics?: boolean; // optimize for performance
+  fullscreen?: boolean; // Use fullscreen (fixed positioning) mode for menus
 };
 
 function mulberry32(a: number) {
@@ -32,7 +33,7 @@ function mulberry32(a: number) {
 }
 
 export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, HyperspaceStarfieldProps>(
-  ({ speed = 0.35, density = 1200, focalLength = 560, trail = 0.4, style = "glow", cx, cy, allowBoost = true, className, lowGraphics = false }, ref) => {
+  ({ speed = 0.35, density = 1200, focalLength = 560, trail = 0.4, style = "glow", cx, cy, allowBoost = true, className, lowGraphics = false, fullscreen = false }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rafRef = useRef<number>(0);
     const seedRef = useRef<number>(123456789);
@@ -380,6 +381,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       };
     }, []);
 
-    return <canvas ref={canvasRef} className={"hyperspace-canvas " + (className || "")} aria-hidden />;
+    const canvasClass = fullscreen ? "hyperspace-canvas-fullscreen" : "hyperspace-canvas";
+    return <canvas ref={canvasRef} className={canvasClass + " " + (className || "")} aria-hidden />;
   }
 );
