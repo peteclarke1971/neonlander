@@ -152,6 +152,15 @@ const Index = () => {
     document.title = "Neon Lunar Lander — Vector Arcade";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Pilot a neon-glow lunar lander. Master thrust and rotation to score precision landings on procedural terrain.");
+    
+    // Check for settings return view parameter
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view');
+    if (viewParam === 'playermenu') {
+      setView('playermenu');
+      // Clean up URL
+      window.history.replaceState({}, '', '/');
+    }
   }, []);
 
   // Cleanup on component unmount (handles navigation away from page)
@@ -867,7 +876,10 @@ const retryGame = () => {
             window.location.href = "/survival";
           }}
           onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
-          onSettings={() => { window.location.href = "/settings/controls"; }}
+          onSettings={() => { 
+            localStorage.setItem('ll-settings-origin', 'playermenu');
+            window.location.href = "/settings/controls"; 
+          }}
           onDevPortal={() => setView("home")}
           onInteraction={() => setLastInteractionTime(Date.now())}
         />
