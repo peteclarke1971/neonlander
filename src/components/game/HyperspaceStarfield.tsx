@@ -191,7 +191,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       const loop = () => {
         rafRef.current = requestAnimationFrame(loop);
         const now = performance.now();
-        const dt = Math.min(0.033, (now - last) / 1000);
+        // Use more generous dt cap to prevent stutter on brief frame drops
+        const rawDt = (now - last) / 1000;
+        const dt = Math.min(0.05, rawDt);
         last = now;
 
         // Gamepad boost (hold select)
@@ -202,32 +204,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
           if (allowBoost && input.ui.select) { boostRef.current = { t: 0, d: 0.2, peak: Math.min(0.2, opts.current.speed + 0.03) }; }
         }
 
-        // Keyboard controls
-        // Shift/B boosts briefly; S cycles style
-        // We use key state via event listeners to keep code light
-        // (handled below only on keydown)
-
-        // Performance auto-tune (with startup grace period)
-        fpsWindow.push(dt);
-        if (fpsWindow.length > 30) fpsWindow.shift();
-        const timeSinceStart = now - startTimeRef.current;
-        
-        // Skip auto-tuning during startup grace period (first 1.5 seconds)
-        if (timeSinceStart > 1500) {
-          const avgMs = (fpsWindow.reduce((a, b) => a + b, 0) / Math.max(1, fpsWindow.length)) * 1000;
-          const p = perfRef.current;
-          if (avgMs > 18.2) { // < ~55 fps
-            p.lowMsFor += dt;
-            p.highMsFor = Math.max(0, p.highMsFor - dt);
-            // Less aggressive: wait 0.6s instead of 0.3s before reducing
-            if (p.lowMsFor > 0.6 && p.target > p.floor) { p.target = Math.max(p.floor, Math.floor(p.target * 0.9)); reinitStars(true); p.lowMsFor = 0; }
-          } else {
-            p.highMsFor += dt;
-            p.lowMsFor = Math.max(0, p.lowMsFor - dt * 2);
-            // Less aggressive: wait 2.0s instead of 1.2s before increasing
-            if (p.highMsFor > 2.0 && p.target < opts.current.density) { p.target = Math.min(opts.current.density, Math.floor(p.target * 1.08 + 12)); reinitStars(true); p.highMsFor = 0; }
-          }
-        }
+        // Performance auto-tune DISABLED for smooth operation
+        // The initial density is good enough; auto-tuning causes micro-stutters
+        // when reinitStars() is called during animation
 
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -236,18 +215,12 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         const cxPx = (opts.current.cx ?? vpRef.current.cx) * w;
         const cyPx = (opts.current.cy ?? vpRef.current.cy) * h;
 
-        // Warp boost easing
-        // Warp boost easing with smoothed base speed to avoid initial bursts
+        // Warp boost easing with very smooth base speed ramp
         const boost = boostRef.current;
         const targetSpeed = Math.max(0, Math.min(1, opts.current.speed));
-        // Exponential smoothing towards target
-        const alpha = 1 - Math.exp(-dt * 3); // ~300ms time constant
-        let nextBase = smoothSpeedRef.current + (targetSpeed - smoothSpeedRef.current) * alpha;
-        // Additional rate limiting to clamp sudden ramps (prevents initial burst)
-        const maxRatePerSec = 0.6; // max change per second
-        const delta = nextBase - smoothSpeedRef.current;
-        const clampedDelta = Math.sign(delta) * Math.min(Math.abs(delta), maxRatePerSec * dt);
-        const baseSpeed = smoothSpeedRef.current + clampedDelta;
+        // Gentler exponential smoothing - longer time constant for silky smoothness
+        const alpha = 1 - Math.exp(-dt * 1.5); // ~650ms time constant (was 300ms)
+        const baseSpeed = smoothSpeedRef.current + (targetSpeed - smoothSpeedRef.current) * alpha;
         smoothSpeedRef.current = baseSpeed;
         let speed01 = baseSpeed;
         if (boost.d > 0) {
