@@ -45,6 +45,31 @@ const gameModeOptions: { id: GameModeId; label: string; description: string }[] 
   { id: "medley", label: "MEDLEY", description: "Mix of all game types in rotation" },
 ];
 
+/** Mini lander icon - matches the game's ship design */
+const LanderIcon = ({ size = 14, color = "currentColor" }: { size?: number; color?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 16 16" 
+    fill="none"
+    style={{ 
+      filter: `drop-shadow(0 0 4px ${color})`,
+      flexShrink: 0
+    }}
+  >
+    {/* Main triangle body */}
+    <path 
+      d="M8 2 L3 11 L8 9 L13 11 Z" 
+      fill={color}
+      stroke={color}
+      strokeWidth="0.5"
+    />
+    {/* Landing legs */}
+    <line x1="4" y1="11" x2="2" y2="14" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    <line x1="12" y1="11" x2="14" y2="14" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+  </svg>
+);
+
 /** Load all game settings from localStorage (same keys as Developer Menu) */
 function loadSettingsFromStorage(): GameSettings {
   const getBool = (key: string, def: boolean) => {
@@ -354,8 +379,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
                 onClick={() => handleSelectMode(mode.id)}
                 onFocus={() => setModeFocusedIndex(index)}
               >
-                <span className="flex items-center justify-center gap-2">
-                  {selectedMode === mode.id && <span style={{ color: "hsl(var(--neon))" }}>●</span>}
+              <span className="flex items-center justify-center gap-2">
+                  {selectedMode === mode.id && <LanderIcon size={14} color="hsl(180, 100%, 50%)" />}
                   {mode.label}
                 </span>
               </button>
