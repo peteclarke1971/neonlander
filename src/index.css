@@ -288,20 +288,16 @@ All colors MUST be HSL.
   }
 
   /* Pulsing glow animation for focused buttons */
-  @keyframes neon-pulse {
-    0%, 100% { 
-      box-shadow: 
-        0 0 15px hsl(var(--neon) / 0.5),
-        0 0 30px hsl(var(--neon) / 0.3),
-        inset 0 0 15px hsl(var(--neon) / 0.15);
-    }
-    50% { 
-      box-shadow: 
-        0 0 25px hsl(var(--neon) / 0.7),
-        0 0 50px hsl(var(--neon) / 0.4),
-        0 0 80px hsl(var(--neon) / 0.2),
-        inset 0 0 20px hsl(var(--neon) / 0.25);
-    }
+  /* Light cycle trail animation - travels clockwise around the border */
+  @keyframes light-cycle-trail {
+    0% { --trail-angle: 0deg; }
+    100% { --trail-angle: 360deg; }
+  }
+
+  @property --trail-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
   }
 
   /* Scale bounce for selection */
@@ -311,23 +307,63 @@ All colors MUST be HSL.
     100% { transform: scale(1); }
   }
 
+  .player-menu-btn {
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Light trail pseudo-element */
+  .player-menu-btn::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 10px;
+    background: conic-gradient(
+      from var(--trail-angle, 0deg),
+      transparent 0deg,
+      transparent 280deg,
+      hsl(var(--neon) / 0.3) 310deg,
+      hsl(var(--neon) / 0.7) 340deg,
+      hsl(var(--neon)) 350deg,
+      hsl(var(--neon-2)) 360deg
+    );
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
   .player-menu-btn:focus {
-    animation: neon-pulse 1.5s ease-in-out infinite;
     border-color: hsl(var(--neon-2));
     transform: scale(1.02);
+  }
+
+  /* Show and animate trail on focus */
+  .player-menu-btn:focus::before {
+    opacity: 1;
+    animation: light-cycle-trail 2s linear infinite;
   }
 
   .player-menu-btn:active {
     animation: select-bounce 0.2s ease-out;
   }
 
-  /* Selected mode button gets persistent glow */
+  /* Selected mode button gets trail + subtle glow */
   .player-menu-btn.selected {
-    background: hsl(var(--neon) / 0.15);
-    box-shadow: 
-      0 0 20px hsl(var(--neon) / 0.6),
-      0 0 40px hsl(var(--neon) / 0.3),
-      inset 0 0 20px hsl(var(--neon) / 0.2);
+    background: hsl(var(--neon) / 0.08);
+  }
+
+  .player-menu-btn.selected::before {
+    opacity: 0.6;
+    animation: light-cycle-trail 3s linear infinite;
   }
 
   /* More prominent back button in sub-menus */
