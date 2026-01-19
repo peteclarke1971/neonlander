@@ -256,12 +256,16 @@ const Index = () => {
         const root = document.documentElement;
         root.style.setProperty("--neon", colors[idx]);
         root.style.setProperty("--neon-2", colors[idx]);
+        // Update logo hue offset
+        const targetHue = parseInt(colors[idx].split(" ")[0], 10);
+        root.style.setProperty("--logo-hue-offset", `${targetHue - 160}deg`);
       } else {
         setCarry(null);
         setSuccessCount(0);
         const root = document.documentElement;
         root.style.removeProperty("--neon");
         root.style.removeProperty("--neon-2");
+        root.style.setProperty("--logo-hue-offset", "0deg"); // Reset to green
       }
       setView("game");
     };
@@ -322,6 +326,11 @@ const Index = () => {
     const root = document.documentElement;
     root.style.setProperty("--neon", colors[colorIndex]);
     root.style.setProperty("--neon-2", colors[colorIndex]);
+    
+    // Calculate logo hue offset (logo is green ~160°, rotate to target hue)
+    const targetHue = parseInt(colors[colorIndex].split(" ")[0], 10);
+    const logoHueOffset = targetHue - 160;
+    root.style.setProperty("--logo-hue-offset", `${logoHueOffset}deg`);
     
     setView("demo");
   };
@@ -471,6 +480,9 @@ const Index = () => {
       const root = document.documentElement;
       root.style.setProperty("--neon", colors[idx]);
       root.style.setProperty("--neon-2", colors[idx]);
+      // Update logo hue offset
+      const targetHue = parseInt(colors[idx].split(" ")[0], 10);
+      root.style.setProperty("--logo-hue-offset", `${targetHue - 160}deg`);
       setView("game");
     };
     
@@ -533,6 +545,9 @@ const retryGame = () => {
     const root = document.documentElement;
     root.style.setProperty("--neon", colors[idx]);
     root.style.setProperty("--neon-2", colors[idx]);
+    // Update logo hue offset
+    const targetHue = parseInt(colors[idx].split(" ")[0], 10);
+    root.style.setProperty("--logo-hue-offset", `${targetHue - 160}deg`);
     setGameKey(prev => prev + 1);
     setView("game");
   };
