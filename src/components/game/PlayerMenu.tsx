@@ -93,7 +93,7 @@ function loadSettingsFromStorage(): GameSettings {
     skipCountdowns: getStr("ll-skip-countdowns", "never") as "never" | "first" | "always",
     photosensitive: getBool("ll-photosensitive", false),
     showGhost: getBool("ll-global-ghosts-enabled", false),
-    nebulaFxEnabled: getBool("ll-nebula-fx-enabled", true),
+    nebulaFxEnabled: getBool("ll-nebula-fx-enabled", false), // Default OFF for new players
     largeRotateButtons: getBool("ll-large-rotate-buttons", true),
     showFullHUD: getBool("ll-show-full-hud", true),
     graphicsLevel: loadGraphicsSettings(),
@@ -439,8 +439,12 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         />
 
         {/* Fade between menu buttons and leaderboard carousel */}
-        {showLeaderboards ? (
-          <div className="animate-fade-in w-full flex flex-col items-center gap-4">
+        <div className="relative w-full flex flex-col items-center">
+          {/* Leaderboard - crossfade in/out with slower transition */}
+          <div 
+            key={`leaderboard-${leaderboardIndex}`}
+            className={`w-full flex flex-col items-center gap-4 transition-opacity duration-1000 ${showLeaderboards ? 'opacity-100' : 'opacity-0 pointer-events-none absolute'}`}
+          >
             <PlayerMenuLeaderboard 
               mode={leaderboardCycle[leaderboardIndex].mode} 
               label={leaderboardCycle[leaderboardIndex].label}
@@ -450,7 +454,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               {leaderboardCycle.map((_, i) => (
                 <span 
                   key={i}
-                  className="w-2 h-2 rounded-full transition-colors duration-300"
+                  className="w-2 h-2 rounded-full transition-colors duration-500"
                   style={{ 
                     backgroundColor: i === leaderboardIndex 
                       ? "hsl(var(--neon))" 
@@ -460,9 +464,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               ))}
             </div>
           </div>
-        ) : (
-          /* Menu buttons - tighter spacing on mobile */
-          <nav className="flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs animate-fade-in">
+          
+          {/* Menu buttons - crossfade in/out with slower transition */}
+          <nav className={`flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs transition-opacity duration-1000 ${showLeaderboards ? 'opacity-0 pointer-events-none absolute' : 'opacity-100'}`}>
             {menuItems.map((item, index) => (
               <button
                 key={item.id}
@@ -482,7 +486,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               </button>
             ))}
           </nav>
-        )}
+        </div>
       </section>
 
       {/* Game Modes Sub-Menu Overlay */}
