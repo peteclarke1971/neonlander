@@ -78,8 +78,11 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
                   </span>
                 </div>
                 <span 
-                  className="font-semibold font-mono"
-                  style={{ color: "hsl(var(--foreground))" }}
+                  className="font-display tracking-wider"
+                  style={{ 
+                    color: "hsl(var(--neon))",
+                    textShadow: isEmpty ? "none" : "0 0 8px hsl(var(--neon) / 0.5)"
+                  }}
                 >
                   {isEmpty ? "---" : r.score.toLocaleString()}
                 </span>
