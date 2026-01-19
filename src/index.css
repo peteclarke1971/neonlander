@@ -312,19 +312,21 @@ All colors MUST be HSL.
     overflow: visible;
   }
 
-  /* Light trail pseudo-element */
+  /* Light trail pseudo-element - ENHANCED VISIBILITY */
   .player-menu-btn::before {
     content: '';
     position: absolute;
-    inset: -2px;
+    inset: -3px;
     border-radius: 10px;
     background: conic-gradient(
       from var(--trail-angle, 0deg),
       transparent 0deg,
-      transparent 280deg,
-      hsl(var(--neon) / 0.3) 310deg,
-      hsl(var(--neon) / 0.7) 340deg,
-      hsl(var(--neon)) 350deg,
+      transparent 180deg,
+      hsl(var(--neon) / 0.15) 210deg,
+      hsl(var(--neon) / 0.4) 250deg,
+      hsl(var(--neon) / 0.7) 290deg,
+      hsl(var(--neon) / 0.9) 320deg,
+      hsl(var(--neon)) 340deg,
       hsl(var(--neon-2)) 360deg
     );
     -webkit-mask: 
@@ -335,7 +337,7 @@ All colors MUST be HSL.
       linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-    padding: 2px;
+    padding: 3px;
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
@@ -346,7 +348,7 @@ All colors MUST be HSL.
     transform: scale(1.02);
   }
 
-  /* Show and animate trail on focus */
+  /* Show and animate trail on focus - HIGH VISIBILITY */
   .player-menu-btn:focus::before {
     opacity: 1;
     animation: light-cycle-trail 2s linear infinite;
@@ -358,11 +360,11 @@ All colors MUST be HSL.
 
   /* Selected mode button gets trail + subtle glow */
   .player-menu-btn.selected {
-    background: hsl(var(--neon) / 0.08);
+    background: hsl(var(--neon) / 0.1);
   }
 
   .player-menu-btn.selected::before {
-    opacity: 0.6;
+    opacity: 0.85;
     animation: light-cycle-trail 3s linear infinite;
   }
 

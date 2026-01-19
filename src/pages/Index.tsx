@@ -12,6 +12,8 @@ import { HomeStarfield } from "@/components/game/HomeStarfield";
 import type { HyperspaceStarfieldHandle } from "@/components/game/HyperspaceStarfield";
 import { AsteroidField } from "@/components/game/AsteroidField";
 import type { AsteroidFieldHandle } from "@/components/game/AsteroidField";
+import { MobileStarfield } from "@/components/game/MobileStarfield";
+import { isIOSDevice } from "@/lib/deviceDetection";
 import { VectorWormhole } from "@/components/game/VectorWormhole";
 import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
 import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
@@ -952,7 +954,13 @@ const retryGame = () => {
                 <div className="absolute inset-0 z-0">
                   <HomeStarfield />
                 </div>
+              ) : isIOSDevice() ? (
+                // iOS uses MobileStarfield for better performance and visual consistency
+                <div className="absolute inset-0 z-0">
+                  <MobileStarfield starCount={400} speed={0.4} />
+                </div>
               ) : (
+                // Desktop uses HyperspaceStarfield + AsteroidField
                 <>
                   <HyperspaceStarfield
                     ref={starfieldRef}
