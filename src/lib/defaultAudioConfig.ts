@@ -18,6 +18,7 @@ export interface AudioEventConfig {
 
 export interface MusicConfig {
   title: AudioEventConfig;
+  title2: AudioEventConfig;
   // 20 level tracks (cycle through these for Fixed, Classic, Medley modes)
   level1: AudioEventConfig;
   level2: AudioEventConfig;
@@ -94,6 +95,7 @@ export type AudioEventKey = MusicEventKey | SfxEventKey;
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   music: {
     title: { path: '/audio/title.mp3', volume: 0.5 },
+    title2: { path: null, volume: 0.5 },
     // 20 level tracks - levels 9-20 fallback to cycling through 1-8
     level1: { path: '/audio/level1.mp3', volume: 0.5 },
     level2: { path: '/audio/level2.mp3', volume: 0.5 },
@@ -161,6 +163,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
 export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
   // Music - Title & Menus
   title: 'Title Screen',
+  title2: 'Title Screen 2',
   // Music - Level Tracks (1-20)
   level1: 'Level 1',
   level2: 'Level 2',
@@ -224,7 +227,7 @@ export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
  * Lists of keys for iteration
  */
 export const MUSIC_EVENT_KEYS: MusicEventKey[] = [
-  'title', 
+  'title', 'title2',
   'level1', 'level2', 'level3', 'level4', 'level5', 
   'level6', 'level7', 'level8', 'level9', 'level10',
   'level11', 'level12', 'level13', 'level14', 'level15',

@@ -34,7 +34,7 @@ interface PlayerMenuProps {
 const menuItems = [
   { id: "start", label: "START GAME" },
   { id: "survival", label: "SURVIVAL" },
-  { id: "modes", label: "GAME MODES" },
+  { id: "modes", label: "CHOOSE GAME MODE" },
   { id: "leaderboards", label: "LEADERBOARDS" },
   { id: "settings", label: "SETTINGS" },
 ] as const;
@@ -134,7 +134,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         return saved as GameModeId;
       }
     } catch {}
-    return "fixed";
+    return "medley";
   });
   
   // Reset idle state on any interaction

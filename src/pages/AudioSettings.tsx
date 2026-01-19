@@ -389,7 +389,15 @@ export default function AudioSettings() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/')}
+            onClick={() => {
+              const origin = localStorage.getItem('ll-settings-origin');
+              localStorage.removeItem('ll-settings-origin');
+              if (origin === 'playermenu') {
+                navigate('/?view=playermenu');
+              } else {
+                navigate('/');
+              }
+            }}
             className="shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />

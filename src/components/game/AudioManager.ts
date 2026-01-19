@@ -16,7 +16,9 @@ export class AudioManager {
   private titleGain?: GainNode;
   private titleSource?: AudioBufferSourceNode | null;
   private titleBuffer?: AudioBuffer | null;
+  private title2Buffer?: AudioBuffer | null;
   private titleMuted = false;
+  private currentTitleTrack: 1 | 2 = 1;
 
   // Thruster sample loop
   private thrusterGain?: GainNode;
@@ -344,12 +346,66 @@ export class AudioManager {
       this.titleGain.gain.value = (this.titleMuted || this.musicGloballyMuted) ? 0 : volume;
       this.titleGain.connect(this.master);
     }
+    
+    // Load title buffer if needed
     if (!this.titleBuffer) {
       const titleUrl = this.getConfigPath('music', 'title') as string || '/audio/title.mp3';
       this.titleBuffer = await this.loadBuffer(titleUrl);
     }
-    if (this.titleBuffer && !this.titleSource) {
-      this.titleSource = this.createLoopingSource(this.titleBuffer, this.titleGain!);
+    
+    // Load title2 buffer if configured (and not already loaded)
+    if (this.title2Buffer === undefined) {
+      const title2Url = this.getConfigPath('music', 'title2') as string | null;
+      if (title2Url) {
+        this.title2Buffer = await this.loadBuffer(title2Url);
+      } else {
+        this.title2Buffer = null;
+      }
+    }
+
+    // Start playing (will cycle between tracks if title2 is configured)
+    if (!this.titleSource) {
+      this.playCurrentTitleTrack();
+    }
+  }
+
+  private playCurrentTitleTrack() {
+    if (!this.ctx || !this.titleGain) return;
+    
+    // Stop any existing source
+    if (this.titleSource) {
+      try { this.titleSource.stop(); } catch {}
+      this.titleSource.disconnect();
+      this.titleSource = null;
+    }
+
+    const buffer = this.currentTitleTrack === 1 ? this.titleBuffer : this.title2Buffer;
+    const hasTitle2 = !!this.title2Buffer;
+
+    if (!buffer) {
+      // If no buffer for current track, try the other or give up
+      if (this.currentTitleTrack === 2 && this.titleBuffer) {
+        this.currentTitleTrack = 1;
+        this.playCurrentTitleTrack();
+      }
+      return;
+    }
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = !hasTitle2; // Only loop if there's no second track
+    src.connect(this.titleGain);
+    src.start(0);
+    this.titleSource = src;
+
+    // If we have two tracks, cycle on end
+    if (hasTitle2) {
+      src.onended = () => {
+        if (this.titleSource === src) { // Make sure it's still our active source
+          this.currentTitleTrack = this.currentTitleTrack === 1 ? 2 : 1;
+          this.playCurrentTitleTrack();
+        }
+      };
     }
   }
 
@@ -376,6 +432,8 @@ export class AudioManager {
       this.titleSource.disconnect();
       this.titleSource = null;
     }
+    // Reset to track 1 for next playback
+    this.currentTitleTrack = 1;
   }
 
   // ========== Thruster (sample-based, loop + gate) ==========

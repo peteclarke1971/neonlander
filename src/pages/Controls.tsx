@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
 
 export default function ControlsSettings() {
+  const navigate = useNavigate();
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
   const [platform, setPlatform] = useState<string>(() => getPlatformFromId(deviceId || ""));
   const [profile, setProfile] = useState(() => loadProfile(deviceId || undefined));
@@ -563,7 +564,15 @@ export default function ControlsSettings() {
       <section ref={containerRef} className="max-w-2xl mx-auto p-6" onKeyDown={handleKeyDown} tabIndex={0}>
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-display font-bold">Controls</h1>
-          <Link to="/"><Button variant="outline">Back</Button></Link>
+          <Button variant="outline" onClick={() => {
+            const origin = localStorage.getItem('ll-settings-origin');
+            localStorage.removeItem('ll-settings-origin');
+            if (origin === 'playermenu') {
+              navigate('/?view=playermenu');
+            } else {
+              navigate('/');
+            }
+          }}>Back</Button>
         </div>
         <p className="text-sm text-muted-foreground mb-4">Detected device: <span className="font-medium">{platform || "—"}</span> {deviceId ? "(saved per device)" : "(connect a controller to customize)"}</p>
         <Glyphs />
