@@ -5378,6 +5378,7 @@ export const GameEngine: React.FC<Props> = ({
         canvasRef={canvasRef}
         lowGraphics={graphicsLevel === "low"}
         shipPosition={shipScreenPos ?? undefined}
+        shieldColor={neonColor}
       />
       
       {/* Fireworks overlay for successful landing */}

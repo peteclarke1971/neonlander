@@ -7,6 +7,15 @@ interface CountdownOverlayProps {
   lowGraphics?: boolean;
   photosensitive?: boolean;
   shipPosition?: { x: number; y: number };
+  shieldColor?: string; // HSL color string for level-colored shield
+}
+
+// Parse shield color to extract hue, fallback to pink/purple (280)
+function getShieldHue(color?: string): number {
+  if (!color) return 280;
+  // Handle various HSL formats: "hsl(X, Y%, Z%)", "X Y% Z%", or just the hue number
+  const match = color.match(/(\d+)/);
+  return match ? parseInt(match[1]) : 280;
 }
 
 // Simple deterministic random number generator
@@ -24,8 +33,11 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
   canvasRef,
   lowGraphics = false,
   photosensitive = false,
-  shipPosition
+  shipPosition,
+  shieldColor
 }) => {
+  // Get shield hue from color prop or use default pink/purple
+  const shieldHue = getShieldHue(shieldColor);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const goPhaseStartRef = useRef<number | null>(null);
   const shipPosRef = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -185,12 +197,12 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           const shimmerPhase = currentTime * 3;
           const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
           
-          // Bubble outline with purple glow (always enabled for shield visibility)
-          ctx.strokeStyle = `hsla(280, 100%, 85%, ${shimmerAlpha + 0.3})`;
+          // Bubble outline with level-colored glow (always enabled for shield visibility)
+          ctx.strokeStyle = `hsla(${shieldHue}, 100%, 85%, ${shimmerAlpha + 0.3})`;
           ctx.lineWidth = 2;
           // Always apply glow for shield - it's important for gameplay visibility
           if (!isIOS) {
-            ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+            ctx.shadowColor = `hsla(${shieldHue}, 100%, 70%, 0.8)`;
             ctx.shadowBlur = 15;
           }
           ctx.beginPath();
@@ -203,9 +215,10 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
             Math.cos(sheenAngle) * bubbleRadius, Math.sin(sheenAngle) * bubbleRadius,
             -Math.cos(sheenAngle) * bubbleRadius, -Math.sin(sheenAngle) * bubbleRadius
           );
-          grad.addColorStop(0, "hsla(260, 100%, 70%, 0.1)");
-          grad.addColorStop(0.5, "hsla(300, 100%, 80%, 0.25)");
-          grad.addColorStop(1, "hsla(260, 100%, 70%, 0.1)");
+          // Use hue offsets from the shield hue for prismatic effect
+          grad.addColorStop(0, `hsla(${shieldHue - 20}, 100%, 70%, 0.1)`);
+          grad.addColorStop(0.5, `hsla(${shieldHue + 20}, 100%, 80%, 0.25)`);
+          grad.addColorStop(1, `hsla(${shieldHue - 20}, 100%, 70%, 0.1)`);
           
           ctx.shadowBlur = 0;
           ctx.fillStyle = grad;
