@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
-import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode } from "@/hooks/use-gamepad";
+import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
 import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { isIOSDevice } from "@/lib/deviceDetection";
@@ -158,38 +158,46 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         // Navigate mode sub-menu
         if (input.ui.up && !prev.up && canFire("up")) {
           setModeFocusedIndex(i => Math.max(0, i - 1));
+          vibrate(30, 0.15, 0.3); // Light haptic feedback
           mark("up");
         }
         if (input.ui.down && !prev.down && canFire("down")) {
           setModeFocusedIndex(i => Math.min(gameModeOptions.length - 1, i + 1));
+          vibrate(30, 0.15, 0.3); // Light haptic feedback
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
           modeButtonRefs.current[modeFocusedIndex]?.click();
+          vibrate(50, 0.3, 0.5); // Stronger haptic on selection
           gateThrustUntilRelease();
           mark("select");
         }
         if (input.ui.back && !prev.back && canFire("back")) {
           setShowModeMenu(false);
+          vibrate(40, 0.2, 0.4); // Medium haptic on back
           mark("back");
         }
       } else {
         // Navigate main menu
         if (input.ui.up && !prev.up && canFire("up")) {
           setFocusedIndex(i => Math.max(0, i - 1));
+          vibrate(30, 0.15, 0.3); // Light haptic feedback
           mark("up");
         }
         if (input.ui.down && !prev.down && canFire("down")) {
           setFocusedIndex(i => Math.min(menuItems.length - 1, i + 1));
+          vibrate(30, 0.15, 0.3); // Light haptic feedback
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
           buttonRefs.current[focusedIndex]?.click();
+          vibrate(50, 0.3, 0.5); // Stronger haptic on selection
           gateThrustUntilRelease();
           mark("select");
         }
         if (input.ui.back && !prev.back && canFire("back")) {
           onDevPortal();
+          vibrate(40, 0.2, 0.4); // Medium haptic on back
           mark("back");
         }
       }
@@ -253,7 +261,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
   const handleSelectMode = (modeId: GameModeId) => {
     setSelectedMode(modeId);
-    setShowModeMenu(false);
+    // Don't close menu - only highlight the selection
+    // Menu closes only via Back button
   };
 
   // Get label for currently selected mode to display on main menu
@@ -326,8 +335,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
       {/* Game Modes Sub-Menu Overlay */}
       {showModeMenu && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 backdrop-blur-sm">
-          <div className="flex flex-col gap-3 p-6 border-2 rounded-lg bg-background/95 max-w-sm w-full mx-4"
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-[2px]">
+          <div className="flex flex-col gap-3 p-6 border-2 rounded-lg bg-background/80 max-w-sm w-full mx-4"
             style={{ borderColor: "hsl(var(--neon) / 0.5)" }}
           >
             <h2 
@@ -340,7 +349,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               <button
                 key={mode.id}
                 ref={el => { modeButtonRefs.current[index] = el; }}
-                className={`player-menu-btn text-sm ${selectedMode === mode.id ? 'ring-2 ring-offset-2 ring-offset-background ring-[hsl(var(--neon))]' : ''}`}
+                className={`player-menu-btn text-sm ${selectedMode === mode.id ? 'selected' : ''}`}
                 onClick={() => handleSelectMode(mode.id)}
                 onFocus={() => setModeFocusedIndex(index)}
               >
@@ -357,9 +366,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               {gameModeOptions.find(m => m.id === selectedMode)?.description}
             </p>
             <button
-              className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity mt-3 py-2"
+              className="player-menu-back-btn"
               onClick={() => setShowModeMenu(false)}
-              style={{ color: "hsl(var(--neon))" }}
             >
               ← BACK
             </button>
