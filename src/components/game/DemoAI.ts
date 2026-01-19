@@ -1,14 +1,17 @@
 // Demo AI for attract mode - pilots the lander with realistic patterns
+import { isIOSDevice } from "@/lib/deviceDetection";
+
 export interface DemoAIState {
   level: number;
   startTime: number;
   thrustActive: boolean;
   thrustStartTime: number;
-  thrustDuration: number; // 0.5 seconds
+  thrustDuration: number; // milliseconds
   mistakeTimer: number;
   shouldMakeMistake: boolean;
   avoidanceRotation: number; // target rotation when avoiding terrain
   isAvoiding: boolean; // currently in avoidance maneuver
+  isIOS: boolean; // cached iOS detection for consistent behavior
 }
 
 export interface DemoControls {
@@ -24,16 +27,19 @@ interface TerrainLike {
 }
 
 export function createDemoAI(level: number): DemoAIState {
+  const isIOS = isIOSDevice();
   return {
     level,
     startTime: performance.now(),
     thrustActive: false,
     thrustStartTime: 0,
-    thrustDuration: 25, // 0.025 seconds in milliseconds - quarter the original burst
+    // iOS needs longer thrust bursts due to zoom/viewport differences
+    thrustDuration: isIOS ? 50 : 25, // 0.05s on iOS, 0.025s on desktop
     mistakeTimer: Math.random() * 8000 + 5000, // Make mistake after 5-13 seconds
     shouldMakeMistake: Math.random() < 0.3, // 30% chance to make a mistake
     avoidanceRotation: 0,
-    isAvoiding: false
+    isAvoiding: false,
+    isIOS
   };
 }
 
@@ -61,25 +67,36 @@ export function updateDemoAI(
   // Check if thrust is currently active
   if (ai.thrustActive) {
     if (now - ai.thrustStartTime >= ai.thrustDuration) {
-      // 0.025 seconds have passed, turn off thrust and stop avoidance
+      // Thrust duration has passed, turn off thrust and stop avoidance
       ai.thrustActive = false;
       ai.isAvoiding = false;
-      console.log("🔥 Thrust off after 0.025s");
     } else {
-      // Still within 0.5 second window, keep thrusting
+      // Still within thrust window, keep thrusting
       controls.thrust = true;
     }
   }
   
+  // iOS/iPad needs earlier reaction due to different zoom/viewport
+  // Base threshold is -300 units above ground
+  // iOS gets -450 to account for faster perceived approach
+  const baseDangerAltitude = -300;
+  const iosDangerMultiplier = ai.isIOS ? 1.5 : 1.0;
+  let dangerAltitude = baseDangerAltitude * iosDangerMultiplier;
+  
+  // Factor in downward velocity - if falling fast, trigger even earlier
+  // This helps prevent crashes when the lander is moving quickly
+  if (ship.vy > 0) {
+    // Add extra margin based on fall speed (2x velocity factor)
+    dangerAltitude -= ship.vy * 2;
+  }
+  
   // Check if too close to landscape and not already avoiding
-  const dangerAltitude = -300; // 300 units above ground (trigger very early)
   if (altitude > dangerAltitude && !ai.thrustActive && !ai.isAvoiding) {
     // Start avoidance maneuver: random direction and angle between 30-60 degrees
     const rotationDirection = Math.random() < 0.5 ? -1 : 1;
     const randomAngle = 30 + Math.random() * 30; // Random angle between 30-60 degrees
     ai.avoidanceRotation = rotationDirection * (randomAngle * Math.PI / 180);
     ai.isAvoiding = true;
-    console.log(`🚨 Too close to ground! Starting avoidance: ${rotationDirection > 0 ? 'right' : 'left'} rotation then thrust`);
   }
   
   // Handle avoidance rotation when avoiding terrain
@@ -102,7 +119,6 @@ export function updateDemoAI(
     if (rotatedAmount > (10 * Math.PI / 180) && !ai.thrustActive) {
       ai.thrustActive = true;
       ai.thrustStartTime = now;
-      console.log("🔥 Started thrust after initial rotation");
     }
   } else {
     // Keep somewhat upright when not avoiding
