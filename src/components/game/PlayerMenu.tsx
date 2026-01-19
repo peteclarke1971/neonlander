@@ -288,6 +288,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             trail={0.55}
             style="glow"
             allowBoost={true}
+            fullscreen={true}
           />
         )}
       </div>

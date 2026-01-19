@@ -205,9 +205,12 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
             ctx.shadowColor = `hsla(${shieldHue}, 100%, 70%, 0.8)`;
             ctx.shadowBlur = 15;
           }
-          ctx.beginPath();
-          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-          ctx.stroke();
+          // Guard against invalid radius values
+          if (bubbleRadius > 0 && Number.isFinite(bubbleRadius)) {
+            ctx.beginPath();
+            ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
           
           // Prismatic sheen - always render for visual consistency
           const sheenAngle = shimmerPhase * 0.5;
