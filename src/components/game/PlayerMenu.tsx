@@ -429,14 +429,20 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       />
 
       {/* Main content - responsive sizing for mobile */}
-      <section className="relative z-10 flex flex-col items-center gap-4 sm:gap-6 md:gap-8 px-4 py-4 max-h-[100dvh] overflow-y-auto">
-        {/* LANDER Logo - responsive image scaling - ALWAYS visible */}
-        <img 
-          src="/images/lander-logo.png" 
-          alt="LANDER"
-          className="player-menu-logo-img w-48 sm:w-64 md:w-80 lg:w-96 h-auto select-none pointer-events-none"
-          draggable={false}
-        />
+      <section className="relative z-10 flex flex-col items-center gap-4 sm:gap-6 md:gap-8 px-4 py-4">
+        {/* LANDER Logo - responsive image scaling - FIXED position, never moves */}
+        <div className="flex-shrink-0">
+          <img 
+            src="/images/lander-logo.png" 
+            alt="LANDER"
+            className="player-menu-logo-img w-48 sm:w-64 md:w-80 lg:w-96 h-auto select-none pointer-events-none"
+            style={{
+              filter: "var(--logo-filter, none)",
+              transition: "filter 0.5s ease-out"
+            }}
+            draggable={false}
+          />
+        </div>
 
         {/* Fade between menu buttons and leaderboard carousel */}
         <div className="relative w-full flex flex-col items-center">

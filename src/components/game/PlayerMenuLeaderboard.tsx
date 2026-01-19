@@ -34,7 +34,7 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
 
   return (
     <div 
-      className="w-full max-w-xs p-5 border-2 rounded-lg bg-background/70 backdrop-blur-sm min-h-[280px] flex flex-col"
+      className="w-full max-w-xs p-5 border-2 rounded-lg bg-background/70 backdrop-blur-sm h-[280px] flex flex-col overflow-hidden"
       style={{ borderColor: "hsl(var(--neon) / 0.4)" }}
     >
       <h2 
