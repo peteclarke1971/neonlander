@@ -444,12 +444,12 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           />
         </div>
 
-        {/* Fade between menu buttons and leaderboard carousel */}
-        <div className="relative w-full flex flex-col items-center">
-          {/* Leaderboard - crossfade in/out with slower transition */}
+        {/* Fixed-height container - NEVER changes size, logo above stays locked */}
+        <div className="relative w-full flex flex-col items-center h-[340px]">
+          {/* Leaderboard - ALWAYS absolute positioned */}
           <div 
             key={`leaderboard-${leaderboardIndex}`}
-            className={`w-full flex flex-col items-center gap-4 transition-opacity duration-1000 ${showLeaderboards ? 'opacity-100' : 'opacity-0 pointer-events-none absolute'}`}
+            className={`absolute inset-x-0 top-0 flex flex-col items-center gap-4 transition-opacity duration-1000 ${showLeaderboards ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           >
             <PlayerMenuLeaderboard 
               mode={leaderboardCycle[leaderboardIndex].mode} 
@@ -471,8 +471,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             </div>
           </div>
           
-          {/* Menu buttons - crossfade in/out with slower transition */}
-          <nav className={`flex flex-col gap-2 sm:gap-3 md:gap-4 w-full max-w-xs transition-opacity duration-1000 ${showLeaderboards ? 'opacity-0 pointer-events-none absolute' : 'opacity-100'}`}>
+          {/* Menu buttons - ALWAYS absolute positioned */}
+          <nav className={`absolute inset-x-0 top-0 flex flex-col gap-2 sm:gap-3 md:gap-4 items-center transition-opacity duration-1000 ${showLeaderboards ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             {menuItems.map((item, index) => (
               <button
                 key={item.id}
