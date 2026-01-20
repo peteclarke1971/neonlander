@@ -62,12 +62,18 @@ import {
 import { 
   initUFOSpawnState, 
   getActiveUFOCount, 
-  canSpawnUFO, 
-  updateSpawnTimers, 
-  shouldSpawnType, 
-  resetSpawnTimer, 
   type UFOSpawnState 
 } from "./systems/landerUFOManager";
+import {
+  shouldHaveUFOs,
+  getUFOConfigForLevel,
+  generateUFOSeed,
+  generateUFOSpawnSchedule,
+  getMedleyUFOConfigForLevel,
+  getMaxActiveUFOs,
+  type LevelUFOConfig,
+  type UFOSpawnEvent
+} from "./systems/ufoProgression";
 import { drawAllUFOs } from "./systems/landerUFORender";
 import type { LanderUFO, UFOProjectile, UFOType, UFOTypeConfig } from "./types/landerUFO";
 import { anyGamepad, loadProfile, readGamepad, saveProfile, setLastDeviceId, vibrate, getLastDeviceId, setUiMode } from "@/hooks/use-gamepad";
@@ -455,9 +461,11 @@ export const GameEngine: React.FC<Props> = ({
   const lightningEnabled = isLightningLevel(mode, level);
   const isUnderwater = isWaterLevel(mode, level);
   
-  // UFO enemy system (classic mode only)
+  // UFO enemy system
   const ufoSpawnStateRef = useRef<UFOSpawnState>(initUFOSpawnState());
   const allProjectilesRef = useRef<UFOProjectile[]>([]);
+  const ufoSpawnScheduleRef = useRef<UFOSpawnEvent[]>([]);
+  const ufoLevelConfigRef = useRef<LevelUFOConfig | null>(null);
   
   // Shield invulnerability after shield break (brief immunity)
   const shieldInvulnerableRef = useRef(false);
@@ -958,23 +966,45 @@ export const GameEngine: React.FC<Props> = ({
     const hazardCount = isCavernLevel ? 0 : (levelVar >= 3 ? Math.min(1 + Math.floor((levelVar - 3) / 5), 4) : 0);
     const hazards = generateHazards(seed, terrain.worldWidth, BASE_HEIGHT).slice(0, hazardCount);
     
-    // UFO spawn system (classic mode level 0, or medley mode normal levels)
-    if ((mode === "classic" && level === 0) || (mode === "medley" && shouldSpawnUFOsInMedley(level))) {
+    // UFO spawn system initialization - uses new progression system
+    // Check if this level should have UFOs (not time trial, level >= 10, not rest level)
+    const ufoTimeTrial = mode === "timetrial" || (mode === "medley" && getMedleyLevelType(level) === "timetrial");
+    
+    if (shouldHaveUFOs(mode, levelVar, ufoTimeTrial)) {
       // Initialize UFO spawn state
       ufoSpawnStateRef.current = initUFOSpawnState();
       allProjectilesRef.current = [];
       
+      // Generate deterministic UFO seed
+      const ufoSeed = generateUFOSeed(mode, levelVar, levelSeed);
+      
+      // Get config for this level (handles medley vs fixed/classic)
+      let ufoConfig: LevelUFOConfig | null;
       if (mode === "medley") {
+        // For medley, count normal levels completed to determine progression
         const normalCount = countNormalLevelsCompleted(level);
-        const ufoConfig = getMedleyUFOConfig(normalCount, effectiveLevel);
-        console.log("🛸 Medley UFO system initialized:", {
-          stage: level,
-          normalCompleted: normalCount,
-          config: ufoConfig
+        ufoConfig = getMedleyUFOConfigForLevel(level, normalCount, levelSeed);
+      } else {
+        ufoConfig = getUFOConfigForLevel(levelVar, mode, levelSeed);
+      }
+      
+      if (ufoConfig) {
+        ufoLevelConfigRef.current = ufoConfig;
+        ufoSpawnScheduleRef.current = generateUFOSpawnSchedule(ufoConfig, ufoSeed);
+        
+        console.log("🛸 UFO system initialized:", {
+          level: levelVar,
+          mode,
+          config: ufoConfig,
+          schedule: ufoSpawnScheduleRef.current.map(e => ({ time: e.spawnTime.toFixed(1), type: e.ufoType, diff: e.difficulty }))
         });
       } else {
-        console.log("🛸 Multi-UFO system initialized for Classic Mode Level 0");
+        ufoLevelConfigRef.current = null;
+        ufoSpawnScheduleRef.current = [];
       }
+    } else {
+      ufoLevelConfigRef.current = null;
+      ufoSpawnScheduleRef.current = [];
     }
     
     // Choose a safe spawn not over pads and with altitude above terrain
@@ -2201,158 +2231,105 @@ export const GameEngine: React.FC<Props> = ({
         updateHazards(nearbyHazards, dt, terrain.worldWidth, BASE_HEIGHT);
       }
       
-      // UFO system update (classic mode level 0, or medley mode normal levels)
-      if (running && ((mode === "classic" && level === 0) || (mode === "medley" && shouldSpawnUFOsInMedley(level)))) {
-        // Load configs from settings (or use medley config for medley mode)
-        let configs: Record<UFOType, UFOTypeConfig>;
+      // UFO system update - uses new spawn schedule system
+      const ufoConfig = ufoLevelConfigRef.current;
+      if (running && ufoConfig && ufoSpawnScheduleRef.current.length > 0) {
+        const state = ufoSpawnStateRef.current;
+        const schedule = ufoSpawnScheduleRef.current;
         
-        if (mode === "medley") {
-          // Get medley UFO configuration
-          const normalCount = countNormalLevelsCompleted(level);
-          const medleyUFOConfig = getMedleyUFOConfig(normalCount, effectiveLevel);
-          
-          configs = {
-            small: {
-              ...UFO_CONFIGS.small,
-              enabled: medleyUFOConfig.smallEnabled
-            },
-            medium: {
-              ...UFO_CONFIGS.medium,
-              enabled: medleyUFOConfig.mediumEnabled
-            },
-            large: {
-              ...UFO_CONFIGS.large,
-              enabled: medleyUFOConfig.largeEnabled
-            }
-          };
-        } else {
-          // Classic mode - load from settings
-          configs = {
-            small: {
-              ...UFO_CONFIGS.small,
-              enabled: (() => {
-                try {
-                  const saved = localStorage.getItem('ll-ufo-small-enabled');
-                  return saved ? JSON.parse(saved) : true;
-                } catch {
-                  return true;
-                }
-              })(),
-              difficulty: (() => {
-                try {
-                  const saved = localStorage.getItem('ll-ufo-small-difficulty');
-                  return saved ? JSON.parse(saved) : 1;
-                } catch {
-                  return 1;
-                }
-              })()
-            },
-            medium: {
-              ...UFO_CONFIGS.medium,
-              enabled: (() => {
-                try {
-                  const saved = localStorage.getItem('ll-ufo-medium-enabled');
-                  return saved ? JSON.parse(saved) : true;
-                } catch {
-                  return true;
-                }
-              })(),
-              difficulty: (() => {
-                try {
-                  const saved = localStorage.getItem('ll-ufo-medium-difficulty');
-                  return saved ? JSON.parse(saved) : 1;
-                } catch {
-                  return 1;
-                }
-              })()
-            },
+        // Build type configs from level config
+        const configs: Record<UFOType, UFOTypeConfig> = {
+          small: {
+            ...UFO_CONFIGS.small,
+            enabled: ufoConfig.smallEnabled,
+            difficulty: ufoConfig.difficulty
+          },
+          medium: {
+            ...UFO_CONFIGS.medium,
+            enabled: ufoConfig.mediumEnabled,
+            difficulty: ufoConfig.difficulty
+          },
           large: {
             ...UFO_CONFIGS.large,
-            enabled: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-large-enabled');
-                return saved ? JSON.parse(saved) : true;
-              } catch {
-                return true;
-              }
-            })(),
-            difficulty: (() => {
-              try {
-                const saved = localStorage.getItem('ll-ufo-large-difficulty');
-                return saved ? JSON.parse(saved) : 1;
-              } catch {
-                return 1;
-              }
-            })()
+            enabled: ufoConfig.largeEnabled,
+            difficulty: ufoConfig.difficulty
           }
         };
-      }
         
-        const state = ufoSpawnStateRef.current;
-        
-        // Update spawn timers
-        updateSpawnTimers(state, dt);
-        
-        // Check each UFO type for spawning
-        const types: UFOType[] = ["small", "medium", "large"];
-        for (const type of types) {
-          if (shouldSpawnType(type, state) && canSpawnUFO(type, state, configs[type])) {
-            let newUFO: LanderUFO | null = null;
-            
-            switch (type) {
-              case "small":
-                newUFO = spawnSmallUFO(
-                  levelSeed + Math.floor(elapsed * 1000),
-                  configs.small.difficulty,
-                  terrain.worldWidth,
-                  BASE_HEIGHT,
-                  x,
-                  y,
-                  elapsed,
-                  configs.small
-                );
-                state.activeSmall = newUFO;
-                if (!isDemo) { audio.current.startUfoSmallSound(); }
-                break;
+        // Check spawn schedule for spawning
+        for (const event of schedule) {
+          if (!event.spawned && elapsed >= event.spawnTime) {
+            // Check max simultaneous limit
+            const activeCount = getActiveUFOCount(state);
+            if (activeCount < ufoConfig.maxSimultaneous) {
+              // Check if this type's slot is free
+              const typeSlotFree = 
+                (event.ufoType === "small" && (!state.activeSmall || !state.activeSmall.active)) ||
+                (event.ufoType === "medium" && (!state.activeMedium || !state.activeMedium.active)) ||
+                (event.ufoType === "large" && (!state.activeLarge || !state.activeLarge.active));
+              
+              if (typeSlotFree && configs[event.ufoType].enabled) {
+                let newUFO: LanderUFO | null = null;
                 
-              case "medium":
-                newUFO = spawnUFO(
-                  levelSeed + Math.floor(elapsed * 1000),
-                  configs.medium.difficulty,
-                  terrain.worldWidth,
-                  BASE_HEIGHT,
-                  x,
-                  y,
-                  elapsed,
-                  DEFAULT_UFO_CONFIG
-                );
-                newUFO.type = "medium";
-                newUFO.scale = 1.0;
-                newUFO.canShoot = true;
-                state.activeMedium = newUFO;
-                if (!isDemo) { audio.current.startUfoMediumSound(); }
-                break;
+                // Use deterministic seed for this spawn
+                const spawnSeed = levelSeed + event.seedOffset * 12345;
                 
-              case "large":
-                newUFO = spawnLargeUFO(
-                  levelSeed + Math.floor(elapsed * 1000),
-                  configs.large.difficulty,
-                  terrain.worldWidth,
-                  BASE_HEIGHT,
-                  x,
-                  y,
-                  elapsed,
-                  configs.large,
-                  terrain.points
-                );
-                state.activeLarge = newUFO;
-                if (!isDemo) { audio.current.startUfoLargeSound(); }
-                break;
-            }
-            
-            if (newUFO) {
-              resetSpawnTimer(type, state, configs[type]);
-              console.log(`🛸 ${type.toUpperCase()} UFO spawned`);
+                switch (event.ufoType) {
+                  case "small":
+                    newUFO = spawnSmallUFO(
+                      spawnSeed,
+                      event.difficulty,
+                      terrain.worldWidth,
+                      BASE_HEIGHT,
+                      x,
+                      y,
+                      elapsed,
+                      configs.small
+                    );
+                    state.activeSmall = newUFO;
+                    if (!isDemo) { audio.current.startUfoSmallSound(); }
+                    break;
+                    
+                  case "medium":
+                    newUFO = spawnUFO(
+                      spawnSeed,
+                      event.difficulty,
+                      terrain.worldWidth,
+                      BASE_HEIGHT,
+                      x,
+                      y,
+                      elapsed,
+                      DEFAULT_UFO_CONFIG
+                    );
+                    newUFO.type = "medium";
+                    newUFO.scale = 1.0;
+                    newUFO.canShoot = true;
+                    state.activeMedium = newUFO;
+                    if (!isDemo) { audio.current.startUfoMediumSound(); }
+                    break;
+                    
+                  case "large":
+                    newUFO = spawnLargeUFO(
+                      spawnSeed,
+                      event.difficulty,
+                      terrain.worldWidth,
+                      BASE_HEIGHT,
+                      x,
+                      y,
+                      elapsed,
+                      configs.large,
+                      terrain.points
+                    );
+                    state.activeLarge = newUFO;
+                    if (!isDemo) { audio.current.startUfoLargeSound(); }
+                    break;
+                }
+                
+                if (newUFO) {
+                  event.spawned = true;
+                  console.log(`🛸 ${event.ufoType.toUpperCase()} UFO spawned at t=${elapsed.toFixed(1)}s (scheduled: ${event.spawnTime.toFixed(1)}s, difficulty: ${event.difficulty})`);
+                }
+              }
             }
           }
         }
@@ -2593,8 +2570,8 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // UFO collision checks (classic mode, level 0) - with shield protection and bounce
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && mode === "classic" && level === 0) {
+      // UFO collision checks - with shield protection and bounce
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && ufoLevelConfigRef.current) {
         const state = ufoSpawnStateRef.current;
         const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge];
         
@@ -4779,8 +4756,8 @@ export const GameEngine: React.FC<Props> = ({
       });
       drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
       
-      // UFO rendering (classic mode, level 0)
-      if (mode === "classic" && level === 0) {
+      // UFO rendering
+      if (ufoLevelConfigRef.current) {
         const state = ufoSpawnStateRef.current;
         const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge].filter(u => u?.active) as LanderUFO[];
         
