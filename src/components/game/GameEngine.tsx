@@ -3085,20 +3085,44 @@ export const GameEngine: React.FC<Props> = ({
                 }, 500);
             } else {
               // crash on cavern walls/floor or invalid landing
-              running = false;
-              crashed = true;
-              spawnExplosion();
-              spawnDebris();
-              if (!isDemo) {
-                audio.current.explosion();
-                audio.current.stopThruster();
-                try { audio.current.stopFuelAlarm(); } catch {}
+              // Check if shield absorbs the hit (with bounce physics)
+              if (shieldActiveRef.current && !shieldInvulnerableRef.current) {
+                // Shield break effect with bounce physics
+                spawnShieldBreak(x, y);
+                shieldActiveRef.current = false;
+                setShieldActive(false);
+                shieldTimerRef.current = 0;
+                
+                // Bounce away from terrain (upward and random horizontal)
+                vx += (Math.random() - 0.5) * 100 * dt;
+                vy = Math.min(vy, -1.5); // Ensure upward bounce
+                
+                // Push lander slightly away from collision point
+                y -= 5;
+                
+                // Grant brief invulnerability
+                shieldInvulnerableRef.current = true;
+                shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+                
+                cameraShake = 10;
+                if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+                if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+              } else if (!shieldActiveRef.current) {
+                running = false;
+                crashed = true;
+                spawnExplosion();
+                spawnDebris();
+                if (!isDemo) {
+                  audio.current.explosion();
+                  audio.current.stopThruster();
+                  try { audio.current.stopFuelAlarm(); } catch {}
+                }
+                cameraShake = 24;
+                if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+                setTimeout(() => {
+                  onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+                }, 700);
               }
-              cameraShake = 24;
-              if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-              setTimeout(() => {
-                onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
-              }, 700);
             }
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
             // MEGA! Moving pad landing
@@ -3376,21 +3400,45 @@ export const GameEngine: React.FC<Props> = ({
               }, 500);
             }
           } else {
-            // crash
-            running = false;
-            crashed = true;
-            spawnExplosion();
-            spawnDebris();
-            if (!isDemo) {
-              audio.current.explosion();
-              audio.current.stopThruster();
-              try { audio.current.stopFuelAlarm(); } catch {}
-            }
-            cameraShake = 24;
-            if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+            // crash - check if shield absorbs the hit (with bounce physics)
+            if (shieldActiveRef.current && !shieldInvulnerableRef.current) {
+              // Shield break effect with bounce physics
+              spawnShieldBreak(x, y);
+              shieldActiveRef.current = false;
+              setShieldActive(false);
+              shieldTimerRef.current = 0;
+              
+              // Bounce away from terrain (upward and random horizontal)
+              vx += (Math.random() - 0.5) * 100 * dt;
+              vy = Math.min(vy, -1.5); // Ensure upward bounce
+              
+              // Push lander slightly above terrain
+              const ground = terrain.getHeightAt(x);
+              y = ground - 15;
+              
+              // Grant brief invulnerability
+              shieldInvulnerableRef.current = true;
+              shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+              
+              cameraShake = 10;
+              if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+              if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+            } else if (!shieldActiveRef.current) {
+              running = false;
+              crashed = true;
+              spawnExplosion();
+              spawnDebris();
+              if (!isDemo) {
+                audio.current.explosion();
+                audio.current.stopThruster();
+                try { audio.current.stopFuelAlarm(); } catch {}
+              }
+              cameraShake = 24;
+              if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
               setTimeout(() => {
                 onGameOver({ score, landings, cause: fuel <= 0 ? "fuel" : "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
               }, 700);
+            }
           }
         }
       }
