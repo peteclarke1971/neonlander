@@ -2284,7 +2284,8 @@ export const GameEngine: React.FC<Props> = ({
                       x,
                       y,
                       elapsed,
-                      configs.small
+                      configs.small,
+                      terrain.points
                     );
                     state.activeSmall = newUFO;
                     if (!isDemo) { audio.current.startUfoSmallSound(); }
@@ -2299,7 +2300,8 @@ export const GameEngine: React.FC<Props> = ({
                       x,
                       y,
                       elapsed,
-                      DEFAULT_UFO_CONFIG
+                      DEFAULT_UFO_CONFIG,
+                      terrain.points
                     );
                     newUFO.type = "medium";
                     newUFO.scale = 1.0;
