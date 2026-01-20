@@ -113,6 +113,9 @@ export interface GameOverData {
   // Spawn position for retry
   initialSpawnX?: number;
   initialSpawnY?: number;
+  // Shield state for carryover
+  shieldActive?: boolean;
+  shieldTimer?: number;
 }
 
 export interface HighScore {
