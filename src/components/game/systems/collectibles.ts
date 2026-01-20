@@ -446,7 +446,8 @@ function repairSpaceJunkPlacement(
 export function generateCollectibles(
   levelSeed: number,
   context: PlacementContext,
-  terrainColor?: string
+  terrainColor?: string,
+  isCollectionLevel?: boolean
 ): CollectiblesData {
   const config = COLLECTIBLES_CONFIG;
   const spaceJunk: SpaceJunk[] = [];
@@ -462,8 +463,13 @@ export function generateCollectibles(
   
   const isHardLevel = context.level >= config.hardPlacementStartLevel;
   
+  // Use higher count for collection levels (6 items instead of 3)
+  const itemCount = isCollectionLevel 
+    ? config.collectionLevelCount 
+    : config.count;
+  
   // Generate space junk items with difficulty-based placement
-  for (let i = 0; i < config.count; i++) {
+  for (let i = 0; i < itemCount; i++) {
     let junk: SpaceJunk | null = null;
     
     // First item is always easy placement, items 2 and 3 are tricky on hard levels
@@ -506,7 +512,12 @@ export function generateCollectibles(
   }
   
   // Ensure minimum guaranteed items (with spacing)
-  while (spaceJunk.length < config.minItemsGuaranteed) {
+  // Collection levels need at least 4 items for fairness
+  const minItems = isCollectionLevel 
+    ? Math.max(config.minItemsGuaranteed, 4) 
+    : config.minItemsGuaranteed;
+  
+  while (spaceJunk.length < minItems) {
     const idx = spaceJunk.length;
     const junk = generateSpaceJunkItem(levelSeed, idx + 100, context, spaceJunk, terrainColor);
     if (junk) {

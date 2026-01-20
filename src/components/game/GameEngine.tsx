@@ -1898,6 +1898,7 @@ export const GameEngine: React.FC<Props> = ({
           vx,
           vy,
           terrain.getHeightAt,
+          terrain.getPadAt,
           dt,
           elapsed
         );

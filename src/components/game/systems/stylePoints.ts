@@ -160,6 +160,7 @@ export function updateNearMiss(
   vx: number,
   vy: number,
   getHeightAt: (x: number) => number,
+  getPadAt: ((x: number) => { x?: number; xStart?: number; xEnd?: number } | null) | null,
   dt: number,
   currentTime: number
 ): { awarded: boolean; awardX: number; awardY: number } | null {
@@ -209,6 +210,16 @@ export function updateNearMiss(
       
       // Check if maintained for 0.3 seconds (much easier!)
       if (elapsed >= 0.3) {
+        // Check if above a landing pad - don't award near misses during landings
+        if (getPadAt) {
+          const pad = getPadAt(x);
+          if (pad) {
+            // Above a pad - reset tracking, no award
+            nm.active = false;
+            return null;
+          }
+        }
+        
         // Check cooldown - must be 1 second since last award
         const timeSinceLastAward = currentTime - nm.lastAwardTime;
         const COOLDOWN = 1.0;
