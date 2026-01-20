@@ -459,6 +459,11 @@ export const GameEngine: React.FC<Props> = ({
   const ufoSpawnStateRef = useRef<UFOSpawnState>(initUFOSpawnState());
   const allProjectilesRef = useRef<UFOProjectile[]>([]);
   
+  // Shield invulnerability after shield break (brief immunity)
+  const shieldInvulnerableRef = useRef(false);
+  const shieldInvulnerableTimerRef = useRef(0);
+  const SHIELD_INVULNERABLE_DURATION = 0.75; // seconds (matches SurvivalEngine)
+  
   // Hint system: show rotation boost hint on first hard level
   useEffect(() => {
     const hintShown = localStorage.getItem('ll-rotation-boost-hint-shown');
@@ -1431,6 +1436,43 @@ export const GameEngine: React.FC<Props> = ({
       }
     };
     
+    // Shield break effect (prismatic particle burst - matching SurvivalEngine)
+    const spawnShieldBreak = (cx: number, cy: number) => {
+      // Concentric ring bursts
+      for (let ring = 0; ring < 3; ring++) {
+        const ringDelay = ring * 30;
+        setTimeout(() => {
+          shockwaves.push({
+            x: cx,
+            y: cy,
+            life: 0,
+            max: 0.4
+          });
+        }, ringDelay);
+      }
+      
+      // Prismatic particle shards
+      const shardCount = shouldOptimizePerformance ? 8 : 40;
+      for (let i = 0; i < shardCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 100 + Math.random() * 200;
+        const hue = 260 + Math.random() * 60; // Purple to cyan
+        
+        particles.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: 0,
+          max: 0.6 + Math.random() * 0.4,
+          color: `hsla(${hue}, 100%, ${60 + Math.random() * 30}%, 1)`
+        });
+      }
+      
+      flashT = 0.25;
+      cameraShake += 2;
+    };
+    
     // Style points helper functions
     const spawnStyle360Burst = (px: number, py: number, terrainColor: string) => {
       const count = 48; // More particles for dramatic effect!
@@ -1639,6 +1681,15 @@ export const GameEngine: React.FC<Props> = ({
           shieldTimerRef.current = 0;
           // Optional: play shield expire sound
           if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+        }
+      }
+      
+      // Update shield invulnerability timer (after shield break)
+      if (shieldInvulnerableRef.current) {
+        shieldInvulnerableTimerRef.current -= dt;
+        if (shieldInvulnerableTimerRef.current <= 0) {
+          shieldInvulnerableRef.current = false;
+          shieldInvulnerableTimerRef.current = 0;
         }
       }
       
@@ -2498,18 +2549,32 @@ export const GameEngine: React.FC<Props> = ({
         hudUpdateTimer = 0;
       }
       
-      // Hazard collisions (airborne)
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkHazardCollision(hazards, x, y, 10).collided) {
+      // Hazard collisions (airborne) - with bounce physics
+      const hazardResult = checkHazardCollision(hazards, x, y, 10);
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && hazardResult.collided) {
         // Check if shield absorbs the hit
-        if (shieldActiveRef.current) {
-          // Shield absorbs hit
+        if (shieldActiveRef.current && hazardResult.hazard) {
+          // Shield break effect with bounce physics
+          spawnShieldBreak(x, y);
           shieldActiveRef.current = false;
           setShieldActive(false);
           shieldTimerRef.current = 0;
-          cameraShake = 10;
+          
+          // Bounce away from hazard (physics-based)
+          const dx = x - hazardResult.hazard.x;
+          const dy = y - hazardResult.hazard.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const bounceStrength = 150;
+          vx += (dx / dist) * bounceStrength * dt;
+          vy += (dy / dist) * bounceStrength * dt;
+          
+          // Grant brief invulnerability
+          shieldInvulnerableRef.current = true;
+          shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+          
           if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
           if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
-        } else {
+        } else if (!shieldActiveRef.current) {
           running = false;
           crashed = true;
           spawnExplosion();
@@ -2527,42 +2592,36 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // UFO collision checks (classic mode, level 0)
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && mode === "classic" && level === 0) {
+      // UFO collision checks (classic mode, level 0) - with shield protection and bounce
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && mode === "classic" && level === 0) {
         const state = ufoSpawnStateRef.current;
         const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge];
         
         // Check UFO body collision
         const ufoHit = checkUFOCollision(activeUFOs, x, y, 10);
         if (ufoHit) {
-          running = false;
-          crashed = true;
-          spawnExplosion();
-          spawnDebris();
-          if (!isDemo) {
-            audio.current.explosion();
-            audio.current.stopThruster();
-            try { audio.current.stopFuelAlarm(); } catch {}
-          }
-          cameraShake = 22;
-          if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-          
-          // Clear UFO on crash
-          state.activeSmall = null;
-          state.activeMedium = null;
-          state.activeLarge = null;
-          allProjectilesRef.current = [];
-          
-          console.log(`💥 Crashed into ${ufoHit.type.toUpperCase()} UFO!`);
-          setTimeout(() => {
-            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
-          }, 700);
-        }
-        
-        // Check UFO projectile collision
-        if (running && !crashed) {
-          const projectileHit = checkProjectileCollision(allProjectilesRef.current, x, y, 10);
-          if (projectileHit) {
+          if (shieldActiveRef.current) {
+            // Shield break effect with bounce physics
+            spawnShieldBreak(x, y);
+            shieldActiveRef.current = false;
+            setShieldActive(false);
+            shieldTimerRef.current = 0;
+            
+            // Bounce away from UFO
+            const dx = x - ufoHit.x;
+            const dy = y - ufoHit.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const bounceStrength = 150;
+            vx += (dx / dist) * bounceStrength * dt;
+            vy += (dy / dist) * bounceStrength * dt;
+            
+            // Grant brief invulnerability
+            shieldInvulnerableRef.current = true;
+            shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+            
+            if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+            if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+          } else {
             running = false;
             crashed = true;
             spawnExplosion();
@@ -2572,32 +2631,105 @@ export const GameEngine: React.FC<Props> = ({
               audio.current.stopThruster();
               try { audio.current.stopFuelAlarm(); } catch {}
             }
-            cameraShake = 18;
+            cameraShake = 22;
             if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
             
-            // Remove hit projectile
-            projectileHit.active = false;
+            // Clear UFO on crash
+            state.activeSmall = null;
+            state.activeMedium = null;
+            state.activeLarge = null;
+            allProjectilesRef.current = [];
             
-            console.log("💥 Hit by UFO projectile!");
+            console.log(`💥 Crashed into ${ufoHit.type.toUpperCase()} UFO!`);
             setTimeout(() => {
               onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
             }, 700);
           }
         }
+        
+        // Check UFO projectile collision
+        if (running && !crashed && !shieldInvulnerableRef.current) {
+          const projectileHit = checkProjectileCollision(allProjectilesRef.current, x, y, 10);
+          if (projectileHit) {
+            if (shieldActiveRef.current) {
+              // Shield break effect with bounce physics
+              spawnShieldBreak(x, y);
+              shieldActiveRef.current = false;
+              setShieldActive(false);
+              shieldTimerRef.current = 0;
+              
+              // Bounce in direction opposite to projectile velocity
+              const projSpeed = Math.sqrt(projectileHit.vx * projectileHit.vx + projectileHit.vy * projectileHit.vy) || 1;
+              const bounceStrength = 100;
+              vx -= (projectileHit.vx / projSpeed) * bounceStrength * dt;
+              vy -= (projectileHit.vy / projSpeed) * bounceStrength * dt;
+              
+              // Remove the projectile
+              projectileHit.active = false;
+              
+              // Grant brief invulnerability
+              shieldInvulnerableRef.current = true;
+              shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+              
+              if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+              if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+            } else {
+              running = false;
+              crashed = true;
+              spawnExplosion();
+              spawnDebris();
+              if (!isDemo) {
+                audio.current.explosion();
+                audio.current.stopThruster();
+                try { audio.current.stopFuelAlarm(); } catch {}
+              }
+              cameraShake = 18;
+              if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+              
+              // Remove hit projectile
+              projectileHit.active = false;
+              
+              console.log("💥 Hit by UFO projectile!");
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+              }, 700);
+            }
+          }
+        }
       }
       
-      // Volcano particle collisions (airborne)
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkVolcanoParticleCollision(volcanoParticles, x, y, 10).collided) {
+      // Volcano particle collisions (airborne) - with bounce physics
+      const volcanoResult = checkVolcanoParticleCollision(volcanoParticles, x, y, 10);
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && volcanoResult.collided) {
         // Check if shield absorbs the hit
-        if (shieldActiveRef.current) {
-          // Shield absorbs hit
+        if (shieldActiveRef.current && volcanoResult.particle) {
+          // Shield break effect with bounce physics
+          spawnShieldBreak(x, y);
           shieldActiveRef.current = false;
           setShieldActive(false);
           shieldTimerRef.current = 0;
-          cameraShake = 10;
+          
+          // Bounce away from particle
+          const dx = x - volcanoResult.particle.x;
+          const dy = y - volcanoResult.particle.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const bounceStrength = 150;
+          vx += (dx / dist) * bounceStrength * dt;
+          vy += (dy / dist) * bounceStrength * dt;
+          
+          // Remove the particle that was hit
+          const particleIndex = volcanoParticles.indexOf(volcanoResult.particle);
+          if (particleIndex > -1) {
+            volcanoParticles.splice(particleIndex, 1);
+          }
+          
+          // Grant brief invulnerability
+          shieldInvulnerableRef.current = true;
+          shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+          
           if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
           if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
-        } else {
+        } else if (!shieldActiveRef.current) {
           running = false;
           crashed = true;
           spawnExplosion();
@@ -2620,7 +2752,7 @@ export const GameEngine: React.FC<Props> = ({
         updateJellyfish(terrain.jellyfish, dt, elapsed, terrain.worldWidth, 800);
         
         // Check jellyfish collisions
-        if (!crashed && invulnerabilityTimer.current <= 0) {
+        if (!crashed && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current) {
           const { directHit, shockwaveHit } = checkJellyfishCollision(
             terrain.jellyfish,
             x,
@@ -2628,15 +2760,28 @@ export const GameEngine: React.FC<Props> = ({
             10 // lander radius
           );
           
-          // Direct hit = instant death (or shield absorbs)
+          // Direct hit = instant death (or shield absorbs with bounce)
           if (directHit) {
             // Check if shield absorbs the hit
             if (shieldActiveRef.current) {
-              // Shield absorbs hit
+              // Shield break effect with bounce physics
+              spawnShieldBreak(x, y);
               shieldActiveRef.current = false;
               setShieldActive(false);
               shieldTimerRef.current = 0;
-              cameraShake = 10;
+              
+              // Bounce away from jellyfish
+              const dx = x - directHit.x;
+              const dy = y - directHit.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const bounceStrength = 150;
+              vx += (dx / dist) * bounceStrength * dt;
+              vy += (dy / dist) * bounceStrength * dt;
+              
+              // Grant brief invulnerability
+              shieldInvulnerableRef.current = true;
+              shieldInvulnerableTimerRef.current = SHIELD_INVULNERABLE_DURATION;
+              
               if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
               if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
             } else {
@@ -2662,11 +2807,11 @@ export const GameEngine: React.FC<Props> = ({
             electrifiedTimer = 3.0;
             lastShockwaveSource = { x: shockwaveHit.x, y: shockwaveHit.y };
             
-      // Knockback away from jellyfish
-      const dx = x - shockwaveHit.x;
-      const dy = y - shockwaveHit.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const knockbackForce = 15; // Reduced knockback (10% of original)
+            // Knockback away from jellyfish
+            const dx = x - shockwaveHit.x;
+            const dy = y - shockwaveHit.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const knockbackForce = 15; // Reduced knockback (10% of original)
             
             if (dist > 0) {
               vx += (dx / dist) * knockbackForce;
@@ -4867,8 +5012,19 @@ export const GameEngine: React.FC<Props> = ({
         ctx.shadowColor = shipColor as any;
         ctx.shadowBlur = shipShadowBlur;
         
+        // Ship flashing during shield invulnerability (8Hz flash rate matching SurvivalEngine)
+        let shipAlpha = 1;
+        if (shieldInvulnerableRef.current) {
+          const flashFreq = 8; // flashes per second
+          const flashPhase = (elapsed * flashFreq) % 1;
+          if (flashPhase < 0.5) {
+            shipAlpha = 0.3; // dim the ship
+          }
+        }
+        
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
           ctx.save();
+          ctx.globalAlpha = shipAlpha;
           ctx.translate(x + offset, y);
           ctx.rotate(angle);
           ctx.beginPath();
