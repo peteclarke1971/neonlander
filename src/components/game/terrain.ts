@@ -634,7 +634,10 @@ export function generateTerrain(
     
     // Use a terrain-based color for collectibles
     const terrainColor = "hsl(var(--primary))"; // Use primary color from design system
-    collectibles = generateCollectibles(seed, context, terrainColor);
+    
+    // Check if this is a collection level (requires all junk before pads appear)
+    const isCollection = mode ? isCollectionLevel(mode, level) : false;
+    collectibles = generateCollectibles(seed, context, terrainColor, isCollection);
     
     // ===== SANITIZE COLLECTIBLES =====
     // Ensure no collectibles are buried under terrain

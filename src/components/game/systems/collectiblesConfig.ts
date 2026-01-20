@@ -1,6 +1,7 @@
 export const COLLECTIBLES_CONFIG = {
   enabled: true,
-  count: 3, // target per level
+  count: 3, // target per level (normal levels)
+  collectionLevelCount: 6, // target per level (collection levels - pads hidden until all collected)
   minItemsGuaranteed: 1, // always place at least this many
   pointsPerPickup: 150,
   setBonus: 1000, // bonus for collecting all 3
