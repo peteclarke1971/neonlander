@@ -186,7 +186,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         // Shield bubble renders at full fidelity on ALL graphics tiers for visual consistency
         if (shipPosition && !photosensitive && state.phase === "countdown") {
           const bubbleRadius = 25; // Fixed radius around the lander
-          const bubbleYOffset = 8; // Downward adjustment to center on lander
+          const bubbleYOffset = 2; // Reduced offset for better centering on lander
           const sp = shipPosRef.current ?? shipPosition;
           const currentTime = performance.now() / 1000;
           

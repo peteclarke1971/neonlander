@@ -82,7 +82,7 @@ const Index = () => {
     localStorage.setItem(HS_FIXED_KEY, JSON.stringify(seed));
     return seed;
   });
-  const [carry, setCarry] = useState<{ score: number; landings: number; level: number } | null>(null);
+  const [carry, setCarry] = useState<{ score: number; landings: number; level: number; shieldActive?: boolean; shieldTimer?: number } | null>(null);
   const [successCount, setSuccessCount] = useState(0);
   const [needsInitials, setNeedsInitials] = useState(false);
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
@@ -430,7 +430,7 @@ const Index = () => {
         setSeedOverride(null);
       }
 
-      setCarry({ score: data.score, landings: data.landings, level: successCount + 1 });
+      setCarry({ score: data.score, landings: data.landings, level: successCount + 1, shieldActive: data.shieldActive, shieldTimer: data.shieldTimer });
       setSuccessCount((c) => c + 1);
       setView("gameover");
       return;
@@ -908,6 +908,8 @@ const retryGame = () => {
           nebulaFxEnabled={nebulaFxEnabled}
           largeRotateButtons={largeRotateButtons}
           showFullHUD={showFullHUD}
+          initialShieldActive={carry?.shieldActive}
+          initialShieldTimer={carry?.shieldTimer}
         />
       )}
       {view === "demo" && (

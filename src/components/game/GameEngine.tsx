@@ -104,6 +104,8 @@ interface Props {
   nebulaFxEnabled?: boolean;
   largeRotateButtons?: boolean;
   showFullHUD?: boolean;
+  initialShieldActive?: boolean;
+  initialShieldTimer?: number;
 }
 
 const WORLD_WIDTH = 4000;
@@ -241,7 +243,9 @@ export const GameEngine: React.FC<Props> = ({
   spawnOverride,
   nebulaFxEnabled = true,
   largeRotateButtons = true,
-  showFullHUD = true
+  showFullHUD = true,
+  initialShieldActive = false,
+  initialShieldTimer = 0
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -357,6 +361,12 @@ export const GameEngine: React.FC<Props> = ({
   // Collectibles state
   const collectiblesRef = useRef<CollectiblesData | null>(null);
   const sparklesRef = useRef<Map<string, any>>(new Map());
+  
+  // Shield state (from collectibles set completion)
+  const SHIELD_DURATION = 75; // seconds (same as Survival mode)
+  const shieldActiveRef = useRef(initialShieldActive);
+  const [shieldActive, setShieldActive] = useState(initialShieldActive);
+  const shieldTimerRef = useRef(initialShieldActive ? (initialShieldTimer > 0 ? initialShieldTimer : SHIELD_DURATION) : 0);
   
   // Track if landing sound has been played for current landing
   const hasPlayedLandingSoundRef = useRef(false);
@@ -1620,6 +1630,18 @@ export const GameEngine: React.FC<Props> = ({
         invulnerabilityTimer.current -= dt * 1000;
       }
       
+      // Update shield timer (collectibles-based shield)
+      if (shieldActiveRef.current && shieldTimerRef.current > 0) {
+        shieldTimerRef.current -= dt;
+        if (shieldTimerRef.current <= 0) {
+          shieldActiveRef.current = false;
+          setShieldActive(false);
+          shieldTimerRef.current = 0;
+          // Optional: play shield expire sound
+          if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+        }
+      }
+      
       // Only increment elapsed time when timer is active (after first movement or 2s after GO)
       if (timerActiveRef.current) {
         elapsed += dt;
@@ -2478,20 +2500,31 @@ export const GameEngine: React.FC<Props> = ({
       
       // Hazard collisions (airborne)
       if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkHazardCollision(hazards, x, y, 10).collided) {
-        running = false;
-        crashed = true;
-        spawnExplosion();
-        spawnDebris();
-        if (!isDemo) {
-          audio.current.explosion();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
+        // Check if shield absorbs the hit
+        if (shieldActiveRef.current) {
+          // Shield absorbs hit
+          shieldActiveRef.current = false;
+          setShieldActive(false);
+          shieldTimerRef.current = 0;
+          cameraShake = 10;
+          if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+          if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+        } else {
+          running = false;
+          crashed = true;
+          spawnExplosion();
+          spawnDebris();
+          if (!isDemo) {
+            audio.current.explosion();
+            audio.current.stopThruster();
+            try { audio.current.stopFuelAlarm(); } catch {}
+          }
+          cameraShake = 24;
+          if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+          setTimeout(() => {
+            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+          }, 700);
         }
-        cameraShake = 24;
-        if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-              setTimeout(() => {
-                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
-              }, 700);
       }
       
       // UFO collision checks (classic mode, level 0)
@@ -2555,20 +2588,31 @@ export const GameEngine: React.FC<Props> = ({
       
       // Volcano particle collisions (airborne)
       if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && checkVolcanoParticleCollision(volcanoParticles, x, y, 10).collided) {
-        running = false;
-        crashed = true;
-        spawnExplosion();
-        spawnDebris();
-        if (!isDemo) {
-          audio.current.explosion();
-          audio.current.stopThruster();
-          try { audio.current.stopFuelAlarm(); } catch {}
+        // Check if shield absorbs the hit
+        if (shieldActiveRef.current) {
+          // Shield absorbs hit
+          shieldActiveRef.current = false;
+          setShieldActive(false);
+          shieldTimerRef.current = 0;
+          cameraShake = 10;
+          if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+          if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+        } else {
+          running = false;
+          crashed = true;
+          spawnExplosion();
+          spawnDebris();
+          if (!isDemo) {
+            audio.current.explosion();
+            audio.current.stopThruster();
+            try { audio.current.stopFuelAlarm(); } catch {}
+          }
+          cameraShake = 24;
+          if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+          setTimeout(() => {
+            onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+          }, 700);
         }
-        cameraShake = 24;
-        if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-              setTimeout(() => {
-                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
-              }, 700);
       }
       
       // Update jellyfish (Level 5 underwater only)
@@ -2584,21 +2628,32 @@ export const GameEngine: React.FC<Props> = ({
             10 // lander radius
           );
           
-          // Direct hit = instant death
+          // Direct hit = instant death (or shield absorbs)
           if (directHit) {
-            running = false;
-            crashed = true;
-            spawnExplosion();
-            spawnDebris();
-            if (!isDemo) {
-              audio.current.explosion();
-              audio.current.stopThruster();
+            // Check if shield absorbs the hit
+            if (shieldActiveRef.current) {
+              // Shield absorbs hit
+              shieldActiveRef.current = false;
+              setShieldActive(false);
+              shieldTimerRef.current = 0;
+              cameraShake = 10;
+              if (!isDemo) { try { audio.current.shieldBreak?.(); } catch {} }
+              if (gpProfileRef.current?.vibration) { try { void vibrate(150, 0.2, 0.6); } catch {} }
+            } else {
+              running = false;
+              crashed = true;
+              spawnExplosion();
+              spawnDebris();
+              if (!isDemo) {
+                audio.current.explosion();
+                audio.current.stopThruster();
+              }
+              cameraShake = 24;
+              if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
+              setTimeout(() => {
+                onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
+              }, 700);
             }
-            cameraShake = 24;
-            if (gpProfileRef.current?.vibration) { try { void vibrate(220, 0.3, 1); } catch {} }
-            setTimeout(() => {
-              onGameOver({ score, landings, cause: "crash", difficulty, elapsed, levelSeed, level, initialSpawnX: initialSpawnRef.current.x, initialSpawnY: initialSpawnRef.current.y });
-            }, 700);
           }
           // Shockwave hit = knockback + paralysis (only if not already paralyzed)
           else if (shockwaveHit && !isParalyzed) {
@@ -2653,9 +2708,22 @@ export const GameEngine: React.FC<Props> = ({
             if (result.setComplete) {
               if (!isDemo) { audio.current.junkSetComplete(); }
               
+              // Award shield for collecting all 3 items!
+              if (!shieldActiveRef.current) {
+                shieldActiveRef.current = true;
+                setShieldActive(true);
+                shieldTimerRef.current = SHIELD_DURATION;
+                if (!isDemo) { try { audio.current.shieldPickup?.(); } catch {} }
+                setBonusMessages(prev => [...prev, "SHIELD ACTIVATED!"]);
+              } else {
+                // Already have shield - reset timer
+                shieldTimerRef.current = SHIELD_DURATION;
+                setBonusMessages(prev => [...prev, "SHIELD RECHARGED!"]);
+              }
+              
               // For collection levels, add visual feedback that pads are now available
               if (isCollectionLevel(mode, level)) {
-                setBonusMessages(["LANDING PADS ACTIVATED"]);
+                setBonusMessages(prev => [...prev, "LANDING PADS ACTIVATED"]);
                 screenFlashAlpha.current = 0.5; // Brief flash effect
               }
               
@@ -4862,6 +4930,52 @@ export const GameEngine: React.FC<Props> = ({
           ctx.restore();
         }
         
+        // Draw collectibles shield bubble if active
+        if (shieldActiveRef.current) {
+          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            ctx.save();
+            ctx.translate(x + offset, y + 2); // +2 for visual centering (match CountdownOverlay)
+            
+            // Shimmer animation
+            const shimmerPhase = elapsed * 3;
+            const shimmerAlpha = 0.3 + Math.sin(shimmerPhase) * 0.1;
+            
+            // Timer-based fade (last 10 seconds)
+            const timerFade = shieldTimerRef.current < 10 
+              ? Math.max(0.3, shieldTimerRef.current / 10) 
+              : 1;
+            
+            // Bubble outline with purple glow
+            ctx.strokeStyle = `hsla(280, 100%, 85%, ${(shimmerAlpha + 0.3) * timerFade})`;
+            ctx.lineWidth = 2;
+            if (!shouldOptimizePerformance) {
+              ctx.shadowColor = "hsla(280, 100%, 70%, 0.8)";
+              ctx.shadowBlur = 15;
+            }
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Prismatic sheen
+            ctx.shadowBlur = 0;
+            const sheenAngle = shimmerPhase * 0.5;
+            const grad = ctx.createLinearGradient(
+              Math.cos(sheenAngle) * 25, Math.sin(sheenAngle) * 25,
+              -Math.cos(sheenAngle) * 25, -Math.sin(sheenAngle) * 25
+            );
+            grad.addColorStop(0, `hsla(260, 100%, 70%, ${0.1 * timerFade})`);
+            grad.addColorStop(0.5, `hsla(300, 100%, 80%, ${0.25 * timerFade})`);
+            grad.addColorStop(1, `hsla(260, 100%, 70%, ${0.1 * timerFade})`);
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+          }
+        }
+        
         // Restore original shadow settings for other elements
         ctx.shadowColor = originalShadowColor;
         ctx.shadowBlur = originalShadowBlur;
@@ -5574,7 +5688,9 @@ export const GameEngine: React.FC<Props> = ({
             lastEarned: lastLandingBonuses.lastEarned,
             padBonus2x: lastLandingBonuses.padBonus2x,
             bullseye: lastLandingBonuses.bullseye,
-            speedBonus: lastLandingBonuses.speedBonus
+            speedBonus: lastLandingBonuses.speedBonus,
+            shieldActive: shieldActiveRef.current,
+            shieldTimer: shieldTimerRef.current
           });
           setIsWorldRecord(false); // Reset for next level
         }}
@@ -5693,7 +5809,9 @@ export const GameEngine: React.FC<Props> = ({
               lastEarned: lastLandingBonuses.lastEarned,
               padBonus2x: lastLandingBonuses.padBonus2x,
               bullseye: lastLandingBonuses.bullseye,
-              speedBonus: lastLandingBonuses.speedBonus
+              speedBonus: lastLandingBonuses.speedBonus,
+              shieldActive: shieldActiveRef.current,
+              shieldTimer: shieldTimerRef.current
             });
             setIsWorldRecord(false); // Reset for next level
           }}
