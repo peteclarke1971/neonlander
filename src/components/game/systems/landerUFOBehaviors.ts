@@ -76,12 +76,46 @@ export function spawnSmallUFO(
   landerX: number,
   landerY: number,
   currentTime: number,
-  config: UFOTypeConfig
+  config: UFOTypeConfig,
+  terrain?: { x: number; y: number }[]
 ): LanderUFO {
   const rng = mulberry32(seed);
   const spawnSide: "left" | "right" = landerX < worldWidth / 2 ? "right" : "left";
   const spawnX = spawnSide === "left" ? -50 : worldWidth + 50;
-  const spawnY = baseHeight - 200 - rng() * 100;
+  
+  // Calculate safe spawn height above terrain
+  let spawnY: number;
+  const minSafeMargin = 80; // Minimum clearance above highest terrain point
+  
+  if (terrain && terrain.length > 0) {
+    // Find the minimum terrain Y (highest point on screen) in the UFO's likely path
+    // Check from spawn side to lander area
+    const pathStartX = spawnSide === "left" ? 0 : worldWidth - 300;
+    const pathEndX = spawnSide === "left" ? 300 : worldWidth;
+    
+    let minTerrainY = baseHeight; // Start with base (lower Y = higher on screen)
+    for (let checkX = pathStartX; checkX <= pathEndX; checkX += 50) {
+      const terrainY = getTerrainHeight(terrain, checkX);
+      if (terrainY < minTerrainY) {
+        minTerrainY = terrainY;
+      }
+    }
+    
+    // Also check around lander position (where it will dive toward)
+    for (let checkX = Math.max(0, landerX - 150); checkX <= Math.min(worldWidth, landerX + 150); checkX += 50) {
+      const terrainY = getTerrainHeight(terrain, checkX);
+      if (terrainY < minTerrainY) {
+        minTerrainY = terrainY;
+      }
+    }
+    
+    // Spawn above the highest terrain point with margin + some variance
+    const maxSpawnY = minTerrainY - minSafeMargin;
+    spawnY = Math.min(maxSpawnY - rng() * 40, 140); // Cap at reasonable height from top
+  } else {
+    // Fallback to old behavior
+    spawnY = baseHeight - 200 - rng() * 100;
+  }
   
   const targetX = landerX;
   const targetY = landerY;
@@ -151,7 +185,6 @@ export function spawnLargeUFO(
   const rng = mulberry32(seed);
   
   // Choose hover position (away from lander)
-  const hoverHeight = config.hoverHeight!;
   let hoverX = worldWidth * 0.3 + rng() * worldWidth * 0.4; // Middle 40% of screen
   
   // Make sure not too close to lander
@@ -159,7 +192,26 @@ export function spawnLargeUFO(
     hoverX = landerX > worldWidth / 2 ? worldWidth * 0.2 : worldWidth * 0.8;
   }
   
-  let hoverY = hoverHeight;
+  // Calculate safe hover Y based on terrain at hover position
+  const minClearance = 120; // Mothership needs more clearance due to size
+  let hoverY: number;
+  
+  if (terrain && terrain.length > 0) {
+    // Find highest terrain point in the hover zone (Mothership moves in a hover radius)
+    let minTerrainY = baseHeight;
+    for (let checkX = hoverX - 150; checkX <= hoverX + 150; checkX += 30) {
+      const terrainY = getTerrainHeight(terrain, checkX);
+      if (terrainY < minTerrainY) {
+        minTerrainY = terrainY;
+      }
+    }
+    
+    // Hover above highest terrain point with clearance
+    hoverY = Math.min(minTerrainY - minClearance, 100); // Cap at reasonable top position
+  } else {
+    // Fallback to config value
+    hoverY = config.hoverHeight!;
+  }
   
   // Spawn off-screen (random side)
   const spawnSide = rng() > 0.5 ? "right" : "left";

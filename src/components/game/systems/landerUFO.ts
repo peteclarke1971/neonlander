@@ -28,7 +28,27 @@ export const DEFAULT_UFO_CONFIG: UFOConfig = {
   trackingStrengthPerDifficulty: 0.08
 };
 
-// Create a new UFO
+// Helper function for terrain height lookup (medium UFO)
+function getTerrainHeightMedium(
+  terrain: { x: number; y: number }[], 
+  x: number, 
+  worldWidth: number
+): number {
+  if (terrain.length < 2) return 1000;
+  
+  let wrappedX = x % worldWidth;
+  if (wrappedX < 0) wrappedX += worldWidth;
+  
+  for (let i = 0; i < terrain.length - 1; i++) {
+    if (terrain[i].x <= wrappedX && terrain[i + 1].x > wrappedX) {
+      const t = (wrappedX - terrain[i].x) / (terrain[i + 1].x - terrain[i].x);
+      return terrain[i].y + (terrain[i + 1].y - terrain[i].y) * t;
+    }
+  }
+  return 1000;
+}
+
+// Create a new UFO (medium type)
 export function spawnUFO(
   seed: number,
   difficulty: number,
@@ -37,7 +57,8 @@ export function spawnUFO(
   landerX: number,
   landerY: number,
   currentTime: number,
-  config: UFOConfig = DEFAULT_UFO_CONFIG
+  config: UFOConfig = DEFAULT_UFO_CONFIG,
+  terrain?: { x: number; y: number }[]
 ): LanderUFO {
   const rng = mulberry32(seed);
   
@@ -46,7 +67,27 @@ export function spawnUFO(
   
   // Calculate spawn position
   const spawnX = spawnSide === "left" ? -config.spawnMargin : worldWidth + config.spawnMargin;
-  const spawnY = baseHeight - config.spawnHeight - rng() * 50; // Slight Y variance
+  
+  // Calculate safe spawn Y based on terrain
+  let spawnY: number;
+  const minClearance = 60;
+  
+  if (terrain && terrain.length > 0) {
+    // Find highest terrain point across entire level (UFO crosses full width)
+    let minTerrainY = baseHeight;
+    for (let checkX = 0; checkX < worldWidth; checkX += 100) {
+      const terrainY = getTerrainHeightMedium(terrain, checkX, worldWidth);
+      if (terrainY < minTerrainY) {
+        minTerrainY = terrainY;
+      }
+    }
+    
+    // Spawn above highest terrain with clearance + variance
+    spawnY = Math.min(minTerrainY - minClearance - rng() * 30, 160);
+  } else {
+    // Fallback to old behavior
+    spawnY = baseHeight - config.spawnHeight - rng() * 50;
+  }
   
   // Scale speed by difficulty (1x at diff 1, 2x at diff 10)
   const speedMultiplier = 1 + (difficulty - 1) * 0.11;
