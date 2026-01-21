@@ -52,7 +52,7 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
           Loading...
         </div>
       ) : (
-        <ol className="space-y-3 flex-1">
+        <ol className="space-y-2 flex-1">
           {displayRows.map((r, i) => {
             const isEmpty = r.initials === "---" || !r.score;
             return (
