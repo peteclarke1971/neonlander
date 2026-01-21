@@ -455,9 +455,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         if (selectedMode === "timetrial" || selectedMode === "fixed") {
           settings.showGhost = true;
         }
-        // Handle survival mode - navigate to /survival page
+        // Handle survival mode - navigate to /survival page with autostart
         if (selectedMode === "survival") {
-          window.location.href = "/survival";
+          window.location.href = "/survival?autostart=true";
           return;
         }
         onStartGame(selectedMode, settings, startingLevel);
