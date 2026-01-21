@@ -848,19 +848,20 @@ const retryGame = () => {
       )}
       {view === "playermenu" && (
         <PlayerMenu
-          onStartGame={(selectedMode, settings) => {
+          onStartGame={(selectedMode, settings, startLevel) => {
             // Map mode selection to the game Mode type
             const modeMap: Record<string, Mode> = {
               fixed: "fixed",
               classic: "classic",
               timetrial: "timetrial",
               medley: "medley",
+              survival: "survival",
             };
             const gameMode = modeMap[selectedMode] || "fixed";
             // Use ALL settings from Developer Menu (passed from PlayerMenu via localStorage)
             startGame(
               settings.difficulty, 
-              undefined, 
+              startLevel > 1 ? startLevel : undefined,
               gameMode, 
               settings.graphicsLevel === "low", 
               undefined, 
@@ -871,9 +872,6 @@ const retryGame = () => {
                 showFullHUD: settings.showFullHUD 
               }
             );
-          }}
-          onSurvival={() => {
-            window.location.href = "/survival";
           }}
           onLeaderboards={() => { /* TODO: Leaderboards screen */ }}
           onSettings={() => { 
