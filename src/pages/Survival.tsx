@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { SurvivalEngine } from "@/components/game/SurvivalEngine";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,11 @@ interface HighScore {
 }
 
 const Survival: React.FC = () => {
-  const [view, setView] = useState<View>("home");
+  // Check for autostart param from Player Menu
+  const [view, setView] = useState<View>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('autostart') === 'true' ? 'game' : 'home';
+  });
   const [lastResult, setLastResult] = useState<SurvivalGameOverData | null>(null);
   const [isHighScore, setIsHighScore] = useState(false);
   const [needsInitials, setNeedsInitials] = useState(false);
@@ -58,6 +62,11 @@ const Survival: React.FC = () => {
   // Get neon color from CSS
   const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
 
+  // Button refs for gamepad navigation on gameover
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [focusedButtonIndex, setFocusedButtonIndex] = useState(0);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
@@ -69,6 +78,58 @@ const Survival: React.FC = () => {
       // Keep current value if parsing fails
     }
   }, []);
+
+  // Show cursor when on menu screens, hide only during gameplay
+  useEffect(() => {
+    const html = document.documentElement;
+    if (view !== 'game') {
+      // Ensure cursor is visible on menu/gameover screens
+      html.classList.remove('hide-cursor');
+    }
+    
+    return () => {
+      // Cleanup: ensure cursor visible on unmount
+      html.classList.remove('hide-cursor');
+    };
+  }, [view]);
+
+  // Gamepad polling for gameover screen navigation
+  useEffect(() => {
+    if (view !== 'gameover' || needsInitials) return;
+    
+    let raf = 0;
+    let prevUp = false, prevDown = false, prevSelect = false;
+    
+    const poll = () => {
+      raf = requestAnimationFrame(poll);
+      const gp = navigator.getGamepads?.()?.[0];
+      if (!gp) return;
+      
+      const up = gp.axes[1] < -0.5 || gp.buttons[12]?.pressed;
+      const down = gp.axes[1] > 0.5 || gp.buttons[13]?.pressed;
+      const select = gp.buttons[0]?.pressed;
+      
+      if (up && !prevUp) setFocusedButtonIndex(i => Math.max(0, i - 1));
+      if (down && !prevDown) setFocusedButtonIndex(i => Math.min(1, i + 1));
+      if (select && !prevSelect) {
+        if (focusedButtonIndex === 0) retryGame();
+        else backToHome();
+      }
+      
+      prevUp = up; prevDown = down; prevSelect = select;
+    };
+    
+    raf = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(raf);
+  }, [view, needsInitials, focusedButtonIndex]);
+
+  // Auto-focus first button when gameover shows
+  useEffect(() => {
+    if (view === 'gameover' && !needsInitials) {
+      setFocusedButtonIndex(0);
+      retryButtonRef.current?.focus();
+    }
+  }, [view, needsInitials]);
 
   const handleGameOver = (data: SurvivalGameOverData) => {
     setLastResult(data);
@@ -122,17 +183,18 @@ const Survival: React.FC = () => {
     setView("home");
   };
 
-  const backToHome = () => {
-    setView("home");
-  };
+  const backToHome = useCallback(() => {
+    // After game ends, go back to Player Menu
+    window.location.href = "/?view=playermenu";
+  }, []);
 
   const backToMainMenu = () => {
-    window.location.href = "/";
+    window.location.href = "/?view=playermenu";
   };
 
-  const retryGame = () => {
+  const retryGame = useCallback(() => {
     setView("game");
-  };
+  }, []);
 
   const startGame = () => {
     setRecentlySubmittedScore(null); // Clear highlight when starting new game
@@ -254,10 +316,22 @@ const Survival: React.FC = () => {
 
         {(!isHighScore || !needsInitials) && (
           <div className="flex flex-col gap-4">
-            <Button onClick={retryGame} variant="outline" size="lg">
+            <Button 
+              ref={retryButtonRef}
+              onClick={retryGame} 
+              variant="outline" 
+              size="lg"
+              className={focusedButtonIndex === 0 ? 'ring-2 ring-accent' : ''}
+              autoFocus
+            >
               Try Again
             </Button>
-            <Button onClick={backToHome} variant="ghost">
+            <Button 
+              ref={menuButtonRef}
+              onClick={backToHome} 
+              variant="ghost"
+              className={focusedButtonIndex === 1 ? 'ring-2 ring-accent' : ''}
+            >
               Back to Menu
             </Button>
           </div>

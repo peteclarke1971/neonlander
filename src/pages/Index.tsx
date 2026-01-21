@@ -1121,15 +1121,19 @@ const retryGame = () => {
                     // Submit to online leaderboard
                     void (async () => {
                       try {
-                        await submitScore({
+                        const result = await submitScore({
                           initials: initials.toUpperCase(),
                           score: medleyFinalScore,
                           difficulty,
                           mode: "medley"
                         });
-                        console.log('✅ Medley score submitted to online leaderboard');
+                        if (result.ok) {
+                          console.log('✅ Medley score submitted to online leaderboard');
+                        } else {
+                          console.error('❌ Medley score submission failed:', result.error);
+                        }
                       } catch (e) {
-                        console.error('❌ Failed to submit medley score:', e);
+                        console.error('❌ Failed to submit medley score (exception):', e);
                       }
                     })();
                     
