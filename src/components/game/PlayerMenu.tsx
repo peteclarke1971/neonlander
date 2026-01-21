@@ -8,7 +8,7 @@ import { useFullscreen } from "@/hooks/use-fullscreen";
 import { isIOSDevice } from "@/lib/deviceDetection";
 import { Difficulty, Mode } from "./types";
 
-export type GameModeId = "fixed" | "classic" | "timetrial" | "medley";
+export type GameModeId = "fixed" | "survival" | "classic" | "timetrial" | "medley";
 
 export interface GameSettings {
   introVariant: "auto" | "freeze" | "warp";
@@ -23,8 +23,7 @@ export interface GameSettings {
 }
 
 interface PlayerMenuProps {
-  onStartGame: (mode: GameModeId, settings: GameSettings) => void;
-  onSurvival: () => void;
+  onStartGame: (mode: GameModeId, settings: GameSettings, startLevel: number) => void;
   onLeaderboards: () => void;
   onSettings: () => void;
   onDevPortal: () => void;
@@ -33,11 +32,13 @@ interface PlayerMenuProps {
 
 const menuItems = [
   { id: "start", label: "START GAME" },
-  { id: "survival", label: "SURVIVAL" },
   { id: "modes", label: "CHOOSE GAME MODE" },
+  { id: "startLevel", label: "STARTING LEVEL" },
   { id: "leaderboards", label: "LEADERBOARDS" },
   { id: "settings", label: "SETTINGS" },
 ] as const;
+
+const startingLevelOptions = [1, 5, 10, 15, 20, 30, 50] as const;
 
 /** Leaderboard cycle configuration for idle display */
 const leaderboardCycle: { mode: Mode; label: string }[] = [
@@ -49,6 +50,7 @@ const leaderboardCycle: { mode: Mode; label: string }[] = [
 
 const gameModeOptions: { id: GameModeId; label: string; description: string }[] = [
   { id: "fixed", label: "CAMPAIGN", description: "Progressive levels with increasing difficulty" },
+  { id: "survival", label: "SURVIVAL", description: "Endless terrain, how far can you go?" },
   { id: "classic", label: "CLASSIC", description: "Random terrain, classic arcade experience" },
   { id: "timetrial", label: "TIME TRIAL", description: "Race against the clock and ghost replays" },
   { id: "medley", label: "MEDLEY", description: "Mix of all game types in rotation" },
@@ -103,7 +105,6 @@ function loadSettingsFromStorage(): GameSettings {
 
 export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   onStartGame,
-  onSurvival,
   onLeaderboards,
   onSettings,
   onDevPortal,
@@ -111,12 +112,26 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [showModeMenu, setShowModeMenu] = useState(false);
+  const [showLevelMenu, setShowLevelMenu] = useState(false);
   const [modeFocusedIndex, setModeFocusedIndex] = useState(0);
+  const [levelFocusedIndex, setLevelFocusedIndex] = useState(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const modeButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const levelButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const backButtonRef = useRef<HTMLButtonElement | null>(null);
+  const levelBackButtonRef = useRef<HTMLButtonElement | null>(null);
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
+  
+  // Starting level state - persisted to localStorage
+  const [startingLevel, setStartingLevel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("ll-player-menu-start-level");
+      const parsed = parseInt(saved || "1", 10);
+      return startingLevelOptions.includes(parsed as any) ? parsed : 1;
+    } catch {}
+    return 1;
+  });
   
   // Loading state - wait for assets before showing UI
   const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -130,7 +145,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [selectedMode, setSelectedMode] = useState<GameModeId>(() => {
     try {
       const saved = localStorage.getItem("ll-selected-game-mode");
-      if (saved && ["fixed", "classic", "timetrial", "medley"].includes(saved)) {
+      if (saved && ["fixed", "survival", "classic", "timetrial", "medley"].includes(saved)) {
         return saved as GameModeId;
       }
     } catch {}
@@ -159,8 +174,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   
   // Idle timer - separate from demo timer
   useEffect(() => {
-    // Don't run idle timer if mode menu is open, assets not loaded, or already showing leaderboards
-    if (showModeMenu || !assetsLoaded || showLeaderboards) {
+    // Don't run idle timer if mode/level menu is open, assets not loaded, or already showing leaderboards
+    if (showModeMenu || showLevelMenu || !assetsLoaded || showLeaderboards) {
       return;
     }
     
@@ -169,15 +184,15 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [showModeMenu, assetsLoaded, showLeaderboards]);
+  }, [showModeMenu, showLevelMenu, assetsLoaded, showLeaderboards]);
   
   // Trigger leaderboard display after 10s idle
   useEffect(() => {
-    if (idleTime >= 10 && !showLeaderboards && !showModeMenu && assetsLoaded) {
+    if (idleTime >= 10 && !showLeaderboards && !showModeMenu && !showLevelMenu && assetsLoaded) {
       setShowLeaderboards(true);
       setLeaderboardIndex(0);
     }
-  }, [idleTime, showLeaderboards, showModeMenu, assetsLoaded]);
+  }, [idleTime, showLeaderboards, showModeMenu, showLevelMenu, assetsLoaded]);
   
   // Cycle through leaderboards every 5 seconds
   useEffect(() => {
@@ -207,10 +222,21 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
 
   // Focus management for main menu
   useEffect(() => {
-    if (!showModeMenu) {
+    if (!showModeMenu && !showLevelMenu) {
       buttonRefs.current[focusedIndex]?.focus();
     }
-  }, [focusedIndex, showModeMenu]);
+  }, [focusedIndex, showModeMenu, showLevelMenu]);
+
+  // Focus management for level sub-menu (includes BACK button)
+  useEffect(() => {
+    if (showLevelMenu) {
+      if (levelFocusedIndex < startingLevelOptions.length) {
+        levelButtonRefs.current[levelFocusedIndex]?.focus();
+      } else {
+        levelBackButtonRef.current?.focus();
+      }
+    }
+  }, [levelFocusedIndex, showLevelMenu]);
 
   // Focus management for mode sub-menu (includes BACK button)
   useEffect(() => {
@@ -297,6 +323,33 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           vibrate(40, 0.2, 0.4); // Medium haptic on back
           mark("back");
         }
+      } else if (showLevelMenu) {
+        // Navigate level sub-menu
+        if (input.ui.up && !prev.up && canFire("up")) {
+          setLevelFocusedIndex(i => Math.max(0, i - 1));
+          vibrate(30, 0.15, 0.3);
+          mark("up");
+        }
+        if (input.ui.down && !prev.down && canFire("down")) {
+          setLevelFocusedIndex(i => Math.min(startingLevelOptions.length, i + 1));
+          vibrate(30, 0.15, 0.3);
+          mark("down");
+        }
+        if (input.ui.select && !prev.select && canFire("select")) {
+          if (levelFocusedIndex < startingLevelOptions.length) {
+            levelButtonRefs.current[levelFocusedIndex]?.click();
+          } else {
+            levelBackButtonRef.current?.click();
+          }
+          vibrate(50, 0.3, 0.5);
+          gateThrustUntilRelease();
+          mark("select");
+        }
+        if (input.ui.back && !prev.back && canFire("back")) {
+          setShowLevelMenu(false);
+          vibrate(40, 0.2, 0.4);
+          mark("back");
+        }
       } else if (!showLeaderboards) {
         // Navigate main menu (only when not showing leaderboards)
         if (input.ui.up && !prev.up && canFire("up")) {
@@ -325,7 +378,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [focusedIndex, modeFocusedIndex, showModeMenu, showLeaderboards, onDevPortal, resetIdle]);
+  }, [focusedIndex, modeFocusedIndex, levelFocusedIndex, showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -344,6 +397,29 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         e.preventDefault();
         setShowModeMenu(false);
       }
+    } else if (showLevelMenu) {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setLevelFocusedIndex(i => Math.max(0, i - 1));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setLevelFocusedIndex(i => Math.min(startingLevelOptions.length, i + 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        // Navigate left in grid
+        if (levelFocusedIndex > 0 && levelFocusedIndex < startingLevelOptions.length) {
+          setLevelFocusedIndex(i => Math.max(0, i - 1));
+        }
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        // Navigate right in grid
+        if (levelFocusedIndex < startingLevelOptions.length - 1) {
+          setLevelFocusedIndex(i => i + 1);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowLevelMenu(false);
+      }
     } else if (!showLeaderboards) {
       // Only handle menu navigation when not showing leaderboards
       if (e.key === "ArrowUp") {
@@ -359,6 +435,13 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }
   };
 
+  const handleSelectLevel = (level: number) => {
+    setStartingLevel(level);
+    try {
+      localStorage.setItem("ll-player-menu-start-level", String(level));
+    } catch {}
+  };
+
   const handleAction = (id: string) => {
     // Reset idle and notify parent of user interaction (for demo timer reset)
     resetIdle();
@@ -372,13 +455,21 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         if (selectedMode === "timetrial" || selectedMode === "fixed") {
           settings.showGhost = true;
         }
-        onStartGame(selectedMode, settings);
+        // Handle survival mode - navigate to /survival page
+        if (selectedMode === "survival") {
+          window.location.href = "/survival";
+          return;
+        }
+        onStartGame(selectedMode, settings, startingLevel);
         break;
       }
-      case "survival": onSurvival(); break;
       case "modes": 
         setShowModeMenu(true); 
         setModeFocusedIndex(gameModeOptions.findIndex(m => m.id === selectedMode));
+        break;
+      case "startLevel":
+        setShowLevelMenu(true);
+        setLevelFocusedIndex(startingLevelOptions.indexOf(startingLevel as typeof startingLevelOptions[number]) || 0);
         break;
       case "leaderboards": onLeaderboards(); break;
       case "settings": onSettings(); break;
@@ -486,6 +577,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
                     <span>START GAME</span>
                     <span className="text-xs opacity-60 tracking-wider">{selectedModeLabel}</span>
                   </span>
+                ) : item.id === "startLevel" ? (
+                  <span className="flex flex-col items-center">
+                    <span>STARTING LEVEL</span>
+                    <span className="text-xs opacity-60 tracking-wider">{startingLevel}</span>
+                  </span>
                 ) : (
                   item.label
                 )}
@@ -532,6 +628,46 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               className="player-menu-back-btn"
               onClick={() => setShowModeMenu(false)}
               onFocus={() => setModeFocusedIndex(gameModeOptions.length)}
+            >
+              ← BACK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Starting Level Sub-Menu Overlay */}
+      {showLevelMenu && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-[2px]">
+          <div className="flex flex-col gap-3 p-6 border-2 rounded-lg bg-background/80 max-w-sm w-full mx-4"
+            style={{ borderColor: "hsl(var(--neon) / 0.5)" }}
+          >
+            <h2 
+              className="text-center text-lg font-display tracking-wider mb-2"
+              style={{ color: "hsl(var(--neon))" }}
+            >
+              SELECT STARTING LEVEL
+            </h2>
+            <div className="grid grid-cols-4 gap-2">
+              {startingLevelOptions.map((level, index) => (
+                <button
+                  key={level}
+                  ref={el => { levelButtonRefs.current[index] = el; }}
+                  className={`player-menu-btn text-sm py-3 ${startingLevel === level ? 'selected' : ''}`}
+                  onClick={() => handleSelectLevel(level)}
+                  onFocus={() => setLevelFocusedIndex(index)}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    {startingLevel === level && <LanderIcon size={12} color="hsl(180, 100%, 50%)" />}
+                    {level}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              ref={levelBackButtonRef}
+              className="player-menu-back-btn mt-2"
+              onClick={() => setShowLevelMenu(false)}
+              onFocus={() => setLevelFocusedIndex(startingLevelOptions.length)}
             >
               ← BACK
             </button>
