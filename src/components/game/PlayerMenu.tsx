@@ -94,7 +94,7 @@ function loadSettingsFromStorage(): GameSettings {
     introVariant: getStr("ll-intro-variant", "auto") as "auto" | "freeze" | "warp",
     skipCountdowns: getStr("ll-skip-countdowns", "never") as "never" | "first" | "always",
     photosensitive: getBool("ll-photosensitive", false),
-    showGhost: getBool("ll-global-ghosts-enabled", false),
+    showGhost: getBool("ll-ghost-mode-enabled", false) || getBool("ll-global-ghosts-enabled", false),
     nebulaFxEnabled: getBool("ll-nebula-fx-enabled", false), // Default OFF for new players
     largeRotateButtons: getBool("ll-large-rotate-buttons", true),
     showFullHUD: getBool("ll-show-full-hud", true),
@@ -122,6 +122,14 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const levelBackButtonRef = useRef<HTMLButtonElement | null>(null);
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
+  
+  // Ghost mode settings - persisted to localStorage
+  const [ghostModeEnabled, setGhostModeEnabled] = useState(() => {
+    return localStorage.getItem('ll-ghost-mode-enabled') === 'true';
+  });
+  const [challengeGlobalGhosts, setChallengeGlobalGhosts] = useState(() => {
+    return localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+  });
   
   // Starting level state - persisted to localStorage
   const [startingLevel, setStartingLevel] = useState<number>(() => {
@@ -452,8 +460,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         // Read all settings from localStorage (same as Developer Menu)
         const settings = loadSettingsFromStorage();
         // For time trial mode, always enable ghost
+        // For fixed and medley modes, respect user's ghost preference
         if (selectedMode === "timetrial" || selectedMode === "fixed") {
           settings.showGhost = true;
+        } else if (selectedMode === "medley") {
+          settings.showGhost = ghostModeEnabled || challengeGlobalGhosts;
         }
         // Handle survival mode - navigate to /survival page with autostart
         if (selectedMode === "survival") {
@@ -675,46 +686,92 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         </div>
       )}
 
-      {/* Footer - Fullscreen, GFX toggle and Dev Portal link */}
-      <footer className="absolute bottom-4 right-4 flex items-center gap-4 z-10">
-        {/* Fullscreen Toggle */}
-        {isSupported && (
+      {/* Footer - Ghost toggles, Fullscreen, GFX toggle and Dev Portal link */}
+      <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
+        {/* Ghost Mode Toggles - Left side */}
+        <div className="flex items-center gap-2">
+          {/* Ghost Mode Toggle */}
+          <button
+            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            onClick={() => {
+              resetIdle();
+              const newVal = !ghostModeEnabled;
+              setGhostModeEnabled(newVal);
+              localStorage.setItem('ll-ghost-mode-enabled', String(newVal));
+            }}
+            style={{ 
+              color: ghostModeEnabled ? "hsl(280, 100%, 70%)" : "hsl(var(--neon))",
+              borderColor: ghostModeEnabled ? "hsl(280, 100%, 70% / 0.5)" : "hsl(var(--neon) / 0.3)",
+              opacity: ghostModeEnabled ? 0.9 : 0.5,
+              textShadow: ghostModeEnabled ? "0 0 8px hsl(280, 100%, 70%)" : "none"
+            }}
+          >
+            GHOST {ghostModeEnabled ? "ON" : "OFF"}
+          </button>
+          
+          {/* Global Ghosts Toggle - only show if ghost mode is enabled */}
+          {ghostModeEnabled && (
+            <button
+              className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+              onClick={() => {
+                resetIdle();
+                const newVal = !challengeGlobalGhosts;
+                setChallengeGlobalGhosts(newVal);
+                localStorage.setItem('ll-global-ghosts-enabled', String(newVal));
+              }}
+              style={{ 
+                color: challengeGlobalGhosts ? "hsl(45, 100%, 60%)" : "hsl(var(--neon))",
+                borderColor: challengeGlobalGhosts ? "hsl(45, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
+                opacity: challengeGlobalGhosts ? 0.9 : 0.5,
+                textShadow: challengeGlobalGhosts ? "0 0 8px hsl(45, 100%, 60%)" : "none"
+              }}
+            >
+              GLOBAL {challengeGlobalGhosts ? "ON" : "OFF"}
+            </button>
+          )}
+        </div>
+        
+        {/* Right side controls */}
+        <div className="flex items-center gap-4">
+          {/* Fullscreen Toggle */}
+          {isSupported && (
+            <button
+              className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
+              onClick={() => { resetIdle(); toggleFullscreen(); }}
+              style={{ color: "hsl(var(--neon))" }}
+            >
+              {isFullscreen ? "EXIT FS" : "FULLSCREEN"}
+            </button>
+          )}
+          
+          {/* GFX Toggle */}
           <button
             className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
-            onClick={() => { resetIdle(); toggleFullscreen(); }}
+            onClick={() => {
+              resetIdle();
+              const newLevel = cycleGraphicsLevel(graphicsLevel);
+              setGraphicsLevel(newLevel);
+              saveGraphicsSettings(newLevel);
+            }}
             style={{ color: "hsl(var(--neon))" }}
           >
-            {isFullscreen ? "EXIT FS" : "FULLSCREEN"}
+            {getGraphicsLabel(graphicsLevel)}
           </button>
-        )}
-        
-        {/* GFX Toggle */}
-        <button
-          className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
-          onClick={() => {
-            resetIdle();
-            const newLevel = cycleGraphicsLevel(graphicsLevel);
-            setGraphicsLevel(newLevel);
-            saveGraphicsSettings(newLevel);
-          }}
-          style={{ color: "hsl(var(--neon))" }}
-        >
-          {getGraphicsLabel(graphicsLevel)}
-        </button>
-        
-        <button
-          className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
-          onClick={() => { resetIdle(); onDevPortal(); }}
-          style={{ color: "hsl(var(--neon))" }}
-        >
-          Dev Portal
-        </button>
-        <span 
-          className="text-sm opacity-30"
-          style={{ color: "hsl(var(--neon))" }}
-        >
-          ✦
-        </span>
+          
+          <button
+            className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
+            onClick={() => { resetIdle(); onDevPortal(); }}
+            style={{ color: "hsl(var(--neon))" }}
+          >
+            Dev Portal
+          </button>
+          <span 
+            className="text-sm opacity-30"
+            style={{ color: "hsl(var(--neon))" }}
+          >
+            ✦
+          </span>
+        </div>
       </footer>
     </main>
   );

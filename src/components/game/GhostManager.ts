@@ -358,6 +358,148 @@ export class GhostManager {
     this.clearNeonDockingGhost(level);
   }
 
+  // ============= Medley Ghost System =============
+
+  /**
+   * Save a Medley ghost recording
+   */
+  saveMedleyGhost(difficulty: string, stage: number, frames: LunarLanderGhostFrame[], completionTime: number): void {
+    const recording: GhostRecording = {
+      frames,
+      completionTime,
+      level: stage,
+      date: Date.now(),
+      gameType: "lunar-lander"
+    };
+    
+    try {
+      const key = `medley-ghost-${difficulty}-stage-${stage}`;
+      localStorage.setItem(key, JSON.stringify(recording));
+    } catch (error) {
+      console.warn('Failed to save medley ghost recording:', error);
+    }
+  }
+
+  /**
+   * Load Medley ghost recording
+   */
+  loadMedleyGhost(difficulty: string, stage: number): GhostRecording | null {
+    try {
+      const key = `medley-ghost-${difficulty}-stage-${stage}`;
+      const data = localStorage.getItem(key);
+      if (!data) return null;
+      
+      const recording = JSON.parse(data) as GhostRecording;
+      
+      if (!recording.frames || !Array.isArray(recording.frames) || 
+          typeof recording.completionTime !== 'number') {
+        return null;
+      }
+      
+      return recording;
+    } catch (error) {
+      console.warn('Failed to load medley ghost recording:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get best time for Medley stage
+   */
+  getMedleyBestTime(difficulty: string, stage: number): number | null {
+    const ghost = this.loadMedleyGhost(difficulty, stage);
+    return ghost ? ghost.completionTime : null;
+  }
+
+  /**
+   * Check if Medley ghost exists
+   */
+  hasMedleyGhost(difficulty: string, stage: number): boolean {
+    return this.getMedleyBestTime(difficulty, stage) !== null;
+  }
+
+  /**
+   * Get Medley ghost state at given time
+   */
+  getMedleyGhostState(difficulty: string, stage: number, gameTime: number): LunarLanderGhostState | null {
+    const recording = this.loadMedleyGhost(difficulty, stage);
+    if (!recording || recording.frames.length === 0) return null;
+    
+    if (gameTime > recording.completionTime) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    const frames = recording.frames as LunarLanderGhostFrame[];
+    
+    let prevFrame = frames[0];
+    let nextFrame = frames[0];
+    
+    for (let i = 0; i < frames.length - 1; i++) {
+      if (frames[i].timestamp <= gameTime && frames[i + 1].timestamp > gameTime) {
+        prevFrame = frames[i];
+        nextFrame = frames[i + 1];
+        break;
+      }
+    }
+    
+    if (gameTime >= frames[frames.length - 1].timestamp) {
+      return { x: 0, y: 0, angle: 0, thrust: false, visible: false };
+    }
+    
+    if (gameTime <= frames[0].timestamp) {
+      return {
+        x: prevFrame.x,
+        y: prevFrame.y,
+        angle: prevFrame.angle,
+        thrust: prevFrame.thrust,
+        visible: true
+      };
+    }
+    
+    const timeDiff = nextFrame.timestamp - prevFrame.timestamp;
+    const factor = timeDiff > 0 ? (gameTime - prevFrame.timestamp) / timeDiff : 0;
+    
+    let angleDiff = nextFrame.angle - prevFrame.angle;
+    if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+    
+    return {
+      x: prevFrame.x + (nextFrame.x - prevFrame.x) * factor,
+      y: prevFrame.y + (nextFrame.y - prevFrame.y) * factor,
+      angle: prevFrame.angle + angleDiff * factor,
+      thrust: factor < 0.5 ? prevFrame.thrust : nextFrame.thrust,
+      visible: true
+    };
+  }
+
+  /**
+   * Clear Medley ghost
+   */
+  clearMedleyGhost(difficulty: string, stage: number): void {
+    try {
+      const key = `medley-ghost-${difficulty}-stage-${stage}`;
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('Failed to clear medley ghost recording:', error);
+    }
+  }
+
+  /**
+   * Update initials for an existing Medley ghost
+   */
+  updateMedleyGhostInitials(difficulty: string, stage: number, initials: string): void {
+    try {
+      const key = `medley-ghost-${difficulty}-stage-${stage}`;
+      const recording = this.loadMedleyGhost(difficulty, stage);
+      if (!recording) return;
+      
+      recording.initials = initials.toUpperCase().slice(0, 3);
+      localStorage.setItem(key, JSON.stringify(recording));
+    } catch (error) {
+      console.warn('Failed to update medley ghost initials:', error);
+    }
+  }
+
   getAvailableGhostLevels(): number[] {
     return this.getAvailableNeonDockingGhostLevels();
   }
@@ -373,7 +515,7 @@ export class GhostManager {
     completionTime: number,
     frames: LunarLanderGhostFrame[],
     initials: string,
-    mode: 'fixed' | 'timetrial'
+    mode: 'fixed' | 'timetrial' | 'medley'
   ): Promise<{ uploaded: boolean; wasRecord: boolean; error?: string }> {
     try {
       console.log('📊 checkAndUploadGlobalGhost called', { difficulty, level, completionTime, initials, framesCount: frames.length });
@@ -441,7 +583,7 @@ export class GhostManager {
   async loadGlobalGhost(
     difficulty: 'easy' | 'hard',
     level: number,
-    mode: 'fixed' | 'timetrial'
+    mode: 'fixed' | 'timetrial' | 'medley'
   ): Promise<GhostRecording | null> {
     try {
       const { fetchGlobalGhost } = await import('@/lib/leaderboard');
