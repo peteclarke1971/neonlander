@@ -47,6 +47,7 @@ export interface MusicConfig {
   endless4: AudioEventConfig;
   endless5: AudioEventConfig;
   missionSuccess: AudioEventConfig;
+  missionSuccess2: AudioEventConfig;
   missionFail: AudioEventConfig;
   highScore: AudioEventConfig;
 }
@@ -124,6 +125,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     endless4: { path: '/audio/Endless_Music_4.mp3', volume: 0.5 },
     endless5: { path: '/audio/Endless_Music_5.mp3', volume: 0.5 },
     missionSuccess: { path: '/audio/mission_success.mp3', volume: 0.5 },
+    missionSuccess2: { path: null, volume: 0.5 },
     missionFail: { path: null, volume: 0.5 },
     highScore: { path: null, volume: 0.5 },
   },
@@ -193,6 +195,7 @@ export const AUDIO_EVENT_LABELS: Record<AudioEventKey, string> = {
   endless5: 'Endless 5',
   // Music - Game Events
   missionSuccess: 'Mission Success',
+  missionSuccess2: 'Mission Success 2',
   missionFail: 'Mission Fail',
   highScore: 'High Score',
   // SFX
@@ -233,7 +236,7 @@ export const MUSIC_EVENT_KEYS: MusicEventKey[] = [
   'level11', 'level12', 'level13', 'level14', 'level15',
   'level16', 'level17', 'level18', 'level19', 'level20',
   'endless1', 'endless2', 'endless3', 'endless4', 'endless5',
-  'missionSuccess', 'missionFail', 'highScore'
+  'missionSuccess', 'missionSuccess2', 'missionFail', 'highScore'
 ];
 
 export const SFX_EVENT_KEYS: SfxEventKey[] = [

@@ -66,6 +66,8 @@ export class AudioManager {
   
   // Mission success music
   private missionSuccessBuffer?: AudioBuffer | null;
+  private missionSuccess2Buffer?: AudioBuffer | null;
+  private currentMissionSuccessTrack: 1 | 2 = 1;
   
   // Lightning sound placeholders (will be implemented later)
   private lightningBuffers: {
@@ -150,6 +152,7 @@ export class AudioManager {
     this.shieldPickupBuffer = null;
     this.shieldBreakBuffer = null;
     this.missionSuccessBuffer = null;
+    this.missionSuccess2Buffer = undefined; // Reset to undefined so it reloads
     this.cometArrivalBuffer = null;
     this.ufoSmallBuffer = null;
     this.ufoMediumBuffer = null;
@@ -1236,11 +1239,37 @@ export class AudioManager {
       const url = this.getConfigPath('music', 'missionSuccess') as string || '/audio/mission_success.mp3';
       this.missionSuccessBuffer = await this.loadBuffer(url);
     }
-    if (this.missionSuccessBuffer && this.musicGain) {
+    
+    // Load missionSuccess2 buffer if configured (and not already loaded)
+    if (this.missionSuccess2Buffer === undefined) {
+      const url2 = this.getConfigPath('music', 'missionSuccess2') as string | null;
+      if (url2) {
+        this.missionSuccess2Buffer = await this.loadBuffer(url2);
+      } else {
+        this.missionSuccess2Buffer = null;
+      }
+    }
+    
+    // Determine which buffer to play
+    const hasTwoTracks = !!this.missionSuccess2Buffer;
+    let bufferToPlay: AudioBuffer | null = null;
+    
+    if (hasTwoTracks) {
+      // Alternate between tracks
+      bufferToPlay = this.currentMissionSuccessTrack === 1 
+        ? this.missionSuccessBuffer 
+        : this.missionSuccess2Buffer;
+      // Toggle for next time
+      this.currentMissionSuccessTrack = this.currentMissionSuccessTrack === 1 ? 2 : 1;
+    } else {
+      bufferToPlay = this.missionSuccessBuffer;
+    }
+    
+    if (bufferToPlay && this.musicGain) {
       // Stop any previous mission success music
       this.stopMissionSuccess();
       const src = this.ctx.createBufferSource();
-      src.buffer = this.missionSuccessBuffer;
+      src.buffer = bufferToPlay;
       src.connect(this.musicGain);
       src.start(0);
       this.missionSuccessSource = src;
