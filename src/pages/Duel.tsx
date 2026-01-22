@@ -1,28 +1,32 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { DuelEngine } from "@/engine/duel/DuelEngine";
 import { DuelOptions } from "@/engine/duel/types";
-import { anyGamepad, readGamepad, loadProfile } from "@/hooks/use-gamepad";
+import { anyGamepad, readGamepad, loadProfile, vibrate } from "@/hooks/use-gamepad";
+import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
+import { MobileStarfield } from "@/components/game/MobileStarfield";
+import { isIOSDevice, shouldShowFullscreenButton } from "@/lib/deviceDetection";
+import { useFullscreen } from "@/hooks/use-fullscreen";
+import { Maximize, Minimize } from "lucide-react";
+
+const MENU_ITEMS = ["start", "back"] as const;
 
 export default function Duel() {
   const navigate = useNavigate();
   const [gameStarted, setGameStarted] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [isIOS] = useState(() => isIOSDevice());
+  const [showFullscreenBtn] = useState(() => shouldShowFullscreenButton());
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  
   const [options, setOptions] = useState<DuelOptions>(() => {
-    // Read graphics setting from localStorage
-    let lowGFX = true; // Default to low-gfx
+    let lowGFX = true;
     try {
-      // Try new format first
       const graphicsSettings = localStorage.getItem('ll-graphics-settings');
       if (graphicsSettings) {
         const parsed = JSON.parse(graphicsSettings);
         lowGFX = parsed.lowGraphics;
       } else {
-        // Fallback to old format
         const savedLowGfx = localStorage.getItem('ll-low-graphics');
         lowGFX = savedLowGfx !== 'false';
       }
@@ -39,39 +43,27 @@ export default function Duel() {
     };
   });
 
-  const seedInputRef = useRef<HTMLInputElement>(null);
-  const startBtnRef = useRef<HTMLButtonElement>(null);
-  const backBtnRef = useRef<HTMLButtonElement>(null);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Focus start button on mount
+  // Focus management
   useEffect(() => {
-    startBtnRef.current?.focus();
-  }, []);
+    if (gameStarted) return;
+    buttonRefs.current[focusedIndex]?.focus();
+  }, [focusedIndex, gameStarted]);
 
   // Gamepad navigation
   useEffect(() => {
     let raf = 0;
     let lastId: string | null = null;
     let profile = loadProfile(undefined);
-    let prev = { up: false, down: false, left: false, right: false, select: false, back: false };
-
-    const fire = (key: string) => {
-      const target = (document.activeElement as HTMLElement) || document.body;
-      if (!target || target === document.body) {
-        startBtnRef.current?.focus();
-      }
-      const dispatchTarget = (document.activeElement as HTMLElement) || document.body;
-      dispatchTarget.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-      if (key === "Enter") {
-        dispatchTarget.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
-        try { (dispatchTarget as any)?.click?.(); } catch {}
-      }
-    };
+    let prev = { up: false, down: false, select: false, back: false };
 
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      if (gameStarted) return;
+      
       const gp = anyGamepad?.();
-      if (!gp || !gp.connected || gameStarted) return;
+      if (!gp || !gp.connected) return;
       
       if (lastId !== gp.id) {
         lastId = gp.id;
@@ -79,38 +71,51 @@ export default function Duel() {
       }
       
       const input = readGamepad(gp, profile);
-      if (input.ui.up && !prev.up) fire("ArrowUp");
-      if (input.ui.down && !prev.down) fire("ArrowDown");
-      if (input.ui.left && !prev.left) fire("ArrowLeft");
-      if (input.ui.right && !prev.right) fire("ArrowRight");
-      if (input.ui.select && !prev.select) fire("Enter");
-      if (input.ui.back && !prev.back) fire("Escape");
-      prev = input.ui;
+      
+      if (input.ui.up && !prev.up) {
+        vibrate(30, 0.3, 0);
+        setFocusedIndex(i => Math.max(0, i - 1));
+      }
+      if (input.ui.down && !prev.down) {
+        vibrate(30, 0.3, 0);
+        setFocusedIndex(i => Math.min(MENU_ITEMS.length - 1, i + 1));
+      }
+      if (input.ui.select && !prev.select) {
+        vibrate(50, 0.5, 0.2);
+        buttonRefs.current[focusedIndex]?.click();
+      }
+      if (input.ui.back && !prev.back) {
+        vibrate(30, 0.3, 0);
+        navigate("/");
+      }
+      
+      prev = { 
+        up: input.ui.up, 
+        down: input.ui.down, 
+        select: input.ui.select, 
+        back: input.ui.back 
+      };
     };
     
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [gameStarted]);
+  }, [gameStarted, focusedIndex, navigate]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (gameStarted) return;
     
-    const key = e.key;
-    if (key === "Escape") {
+    if (e.key === "Escape") {
+      e.preventDefault();
       navigate("/");
       return;
     }
     
-    if (!(key === "ArrowUp" || key === "ArrowDown")) return;
-    e.preventDefault();
-    
-    const active = document.activeElement as HTMLElement | null;
-    const focus = (el?: HTMLElement | null) => el && el.focus();
-    
-    if (active === startBtnRef.current) {
-      if (key === "ArrowDown") focus(backBtnRef.current);
-    } else if (active === backBtnRef.current) {
-      if (key === "ArrowUp") focus(startBtnRef.current);
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIndex(i => Math.max(0, i - 1));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIndex(i => Math.min(MENU_ITEMS.length - 1, i + 1));
     }
   };
 
@@ -137,112 +142,164 @@ export default function Duel() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
-      <Card className="w-full max-w-2xl border-border bg-card/80 backdrop-blur-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-4xl font-display tracking-wider text-foreground drop-shadow-[0_0_18px_hsla(var(--neon),_0.5)]">
-            LANDER DUEL
-          </CardTitle>
-          <p className="text-muted-foreground">
-            Two-player arena combat using classic Lander physics. First to 2 round wins!
+    <main 
+      className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
+      {/* Starfield Background */}
+      <div className="absolute inset-0 z-0">
+        {isIOS ? (
+          <MobileStarfield starCount={400} speed={0.3} />
+        ) : (
+          <HyperspaceStarfield 
+            speed={0.3} 
+            density={400} 
+            style="vector" 
+            fullscreen 
+            lowGraphics={options.lowGFX} 
+          />
+        )}
+      </div>
+
+      {/* Radial gradient overlay */}
+      <div 
+        className="absolute inset-0 z-[1] pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.8) 100%)"
+        }}
+      />
+
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col items-center px-4 w-full max-w-md">
+        {/* Title */}
+        <h1 
+          className="text-4xl sm:text-5xl md:text-6xl font-display tracking-widest text-center mb-2"
+          style={{ 
+            color: "hsl(var(--neon))",
+            textShadow: "0 0 20px hsl(var(--neon) / 0.6), 0 0 40px hsl(var(--neon) / 0.3)"
+          }}
+        >
+          LANDER DUEL
+        </h1>
+        <p 
+          className="text-center text-sm mb-6 opacity-70"
+          style={{ color: "hsl(var(--neon))" }}
+        >
+          Two-player arena combat • First to 2 wins!
+        </p>
+
+        {/* Arena Seed Panel */}
+        <div 
+          className="border-2 rounded-lg p-4 bg-background/40 backdrop-blur-sm mb-4 w-full"
+          style={{ borderColor: "hsl(var(--neon) / 0.5)" }}
+        >
+          <label 
+            className="block text-sm font-display tracking-wider mb-2"
+            style={{ color: "hsl(var(--neon))" }}
+          >
+            ARENA SEED
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={options.seed}
+              onChange={(e) => setOptions(prev => ({ 
+                ...prev, 
+                seed: parseInt(e.target.value) || 0 
+              }))}
+              className="flex-1 bg-background/60 border-2 rounded px-3 py-2 font-display tracking-wider text-center focus:outline-none focus:ring-2"
+              style={{ 
+                borderColor: "hsl(var(--neon) / 0.4)", 
+                color: "hsl(var(--neon))",
+              }}
+            />
+            <button
+              onClick={generateNewSeed}
+              className="player-menu-btn px-4 py-2 text-sm"
+            >
+              RANDOM
+            </button>
+          </div>
+          <p className="text-xs mt-2 opacity-50" style={{ color: "hsl(var(--neon))" }}>
+            Same seed = same arena layout
           </p>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* Arena Seed */}
-          <div className="space-y-2">
-            <Label htmlFor="seed">Arena Seed</Label>
-            <div className="flex gap-2">
-              <Input
-                id="seed"
-                ref={seedInputRef}
-                type="number"
-                value={options.seed}
-                onChange={(e) => setOptions(prev => ({ 
-                  ...prev, 
-                  seed: parseInt(e.target.value) || 0 
-                }))}
-                className="flex-1"
-              />
-              <Button variant="outline" onClick={generateNewSeed}>
-                Random
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Same seed = same arena layout and hazard patterns
-            </p>
-          </div>
+        </div>
 
-          {/* Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="wrap"
-                checked={options.wrap}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, wrap: checked }))}
-              />
-              <Label htmlFor="wrap">Screen Wrap</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="hazards"
-                checked={options.hazards}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, hazards: checked }))}
-              />
-              <Label htmlFor="hazards">Volcano Hazards</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="showFuel"
-                checked={options.showFuel}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, showFuel: checked }))}
-              />
-              <Label htmlFor="showFuel">Show Fuel Gauge</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="lowGFX"
-                checked={options.lowGFX}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, lowGFX: checked }))}
-              />
-              <Label htmlFor="lowGFX">Low Graphics Mode</Label>
-            </div>
-          </div>
+        {/* Options Grid */}
+        <div className="grid grid-cols-2 gap-2 mb-4 w-full">
+          <button
+            onClick={() => setOptions(prev => ({ ...prev, wrap: !prev.wrap }))}
+            className={`player-menu-btn text-sm py-2 ${options.wrap ? 'selected' : ''}`}
+          >
+            WRAP: {options.wrap ? "ON" : "OFF"}
+          </button>
+          
+          <button
+            onClick={() => setOptions(prev => ({ ...prev, hazards: !prev.hazards }))}
+            className={`player-menu-btn text-sm py-2 ${options.hazards ? 'selected' : ''}`}
+          >
+            HAZARDS: {options.hazards ? "ON" : "OFF"}
+          </button>
+          
+          <button
+            onClick={() => setOptions(prev => ({ ...prev, showFuel: !prev.showFuel }))}
+            className={`player-menu-btn text-sm py-2 ${options.showFuel ? 'selected' : ''}`}
+          >
+            FUEL: {options.showFuel ? "ON" : "OFF"}
+          </button>
+          
+          <button
+            onClick={() => setOptions(prev => ({ ...prev, lowGFX: !prev.lowGFX }))}
+            className={`player-menu-btn text-sm py-2 ${options.lowGFX ? 'selected' : ''}`}
+          >
+            LOW GFX: {options.lowGFX ? "ON" : "OFF"}
+          </button>
+        </div>
 
-          {/* Controls Info */}
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p><strong>Controls:</strong></p>
-            <p>P1: Gamepad or Arrow Keys (rotate) + Up Arrow (thrust) + Space (fire) + Shift (rotate boost)</p>
-            <p>P2: Second Gamepad or A/D (rotate) + W (thrust) + F (fire) + Left Shift (rotate boost)</p>
-          </div>
+        {/* Controls Info */}
+        <div 
+          className="text-xs space-y-1 mb-6 text-center"
+          style={{ color: "hsl(var(--neon) / 0.6)" }}
+        >
+          <p className="font-display tracking-wider" style={{ color: "hsl(var(--neon))" }}>CONTROLS</p>
+          <p>P1: Arrows/Gamepad + Space (fire) + Shift (boost)</p>
+          <p>P2: A/D + W + F (fire) + Left Shift (boost)</p>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 justify-center">
-            <Button
-              ref={startBtnRef}
-              variant="neon"
-              size="lg"
-              onClick={handleStartMatch}
-              className="px-8"
-            >
-              Start Match
-            </Button>
-            
-            <Button
-              ref={backBtnRef}
-              variant="outline" 
-              size="lg"
-              onClick={() => navigate("/")}
-              className="px-8"
-            >
-              Back to Home
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Action Buttons */}
+        <nav className="flex flex-col items-center gap-2 w-full">
+          <button
+            ref={el => buttonRefs.current[0] = el}
+            className={`player-menu-btn w-full ${focusedIndex === 0 ? 'selected' : ''}`}
+            onClick={handleStartMatch}
+            onFocus={() => setFocusedIndex(0)}
+          >
+            START MATCH
+          </button>
+          <button
+            ref={el => buttonRefs.current[1] = el}
+            className={`player-menu-btn w-full ${focusedIndex === 1 ? 'selected' : ''}`}
+            onClick={() => navigate("/")}
+            onFocus={() => setFocusedIndex(1)}
+          >
+            BACK TO MENU
+          </button>
+        </nav>
+      </div>
+
+      {/* Footer */}
+      <footer className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 p-4 text-xs">
+        {showFullscreenBtn && (
+          <button
+            onClick={toggleFullscreen}
+            className="player-menu-back-btn flex items-center gap-1.5 px-3 py-1.5"
+          >
+            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            <span className="hidden sm:inline">{isFullscreen ? "Exit FS" : "Fullscreen"}</span>
+          </button>
+        )}
+      </footer>
     </main>
   );
 }
