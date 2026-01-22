@@ -1073,14 +1073,17 @@ export const GameEngine: React.FC<Props> = ({
 
     // Ghost recording and playback initialization
     let gameTime = 0;
-    const isGhostMode = showGhost && mode === "fixed" && !isCavernLevel;
-    const shouldRecord = mode === "fixed" && !isCavernLevel;
+    const isGhostModeFixed = showGhost && mode === "fixed" && !isCavernLevel;
+    const isGhostModeMedley = showGhost && mode === "medley";
+    const isGhostMode = isGhostModeFixed || isGhostModeMedley;
+    const shouldRecord = (mode === "fixed" && !isCavernLevel) || mode === "medley";
     
     // Initialize ghost system - load dynamically for current level
     let activeGhostRecording: any = null;
     let isUsingGlobalGhost = false;
 
-    if (isGhostMode && ghostLevel !== undefined) {
+    // Fixed mode ghost loading
+    if (isGhostModeFixed && ghostLevel !== undefined) {
       const difficultyStr = difficulty;
       
       // Check if global ghosts are enabled
@@ -1107,11 +1110,40 @@ export const GameEngine: React.FC<Props> = ({
       }
     }
     
+    // Medley mode ghost loading (uses level as stage number)
+    if (isGhostModeMedley) {
+      const difficultyStr = difficulty;
+      const medleyStage = level; // In medley mode, level represents the stage
+      
+      // Check if global ghosts are enabled
+      const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+      
+      // Try to load global ghost first if enabled
+      if (globalGhostsEnabled) {
+        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, medleyStage, 'medley');
+        if (globalRecording) {
+          activeGhostRecording = globalRecording;
+          isUsingGlobalGhost = true;
+          console.log("🌍 Global medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time to beat:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+        }
+      }
+      
+      // Fallback to local ghost if no global ghost available
+      if (!activeGhostRecording) {
+        const localRecording = ghostManager.current.loadMedleyGhost(difficultyStr, medleyStage);
+        if (localRecording) {
+          activeGhostRecording = localRecording;
+          isUsingGlobalGhost = false;
+          console.log("👻 Local medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time to beat:", (localRecording.completionTime / 1000).toFixed(2) + "s");
+        }
+      }
+    }
+    
     if (shouldRecord) {
       setGhostRecording([]);
       setIsRecording(true);
       lastRecordTime.current = 0;
-      console.log("🔴 Ghost recording started for", difficulty, "level", level);
+      console.log("🔴 Ghost recording started for", difficulty, mode === "medley" ? "stage" : "level", level);
     }
     
     // Load Time Trial ghost if in time trial mode
@@ -1780,13 +1812,15 @@ export const GameEngine: React.FC<Props> = ({
         lastRecordTime.current = gameTime;
       }
       
-      // Ghost playback - update ghost state
-      if (isGhostMode && ghostLevel !== undefined) {
+      // Ghost playback - update ghost state (fixed and medley modes)
+      if (isGhostMode) {
         let ghostStateUpdate = null;
         if (isUsingGlobalGhost && activeGhostRecording) {
           ghostStateUpdate = ghostManager.current.getGlobalGhostState(activeGhostRecording, gameTime);
-        } else {
+        } else if (mode === "fixed" && ghostLevel !== undefined) {
           ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+        } else if (mode === "medley") {
+          ghostStateUpdate = ghostManager.current.getMedleyGhostState(difficulty, level, gameTime);
         }
         setGhostState(ghostStateUpdate);
       }
@@ -5774,11 +5808,19 @@ export const GameEngine: React.FC<Props> = ({
           let isNewBestTime = false;
           let ghostTimeDiff: number | undefined;
           
-          if (mode === "fixed" && ghostRecording.length > 0) {
+          if ((mode === "fixed" || mode === "medley") && ghostRecording.length > 0) {
             try {
-              const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
               const currentTimeMs = hud.time * 1000; // Convert seconds to milliseconds
+              let existingBestTime: number | null = null;
+              
+              if (mode === "fixed") {
+                existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+              } else if (mode === "medley") {
+                existingBestTime = ghostManager.current.getMedleyBestTime(difficulty, level);
+              }
+              
               console.log('🕐 Best time check:', {
+                mode,
                 existingBestTime,
                 currentTime: currentTimeMs,
                 isNewBest: !existingBestTime || currentTimeMs < existingBestTime
@@ -5786,7 +5828,13 @@ export const GameEngine: React.FC<Props> = ({
               
               if (!existingBestTime || currentTimeMs < existingBestTime) {
                 isNewBestTime = true;
-                ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, currentTimeMs);
+                
+                // Save local ghost
+                if (mode === "fixed") {
+                  ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, currentTimeMs);
+                } else if (mode === "medley") {
+                  ghostManager.current.saveMedleyGhost(difficulty, level, ghostRecording, currentTimeMs);
+                }
                 console.log('💾 Local ghost saved');
                 
                 // Try to upload to global ghosts
@@ -5795,6 +5843,7 @@ export const GameEngine: React.FC<Props> = ({
                   console.log('🌍 Attempting to upload global ghost...', {
                     difficulty,
                     level,
+                    mode,
                     time: currentTimeMs,
                     initials: initials || '(empty)',
                     frameCount: ghostRecording.length
@@ -5806,7 +5855,7 @@ export const GameEngine: React.FC<Props> = ({
                     currentTimeMs,
                     ghostRecording,
                     initials,
-                    'fixed'
+                    mode as 'fixed' | 'medley'
                   );
                   
                   console.log('🌍 Upload result:', uploadResult);
@@ -5827,13 +5876,13 @@ export const GameEngine: React.FC<Props> = ({
                       initials,
                       score: hud.score,
                       difficulty,
-                      mode: 'fixed',
+                      mode,
                       level,
                       completion_time: currentTimeMs
                     });
-                    console.log('✅ Fixed mode score submitted to leaderboard');
+                    console.log(`✅ ${mode} mode score submitted to leaderboard`);
                   } catch (scoreError) {
-                    console.error('❌ Error submitting fixed mode score:', scoreError);
+                    console.error(`❌ Error submitting ${mode} mode score:`, scoreError);
                   }
                 } catch (uploadError) {
                   console.error('💥 Exception during global ghost upload:', uploadError);
@@ -5851,7 +5900,7 @@ export const GameEngine: React.FC<Props> = ({
           } else {
             console.log('❌ Skipping ghost logic:', {
               mode,
-              modeIsFixed: mode === "fixed",
+              modeIsFixedOrMedley: mode === "fixed" || mode === "medley",
               hasRecording: ghostRecording.length > 0
             });
           }
@@ -5896,11 +5945,19 @@ export const GameEngine: React.FC<Props> = ({
             let isNewBestTime = false;
             let ghostTimeDiff: number | undefined;
             
-            if (mode === "fixed" && ghostRecording.length > 0) {
+            if ((mode === "fixed" || mode === "medley") && ghostRecording.length > 0) {
               try {
-                const existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
                 const currentTimeMs = hud.time * 1000; // Convert seconds to milliseconds
+                let existingBestTime: number | null = null;
+                
+                if (mode === "fixed") {
+                  existingBestTime = ghostManager.current.getLunarLanderBestTime(difficulty, level);
+                } else if (mode === "medley") {
+                  existingBestTime = ghostManager.current.getMedleyBestTime(difficulty, level);
+                }
+                
                 console.log('🕐 Best time check (skip):', {
+                  mode,
                   existingBestTime,
                   currentTime: currentTimeMs,
                   isNewBest: !existingBestTime || currentTimeMs < existingBestTime
@@ -5908,7 +5965,13 @@ export const GameEngine: React.FC<Props> = ({
                 
                 if (!existingBestTime || currentTimeMs < existingBestTime) {
                   isNewBestTime = true;
-                  ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, currentTimeMs);
+                  
+                  // Save local ghost
+                  if (mode === "fixed") {
+                    ghostManager.current.saveLunarLanderGhost(difficulty, level, ghostRecording, currentTimeMs);
+                  } else if (mode === "medley") {
+                    ghostManager.current.saveMedleyGhost(difficulty, level, ghostRecording, currentTimeMs);
+                  }
                   console.log('💾 Local ghost saved (skip)');
                   
                   // Try to upload to global ghosts
@@ -5917,6 +5980,7 @@ export const GameEngine: React.FC<Props> = ({
                     console.log('🌍 Attempting to upload global ghost (skip)...', {
                       difficulty,
                       level,
+                      mode,
                       time: currentTimeMs,
                       initials: initials || '(empty)',
                       frameCount: ghostRecording.length
@@ -5928,7 +5992,7 @@ export const GameEngine: React.FC<Props> = ({
                       currentTimeMs,
                       ghostRecording,
                       initials,
-                      'fixed'
+                      mode as 'fixed' | 'medley'
                     );
                     
                     console.log('🌍 Upload result (skip):', uploadResult);
@@ -5948,13 +6012,13 @@ export const GameEngine: React.FC<Props> = ({
                         initials,
                         score: hud.score,
                         difficulty,
-                        mode: 'fixed',
+                        mode,
                         level,
                         completion_time: currentTimeMs
                       });
-                      console.log('✅ Fixed mode score submitted to leaderboard (skip)');
+                      console.log(`✅ ${mode} mode score submitted to leaderboard (skip)`);
                     } catch (scoreError) {
-                      console.error('❌ Error submitting fixed mode score (skip):', scoreError);
+                      console.error(`❌ Error submitting ${mode} mode score (skip):`, scoreError);
                     }
                   } catch (uploadError) {
                     console.error('💥 Exception during global ghost upload (skip):', uploadError);
@@ -5972,7 +6036,7 @@ export const GameEngine: React.FC<Props> = ({
             } else {
               console.log('❌ Skipping ghost logic (skip):', {
                 mode,
-                modeIsFixed: mode === "fixed",
+                modeIsFixedOrMedley: mode === "fixed" || mode === "medley",
                 hasRecording: ghostRecording.length > 0
               });
             }
