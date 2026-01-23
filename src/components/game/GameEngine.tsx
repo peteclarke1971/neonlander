@@ -5531,18 +5531,28 @@ export const GameEngine: React.FC<Props> = ({
           ctx.restore();
           
           // Draw simple beam glow overlay (no composite operations)
+          // Convert world coords to screen coords for the beam visual
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.scale(dpr, dpr);
           
-          const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
+          // Convert beam from world coords to screen coords
+          const screenCenterX = w / (2 * dpr);
+          const beamScreenCenterX = screenCenterX + (beamCenterX - cameraX + shakeX) * zoom;
+          const beamScreenWidth = beamWidth * zoom;
+          const beamScreenLeft = beamScreenCenterX - beamScreenWidth / 2;
+          const beamScreenRight = beamScreenCenterX + beamScreenWidth / 2;
+          
+          const gradient = ctx.createLinearGradient(beamScreenLeft, 0, beamScreenRight, 0);
           gradient.addColorStop(0, `rgba(200, 220, 255, 0)`);
-          gradient.addColorStop(0.5, `rgba(200, 220, 255, 0.15)`);
+          gradient.addColorStop(0.3, `rgba(200, 220, 255, 0.12)`);
+          gradient.addColorStop(0.5, `rgba(220, 240, 255, 0.25)`);
+          gradient.addColorStop(0.7, `rgba(200, 220, 255, 0.12)`);
           gradient.addColorStop(1, `rgba(200, 220, 255, 0)`);
           
           ctx.fillStyle = gradient;
           ctx.globalAlpha = 1.0;
-          ctx.fillRect(beamLeftX, 0, beamWidth, h / dpr);
+          ctx.fillRect(beamScreenLeft, 0, beamScreenWidth, h / dpr);
           ctx.restore();
           
           // Re-apply camera transform
