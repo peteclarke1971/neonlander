@@ -823,4 +823,23 @@ export class GhostManager {
       console.error('❌ Failed to update ghost initials:', error);
     }
   }
+
+  /**
+   * Clear all medley ghost records from local storage
+   */
+  clearAllMedleyGhosts(): void {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('medley-ghost-')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      console.log(`🗑️ Cleared ${keysToRemove.length} medley ghost records from local storage`);
+    } catch (error) {
+      console.warn('Failed to clear medley ghosts:', error);
+    }
+  }
 }
