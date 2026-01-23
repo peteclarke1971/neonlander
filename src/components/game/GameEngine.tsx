@@ -1140,10 +1140,21 @@ export const GameEngine: React.FC<Props> = ({
     }
     
     if (shouldRecord) {
-      setGhostRecording([]);
+      // Record initial frame at timestamp 0 with exact spawn position
+      const initialFrame: LunarLanderGhostFrame = {
+        timestamp: 0,
+        x: spawn.x,
+        y: spawn.y,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        thrust: false,
+        fuel: fuelCap
+      };
+      setGhostRecording([initialFrame]);
       setIsRecording(true);
       lastRecordTime.current = 0;
-      console.log("🔴 Ghost recording started for", difficulty, mode === "medley" ? "stage" : "level", level);
+      console.log("🔴 Ghost recording started for", difficulty, mode === "medley" ? "stage" : "level", level, "at spawn:", spawn.x.toFixed(1), spawn.y.toFixed(1));
     }
     
     // Load Time Trial ghost if in time trial mode
