@@ -1243,7 +1243,8 @@ export const GameEngine: React.FC<Props> = ({
     
     // Ghost state
     let ghostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
-    if (isGhostMode && ghostLevel !== undefined) {
+    // Initialize ghost for fixed mode (needs ghostLevel) OR medley mode (uses level directly)
+    if ((isGhostModeFixed && ghostLevel !== undefined) || isGhostModeMedley) {
       ghostShip = { x: 0, y: 0, angle: 0, visible: false };
     }
     
@@ -1772,25 +1773,7 @@ export const GameEngine: React.FC<Props> = ({
         gameTime += dt;
       }
       
-      // Ghost state update
-      if (ghostShip && isGhostMode && ghostLevel !== undefined) {
-        let ghostState = null;
-        if (isUsingGlobalGhost && activeGhostRecording) {
-          ghostState = ghostManager.current.getGlobalGhostState(activeGhostRecording, gameTime);
-        } else {
-          ghostState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
-        }
-        if (ghostState) {
-          ghostShip.x = ghostState.x;
-          ghostShip.y = ghostState.y;
-          ghostShip.angle = ghostState.angle;
-          ghostShip.visible = ghostState.visible;
-        } else {
-          ghostShip.visible = false;
-        }
-      }
-      
-          // Ghost recording (sample every 50ms when recording)
+      // Ghost recording (sample every 50ms when recording)
       if (shouldRecord && gameTime - lastRecordTime.current >= 0.05) {
         const newFrame: LunarLanderGhostFrame = {
           timestamp: gameTime,
@@ -1833,6 +1816,17 @@ export const GameEngine: React.FC<Props> = ({
         } else if (mode === "medley") {
           ghostStateUpdate = ghostManager.current.getMedleyGhostState(difficulty, level, gameTime);
         }
+        
+        // Update ghostShip object for rendering
+        if (ghostShip && ghostStateUpdate) {
+          ghostShip.x = ghostStateUpdate.x;
+          ghostShip.y = ghostStateUpdate.y;
+          ghostShip.angle = ghostStateUpdate.angle;
+          ghostShip.visible = ghostStateUpdate.visible;
+        } else if (ghostShip) {
+          ghostShip.visible = false;
+        }
+        
         setGhostState(ghostStateUpdate);
       }
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
