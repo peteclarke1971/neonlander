@@ -87,7 +87,7 @@ import { GraphicsLevel, getGraphicsValue, isOptimizedGraphics } from "@/lib/grap
 import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
-import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
+import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
 
 interface Props {
   difficulty: Difficulty;
@@ -356,7 +356,9 @@ export const GameEngine: React.FC<Props> = ({
   // Performance monitoring and optimization state
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isIPhone = /iPhone/i.test(navigator.userAgent);
+  const isIPad = isIPadDevice();
   const shouldOptimizePerformance = isOptimizedGraphics(graphicsLevel);
+  const shouldOptimizeLightBeam = isIPad && isOptimizedGraphics(graphicsLevel);
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
@@ -4251,7 +4253,8 @@ export const GameEngine: React.FC<Props> = ({
         offCtx.globalAlpha = 1.0;
         offCtx.strokeStyle = neonColor;
         offCtx.shadowColor = neonColor;
-        offCtx.shadowBlur = shadowBlur * 1.5;
+        // iPad optimization: disable shadow blur on offscreen canvas for mid/low
+        offCtx.shadowBlur = shouldOptimizeLightBeam ? 0 : shadowBlur * 1.5;
         offCtx.lineWidth = 2;
         
         // Draw terrain to off-screen canvas
@@ -4303,7 +4306,8 @@ export const GameEngine: React.FC<Props> = ({
         offCtx.globalAlpha = 1.0;
         offCtx.strokeStyle = neonColor;
         offCtx.shadowColor = neonColor;
-        offCtx.shadowBlur = shadowBlur * 1.5;
+        // iPad optimization: disable shadow blur on offscreen canvas for mid/low
+        offCtx.shadowBlur = shouldOptimizeLightBeam ? 0 : shadowBlur * 1.5;
         offCtx.lineWidth = 2;
         
         // Draw terrain to off-screen canvas
@@ -5455,11 +5459,19 @@ export const GameEngine: React.FC<Props> = ({
         
         // Draw beam gradient glow (additive blending)
         const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
-        gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-        gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-        gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
-        gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
-        gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        if (shouldOptimizeLightBeam) {
+          // iPad mid/low: 3-stop gradient (less GPU work)
+          gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+          gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.4 * stormFadeAlpha})`);
+          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        } else {
+          // Full quality for PC/iPhone/high graphics
+          gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+          gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+          gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
+          gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
+          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+        }
         
         ctx.fillStyle = gradient;
         ctx.globalCompositeOperation = 'lighter';
@@ -5474,10 +5486,12 @@ export const GameEngine: React.FC<Props> = ({
         ctx.globalAlpha = 1.0 * stormFadeAlpha;
         ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
         
-        // Add bloom/glow layer
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.2 * stormFadeAlpha;
-        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        // Add bloom/glow layer (skip on iPad mid/low for performance)
+        if (!shouldOptimizeLightBeam) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.2 * stormFadeAlpha;
+          ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+        }
         
         ctx.restore();
         
