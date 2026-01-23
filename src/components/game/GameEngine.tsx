@@ -4235,58 +4235,76 @@ export const GameEngine: React.FC<Props> = ({
       ctx.shadowBlur = shadowBlur;
 
       // Special rendering for light beam levels
-      if (lightStormActive.current && sweepActiveRef.current && !isCavernLevel && offscreenTerrainCtxRef.current && offscreenTerrainCanvasRef.current) {
-        const offCtx = offscreenTerrainCtxRef.current;
-        const offCanvas = offscreenTerrainCanvasRef.current;
-        
-        // Clear off-screen canvas
-        offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
-        
-        // Apply same camera transform as main canvas
-        offCtx.setTransform(1, 0, 0, 1, 0, 0);
-        offCtx.scale(dpr, dpr);
-        offCtx.translate(w / (2 * dpr), h / (2 * dpr));
-        offCtx.scale(zoom, zoom);
-        offCtx.translate(-cameraX + shakeX, anchor);
-        
-        // Render terrain at FULL BRIGHTNESS to off-screen canvas
-        offCtx.globalAlpha = 1.0;
-        offCtx.strokeStyle = neonColor;
-        offCtx.shadowColor = neonColor;
-        // iPad optimization: disable shadow blur on offscreen canvas for mid/low
-        offCtx.shadowBlur = shouldOptimizeLightBeam ? 0 : shadowBlur * 1.5;
-        offCtx.lineWidth = 2;
-        
-        // Draw terrain to off-screen canvas
-        const drawTerrainOffscreen = (offset: number) => {
-          if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+      // iPad mid/low optimization: skip off-screen canvas entirely and draw terrain directly with clipping
+      if (lightStormActive.current && sweepActiveRef.current && !isCavernLevel) {
+        if (shouldOptimizeLightBeam) {
+          // SIMPLIFIED iPad mid/low path: Draw terrain directly within beam clip - no off-screen canvas
+          // This avoids expensive drawImage, off-screen rendering, and multiple composite operations
           
-          offCtx.beginPath();
-          for (let i = 0; i < terrain.points.length; i++) {
-            const p = terrain.points[i];
-            if (i === 0) offCtx.moveTo(p.x + offset, p.y);
-            else offCtx.lineTo(p.x + offset, p.y);
-          }
-          offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
-          offCtx.stroke();
-        };
-        
-        const wrap = Math.floor(cameraX / terrain.worldWidth);
-        for (let w = -1; w <= 1; w++) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
-        
-        // Draw pads to off-screen canvas
-        for (const pad of terrain.pads) {
-          const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-          offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
-          offCtx.fillRect(pad.xStart, pad.y, w, 2);
+          const beamWidth = currentBeamWidthRef.current;
+          const beamCenterX = sweepXRef.current;
+          
+          // Convert beam position from screen to world coordinates for clipping
+          const screenCenterX = w / (2 * dpr);
+          const beamWorldX = cameraX - shakeX + (beamCenterX - screenCenterX) / zoom;
+          const beamWorldWidth = beamWidth / zoom;
+          
+          // Just draw terrain normally - it will be clipped later in the composite section
+          // For now, skip the off-screen rendering entirely
+          
+        } else if (offscreenTerrainCtxRef.current && offscreenTerrainCanvasRef.current) {
+          // Full quality PC/iPhone/high-gfx path: Use off-screen canvas for bloom effects
+          const offCtx = offscreenTerrainCtxRef.current;
+          const offCanvas = offscreenTerrainCanvasRef.current;
+          
+          // Clear off-screen canvas
+          offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+          
+          // Apply same camera transform as main canvas
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
+          offCtx.scale(dpr, dpr);
+          offCtx.translate(w / (2 * dpr), h / (2 * dpr));
+          offCtx.scale(zoom, zoom);
+          offCtx.translate(-cameraX + shakeX, anchor);
+          
+          // Render terrain at FULL BRIGHTNESS to off-screen canvas
+          offCtx.globalAlpha = 1.0;
           offCtx.strokeStyle = neonColor;
-          offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+          offCtx.shadowColor = neonColor;
+          offCtx.shadowBlur = shadowBlur * 1.5;
+          offCtx.lineWidth = 2;
+          
+          // Draw terrain to off-screen canvas
+          const drawTerrainOffscreen = (offset: number) => {
+            if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+            
+            offCtx.beginPath();
+            for (let i = 0; i < terrain.points.length; i++) {
+              const p = terrain.points[i];
+              if (i === 0) offCtx.moveTo(p.x + offset, p.y);
+              else offCtx.lineTo(p.x + offset, p.y);
+            }
+            offCtx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+            offCtx.stroke();
+          };
+          
+          const wrap = Math.floor(cameraX / terrain.worldWidth);
+          for (let w = -1; w <= 1; w++) drawTerrainOffscreen((wrap + w) * terrain.worldWidth);
+          
+          // Draw pads to off-screen canvas
+          for (const pad of terrain.pads) {
+            const w = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+            offCtx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+            offCtx.fillRect(pad.xStart, pad.y, w, 2);
+            offCtx.strokeStyle = neonColor;
+            offCtx.strokeRect(pad.xStart, pad.y, w, 2);
+          }
+          
+          offCtx.globalAlpha = 1;
+          offCtx.setTransform(1, 0, 0, 1, 0, 0);
         }
         
-        offCtx.globalAlpha = 1;
-        offCtx.setTransform(1, 0, 0, 1, 0, 0);
-        
-        // Main canvas stays completely black - no terrain visible
+        // Main canvas stays completely black - no terrain visible (handled in composite section)
         
       } else if (blackoutActive.current && !isCavernLevel && offscreenTerrainCtxRef.current && offscreenTerrainCanvasRef.current) {
         const offCtx = offscreenTerrainCtxRef.current;
@@ -5437,69 +5455,131 @@ export const GameEngine: React.FC<Props> = ({
       }
       
       // Composite off-screen terrain using vertical sweep beam (during Light Storm)
-      if (lightStormActive.current && sweepActiveRef.current && !crashed && offscreenTerrainCanvasRef.current) {
-        ctx.save();
-        
-        const stormFadeAlpha = 1.0;
-        
+      if (lightStormActive.current && sweepActiveRef.current && !crashed) {
         const beamWidth = currentBeamWidthRef.current;
         const beamCenterX = sweepXRef.current;
         const beamLeftX = beamCenterX - beamWidth / 2;
         const beamRightX = beamCenterX + beamWidth / 2;
         
-        // Create vertical beam clipping path
-        ctx.beginPath();
-        ctx.rect(
-          beamLeftX,
-          -viewH * 2,
-          beamWidth,
-          viewH * 4
-        );
-        ctx.closePath();
-        
-        // Draw beam gradient glow (additive blending)
-        const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
         if (shouldOptimizeLightBeam) {
-          // iPad mid/low: 3-stop gradient (less GPU work)
-          gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
-          gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.4 * stormFadeAlpha})`);
-          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
-        } else {
-          // Full quality for PC/iPhone/high graphics
+          // SIMPLIFIED iPad mid/low path: Draw terrain directly with simple rect clip
+          // No off-screen canvas, no composite operations, no bloom
+          ctx.save();
+          
+          // Convert screen-space beam to world coordinates
+          const screenCenterX = w / (2 * dpr);
+          const beamWorldCenterX = cameraX - shakeX + (beamCenterX - screenCenterX) / zoom;
+          const beamWorldWidth = beamWidth / zoom;
+          const beamWorldLeft = beamWorldCenterX - beamWorldWidth / 2;
+          
+          // Simple clip rect in world space
+          ctx.beginPath();
+          ctx.rect(beamWorldLeft, -10000, beamWorldWidth, 20000);
+          ctx.clip();
+          
+          // Draw terrain directly - no glow, no bloom, just solid lines
+          ctx.strokeStyle = neonColor as any;
+          ctx.shadowColor = neonColor as any;
+          ctx.shadowBlur = 2; // Minimal glow
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 1.0;
+          
+          // Draw terrain
+          const drawTerrainDirect = (offset: number) => {
+            if (offset + terrain.worldWidth < viewLeft || offset > viewRight) return;
+            ctx.beginPath();
+            for (let i = 0; i < terrain.points.length; i++) {
+              const p = terrain.points[i];
+              if (i === 0) ctx.moveTo(p.x + offset, p.y);
+              else ctx.lineTo(p.x + offset, p.y);
+            }
+            ctx.lineTo(terrain.points[0].x + offset + terrain.worldWidth, terrain.points[0].y);
+            ctx.stroke();
+          };
+          
+          const wrapVal = Math.floor(cameraX / terrain.worldWidth);
+          for (let ww = -1; ww <= 1; ww++) drawTerrainDirect((wrapVal + ww) * terrain.worldWidth);
+          
+          // Draw pads
+          for (const pad of terrain.pads) {
+            const padW = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+            ctx.fillRect(pad.xStart, pad.y, padW, 2);
+          }
+          
+          ctx.restore();
+          
+          // Draw simple beam glow overlay (no composite operations)
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(dpr, dpr);
+          
+          const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
+          gradient.addColorStop(0, `rgba(200, 220, 255, 0)`);
+          gradient.addColorStop(0.5, `rgba(200, 220, 255, 0.15)`);
+          gradient.addColorStop(1, `rgba(200, 220, 255, 0)`);
+          
+          ctx.fillStyle = gradient;
+          ctx.globalAlpha = 1.0;
+          ctx.fillRect(beamLeftX, 0, beamWidth, h / dpr);
+          ctx.restore();
+          
+          // Re-apply camera transform
+          ctx.scale(dpr, dpr);
+          ctx.translate(w / (2 * dpr), h / (2 * dpr));
+          ctx.scale(zoom, zoom);
+          ctx.translate(-cameraX + shakeX, anchor);
+          
+        } else if (offscreenTerrainCanvasRef.current) {
+          // Full quality PC/iPhone/high-gfx path: Use off-screen canvas for bloom effects
+          ctx.save();
+          
+          const stormFadeAlpha = 1.0;
+          
+          // Create vertical beam clipping path
+          ctx.beginPath();
+          ctx.rect(
+            beamLeftX,
+            -viewH * 2,
+            beamWidth,
+            viewH * 4
+          );
+          ctx.closePath();
+          
+          // Draw beam gradient glow (additive blending)
+          const gradient = ctx.createLinearGradient(beamLeftX, 0, beamRightX, 0);
           gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
           gradient.addColorStop(0.3, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
           gradient.addColorStop(0.5, `rgba(220, 240, 255, ${0.5 * stormFadeAlpha})`);
           gradient.addColorStop(0.7, `rgba(200, 220, 255, ${0.3 * stormFadeAlpha})`);
           gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
-        }
-        
-        ctx.fillStyle = gradient;
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fill();
-        
-        // Clip to beam area
-        ctx.clip();
-        
-        // Draw off-screen terrain (only visible inside beam)
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 1.0 * stormFadeAlpha;
-        ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
-        
-        // Add bloom/glow layer (skip on iPad mid/low for performance)
-        if (!shouldOptimizeLightBeam) {
+          
+          ctx.fillStyle = gradient;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fill();
+          
+          // Clip to beam area
+          ctx.clip();
+          
+          // Draw off-screen terrain (only visible inside beam)
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = 1.0 * stormFadeAlpha;
+          ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+          
+          // Add bloom/glow layer
           ctx.globalCompositeOperation = 'lighter';
           ctx.globalAlpha = 0.2 * stormFadeAlpha;
           ctx.drawImage(offscreenTerrainCanvasRef.current, 0, 0);
+          
+          ctx.restore();
+          
+          // Re-apply camera transform for remaining objects
+          ctx.scale(dpr, dpr);
+          ctx.translate(w / (2 * dpr), h / (2 * dpr));
+          ctx.scale(zoom, zoom);
+          ctx.translate(-cameraX + shakeX, anchor);
         }
-        
-        ctx.restore();
-        
-        // Re-apply camera transform for remaining objects
-        ctx.scale(dpr, dpr);
-        ctx.translate(w / (2 * dpr), h / (2 * dpr));
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cameraX + shakeX, anchor);
       }
 
       // ============= END OF TERRAIN RENDERING =============
