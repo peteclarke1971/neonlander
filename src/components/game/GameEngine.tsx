@@ -5466,15 +5466,13 @@ export const GameEngine: React.FC<Props> = ({
           // No off-screen canvas, no composite operations, no bloom
           ctx.save();
           
-          // Convert screen-space beam to world coordinates
-          const screenCenterX = w / (2 * dpr);
-          const beamWorldCenterX = cameraX - shakeX + (beamCenterX - screenCenterX) / zoom;
-          const beamWorldWidth = beamWidth / zoom;
-          const beamWorldLeft = beamWorldCenterX - beamWorldWidth / 2;
+          // sweepXRef.current (beamCenterX) is ALREADY in world coordinates
+          // beamWidth is also already in world units - use directly!
+          const beamWorldLeft = beamCenterX - beamWidth / 2;
           
           // Simple clip rect in world space
           ctx.beginPath();
-          ctx.rect(beamWorldLeft, -10000, beamWorldWidth, 20000);
+          ctx.rect(beamWorldLeft, -10000, beamWidth, 20000);
           ctx.clip();
           
           // Draw terrain directly - no glow, no bloom, just solid lines
