@@ -1935,12 +1935,21 @@ export const GameEngine: React.FC<Props> = ({
 
       // Style points tracking (for classic, fixed, and medley modes)
       if ((mode === "classic" || mode === "fixed" || mode === "medley") && running && !crashed && !playerLockedRef.current) {
+        // Detect rotation input from keyboard OR gamepad analog stick
+        // Gamepad analog: input.rotation is -1 to 1, negative = left, positive = right
+        const gp = anyGamepad?.();
+        const gpAnalogRotation = gp?.connected ? readGamepad(gp, gpProfileRef.current).rotation : 0;
+        const analogThreshold = 0.15; // Analog stick threshold for detecting intentional rotation
+        
+        const isRotatingLeft = keys.current.left || gpLeft || gpAnalogRotation < -analogThreshold;
+        const isRotatingRight = keys.current.right || gpRight || gpAnalogRotation > analogThreshold;
+        
         // Update 360° rotation tracking
         const rotation360Result = update360Tracking(
           stylePointsStateRef.current,
           angle,
-          keys.current.left,
-          keys.current.right,
+          isRotatingLeft,
+          isRotatingRight,
           dt,
           abortRotationActive.current,
           elapsed
