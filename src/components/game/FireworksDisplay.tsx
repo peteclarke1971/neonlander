@@ -408,7 +408,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         
         // Create particles for each position in the ghost bitmap - all same color
         ghostTargets.forEach((target) => {
-          const speed = 0.5 + Math.random() * 0.8;
+          const speed = 4 + Math.random() * 3; // Increased from 0.5-1.3 to 4-7 for explosive outward burst
           const angle = Math.atan2(target.y, target.x);
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
@@ -434,7 +434,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         
         // Create larger particles for giant ghost effect - all same color
         giantGhostTargets.forEach((target) => {
-          const speed = 0.3 + Math.random() * 0.5;
+          const speed = 3 + Math.random() * 2; // Increased from 0.3-0.8 to 3-5 for explosive outward burst
           const angle = Math.atan2(target.y, target.x);
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;
@@ -458,7 +458,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
         
         // Create particles for Pac-Man - all neon yellow
         pacmanTargets.forEach((target) => {
-          const speed = 0.5 + Math.random() * 0.8;
+          const speed = 4 + Math.random() * 3; // Increased from 0.5-1.3 to 4-7 for explosive outward burst
           const angle = Math.atan2(target.y, target.x);
           const vx = Math.cos(angle) * speed;
           const vy = Math.sin(angle) * speed;

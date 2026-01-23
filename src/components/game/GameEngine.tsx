@@ -5500,11 +5500,34 @@ export const GameEngine: React.FC<Props> = ({
           const wrapVal = Math.floor(cameraX / terrain.worldWidth);
           for (let ww = -1; ww <= 1; ww++) drawTerrainDirect((wrapVal + ww) * terrain.worldWidth);
           
-          // Draw pads
-          for (const pad of terrain.pads) {
-            const padW = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
-            ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
-            ctx.fillRect(pad.xStart, pad.y, padW, 2);
+          // Draw pads WITH world wrapping (like terrain)
+          for (let ww = -1; ww <= 1; ww++) {
+            const worldOffset = (wrapVal + ww) * terrain.worldWidth;
+            for (const pad of terrain.pads) {
+              const padW = (pad.xEnd >= pad.xStart ? (pad.xEnd - pad.xStart) : (terrain.worldWidth - pad.xStart + pad.xEnd));
+              ctx.fillStyle = pad.bonus2x ? `rgba(255,100,255,0.8)` : `rgba(100,255,255,0.8)`;
+              ctx.fillRect(pad.xStart + worldOffset, pad.y, padW, 2);
+            }
+          }
+          
+          ctx.restore();
+          
+          // Draw faint terrain outline (always visible for navigation)
+          ctx.save();
+          ctx.globalAlpha = 0.05;
+          ctx.strokeStyle = neonColor as any;
+          ctx.shadowBlur = 0;
+          ctx.lineWidth = 1;
+          for (let ww = -1; ww <= 1; ww++) {
+            const offset = (wrapVal + ww) * terrain.worldWidth;
+            if (offset + terrain.worldWidth < viewLeft || offset > viewRight) continue;
+            ctx.beginPath();
+            for (let i = 0; i < terrain.points.length; i++) {
+              const p = terrain.points[i];
+              if (i === 0) ctx.moveTo(p.x + offset, p.y);
+              else ctx.lineTo(p.x + offset, p.y);
+            }
+            ctx.stroke();
           }
           
           ctx.restore();
