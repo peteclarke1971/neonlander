@@ -15,6 +15,22 @@ export function isIOSDevice(): boolean {
 }
 
 /**
+ * Detects if the current device is an iPad (not iPhone/iPod)
+ */
+export function isIPadDevice(): boolean {
+  const ua = navigator.userAgent;
+  // Standard iPad detection
+  if (/iPad/.test(ua)) {
+    return true;
+  }
+  // iPad on iOS 13+ reports as MacIntel but has touch
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Detects if the current device is a desktop (not mobile/tablet)
  */
 export function isDesktopDevice(): boolean {

@@ -136,4 +136,9 @@ export const GRAPHICS_VALUES = {
   
   // CRT scanlines
   enableScanlines: { low: false, mid: false, high: true },
+  
+  // Light beam effect settings (iPad optimizations for mid/low)
+  lightBeamBloomPass: { low: false, mid: false, high: true },
+  lightBeamGradientStops: { low: 3, mid: 3, high: 5 },
+  lightBeamShadowBlur: { low: 0, mid: 0, high: 1.5 }, // multiplier applied to base shadowBlur
 } as const;
