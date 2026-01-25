@@ -349,6 +349,9 @@ export const GameEngine: React.FC<Props> = ({
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
   const [coreComposition] = useState(() => new CoreComposition());
   
+  // Terrain ref for fireworks masking
+  const terrainDataRef = useRef<TerrainData | CavernData | null>(null);
+  
   // Random effects state for first 5 levels
   const [hasRandomEffects, setHasRandomEffects] = useState(false);
   const [randomEffectParams, setRandomEffectParams] = useState<CavernFXParams | undefined>(undefined);
@@ -383,6 +386,16 @@ export const GameEngine: React.FC<Props> = ({
   const bgDecorationsRef = useRef<BackgroundDecoration[]>([]);
   const bgDecorationImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const bgDecorationStartTimeRef = useRef<number>(0);
+  
+  // Terrain-masked fireworks setting
+  const [terrainMaskedFireworks] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-terrain-masked-fireworks');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   
   // Time Trial state
   const [timeTrialState, setTimeTrialState] = useState({
@@ -788,6 +801,9 @@ export const GameEngine: React.FC<Props> = ({
           const timeTrialPadCount = timeTrialConfig?.padCount;
           return generateTerrain(seed, WORLD_WIDTH, BASE_HEIGHT, terrainAmp, levelVar, level, difficulty, isTimeTrialMode, timeTrialPadCount, mode, timeTrialConfig);
          })();
+    
+    // Store terrain for fireworks masking
+    terrainDataRef.current = terrain;
     
     // Setup Time Trial state if in time trial mode
     if (isTimeTrial && !isCavernLevel && terrain.sequencedPads && timeTrialConfig) {
@@ -5872,6 +5888,11 @@ export const GameEngine: React.FC<Props> = ({
           isWorldRecord={isWorldRecord}
           isHighScore={isWorldRecord}
           lowGraphics={graphicsLevel === "low"}
+          terrainMaskEnabled={terrainMaskedFireworks}
+          terrainPoints={terrainDataRef.current?.points}
+          terrainWorldWidth={terrainDataRef.current?.worldWidth}
+          cameraX={cameraState.cameraX}
+          cameraY={cameraState.cameraY}
         onComplete={async () => {
           setShowFireworks(false);
           

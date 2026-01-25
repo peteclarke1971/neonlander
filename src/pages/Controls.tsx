@@ -143,6 +143,16 @@ export default function ControlsSettings() {
     }
   });
   
+  // Terrain-masked fireworks toggle (experimental)
+  const [terrainMaskedFireworks, setTerrainMaskedFireworks] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-terrain-masked-fireworks');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+  
   // Graphics quality setting
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   
@@ -269,6 +279,13 @@ export default function ControlsSettings() {
       console.warn('Failed to save large UFO enabled:', e);
     }
   }, [largeUFOEnabled]);
+
+  // Save terrain-masked fireworks setting
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-terrain-masked-fireworks', JSON.stringify(terrainMaskedFireworks));
+    } catch {}
+  }, [terrainMaskedFireworks]);
 
   useEffect(() => {
     try {
@@ -862,6 +879,17 @@ export default function ControlsSettings() {
                   1 = barely visible, 10 = fully visible
                 </div>
               </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Terrain-Masked Fireworks</Label>
+                <div className="text-xs text-muted-foreground">Fireworks appear behind terrain (experimental)</div>
+              </div>
+              <Switch 
+                checked={terrainMaskedFireworks}
+                onCheckedChange={setTerrainMaskedFireworks}
+              />
             </div>
             
             <div className="flex items-center justify-between">
