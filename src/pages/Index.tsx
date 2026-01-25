@@ -594,16 +594,29 @@ const retryGame = () => {
     } catch {}
   }, [view, sfConfig]);
 
+  // Input cooldown for game-over screen to prevent button carry-over from fireworks skip
+  const [gameOverInputEnabled, setGameOverInputEnabled] = useState(false);
+  const gameOverPrevRef = useRef({ up: false, down: false, left: false, right: false, select: false, back: false });
+  const gameOverLastFireRef = useRef({ up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 });
+
+  useEffect(() => {
+    if (view === "gameover") {
+      setGameOverInputEnabled(false);
+      // Reset edge detection refs when entering gameover
+      gameOverPrevRef.current = { up: false, down: false, left: false, right: false, select: false, back: false };
+      const timer = setTimeout(() => setGameOverInputEnabled(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [view]);
+
   // Map gamepad D-pad/LS to Arrow keys and activate selected index on press
   useEffect(() => {
     if (view !== "gameover") return;
     let raf = 0;
     let lastId: string | null = getLastDeviceId();
     let gpProfile = loadProfile(lastId || undefined);
-    let prev = { up: false, down: false, left: false, right: false, select: false, back: false };
-    let lastFire = { up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 };
-    const canFire = (k: keyof typeof lastFire) => (performance.now() - lastFire[k]) > 150;
-    const mark = (k: keyof typeof lastFire) => { lastFire[k] = performance.now(); };
+    const canFire = (k: keyof typeof gameOverLastFireRef.current) => (performance.now() - gameOverLastFireRef.current[k]) > 150;
+    const mark = (k: keyof typeof gameOverLastFireRef.current) => { gameOverLastFireRef.current[k] = performance.now(); };
     const fire = (key: string) => {
       const target = (document.activeElement as HTMLElement) || document.body;
       target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
@@ -618,6 +631,14 @@ const retryGame = () => {
         gpProfile = loadProfile(gp.id);
       }
       const input = readGamepad(gp, gpProfile);
+      const prev = gameOverPrevRef.current;
+      
+      // Skip input processing during cooldown period
+      if (!gameOverInputEnabled) {
+        gameOverPrevRef.current = { ...input.ui };
+        return;
+      }
+      
       if (input.ui.up && !prev.up && canFire("up")) { fire("ArrowUp"); mark("up"); }
       if (input.ui.down && !prev.down && canFire("down")) { fire("ArrowDown"); mark("down"); }
       if (input.ui.left && !prev.left && canFire("left")) {
@@ -659,11 +680,11 @@ const retryGame = () => {
         mark("select");
       }
       if (input.ui.back && !prev.back && canFire("back")) { fire("Escape"); mark("back"); }
-      prev = input.ui;
+      gameOverPrevRef.current = { ...input.ui };
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [view, lastResult, needsInitials, goIndex]);
+  }, [view, lastResult, needsInitials, goIndex, gameOverInputEnabled]);
 
   // Arrow-key navigation on gameover screen (matches HomeScreen pattern)
   const handleGameOverKeys: React.KeyboardEventHandler<HTMLDivElement> = (e) => {

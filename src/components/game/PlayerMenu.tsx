@@ -275,7 +275,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     };
   }, []);
 
-  // Gamepad navigation
+  // Gamepad navigation - use refs for persistent state across effect restarts
+  const gpPrevRef = useRef({ up: false, down: false, select: false, back: false });
+  const gpLastFireRef = useRef({ up: 0, down: 0, select: 0, back: 0 });
+
   useEffect(() => {
     let raf = 0;
     let lastId: string | null = null;
@@ -283,10 +286,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       lastId = localStorage.getItem("ll-gp-last-device");
     } catch {}
     let profile = loadProfile(lastId || undefined);
-    let prev = { up: false, down: false, select: false, back: false };
-    let lastFire = { up: 0, down: 0, select: 0, back: 0 };
-    const canFire = (dir: keyof typeof lastFire) => performance.now() - lastFire[dir] > 140;
-    const mark = (dir: keyof typeof lastFire) => { lastFire[dir] = performance.now(); };
+    const canFire = (dir: keyof typeof gpLastFireRef.current) => performance.now() - gpLastFireRef.current[dir] > 140;
+    const mark = (dir: keyof typeof gpLastFireRef.current) => { gpLastFireRef.current[dir] = performance.now(); };
 
     const loop = () => {
       raf = requestAnimationFrame(loop);
@@ -297,6 +298,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         profile = loadProfile(gp.id);
       }
       const input = readGamepad(gp, profile);
+      const prev = gpPrevRef.current;
       
       // Any gamepad input resets idle
       if (input.ui.up || input.ui.down || input.ui.select || input.ui.back) {
@@ -317,11 +319,14 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
-          if (modeFocusedIndex < gameModeOptions.length) {
-            modeButtonRefs.current[modeFocusedIndex]?.click();
-          } else {
-            backButtonRef.current?.click();
-          }
+          setModeFocusedIndex(idx => {
+            if (idx < gameModeOptions.length) {
+              modeButtonRefs.current[idx]?.click();
+            } else {
+              backButtonRef.current?.click();
+            }
+            return idx;
+          });
           vibrate(50, 0.3, 0.5); // Stronger haptic on selection
           gateThrustUntilRelease();
           mark("select");
@@ -344,11 +349,14 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
-          if (levelFocusedIndex < startingLevelOptions.length) {
-            levelButtonRefs.current[levelFocusedIndex]?.click();
-          } else {
-            levelBackButtonRef.current?.click();
-          }
+          setLevelFocusedIndex(idx => {
+            if (idx < startingLevelOptions.length) {
+              levelButtonRefs.current[idx]?.click();
+            } else {
+              levelBackButtonRef.current?.click();
+            }
+            return idx;
+          });
           vibrate(50, 0.3, 0.5);
           gateThrustUntilRelease();
           mark("select");
@@ -371,7 +379,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("down");
         }
         if (input.ui.select && !prev.select && canFire("select")) {
-          buttonRefs.current[focusedIndex]?.click();
+          setFocusedIndex(idx => {
+            buttonRefs.current[idx]?.click();
+            return idx;
+          });
           vibrate(50, 0.3, 0.5); // Stronger haptic on selection
           gateThrustUntilRelease();
           mark("select");
@@ -382,11 +393,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("back");
         }
       }
-      prev = { up: input.ui.up, down: input.ui.down, select: input.ui.select, back: input.ui.back };
+      gpPrevRef.current = { up: input.ui.up, down: input.ui.down, select: input.ui.select, back: input.ui.back };
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [focusedIndex, modeFocusedIndex, levelFocusedIndex, showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle]);
+  }, [showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
