@@ -46,7 +46,8 @@ interface FireworksDisplayProps {
   terrainPoints?: { x: number; y: number }[];
   terrainWorldWidth?: number;
   cameraX?: number;
-  cameraY?: number;
+  cameraAnchor?: number;
+  zoom?: number;
 }
 
 // Object pool for particle reuse
@@ -86,7 +87,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   terrainPoints,
   terrainWorldWidth,
   cameraX,
-  cameraY
+  cameraAnchor,
+  zoom
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1774,7 +1776,8 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       const canvasWidth = canvas.width;
       const worldWidth = terrainWorldWidth || 4000;
       const camX = cameraX ?? 0;
-      const camY = cameraY ?? 0;
+      const camAnchor = cameraAnchor ?? 0;
+      const zoomFactor = zoom ?? 1;
       
       // Draw filled terrain polygon (terrain + screen bottom)
       ctx.beginPath();
@@ -1784,11 +1787,13 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       
       // Draw terrain line (transformed from world space to screen space)
       // Account for world wrapping by drawing extended terrain
+      // Match GameEngine's transform: screenX = w/2 + (worldX - cameraX) * zoom
+      //                              screenY = h/2 + (worldY + anchor) * zoom
       for (let offset = -worldWidth; offset <= worldWidth; offset += worldWidth) {
-        terrainPoints.forEach((pt, i) => {
-          // Transform world coords to screen coords
-          const screenX = (pt.x + offset) - camX + canvasWidth / 2;
-          const screenY = pt.y - camY + canvasHeight / 2;
+        terrainPoints.forEach((pt) => {
+          // Transform world coords to screen coords (matching GameEngine's camera transform)
+          const screenX = canvasWidth / 2 + (pt.x + offset - camX) * zoomFactor;
+          const screenY = canvasHeight / 2 + (pt.y + camAnchor) * zoomFactor;
           
           // Only draw if within extended screen bounds
           if (screenX >= -100 && screenX <= canvasWidth + 100) {
@@ -1807,7 +1812,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
       
       ctx.restore();
     }
-  }, [particles, terrainMaskEnabled, terrainPoints, terrainWorldWidth, cameraX, cameraY]);
+  }, [particles, terrainMaskEnabled, terrainPoints, terrainWorldWidth, cameraX, cameraAnchor, zoom]);
 
   // Shape drawing functions
   const drawStar = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, points: number) => {
