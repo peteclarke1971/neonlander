@@ -8,6 +8,41 @@ export interface AssetData {
   spinSpeed: number; // degrees per second
 }
 
+// Neon color palette for cycling (matches MobileStarfield)
+export const NEON_CYCLE_COLORS = [
+  { h: 330, s: 100, l: 65 }, // pink
+  { h: 50, s: 100, l: 55 },  // yellow
+  { h: 140, s: 100, l: 55 }, // green
+  { h: 270, s: 100, l: 70 }, // purple
+  { h: 25, s: 100, l: 60 },  // orange
+  { h: 0, s: 100, l: 60 },   // red
+  { h: 180, s: 100, l: 60 }, // cyan
+];
+
+// Color interpolation function for smooth transitions
+export function getCyclingColor(time: number, seedOffset: number = 0, cycleSpeed: number = 0.4): string {
+  const t = (time * cycleSpeed + seedOffset) % NEON_CYCLE_COLORS.length;
+  const idx1 = Math.floor(t);
+  const idx2 = (idx1 + 1) % NEON_CYCLE_COLORS.length;
+  const blend = t - idx1;
+  
+  const c1 = NEON_CYCLE_COLORS[idx1];
+  const c2 = NEON_CYCLE_COLORS[idx2];
+  
+  // Handle hue wrapping for smooth transitions
+  let h1 = c1.h, h2 = c2.h;
+  if (Math.abs(h2 - h1) > 180) {
+    if (h2 > h1) h1 += 360;
+    else h2 += 360;
+  }
+  
+  const h = ((h1 + (h2 - h1) * blend) % 360 + 360) % 360;
+  const s = c1.s + (c2.s - c1.s) * blend;
+  const l = c1.l + (c2.l - c1.l) * blend;
+  
+  return `hsl(${h}, ${s}%, ${l}%)`
+}
+
 export interface SparkleEffect {
   pos: Vec2;
   angle: number;
@@ -159,22 +194,29 @@ export function renderSpaceJunk(
   rotation: number,
   scale: number,
   tint: string,
-  sparkles?: SparkleEffect[]
+  sparkles?: SparkleEffect[],
+  time?: number,          // Current elapsed time for color cycling
+  seedOffset?: number     // Per-item offset for variety
 ): void {
   // Reduce size by 50%
   const adjustedScale = scale * 0.5;
   const asset = SPACE_JUNK_ASSETS[shape];
+  
+  // Calculate cycling color if time is provided
+  const cyclingColor = time !== undefined 
+    ? getCyclingColor(time, seedOffset ?? 0, 0.4)
+    : tint;
   
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.scale(adjustedScale, adjustedScale);
   
-  // Main shape with glow
-  ctx.strokeStyle = tint;
+  // Main shape with cycling glow
+  ctx.strokeStyle = cyclingColor;
   ctx.lineWidth = 2;
-  ctx.shadowColor = tint;
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = cyclingColor;
+  ctx.shadowBlur = 10;  // Slightly increased for visibility
   
   ctx.beginPath();
   const path = asset.path;
@@ -186,13 +228,13 @@ export function renderSpaceJunk(
   }
   ctx.stroke();
   
-  // Sparkles
+  // Sparkles also use cycling color
   if (sparkles) {
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = 6;
     sparkles.forEach(sparkle => {
       if (sparkle.alpha > 0.1) {
         ctx.globalAlpha = sparkle.alpha;
-        ctx.strokeStyle = tint;
+        ctx.strokeStyle = cyclingColor;
         ctx.lineWidth = 1;
         
         ctx.beginPath();

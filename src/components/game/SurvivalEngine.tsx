@@ -2829,7 +2829,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           ctx.save();
           ctx.globalAlpha = 0.9;
-          renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles);
+          renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles, elapsed, junk.seed * 0.001);
           ctx.restore();
         });
       }
