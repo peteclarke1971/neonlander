@@ -1504,15 +1504,21 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [onSkip, allowSkip]);
 
-  // Gamepad input for skipping
+  // Gamepad input for skipping - with edge detection to prevent double-trigger
   useEffect(() => {
     if (!allowSkip) return;
     
+    let prevPressed = false; // Track previous frame's button state
+    
     const checkGamepad = () => {
       const gamepad = anyGamepad();
-      if (gamepad && (gamepad.buttons[0]?.pressed || gamepad.buttons[1]?.pressed)) {
+      const isPressed = !!(gamepad && (gamepad.buttons[0]?.pressed || gamepad.buttons[1]?.pressed));
+      
+      // Only trigger on rising edge (button just pressed, wasn't pressed before)
+      if (isPressed && !prevPressed) {
         onSkip();
       }
+      prevPressed = isPressed;
     };
 
     const interval = setInterval(checkGamepad, 100);
