@@ -41,6 +41,12 @@ interface FireworksDisplayProps {
   debugCycleTrigger?: number; // Trigger for debug cycling on home screen
   forceSeason?: 'halloween' | 'christmas' | null; // Force specific seasonal theme
   allowSkip?: boolean; // Control whether skip is enabled (default: true)
+  // Terrain masking props (optional)
+  terrainMaskEnabled?: boolean;
+  terrainPoints?: { x: number; y: number }[];
+  terrainWorldWidth?: number;
+  cameraX?: number;
+  cameraY?: number;
 }
 
 // Object pool for particle reuse
@@ -75,7 +81,12 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   isHighScore = false,
   debugCycleTrigger,
   forceSeason,
-  allowSkip = true
+  allowSkip = true,
+  terrainMaskEnabled = false,
+  terrainPoints,
+  terrainWorldWidth,
+  cameraX,
+  cameraY
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [particles, setParticles] = useState<FireworkParticle[]>([]);
@@ -1751,7 +1762,52 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
     });
     
     ctx.globalAlpha = 1;
-  }, [particles]);
+    
+    // Apply terrain mask if enabled - erase fireworks that fall below terrain
+    if (terrainMaskEnabled && terrainPoints && terrainPoints.length > 0) {
+      ctx.save();
+      
+      // Use destination-out to "erase" the terrain area from fireworks
+      ctx.globalCompositeOperation = 'destination-out';
+      
+      const canvasHeight = canvas.height;
+      const canvasWidth = canvas.width;
+      const worldWidth = terrainWorldWidth || 4000;
+      const camX = cameraX ?? 0;
+      const camY = cameraY ?? 0;
+      
+      // Draw filled terrain polygon (terrain + screen bottom)
+      ctx.beginPath();
+      
+      // Start from bottom-left of screen
+      ctx.moveTo(0, canvasHeight);
+      
+      // Draw terrain line (transformed from world space to screen space)
+      // Account for world wrapping by drawing extended terrain
+      for (let offset = -worldWidth; offset <= worldWidth; offset += worldWidth) {
+        terrainPoints.forEach((pt, i) => {
+          // Transform world coords to screen coords
+          const screenX = (pt.x + offset) - camX + canvasWidth / 2;
+          const screenY = pt.y - camY + canvasHeight / 2;
+          
+          // Only draw if within extended screen bounds
+          if (screenX >= -100 && screenX <= canvasWidth + 100) {
+            ctx.lineTo(screenX, screenY);
+          }
+        });
+      }
+      
+      // Close polygon at bottom-right and back to bottom-left
+      ctx.lineTo(canvasWidth + 100, canvasHeight);
+      ctx.lineTo(0, canvasHeight);
+      ctx.closePath();
+      
+      // Fill to erase (since we're using destination-out)
+      ctx.fill();
+      
+      ctx.restore();
+    }
+  }, [particles, terrainMaskEnabled, terrainPoints, terrainWorldWidth, cameraX, cameraY]);
 
   // Shape drawing functions
   const drawStar = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, points: number) => {
