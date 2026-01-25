@@ -345,7 +345,7 @@ export const GameEngine: React.FC<Props> = ({
   const messageShownForLevel = useRef<number>(-1); // Track which level we showed message for
   
   // Camera and cavern state for FX renderer
-  const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600 });
+  const [cameraState, setCameraState] = useState({ cameraX: 0, cameraY: 0, viewWidth: 800, viewHeight: 600, anchor: 0, zoom: 1 });
   const [cavernBakeResult, setCavernBakeResult] = useState<CavernBakeResult | null>(null);
   const [coreComposition] = useState(() => new CoreComposition());
   
@@ -3997,12 +3997,15 @@ export const GameEngine: React.FC<Props> = ({
       const shakeWorldY = shakeY / (zoom * dpr);
 
       // Update camera state for FX renderer (compensate for shake)
-      setCameraState({
+      // Note: anchor is set later in this frame, so we update it after computation
+      setCameraState(prev => ({
         cameraX: cameraX - shakeWorldX,
         cameraY: y - shakeWorldY, // Use player world Y (not anchor)
         viewWidth: viewWidth,
-        viewHeight: viewH
-      });
+        viewHeight: viewH,
+        anchor: prev.anchor, // Will be updated after anchor computation
+        zoom: zoom
+      }));
 
       // Compute world anchor with smoothing (frame ground near bottom; keep lander visible)
       let anchor: number;
@@ -4022,6 +4025,9 @@ export const GameEngine: React.FC<Props> = ({
         smoothedAnchor += (anchorTarget - smoothedAnchor) * aAlpha;
         anchor = smoothedAnchor;
       }
+      
+      // Update anchor in camera state for terrain masking
+      setCameraState(prev => ({ ...prev, anchor }));
 
       // Update ship screen position (CSS pixels) for overlay during intro
       if (introRef.current?.isActive()) {
@@ -5892,7 +5898,8 @@ export const GameEngine: React.FC<Props> = ({
           terrainPoints={terrainDataRef.current?.points}
           terrainWorldWidth={terrainDataRef.current?.worldWidth}
           cameraX={cameraState.cameraX}
-          cameraY={cameraState.cameraY}
+          cameraAnchor={cameraState.anchor}
+          zoom={cameraState.zoom}
         onComplete={async () => {
           setShowFireworks(false);
           
