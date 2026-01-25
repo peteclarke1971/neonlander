@@ -21,7 +21,9 @@ export const NEON_CYCLE_COLORS = [
 
 // Color interpolation function for smooth transitions
 export function getCyclingColor(time: number, seedOffset: number = 0, cycleSpeed: number = 0.4): string {
-  const t = (time * cycleSpeed + seedOffset) % NEON_CYCLE_COLORS.length;
+  // Fix: JavaScript modulo can be negative, use double-modulo pattern to ensure positive index
+  const rawT = (time * cycleSpeed + seedOffset) % NEON_CYCLE_COLORS.length;
+  const t = ((rawT % NEON_CYCLE_COLORS.length) + NEON_CYCLE_COLORS.length) % NEON_CYCLE_COLORS.length;
   const idx1 = Math.floor(t);
   const idx2 = (idx1 + 1) % NEON_CYCLE_COLORS.length;
   const blend = t - idx1;
