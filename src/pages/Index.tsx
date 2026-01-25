@@ -33,6 +33,7 @@ const Index = () => {
   const [view, setView] = useState<"home" | "playermenu" | "game" | "gameover" | "demo">("home");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionReady, setTransitionReady] = useState(false);
+  const [gameOriginView, setGameOriginView] = useState<"home" | "playermenu">("home"); // Track where game was launched from
   const transitionRef = useRef<GameTransitionHandle>(null);
   
   // Demo/attract mode state
@@ -856,7 +857,10 @@ const retryGame = () => {
       {view === "home" && (
         <DemoTransition isVisible={view === "home"}>
           <HomeScreen 
-            onStart={startGame} 
+            onStart={(d, startLevel, mode, lowGfx, seedOverrideParam, gameSettings) => {
+              setGameOriginView("home");
+              startGame(d, startLevel, mode, lowGfx, seedOverrideParam, gameSettings);
+            }} 
             highScoresClassic={classicScores} 
             highScoresFixed={fixedScores} 
             lastPlayedSeed={lastPlayedSeed ?? undefined}
@@ -879,6 +883,8 @@ const retryGame = () => {
               survival: "survival",
             };
             const gameMode = modeMap[selectedMode] || "fixed";
+            // Track that this game was launched from player menu
+            setGameOriginView("playermenu");
             // Use ALL settings from Developer Menu (passed from PlayerMenu via localStorage)
             startGame(
               settings.difficulty, 
@@ -908,8 +914,8 @@ const retryGame = () => {
           key={gameKey}
           difficulty={difficulty}
           onExit={() => {
-            console.log("🏠 Game exited, returning to home");
-            setView("home");
+            console.log("🏠 Game exited, returning to:", gameOriginView);
+            setView(gameOriginView);
             resetTimers();
           }}
           onGameOver={handleGameOver}
@@ -1418,7 +1424,7 @@ const retryGame = () => {
                       Continue
                     </Button>
                     <Button variant="outline" onClick={() => {
-                      setView("home");
+                      setView(gameOriginView);
                       resetTimers();
                     }} disabled={needsInitials}>
                       Main Menu
@@ -1437,10 +1443,10 @@ const retryGame = () => {
               ) : (
                 <>
                   <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
-                    console.log("🏠 Home button clicked from gameover");
+                    console.log("🏠 Home button clicked from gameover, returning to:", gameOriginView);
                     setShowLeaderboardsAfterInitials(false);
                     setShowMedleyHighScoreEntry(false);
-                    setView("home");
+                    setView(gameOriginView);
                     resetTimers();
                   }} disabled={needsInitials || showMedleyHighScoreEntry}>Home</Button>
                   <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials || showMedleyHighScoreEntry}>Retry Current Level</Button>
