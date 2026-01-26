@@ -35,6 +35,8 @@ interface Props {
   onCalibrateGyro?: () => void;
   // Weather effect
   weatherType?: string;
+  // HUD visibility setting
+  showFullHUD?: boolean;
 }
 
 export const SurvivalHUD: React.FC<Props> = ({ 
@@ -63,7 +65,13 @@ export const SurvivalHUD: React.FC<Props> = ({
   onEnableGyro,
   onCalibrateGyro,
   weatherType,
+  showFullHUD = true,
 }) => {
+  // If HUD is hidden by user preference, don't render anything
+  if (!showFullHUD) {
+    return null;
+  }
+  
   return (
     <aside className="pointer-events-none select-none fixed top-4 left-4 z-20 animate-fade-in">
       <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-3 shadow-neon">
