@@ -5240,18 +5240,25 @@ export const GameEngine: React.FC<Props> = ({
             prevFuelPercentRef.current = smoothFuelPercent;
             
             // Determine fill color based on fuel level
+            // Extract hue from neonColor for consistent color construction
+            const hueMatch = neonColor.match(/hsl\((\d+)/);
+            const neonHue = hueMatch ? parseInt(hueMatch[1]) : 180;
+            
             let fillColor: string;
-            const fillAlpha = 0.9;
+            let baseAlpha: number;
             
             if (smoothFuelPercent > 0.5) {
-              // Above 50% - use current level's neon color
-              fillColor = neonColor.replace('hsl', 'hsla').replace(')', `, ${fillAlpha})`);
+              // Above 50% - use neon hue at full saturation/lightness with FULL opacity
+              fillColor = `hsl(${neonHue}, 100%, 50%)`;
+              baseAlpha = 1.0;
             } else if (smoothFuelPercent > 0.25) {
               // 25-50% - bright orange
-              fillColor = `hsla(30, 100%, 50%, ${fillAlpha})`;
+              fillColor = `hsl(30, 100%, 50%)`;
+              baseAlpha = 0.9;
             } else {
               // Below 25% - bright red  
-              fillColor = `hsla(0, 100%, 50%, ${fillAlpha})`;
+              fillColor = `hsl(0, 100%, 50%)`;
+              baseAlpha = 0.9;
             }
             
             // Low fuel flicker (<15%)
@@ -5318,7 +5325,7 @@ export const GameEngine: React.FC<Props> = ({
                 ctx.shadowColor = fillColor;
                 ctx.shadowBlur = 8;
               }
-              ctx.globalAlpha = fillAlpha * flickerAlpha;
+              ctx.globalAlpha = baseAlpha * flickerAlpha;
               ctx.beginPath();
               ctx.moveTo(points[0].x, points[0].y);
               for (let i = 1; i < points.length; i++) {
