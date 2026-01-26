@@ -19,23 +19,36 @@ export const SectorMessageDisplay = ({
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const isAnimatingRef = useRef<boolean>(false);
+  const onCompleteRef = useRef(onComplete);
+  const currentMessageRef = useRef<string | null>(null);
   const isIPhone = /iPhone/i.test(navigator.userAgent);
 
+  // Keep onComplete ref updated
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
-    // Reset when message changes
-    if (!message) {
+    // Reset when message changes to a new value
+    if (message !== currentMessageRef.current) {
+      currentMessageRef.current = message;
       isAnimatingRef.current = false;
       setAnimationTime(0);
+      startTimeRef.current = 0;
+      
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    }
+    
+    if (!message) {
       return;
     }
 
-    // If already animating same message, don't restart
+    // If already animating this message, don't restart
     if (isAnimatingRef.current) {
       return;
     }
 
     isAnimatingRef.current = true;
-    startTimeRef.current = 0;
 
     const MESSAGE_DURATION = 1500; // 1.5 seconds (shorter than bonus messages)
 
@@ -51,7 +64,7 @@ export const SectorMessageDisplay = ({
 
       if (progress >= 1) {
         isAnimatingRef.current = false;
-        onComplete();
+        onCompleteRef.current();
         return;
       }
 
@@ -64,9 +77,8 @@ export const SectorMessageDisplay = ({
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
-      isAnimatingRef.current = false;
     };
-  }, [message, onComplete]);
+  }, [message]);
 
   if (!message) {
     return null;

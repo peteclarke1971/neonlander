@@ -24,7 +24,7 @@ import { spawnRainParticles, spawnDustParticles, spawnPlasmaParticles, updateRai
 import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLightningBolts, renderRainbowDiffraction, renderPadResidue, updateLightningBolts } from "./systems/weatherRenderer";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
 import { SectorMessageDisplay } from "./SectorMessageDisplay";
-import { getSectorName, SECTOR_INTERVAL } from "./systems/survivalSectors";
+import { getSectorName, getSectorIndex } from "./systems/survivalSectors";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -61,6 +61,14 @@ export const SurvivalEngine: React.FC<Props> = ({
       return saved ? JSON.parse(saved) : 10;
     } catch {
       return 10;
+    }
+  });
+  const [showFullHUD, setShowFullHUD] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-full-hud');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
     }
   });
   
@@ -1561,11 +1569,11 @@ export const SurvivalEngine: React.FC<Props> = ({
           currentDistance = newDistance;
           setDistance(currentDistance);
           
-          // Check for sector milestone crossing (every 750m)
-          const currentSectorIndex = Math.floor(currentDistance / SECTOR_INTERVAL);
+          // Check for sector milestone crossing (first at 100m, then every 750m)
+          const currentSectorIndex = getSectorIndex(currentDistance);
           if (currentSectorIndex > lastSectorIndexRef.current) {
             // Crossed into a new sector
-            const sectorName = getSectorName(currentSectorIndex - 1); // -1 because index 1 = first sector at 750m
+            const sectorName = getSectorName(currentSectorIndex);
             setSectorMessage(sectorName);
             lastSectorIndexRef.current = currentSectorIndex;
           }
@@ -3460,6 +3468,7 @@ export const SurvivalEngine: React.FC<Props> = ({
         tiltAngle={gyroscope.tiltAngle}
         onEnableGyro={handleEnableGyro}
         onCalibrateGyro={handleCalibrateGyro}
+        showFullHUD={showFullHUD}
       />
       
       {/* FPS Counter */}

@@ -1,6 +1,6 @@
 /**
  * Survival Mode Sector Names
- * Displayed every 750 meters in sequential order
+ * First sector appears at 100m, then every 750m thereafter
  */
 
 export const SURVIVAL_SECTOR_NAMES = [
@@ -56,12 +56,25 @@ export const SURVIVAL_SECTOR_NAMES = [
   "SECTOR ALPHA-9"
 ];
 
-export const SECTOR_INTERVAL = 750; // meters between sector announcements
+export const FIRST_SECTOR_DISTANCE = 100; // First sector appears at 100m
+export const SECTOR_INTERVAL = 750; // Subsequent sectors every 750m after first
+
+/**
+ * Calculate sector index for a given distance
+ * @param distance - Current distance in meters
+ * @returns Sector index (0 = not yet reached first sector, 1+ = sector number)
+ */
+export function getSectorIndex(distance: number): number {
+  if (distance < FIRST_SECTOR_DISTANCE) return 0;
+  // First sector at 100m (index 1), then 850m (index 2), 1600m (index 3), etc.
+  return 1 + Math.floor((distance - FIRST_SECTOR_DISTANCE) / SECTOR_INTERVAL);
+}
 
 /**
  * Get the sector name for a given sector index
- * @param sectorIndex - The sector number (0 = first sector at 750m)
+ * @param sectorIndex - The sector number (1 = first sector at 100m)
  */
 export function getSectorName(sectorIndex: number): string {
-  return SURVIVAL_SECTOR_NAMES[sectorIndex % SURVIVAL_SECTOR_NAMES.length];
+  if (sectorIndex <= 0) return "";
+  return SURVIVAL_SECTOR_NAMES[(sectorIndex - 1) % SURVIVAL_SECTOR_NAMES.length];
 }
