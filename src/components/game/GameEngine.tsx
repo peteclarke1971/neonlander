@@ -5248,25 +5248,26 @@ export const GameEngine: React.FC<Props> = ({
             let baseAlpha: number;
             
             if (smoothFuelPercent > 0.5) {
-              // Above 50% - use neon hue at full saturation/lightness with FULL opacity
+              // Above 50% - use neon hue at full saturation/lightness with 80% opacity
               fillColor = `hsl(${neonHue}, 100%, 50%)`;
-              baseAlpha = 1.0;
+              baseAlpha = 0.8;
             } else if (smoothFuelPercent > 0.25) {
               // 25-50% - bright orange
               fillColor = `hsl(30, 100%, 50%)`;
-              baseAlpha = 0.9;
+              baseAlpha = 0.8;
             } else {
               // Below 25% - bright red  
               fillColor = `hsl(0, 100%, 50%)`;
-              baseAlpha = 0.9;
+              baseAlpha = 0.8;
             }
             
-            // Low fuel flicker (<15%)
+            // Low fuel flicker (<15%) - use gameTime for consistent timing
             let flickerAlpha = 1;
             if (smoothFuelPercent < 0.15 && smoothFuelPercent > 0) {
-              const flickerFreq = shouldOptimizePerformance ? 4 : 8;
-              const flickerPhase = Math.sin(elapsed * flickerFreq + Math.cos(elapsed * 13)) * 0.5 + 0.5;
-              flickerAlpha = 0.4 + flickerPhase * 0.6;
+              const flickerFreq = shouldOptimizePerformance ? 8 : 16;
+              const now = performance.now() / 1000;
+              const flickerPhase = Math.sin(now * flickerFreq * Math.PI * 2) * 0.5 + 0.5;
+              flickerAlpha = 0.3 + flickerPhase * 0.7; // Flash between 30% and 100% opacity
             }
             
             // Draw fuel fill clipped to triangle
