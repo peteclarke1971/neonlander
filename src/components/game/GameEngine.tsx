@@ -5184,24 +5184,29 @@ export const GameEngine: React.FC<Props> = ({
       let shipColor = neonColor;
       let shipShadowBlur = shadowBlur;
       
-      if ((mode === "classic" || mode === "fixed" || mode === "timetrial") && fuel <= 50) {
-        if (fuel < 10) {
-          // Solid red with pulsing glow when critically low
-          shipColor = "#ff0000";
-          // Pulsing glow effect (20-40px) at 5Hz for urgency
-          const glowPulse = (Math.sin(elapsed * 5 * Math.PI * 2) + 1) / 2; // 0 to 1
-          shipShadowBlur = 20 + glowPulse * 20; // 20-40px pulsing
-        } else {
-          // Clear pulsing between neon and red - frequency increases as fuel decreases
-          const fuelRatio = (fuel - 10) / 40; // 0 to 1 (10 to 50 fuel)
-          const pulseFreq = 2 + (1 - fuelRatio) * 6; // 2Hz to 8Hz
-          const pulse = (Math.sin(elapsed * pulseFreq * Math.PI * 2) + 1) / 2; // 0 to 1
-          
-          // Red influence increases as fuel decreases
-          const redInfluence = 0.3 + (1 - fuelRatio) * 0.7; // 30% to 100% red
-          
-          // Binary switch between neon and red - no blending
-          shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
+      if (mode === "classic" || mode === "fixed" || mode === "timetrial") {
+        const fuelPercent = fuel / fuelCap;
+        
+        if (fuelPercent <= 0.5) { // Below 50% fuel - start warning
+          if (fuelPercent < 0.08) {
+            // Below 8% - Solid red with pulsing glow when critically low
+            shipColor = "#ff0000";
+            // Pulsing glow effect (20-40px) at 5Hz for urgency
+            const glowPulse = (Math.sin(elapsed * 5 * Math.PI * 2) + 1) / 2; // 0 to 1
+            shipShadowBlur = 20 + glowPulse * 20; // 20-40px pulsing
+          } else {
+            // 8-50% - Clear pulsing between neon and red
+            // Frequency increases as fuel decreases (slowly at first, quicker near empty)
+            const fuelRatio = (fuelPercent - 0.08) / 0.42; // 0 to 1 (8% to 50%)
+            const pulseFreq = 2 + (1 - fuelRatio) * 6; // 2Hz to 8Hz (slow→fast)
+            const pulse = (Math.sin(elapsed * pulseFreq * Math.PI * 2) + 1) / 2; // 0 to 1
+            
+            // Red influence increases as fuel decreases
+            const redInfluence = 0.3 + (1 - fuelRatio) * 0.7; // 30% to 100% red
+            
+            // Binary switch between neon and red - no blending
+            shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
+          }
         }
       }
 
@@ -5248,17 +5253,17 @@ export const GameEngine: React.FC<Props> = ({
             let baseAlpha: number;
             
             if (smoothFuelPercent > 0.5) {
-              // Above 50% - use neon hue at full saturation/lightness with 80% opacity
+              // Above 50% - use neon hue at full saturation/lightness with 50% opacity
               fillColor = `hsl(${neonHue}, 100%, 50%)`;
-              baseAlpha = 0.8;
+              baseAlpha = 0.5;
             } else if (smoothFuelPercent > 0.25) {
               // 25-50% - bright orange
               fillColor = `hsl(30, 100%, 50%)`;
-              baseAlpha = 0.8;
+              baseAlpha = 0.5;
             } else {
               // Below 25% - bright red  
               fillColor = `hsl(0, 100%, 50%)`;
-              baseAlpha = 0.8;
+              baseAlpha = 0.5;
             }
             
             // Low fuel flicker (<15%) - use gameTime for consistent timing
