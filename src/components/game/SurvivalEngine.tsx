@@ -23,6 +23,8 @@ import { createWeatherState, updateWeatherTransition, getWeatherIntensity, gener
 import { spawnRainParticles, spawnDustParticles, spawnPlasmaParticles, updateRainParticles, updateDustParticles, updatePlasmaParticles, applyTransitionAlpha } from "./systems/weatherParticles";
 import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLightningBolts, renderRainbowDiffraction, renderPadResidue, updateLightningBolts } from "./systems/weatherRenderer";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
+import { SectorMessageDisplay } from "./SectorMessageDisplay";
+import { getSectorName, SECTOR_INTERVAL } from "./systems/survivalSectors";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -113,6 +115,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   const fieldWarningShownRef = useRef(false);
   const [fieldMessage, setFieldMessage] = useState<string>("");
   const [fieldMessageTimer, setFieldMessageTimer] = useState(0);
+  
+  // Sector milestone tracking
+  const [sectorMessage, setSectorMessage] = useState<string | null>(null);
+  const lastSectorIndexRef = useRef<number>(0); // Track which sector we last announced
   
   // Shield state
   const shieldActiveRef = useRef(false);
@@ -1554,6 +1560,15 @@ export const SurvivalEngine: React.FC<Props> = ({
           const newDistance = Math.max(currentDistance, shipX - CHUNK_WIDTH / 2);
           currentDistance = newDistance;
           setDistance(currentDistance);
+          
+          // Check for sector milestone crossing (every 750m)
+          const currentSectorIndex = Math.floor(currentDistance / SECTOR_INTERVAL);
+          if (currentSectorIndex > lastSectorIndexRef.current) {
+            // Crossed into a new sector
+            const sectorName = getSectorName(currentSectorIndex - 1); // -1 because index 1 = first sector at 750m
+            setSectorMessage(sectorName);
+            lastSectorIndexRef.current = currentSectorIndex;
+          }
           
           // Update color palette based on distance (throttled to every 0.1s)
           if (!classicColorsMode.current && currentTime - lastPaletteUpdate.current > 0.1) {
@@ -3497,6 +3512,17 @@ export const SurvivalEngine: React.FC<Props> = ({
             </Button>
           </div>
         </div>
+      )}
+      
+      {/* Sector Milestone Display */}
+      {sectorMessage && (
+        <SectorMessageDisplay
+          message={sectorMessage}
+          neonColor={classicColorsMode.current 
+            ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})` 
+            : currentPalette.accent}
+          onComplete={() => setSectorMessage(null)}
+        />
       )}
       
       {/* Fireworks Display */}
