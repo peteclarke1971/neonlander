@@ -435,6 +435,26 @@ export const GameEngine: React.FC<Props> = ({
   const lastPauseDown = useRef(false);
   const lastAbortDown = useRef(false);
   
+  // Liquid fuel sloshing physics refs (matches SurvivalEngine implementation)
+  const liquidFuelEnabledRef = useRef<boolean>((() => {
+    try {
+      const saved = localStorage.getItem('ll-liquid-fuel-enabled');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  })());
+  const liquidTiltAngleRef = useRef(0);        // Current tilt of liquid surface
+  const liquidTiltVelocityRef = useRef(0);     // Angular velocity of tilt
+  const liquidWavePhaseRef = useRef(0);        // Phase for wave animation
+  const liquidWaveAmplitudeRef = useRef(0);    // Current wave amplitude
+  const prevShipVxRef = useRef(0);             // Previous frame velocity X
+  const prevShipVyRef = useRef(0);             // Previous frame velocity Y  
+  const prevShipAngularVelRef = useRef(0);     // Previous frame angular velocity
+  const visualFuelRef = useRef(100);           // Smoothed fuel for animation
+  const prevFuelPercentRef = useRef(1.0);      // Previous fuel percentage
+  const forceSloshingTimerRef = useRef(0);     // Timer for post-refuel sloshing
+  
   // Abort animation state
   const abortRotationActive = useRef(false);
   const abortStartAngle = useRef(0);
@@ -2282,6 +2302,69 @@ export const GameEngine: React.FC<Props> = ({
             vx = 0;
             vy = 0;
           }
+        }
+      }
+      
+      // Update liquid sloshing physics (if enabled - matches SurvivalEngine)
+      if (liquidFuelEnabledRef.current && running && !crashed) {
+        const isLanded = !running || crashed;
+        
+        if (!isLanded && !playerLockedRef.current) {
+          // Calculate acceleration from velocity change
+          const accelX = dt > 0 ? (vx - prevShipVxRef.current) / dt : 0;
+          const accelY = dt > 0 ? (vy - prevShipVyRef.current) / dt : 0;
+          prevShipVxRef.current = vx;
+          prevShipVyRef.current = vy;
+          
+          // Lateral acceleration relative to ship orientation
+          const lateralAccel = accelX * Math.cos(angle) - accelY * Math.sin(angle);
+          
+          // Angular acceleration
+          const angularAccel = dt > 0 ? (av - prevShipAngularVelRef.current) / dt : 0;
+          prevShipAngularVelRef.current = av;
+          
+          // Spring-damper physics constants (identical to SurvivalEngine)
+          const SPRING_K = 15.0;
+          const DAMPING = 0.85;
+          const SENSITIVITY = 0.008;
+          const ANGULAR_INFLUENCE = 0.3;
+          
+          // External force from ship movement
+          let externalForce = -lateralAccel * SENSITIVITY - angularAccel * ANGULAR_INFLUENCE;
+          
+          // Add forced sloshing after refuel
+          if (forceSloshingTimerRef.current > 0) {
+            const sloshProgress = 1 - (forceSloshingTimerRef.current / 1.5);
+            const sloshIntensity = 150 * (1 - sloshProgress);
+            externalForce += Math.sin(elapsed * 3.5) * sloshIntensity;
+            forceSloshingTimerRef.current -= dt;
+          }
+          
+          // Spring force (restoring)
+          const springForce = -liquidTiltAngleRef.current * SPRING_K;
+          
+          // Update tilt velocity and angle
+          liquidTiltVelocityRef.current += (springForce + externalForce) * dt;
+          liquidTiltVelocityRef.current *= Math.pow(DAMPING, dt * 60);
+          liquidTiltAngleRef.current += liquidTiltVelocityRef.current * dt;
+          liquidTiltAngleRef.current = Math.max(-0.4, Math.min(0.4, liquidTiltAngleRef.current));
+          
+          // Surface wave animation
+          liquidWavePhaseRef.current += dt * 3.5;
+          
+          // Wave amplitude reacts to acceleration
+          const disturbance = Math.abs(lateralAccel) * 0.002 + Math.abs(angularAccel) * 0.5;
+          liquidWaveAmplitudeRef.current += disturbance;
+          if (forceSloshingTimerRef.current > 0) {
+            liquidWaveAmplitudeRef.current += 0.08;
+          }
+          liquidWaveAmplitudeRef.current *= Math.pow(0.92, dt * 60);
+          liquidWaveAmplitudeRef.current = Math.min(liquidWaveAmplitudeRef.current, 3.0);
+        } else {
+          // Settle when landed or paused
+          liquidTiltVelocityRef.current *= Math.pow(0.8, dt * 60);
+          liquidTiltAngleRef.current *= Math.pow(0.9, dt * 60);
+          liquidWaveAmplitudeRef.current *= Math.pow(0.95, dt * 60);
         }
       }
 
@@ -5147,6 +5230,110 @@ export const GameEngine: React.FC<Props> = ({
           ctx.globalAlpha = shipAlpha;
           ctx.translate(x + offset, y);
           ctx.rotate(angle);
+          
+          // Draw liquid fuel fill if enabled (before ship outline)
+          if (liquidFuelEnabledRef.current && fuel > 0.5) {
+            visualFuelRef.current += (fuel - visualFuelRef.current) * 0.15;
+            const fuelPercent = visualFuelRef.current / fuelCap;
+            const smoothFuelPercent = prevFuelPercentRef.current + 
+              (fuelPercent - prevFuelPercentRef.current) * 0.2;
+            prevFuelPercentRef.current = smoothFuelPercent;
+            
+            // Determine fill color based on fuel level
+            let fillColor: string;
+            const fillAlpha = 0.9;
+            
+            if (smoothFuelPercent > 0.5) {
+              // Above 50% - use current level's neon color
+              fillColor = neonColor.replace('hsl', 'hsla').replace(')', `, ${fillAlpha})`);
+            } else if (smoothFuelPercent > 0.25) {
+              // 25-50% - bright orange
+              fillColor = `hsla(30, 100%, 50%, ${fillAlpha})`;
+            } else {
+              // Below 25% - bright red  
+              fillColor = `hsla(0, 100%, 50%, ${fillAlpha})`;
+            }
+            
+            // Low fuel flicker (<15%)
+            let flickerAlpha = 1;
+            if (smoothFuelPercent < 0.15 && smoothFuelPercent > 0) {
+              const flickerFreq = shouldOptimizePerformance ? 4 : 8;
+              const flickerPhase = Math.sin(elapsed * flickerFreq + Math.cos(elapsed * 13)) * 0.5 + 0.5;
+              flickerAlpha = 0.4 + flickerPhase * 0.6;
+            }
+            
+            // Draw fuel fill clipped to triangle
+            if (smoothFuelPercent > 0.01) {
+              ctx.save();
+              
+              // Create clipping path (lander triangle shape)
+              ctx.beginPath();
+              ctx.moveTo(0, -10);
+              ctx.lineTo(8, 10);
+              ctx.lineTo(-8, 10);
+              ctx.closePath();
+              ctx.clip();
+              
+              // Calculate liquid surface
+              const fillHeight = 20 * smoothFuelPercent;
+              const baseY = 10 - fillHeight;
+              const tiltAngle = liquidTiltAngleRef.current;
+              const wavePhase = liquidWavePhaseRef.current;
+              const waveAmp = liquidWaveAmplitudeRef.current;
+              
+              // Build polygon points for wavy liquid surface
+              const resolution = shouldOptimizePerformance ? 8 : 28;
+              const points: {x: number, y: number}[] = [];
+              points.push({ x: -8, y: 10 });
+              points.push({ x: 8, y: 10 });
+              
+              for (let i = resolution; i >= 0; i--) {
+                const t = i / resolution;
+                const px = -8 + 16 * t;
+                const tiltOffset = (t - 0.5) * 16 * Math.tan(tiltAngle);
+                
+                let waveOffset = 0;
+                if (!shouldOptimizePerformance) {
+                  const edgeDistance = Math.abs(t - 0.5) * 2;
+                  const dampening = edgeDistance > 0.7 ? 
+                    (1 - Math.pow((edgeDistance - 0.7) / 0.3, 2) * 0.6) : 1;
+                  waveOffset = (
+                    Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.40 +
+                    Math.sin(t * Math.PI * 4 - wavePhase * 1.3) * waveAmp * 0.25 +
+                    Math.sin(t * Math.PI * 6 + wavePhase * 0.7) * waveAmp * 0.15 +
+                    Math.sin(t * Math.PI * 8 + wavePhase * 2.1) * waveAmp * 0.10 +
+                    Math.sin(t * Math.PI * 12 - wavePhase * 1.7) * waveAmp * 0.06 +
+                    Math.sin(t * Math.PI * 16 + wavePhase * 0.9) * waveAmp * 0.04
+                  ) * dampening;
+                } else {
+                  waveOffset = Math.sin(t * Math.PI * 2 + wavePhase) * waveAmp * 0.8;
+                }
+                
+                points.push({ x: px, y: baseY + tiltOffset + waveOffset });
+              }
+              
+              // Draw liquid polygon
+              ctx.fillStyle = fillColor;
+              if (!shouldOptimizePerformance) {
+                ctx.shadowColor = fillColor;
+                ctx.shadowBlur = 8;
+              }
+              ctx.globalAlpha = fillAlpha * flickerAlpha;
+              ctx.beginPath();
+              ctx.moveTo(points[0].x, points[0].y);
+              for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+              }
+              ctx.closePath();
+              ctx.fill();
+              
+              ctx.restore();
+              
+              // Reset globalAlpha for ship outline
+              ctx.globalAlpha = shipAlpha;
+            }
+          }
+          
           ctx.beginPath();
           ctx.moveTo(0, -10);
           ctx.lineTo(8, 10);

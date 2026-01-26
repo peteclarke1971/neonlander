@@ -36,6 +36,14 @@ export default function ControlsSettings() {
       return true;
     }
   });
+  const [liquidFuelEnabled, setLiquidFuelEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-liquid-fuel-enabled');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   const [scanlinesEnabled, setScanlinesEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-scanlines-enabled');
@@ -193,6 +201,15 @@ export default function ControlsSettings() {
       // Silently fail if localStorage is unavailable
     }
   }, [showFullHUD]);
+
+  // Save liquid fuel display setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-liquid-fuel-enabled', JSON.stringify(liquidFuelEnabled));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [liquidFuelEnabled]);
 
   // Save scanlines setting when it changes
   useEffect(() => {
@@ -731,6 +748,16 @@ export default function ControlsSettings() {
               <Switch 
                 checked={showFullHUD}
                 onCheckedChange={setShowFullHUD}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Liquid Fuel Display</Label>
+                <div className="text-xs text-muted-foreground">Show animated fuel level inside lander (sloshes with movement)</div>
+              </div>
+              <Switch 
+                checked={liquidFuelEnabled}
+                onCheckedChange={setLiquidFuelEnabled}
               />
             </div>
             <div className="flex items-center justify-between">
