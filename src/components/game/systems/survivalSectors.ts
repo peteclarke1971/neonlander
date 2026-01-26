@@ -57,7 +57,7 @@ export const SURVIVAL_SECTOR_NAMES = [
 ];
 
 export const FIRST_SECTOR_DISTANCE = 100; // First sector appears at 100m
-export const SECTOR_INTERVAL = 750; // Subsequent sectors every 750m after first
+export const SECTOR_INTERVAL = 3000; // Subsequent sectors every 3000m after first
 
 /**
  * Calculate sector index for a given distance
