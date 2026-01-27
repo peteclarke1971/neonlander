@@ -71,6 +71,14 @@ export const SurvivalEngine: React.FC<Props> = ({
       return true;
     }
   });
+  const [showFPS] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-fps');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   
   // Gyroscope controls
   const [gyroConfig, setGyroConfig] = useState(DEFAULT_GYROSCOPE_CONFIG);
@@ -3471,14 +3479,16 @@ export const SurvivalEngine: React.FC<Props> = ({
         showFullHUD={showFullHUD}
       />
       
-      {/* FPS Counter */}
-      <div className="fixed bottom-4 right-4 z-20 pointer-events-none select-none">
-        <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-3 py-1.5">
-          <div className="text-xs font-mono text-muted-foreground">
-            {fps} FPS
+      {/* FPS Counter - Independent of HUD setting */}
+      {showFPS && (
+        <div className="fixed bottom-4 right-4 z-20 pointer-events-none select-none">
+          <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-3 py-1.5">
+            <div className="text-xs font-mono text-muted-foreground">
+              FPS: {fps}
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-30">
