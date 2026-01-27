@@ -44,6 +44,14 @@ export default function ControlsSettings() {
       return false;
     }
   });
+  const [showFPS, setShowFPS] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-fps');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   const [scanlinesEnabled, setScanlinesEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-scanlines-enabled');
@@ -210,6 +218,15 @@ export default function ControlsSettings() {
       // Silently fail if localStorage is unavailable
     }
   }, [liquidFuelEnabled]);
+
+  // Save show FPS setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-show-fps', JSON.stringify(showFPS));
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  }, [showFPS]);
 
   // Save scanlines setting when it changes
   useEffect(() => {
@@ -748,6 +765,16 @@ export default function ControlsSettings() {
               <Switch 
                 checked={showFullHUD}
                 onCheckedChange={setShowFullHUD}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Show FPS</Label>
+                <div className="text-xs text-muted-foreground">Display FPS counter in bottom-right (visible even when HUD is hidden)</div>
+              </div>
+              <Switch 
+                checked={showFPS}
+                onCheckedChange={setShowFPS}
               />
             </div>
             <div className="flex items-center justify-between">

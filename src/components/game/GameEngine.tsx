@@ -272,6 +272,14 @@ export const GameEngine: React.FC<Props> = ({
     }
   });
   const [fps, setFps] = useState(0);
+  const [showFPSSetting] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-show-fps');
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showFireworks, setShowFireworks] = useState(false);
   
@@ -6007,10 +6015,10 @@ export const GameEngine: React.FC<Props> = ({
 
       <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} mode={mode} showFullHUD={showFullHUD} />
 
-      {showFullHUD && (
+      {showFPSSetting && (
         <div className="pointer-events-none absolute bottom-2 right-3 z-40">
           <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-            FPS: {Math.round(fps)} • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}
+            FPS: {Math.round(fps)}{showFullHUD && <> • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}</>}
           </div>
         </div>
       )}
