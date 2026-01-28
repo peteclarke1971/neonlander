@@ -27,6 +27,13 @@ import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } fro
 import { SectorMessageDisplay } from "./SectorMessageDisplay";
 import { getSectorName, getSectorIndex } from "./systems/survivalSectors";
 import { showTip, TipDefinition } from "@/lib/inFlightGuide";
+import { 
+  createStylePointsState, 
+  update360Tracking, 
+  updateNearMiss, 
+  resetStylePoints, 
+  StylePointsState 
+} from "./systems/stylePoints";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -238,6 +245,9 @@ export const SurvivalEngine: React.FC<Props> = ({
   
   const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
   const audio = useRef(getGlobalAudioManager());
+  
+  // Style points tracking (rotation bonuses & near misses)
+  const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
   
   // Gamepad state
   const gamepadRef = useRef<Gamepad | null>(null);
@@ -479,6 +489,40 @@ export const SurvivalEngine: React.FC<Props> = ({
     // Comet dust particles
     type CometDustParticle = { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number };
     const cometDustParticles: CometDustParticle[] = [];
+    
+    // Style points visual effects
+    type StyleParticle = {
+      id: string;
+      x: number; 
+      y: number; 
+      vx: number; 
+      vy: number; 
+      life: number; 
+      maxLife: number;
+      size: number;
+      color: string;
+    };
+    const styleParticles: StyleParticle[] = [];
+
+    type NearMissText = {
+      id: string;
+      x: number;
+      y: number;
+      text: string;
+      life: number;
+      maxLife: number;
+    };
+    const nearMissTexts: NearMissText[] = [];
+
+    type FloatingScoreText = {
+      id: string;
+      x: number;
+      y: number;
+      points: number;
+      life: number;
+      maxLife: number;
+    };
+    const floatingScoreTexts: FloatingScoreText[] = [];
     
     // Shockwave rings and flash on big explosions
     type Shockwave = { x: number; y: number; life: number; max: number };
@@ -740,6 +784,49 @@ export const SurvivalEngine: React.FC<Props> = ({
         scale, 
         rot: Math.random() * Math.PI * 2, 
         rotV: -0.8 + Math.random() * 1.6 
+      });
+    };
+    
+    // Style points helper functions (matching GameEngine)
+    const spawnStyle360Burst = (px: number, py: number, terrainColor: string) => {
+      const count = 48;
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const speed = 150 + Math.random() * 100;
+        const size = 3 + Math.random() * 5;
+        styleParticles.push({
+          id: `${Date.now()}_${i}`,
+          x: px,
+          y: py,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1.5,
+          maxLife: 1.5,
+          size,
+          color: terrainColor
+        });
+      }
+    };
+
+    const spawnNearMissText = (px: number, py: number) => {
+      nearMissTexts.push({
+        id: `${Date.now()}`,
+        x: px,
+        y: py,
+        text: "NEAR MISS",
+        life: 2.0,
+        maxLife: 2.0
+      });
+    };
+
+    const spawnFloatingScore = (px: number, py: number, points: number) => {
+      floatingScoreTexts.push({
+        id: `score_${Date.now()}`,
+        x: px,
+        y: py,
+        points: points,
+        life: 0,
+        maxLife: 0.5
       });
     };
     
@@ -1218,6 +1305,70 @@ export const SurvivalEngine: React.FC<Props> = ({
           // Apply angular velocity cap (matching main game)
           const maxAngularVel = 8.0;
           shipAngularVel = Math.max(-maxAngularVel, Math.min(maxAngularVel, shipAngularVel));
+        }
+        
+        // Style points tracking (360°/720°/1080° rotations)
+        if (!isLanded) {
+          // Consolidate rotation input detection
+          const gp = anyGamepad();
+          let isRotatingLeft = keys.current.left;
+          let isRotatingRight = keys.current.right;
+          
+          if (gp) {
+            const input = readGamepad(gp, loadProfile(gp.id));
+            const analogThreshold = 0.15;
+            isRotatingLeft = isRotatingLeft || input.buttons.rotateLeft || input.rotation < -analogThreshold;
+            isRotatingRight = isRotatingRight || input.buttons.rotateRight || input.rotation > analogThreshold;
+          }
+          
+          // Also check gyroscope input
+          const gyroInput = gyroRotationRef.current;
+          if (gyroInput < -0.15) isRotatingLeft = true;
+          if (gyroInput > 0.15) isRotatingRight = true;
+          
+          const rotation360Result = update360Tracking(
+            stylePointsStateRef.current,
+            shipAngle,
+            isRotatingLeft,
+            isRotatingRight,
+            dt,
+            false, // No abort in survival mode
+            currentTime
+          );
+          
+          if (rotation360Result?.awarded) {
+            const consecutiveCount = rotation360Result.consecutiveCount;
+            const pointsAwarded = 360 * consecutiveCount; // 360, 720, or 1080
+            
+            currentScore += pointsAwarded;
+            setScore(currentScore);
+            
+            spawnStyle360Burst(shipX, shipY, neonColor);
+            spawnFloatingScore(shipX, shipY, pointsAwarded);
+            
+            // Play sound effect
+            audio.current.click();
+          }
+          
+          // Near miss tracking
+          const nearMissResult = updateNearMiss(
+            stylePointsStateRef.current,
+            shipX,
+            shipY,
+            shipVx,
+            shipVy,
+            getHeightAt,
+            (x) => getPadAt(x, shipY),
+            dt,
+            currentTime
+          );
+          
+          if (nearMissResult?.awarded) {
+            currentScore += 250;
+            setScore(currentScore);
+            spawnNearMissText(nearMissResult.awardX, nearMissResult.awardY);
+            audio.current.click();
+          }
         }
       }
       
@@ -1965,6 +2116,9 @@ export const SurvivalEngine: React.FC<Props> = ({
                 }
                 setFuel(fuelAmount);
                 
+                // Reset style points after landing
+                resetStylePoints(stylePointsStateRef.current);
+                
                 audio.current.success();
                 
                 // No auto-takeoff - player must thrust to take off
@@ -2137,6 +2291,36 @@ export const SurvivalEngine: React.FC<Props> = ({
         const sw = shockwaves[i];
         sw.life += dt;
         if (sw.life >= sw.max) shockwaves.splice(i, 1);
+      }
+      
+      // Update style particles (360° burst)
+      for (let i = styleParticles.length - 1; i >= 0; i--) {
+        const p = styleParticles[i];
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.life <= 0) {
+          styleParticles.splice(i, 1);
+        }
+      }
+
+      // Update near miss texts
+      for (let i = nearMissTexts.length - 1; i >= 0; i--) {
+        const t = nearMissTexts[i];
+        t.life -= dt;
+        if (t.life <= 0) {
+          nearMissTexts.splice(i, 1);
+        }
+      }
+
+      // Update floating score texts
+      for (let i = floatingScoreTexts.length - 1; i >= 0; i--) {
+        const text = floatingScoreTexts[i];
+        text.life += dt;
+        text.y -= 30 * dt;
+        if (text.life >= text.maxLife) {
+          floatingScoreTexts.splice(i, 1);
+        }
       }
 
       // Update screen flash
@@ -2972,6 +3156,57 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
+      
+      // Render 360° particle burst (style points)
+      for (const particle of styleParticles) {
+        const alpha = Math.max(0, particle.life / particle.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = particle.color;
+        ctx.shadowBlur = shouldOptimize ? 0 : 40;
+        ctx.shadowColor = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Render near miss text (style points)
+      for (const text of nearMissTexts) {
+        const alpha = text.life / text.maxLife;
+        const yOffset = (1 - alpha) * 30;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 16px "Orbitron", sans-serif';
+        ctx.fillStyle = neonColor;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.textAlign = 'center';
+        ctx.strokeText(text.text, text.x, text.y - yOffset);
+        ctx.fillText(text.text, text.x, text.y - yOffset);
+        ctx.restore();
+      }
+
+      // Render floating score texts (rotation style points)
+      for (const text of floatingScoreTexts) {
+        const t = text.life / text.maxLife;
+        const alpha = 1 - t;
+        const scale = 1 + t * 0.3;
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${24 * scale}px "Orbitron", monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = neonColor;
+        ctx.shadowBlur = shouldOptimize ? 0 : 20;
+        ctx.fillStyle = neonColor;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeText(text.points.toString(), text.x, text.y);
+        ctx.fillText(text.points.toString(), text.x, text.y);
+        ctx.restore();
+      }
       
       // Draw shield bubble (if active)
       if (shieldActiveRef.current && !isDead) {
