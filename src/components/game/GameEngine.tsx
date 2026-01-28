@@ -89,7 +89,7 @@ import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
-import { showTip, TipDefinition } from "@/lib/inFlightGuide";
+import { showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
 
 interface Props {
   difficulty: Difficulty;
@@ -411,7 +411,7 @@ export const GameEngine: React.FC<Props> = ({
   const [currentTip, setCurrentTip] = useState<TipDefinition | null>(null);
   const tipShownThisLevel = useRef(false);
   
-  // Show contextual tips based on level and mode
+  // Show contextual tips based on level and mode (shows every time if tips enabled)
   useEffect(() => {
     if (isDemo || tipShownThisLevel.current) return;
     
@@ -421,11 +421,11 @@ export const GameEngine: React.FC<Props> = ({
       
       // Time trial specific tip
       if (mode === 'timetrial') {
-        tip = showTip('timetrial');
+        tip = showTipAlways('timetrial');
       }
       // Basic controls on level 1
       else if (level === 1 || level === 0) {
-        tip = showTip('basic');
+        tip = showTipAlways('basic');
       }
       
       if (tip) {
