@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { InFlightTip } from "./InFlightTip";
 import { SurvivalHUD } from "./SurvivalHUD";
 import { getGlobalAudioManager } from "./AudioManager";
 import { SurvivalGameOverData } from "./types/survival";
@@ -25,6 +26,7 @@ import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLig
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
 import { SectorMessageDisplay } from "./SectorMessageDisplay";
 import { getSectorName, getSectorIndex } from "./systems/survivalSectors";
+import { showTip, TipDefinition } from "@/lib/inFlightGuide";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -135,6 +137,10 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Sector milestone tracking
   const [sectorMessage, setSectorMessage] = useState<string | null>(null);
   const lastSectorIndexRef = useRef<number>(0); // Track which sector we last announced
+  
+  // In-flight tip state
+  const [currentTip, setCurrentTip] = useState<TipDefinition | null>(null);
+  const hasShownSurvivalTip = useRef(false);
   
   // Shield state
   const shieldActiveRef = useRef(false);
@@ -383,6 +389,17 @@ export const SurvivalEngine: React.FC<Props> = ({
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);
     };
+  }, []);
+  
+  // Show survival intro tip on mount
+  useEffect(() => {
+    if (!hasShownSurvivalTip.current) {
+      const tip = showTip('survival');
+      if (tip) {
+        setCurrentTip(tip);
+        hasShownSurvivalTip.current = true;
+      }
+    }
   }, []);
   
   useEffect(() => {
@@ -3555,6 +3572,18 @@ export const SurvivalEngine: React.FC<Props> = ({
           onSkip={() => setShowFireworks(false)}
           lowGraphics={lowGraphics}
           allowSkip={false}
+        />
+      )}
+      
+      {/* In-Flight Tips */}
+      {currentTip && (
+        <InFlightTip
+          message={currentTip.message}
+          neonColor={classicColorsMode.current 
+            ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})` 
+            : currentPalette.accent}
+          duration={currentTip.duration}
+          onComplete={() => setCurrentTip(null)}
         />
       )}
     </div>

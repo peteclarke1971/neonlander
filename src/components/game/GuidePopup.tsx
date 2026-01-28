@@ -1,0 +1,255 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GuidePageControls } from './guide/GuidePageControls';
+import { GuidePageLanding } from './guide/GuidePageLanding';
+import { GuidePageFuelShields } from './guide/GuidePageFuelShields';
+import { GuidePageJunk } from './guide/GuidePageJunk';
+import { GuidePageHazards } from './guide/GuidePageHazards';
+import { GuidePageScoring } from './guide/GuidePageScoring';
+import { GuidePageModes } from './guide/GuidePageModes';
+import { GuidePageSurvival } from './guide/GuidePageSurvival';
+import { anyGamepad, loadProfile, readGamepad, vibrate, getLastDeviceId } from '@/hooks/use-gamepad';
+
+interface GuidePopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const PAGES = [
+  { id: 'controls', title: 'CONTROLS', Component: GuidePageControls },
+  { id: 'landing', title: 'LANDING', Component: GuidePageLanding },
+  { id: 'fuel', title: 'FUEL & SHIELDS', Component: GuidePageFuelShields },
+  { id: 'junk', title: 'SPACE JUNK', Component: GuidePageJunk },
+  { id: 'hazards', title: 'HAZARDS', Component: GuidePageHazards },
+  { id: 'scoring', title: 'SCORING', Component: GuidePageScoring },
+  { id: 'modes', title: 'GAME MODES', Component: GuidePageModes },
+  { id: 'survival', title: 'SURVIVAL', Component: GuidePageSurvival },
+];
+
+export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose }) => {
+  const [currentPage, setCurrentPage] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const gpPrevRef = useRef({ left: false, right: false, back: false, select: false });
+  const gpLastFireRef = useRef({ left: 0, right: 0, back: 0, select: 0 });
+
+  // Load last viewed page from storage
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = localStorage.getItem('ll-guide-last-page');
+        if (saved) {
+          const pageIndex = parseInt(saved, 10);
+          if (pageIndex >= 0 && pageIndex < PAGES.length) {
+            setCurrentPage(pageIndex);
+          }
+        }
+      } catch {}
+    }
+  }, [isOpen]);
+
+  // Save current page to storage
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-guide-last-page', String(currentPage));
+    } catch {}
+  }, [currentPage]);
+
+  const goToPrevPage = useCallback(() => {
+    setCurrentPage(p => Math.max(0, p - 1));
+  }, []);
+
+  const goToNextPage = useCallback(() => {
+    setCurrentPage(p => Math.min(PAGES.length - 1, p + 1));
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        goToPrevPage();
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        goToNextPage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, goToPrevPage, goToNextPage]);
+
+  // Gamepad navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let raf = 0;
+    let lastId: string | null = getLastDeviceId();
+    let profile = loadProfile(lastId || undefined);
+    
+    const canFire = (dir: keyof typeof gpLastFireRef.current) => 
+      performance.now() - gpLastFireRef.current[dir] > 200;
+    const mark = (dir: keyof typeof gpLastFireRef.current) => { 
+      gpLastFireRef.current[dir] = performance.now(); 
+    };
+
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const gp = anyGamepad?.();
+      if (!gp || !gp.connected) return;
+      
+      if (lastId !== gp.id) {
+        lastId = gp.id;
+        profile = loadProfile(gp.id);
+      }
+      
+      const input = readGamepad(gp, profile);
+      const prev = gpPrevRef.current;
+
+      // D-pad left/right for page navigation
+      if (input.ui.left && !prev.left && canFire('left')) {
+        goToPrevPage();
+        vibrate(30, 0.15, 0.3);
+        mark('left');
+      }
+      if (input.ui.right && !prev.right && canFire('right')) {
+        goToNextPage();
+        vibrate(30, 0.15, 0.3);
+        mark('right');
+      }
+      
+      // Back button to close
+      if (input.ui.back && !prev.back && canFire('back')) {
+        onClose();
+        vibrate(40, 0.2, 0.4);
+        mark('back');
+      }
+
+      gpPrevRef.current = { 
+        left: input.ui.left, 
+        right: input.ui.right, 
+        back: input.ui.back,
+        select: input.ui.select 
+      };
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, onClose, goToPrevPage, goToNextPage]);
+
+  // Touch swipe handling
+  const touchStartX = useRef<number | null>(null);
+  
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX;
+    const threshold = 50;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0) {
+        goToNextPage();
+      } else {
+        goToPrevPage();
+      }
+    }
+    
+    touchStartX.current = null;
+  };
+
+  if (!isOpen) return null;
+
+  const CurrentPageComponent = PAGES[currentPage].Component;
+
+  return (
+    <div 
+      className="absolute inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div 
+        className="flex flex-col w-full max-w-lg mx-4 max-h-[85vh] border-2 rounded-lg bg-background/95 overflow-hidden"
+        style={{ borderColor: 'hsl(var(--neon) / 0.5)' }}
+      >
+        {/* Header */}
+        <div 
+          className="flex items-center justify-between px-4 py-3 border-b"
+          style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}
+        >
+          <button
+            className="text-sm opacity-60 hover:opacity-100 transition-opacity disabled:opacity-20"
+            onClick={goToPrevPage}
+            disabled={currentPage === 0}
+            style={{ color: 'hsl(var(--neon))' }}
+          >
+            ← PREV
+          </button>
+          
+          <h2 
+            className="text-center text-base font-display tracking-wider"
+            style={{ 
+              color: 'hsl(var(--neon))',
+              textShadow: '0 0 10px hsl(var(--neon) / 0.5)'
+            }}
+          >
+            {PAGES[currentPage].title}
+          </h2>
+          
+          <button
+            className="text-sm opacity-60 hover:opacity-100 transition-opacity disabled:opacity-20"
+            onClick={goToNextPage}
+            disabled={currentPage === PAGES.length - 1}
+            style={{ color: 'hsl(var(--neon))' }}
+          >
+            NEXT →
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <CurrentPageComponent />
+        </div>
+
+        {/* Footer with page indicators and close button */}
+        <div 
+          className="flex flex-col gap-3 px-4 py-3 border-t"
+          style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}
+        >
+          {/* Page indicator dots */}
+          <div className="flex justify-center gap-1.5">
+            {PAGES.map((_, i) => (
+              <button
+                key={i}
+                className="w-2 h-2 rounded-full transition-all duration-300"
+                onClick={() => setCurrentPage(i)}
+                style={{ 
+                  backgroundColor: i === currentPage 
+                    ? 'hsl(var(--neon))' 
+                    : 'hsl(var(--neon) / 0.3)',
+                  boxShadow: i === currentPage ? '0 0 6px hsl(var(--neon))' : 'none'
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Close button */}
+          <button
+            className="player-menu-back-btn w-full"
+            onClick={onClose}
+          >
+            ← CLOSE GUIDE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
