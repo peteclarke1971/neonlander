@@ -1,255 +1,345 @@
 
-# Comprehensive In-Game Guide System Implementation Plan
+# Add Style Points (360/720/1080 & Near Misses) to Survival Mode
 
 ## Overview
-
-This plan implements a two-part instruction system:
-1. **GUIDE Popup** - A comprehensive multi-page guide accessible from the Player Menu (replaces LEADERBOARDS button)
-2. **In Flight Guide Toggle** - Progressive contextual tips displayed during gameplay as elements are introduced
+This plan adds the style scoring system from classic/fixed modes to survival mode, including:
+- 360°/720°/1080° rotation bonuses
+- Near miss detection and rewards
+- All associated visual effects (particle bursts, floating score text, "NEAR MISS" text)
 
 ---
 
-## Part 1: GUIDE Popup System
+## Current Implementation Analysis
 
-### Architecture
+### In GameEngine.tsx (classic/fixed modes):
 
-Create a new `GuidePopup.tsx` component that displays as an overlay on the Player Menu with:
-- Multiple scrollable/swipeable pages
-- Animated visual representations of game elements
-- Gamepad and keyboard navigation support (consistent with existing menu systems)
+**State Management:**
+- Uses `stylePointsStateRef` (a ref to `StylePointsState`)
+- Imports from `systems/stylePoints.ts`: `createStylePointsState`, `update360Tracking`, `updateNearMiss`, `resetStylePoints`
 
-### Menu Integration
-
-**File: `src/components/game/PlayerMenu.tsx`**
-
-Replace the "LEADERBOARDS" menu item with "GUIDE":
-
+**Visual Effect Types:**
 ```typescript
-const menuItems = [
-  { id: "start", label: "START GAME" },
-  { id: "modes", label: "CHOOSE GAME MODE" },
-  { id: "startLevel", label: "STARTING LEVEL" },
-  { id: "guide", label: "GUIDE" },  // Changed from "leaderboards"
-  { id: "settings", label: "SETTINGS" },
-];
+type StyleParticle = { id, x, y, vx, vy, life, maxLife, size, color }
+type NearMissText = { id, x, y, text, life, maxLife }
+type FloatingScoreText = { id, x, y, points, life, maxLife }
 ```
 
-Update `handleAction` to show the guide popup instead of calling `onLeaderboards()`.
+**Helper Functions:**
+- `spawnStyle360Burst(px, py, terrainColor)` - Spawns 48 particles in circular burst
+- `spawnNearMissText(px, py)` - Spawns floating "NEAR MISS" text
+- `spawnFloatingScore(px, py, points)` - Spawns floating score number
 
-### Guide Content Structure (8 Pages)
+**Tracking Logic (called in physics update loop):**
+1. `update360Tracking()` - Tracks rotation input, returns award data when 360° completed
+2. `updateNearMiss()` - Tracks proximity to terrain at speed, returns award when maintained 0.3s
 
-| Page | Title | Content |
-|------|-------|---------|
-| 1 | **BASIC CONTROLS** | Thrust, rotate left/right, abort. Animated lander with thrust particles. Touch vs keyboard/gamepad layouts. |
-| 2 | **LANDING** | Safe landing requirements: angle, velocity thresholds. Animated landing sequence showing good vs crash. Bullseye bonus (centered), Speed bonus (< 10s). |
-| 3 | **FUEL & SHIELDS** | Fuel consumption mechanics. Shield pickup (bubble visual). Shield bounce physics. Post-break invulnerability. |
-| 4 | **SPACE JUNK** | Collectible items with rainbow cycling animation. 3 items unlock wormhole. 6 items in Collection levels. Fuel reward per pickup. |
-| 5 | **HAZARDS** | Volcanoes (eruption warning), gravity wells (attraction zones), lightning storms (weather). UFOs (small/medium/large from level 10+). |
-| 6 | **SCORING** | Points breakdown: landing base + finesse, Bullseye (+500), Speed Bonus (+500), Perfect Landing (+1000), 360 Rotation, Near Miss. |
-| 7 | **GAME MODES** | Campaign, Classic, Time Trial, Survival, Medley. Brief description of each with distinctive visual. |
-| 8 | **SURVIVAL MODE** | Endless terrain, distance tracking, sector milestones, comet bonuses, blackout zones, light storms. |
-
-### Visual Animations (Canvas-based)
-
-Each page will include small animated canvas elements:
-- **Lander Animation**: Rotating ship with thrust particles
-- **Landing Sequence**: Ship approaching pad with velocity indicator
-- **Shield Bubble**: Pulsing pink/purple bubble around ship
-- **Space Junk**: Spinning collectible with rainbow color cycling
-- **Volcano**: Erupting particles
-- **UFO Patrol**: Side-scrolling UFO with projectile
-
-### New Files
-
-```text
-src/components/game/GuidePopup.tsx           - Main guide overlay component
-src/components/game/guide/GuidePageControls.tsx    - Page 1 content
-src/components/game/guide/GuidePageLanding.tsx     - Page 2 content  
-src/components/game/guide/GuidePageFuelShields.tsx - Page 3 content
-src/components/game/guide/GuidePageJunk.tsx        - Page 4 content
-src/components/game/guide/GuidePageHazards.tsx     - Page 5 content
-src/components/game/guide/GuidePageScoring.tsx     - Page 6 content
-src/components/game/guide/GuidePageModes.tsx       - Page 7 content
-src/components/game/guide/GuidePageSurvival.tsx    - Page 8 content
-src/components/game/guide/LanderAnimation.tsx      - Reusable animated lander
-```
-
-### Navigation
-
-- Left/Right arrows or swipe to change pages
-- Page indicator dots at bottom
-- Gamepad D-pad left/right for page navigation
-- Back button or Escape to close
-- Consistent `player-menu-btn` styling
+**Rendering (in draw section):**
+- Particle burst with glow and fade
+- Near miss text floating upward with fade
+- Floating score text scaling up with fade
 
 ---
 
-## Part 2: In Flight Guide System
+## Implementation for SurvivalEngine.tsx
 
-### Architecture
+### 1. Add Imports
 
-Create a progressive tip system that shows contextual instructions during gameplay based on:
-1. First time playing (global)
-2. Current level number
-3. Current game mode
-4. Elements being encountered for the first time
-
-### State Management
-
-**LocalStorage Keys** (prefix: `ll-guide-`):
+Add to imports section (~line 29):
 ```typescript
-ll-guide-enabled: boolean           // Master toggle
-ll-guide-basic-shown: boolean       // Controls tip shown
-ll-guide-landing-shown: boolean     // Landing tip shown
-ll-guide-junk-shown-{mode}: boolean // Space junk tip per mode
-ll-guide-shield-shown: boolean      // Shield tip shown
-ll-guide-volcano-shown: boolean     // Volcano tip shown
-ll-guide-ufo-shown: boolean         // UFO tip shown
-ll-guide-timetrial-shown: boolean   // Time trial rules
-ll-guide-survival-shown: boolean    // Survival mode intro
-ll-guide-blackout-shown: boolean    // Blackout zone tip
-ll-guide-storm-shown: boolean       // Lightning storm tip
+import { 
+  createStylePointsState, 
+  update360Tracking, 
+  updateNearMiss, 
+  resetStylePoints, 
+  StylePointsState 
+} from "./systems/stylePoints";
 ```
 
-### Tip Trigger Points
+### 2. Add State Refs
 
-| Level/Event | Tip Shown | Content |
-|-------------|-----------|---------|
-| Level 1 (any mode) | Basic Controls | "THRUST to ascend, ROTATE to aim. Land gently on pads!" |
-| First landing | Landing Mechanics | "Green pads = safe. Land at low speed with level angle." |
-| First space junk spawn | Collectibles | "Collect SPACE JUNK for fuel! 3 items opens WORMHOLE." |
-| First shield pickup | Shield | "SHIELD protects from one crash. Bounces you to safety." |
-| First volcano visible | Hazards | "VOLCANOES erupt! Avoid lava particles." |
-| Level 10+ (first UFO) | UFOs | "UFO ALERT! Dodge projectiles or use shield." |
-| Time Trial Level 1 | Time Trial | "Land on pads IN ORDER! Timer starts at first takeoff." |
-| Survival Start | Survival | "Travel as far as you can! Land to refuel." |
-| First blackout zone | Blackout | "BLACKOUT! Use your spotlight to navigate." |
-| First storm level | Storm | "LIGHTNING STORM! Watch for strikes!" |
-
-### Display Component
-
-**File: `src/components/game/InFlightTip.tsx`**
-
-A non-intrusive tip display positioned at top-center, similar to `SectorMessageDisplay.tsx`:
-- Fade in/out animation
-- Auto-dismiss after 4 seconds OR on any input
-- Semi-transparent background
-- Neon glow text matching level color
-- Skip with any button press
-
-### Integration Points
-
-**File: `src/components/game/GameEngine.tsx`**
-
-Add tip trigger checks at key points:
-1. After countdown intro completes (level start)
-2. When collectibles first spawned
-3. When UFO first spawned
-4. When volcano first becomes visible
-5. On first successful landing
-
-**File: `src/components/game/SurvivalEngine.tsx`**
-
-Add survival-specific tips:
-1. On game start (survival intro)
-2. First blackout zone
-3. First light storm
-4. First comet bonus
-
-### Player Menu Toggle
-
-**File: `src/components/game/PlayerMenu.tsx`**
-
-Add toggle in footer (near Ghost toggles):
-```tsx
-<button
-  className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
-  onClick={() => toggleInFlightGuide()}
-  style={{ 
-    color: inFlightGuideEnabled ? "hsl(120, 100%, 60%)" : "hsl(var(--neon))",
-    borderColor: inFlightGuideEnabled ? "hsl(120, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-    opacity: inFlightGuideEnabled ? 0.9 : 0.5,
-  }}
->
-  TIPS {inFlightGuideEnabled ? "ON" : "OFF"}
-</button>
+Add after existing refs (~line 237):
+```typescript
+// Style points tracking (rotation bonuses & near misses)
+const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
 ```
 
-### New Files
+### 3. Add Visual Effect Arrays
 
-```text
-src/components/game/InFlightTip.tsx          - Tip display component
-src/lib/inFlightGuide.ts                     - State management and tip definitions
+Inside the main `useEffect`, after the `debris` array declaration (~line 477):
+```typescript
+// Style points visual effects
+type StyleParticle = {
+  id: string;
+  x: number; 
+  y: number; 
+  vx: number; 
+  vy: number; 
+  life: number; 
+  maxLife: number;
+  size: number;
+  color: string;
+};
+const styleParticles: StyleParticle[] = [];
+
+type NearMissText = {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  life: number;
+  maxLife: number;
+};
+const nearMissTexts: NearMissText[] = [];
+
+type FloatingScoreText = {
+  id: string;
+  x: number;
+  y: number;
+  points: number;
+  life: number;
+  maxLife: number;
+};
+const floatingScoreTexts: FloatingScoreText[] = [];
+```
+
+### 4. Add Helper Functions
+
+Add after `spawnExplosion` function (~line 744):
+```typescript
+// Style points helper functions (matching GameEngine)
+const spawnStyle360Burst = (px: number, py: number, terrainColor: string) => {
+  const count = 48;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const speed = 150 + Math.random() * 100;
+    const size = 3 + Math.random() * 5;
+    styleParticles.push({
+      id: `${Date.now()}_${i}`,
+      x: px,
+      y: py,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.5,
+      maxLife: 1.5,
+      size,
+      color: terrainColor
+    });
+  }
+};
+
+const spawnNearMissText = (px: number, py: number) => {
+  nearMissTexts.push({
+    id: `${Date.now()}`,
+    x: px,
+    y: py,
+    text: "NEAR MISS",
+    life: 2.0,
+    maxLife: 2.0
+  });
+};
+
+const spawnFloatingScore = (px: number, py: number, points: number) => {
+  floatingScoreTexts.push({
+    id: `score_${Date.now()}`,
+    x: px,
+    y: py,
+    points: points,
+    life: 0,
+    maxLife: 0.5
+  });
+};
+```
+
+### 5. Add Style Tracking in Physics Update
+
+After the rotation input handling section (~line 1220), before thrust controls:
+```typescript
+// Style points tracking (360°/720°/1080° rotations)
+if (!isLanded && !isDead) {
+  // Consolidate rotation input detection
+  const gp = anyGamepad();
+  let isRotatingLeft = keys.current.left;
+  let isRotatingRight = keys.current.right;
+  
+  if (gp) {
+    const input = readGamepad(gp, loadProfile(gp.id));
+    const analogThreshold = 0.15;
+    isRotatingLeft = isRotatingLeft || input.buttons.rotateLeft || input.rotation < -analogThreshold;
+    isRotatingRight = isRotatingRight || input.buttons.rotateRight || input.rotation > analogThreshold;
+  }
+  
+  const rotation360Result = update360Tracking(
+    stylePointsStateRef.current,
+    shipAngle,
+    isRotatingLeft,
+    isRotatingRight,
+    dt,
+    false, // No abort in survival mode
+    currentTime
+  );
+  
+  if (rotation360Result?.awarded) {
+    const consecutiveCount = rotation360Result.consecutiveCount;
+    const pointsAwarded = 360 * consecutiveCount; // 360, 720, or 1080
+    
+    currentScore += pointsAwarded;
+    setScore(currentScore);
+    
+    spawnStyle360Burst(shipX, shipY, neonColor);
+    spawnFloatingScore(shipX, shipY, pointsAwarded);
+    
+    // Play sound effect
+    audio.current.click();
+  }
+  
+  // Near miss tracking
+  const nearMissResult = updateNearMiss(
+    stylePointsStateRef.current,
+    shipX,
+    shipY,
+    shipVx,
+    shipVy,
+    getHeightAt,
+    (x) => getPadAt(x, shipY), // Wrapper to match expected signature
+    dt,
+    currentTime
+  );
+  
+  if (nearMissResult?.awarded) {
+    currentScore += 250;
+    setScore(currentScore);
+    spawnNearMissText(nearMissResult.awardX, nearMissResult.awardY);
+    audio.current.click();
+  }
+}
+```
+
+### 6. Reset Style Points on Landing/Death
+
+In the successful landing section (~line 1930) and death section:
+```typescript
+// Reset style points after landing
+resetStylePoints(stylePointsStateRef.current);
+```
+
+### 7. Add Particle Update Logic
+
+In the particle update section (~after line 2100):
+```typescript
+// Update style particles (360° burst)
+for (let i = styleParticles.length - 1; i >= 0; i--) {
+  const p = styleParticles[i];
+  p.life -= dt;
+  p.x += p.vx * dt;
+  p.y += p.vy * dt;
+  if (p.life <= 0) {
+    styleParticles.splice(i, 1);
+  }
+}
+
+// Update near miss texts
+for (let i = nearMissTexts.length - 1; i >= 0; i--) {
+  const t = nearMissTexts[i];
+  t.life -= dt;
+  if (t.life <= 0) {
+    nearMissTexts.splice(i, 1);
+  }
+}
+
+// Update floating score texts
+for (let i = floatingScoreTexts.length - 1; i >= 0; i--) {
+  const text = floatingScoreTexts[i];
+  text.life += dt;
+  text.y -= 30 * dt;
+  if (text.life >= text.maxLife) {
+    floatingScoreTexts.splice(i, 1);
+  }
+}
+```
+
+### 8. Add Rendering Logic
+
+In the rendering section, after thruster particles (~line 2895):
+```typescript
+// Render 360° particle burst (style points)
+for (const particle of styleParticles) {
+  const alpha = Math.max(0, particle.life / particle.maxLife);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = particle.color;
+  ctx.shadowBlur = shouldOptimize ? 0 : 40;
+  ctx.shadowColor = particle.color;
+  ctx.beginPath();
+  ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Render near miss text (style points)
+for (const text of nearMissTexts) {
+  const alpha = text.life / text.maxLife;
+  const yOffset = (1 - alpha) * 30;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = 'bold 16px "Orbitron", sans-serif';
+  ctx.fillStyle = neonColor;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 3;
+  ctx.textAlign = 'center';
+  ctx.strokeText(text.text, text.x, text.y - yOffset);
+  ctx.fillText(text.text, text.x, text.y - yOffset);
+  ctx.restore();
+}
+
+// Render floating score texts (rotation style points)
+for (const text of floatingScoreTexts) {
+  const t = text.life / text.maxLife;
+  const alpha = 1 - t;
+  const scale = 1 + t * 0.3;
+  
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold ${24 * scale}px "Orbitron", monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = neonColor;
+  ctx.shadowBlur = shouldOptimize ? 0 : 20;
+  ctx.fillStyle = neonColor;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 3;
+  ctx.strokeText(text.points.toString(), text.x, text.y);
+  ctx.fillText(text.points.toString(), text.x, text.y);
+  ctx.restore();
+}
 ```
 
 ---
 
-## Technical Details
+## Files Modified
 
-### Guide Popup Styling
-
-Consistent with existing Player Menu aesthetic:
-- `bg-background/80` with `backdrop-blur-[2px]`
-- Border: `hsl(var(--neon) / 0.5)`
-- Text: Orbitron font family
-- Neon glow text shadows
-- Responsive sizing for mobile
-
-### Animation Specifications
-
-**Lander Animation Canvas** (120x120px):
-- 30 FPS animation loop
-- Ship rotation demonstration
-- Thrust particle system (simplified)
-- requestAnimationFrame based
-
-**Landing Sequence Canvas** (200x100px):
-- Ship descending to pad
-- Velocity vectors shown
-- Color change: green (safe) to red (crash)
-
-### Accessibility
-
-- All text readable without animations
-- Pause/skip option for animations
-- Keyboard navigable throughout
-- Screen reader labels for visual elements
+| File | Changes |
+|------|---------|
+| `src/components/game/SurvivalEngine.tsx` | Add style points imports, state refs, effect arrays, helper functions, tracking logic, update logic, rendering |
 
 ---
 
-## Implementation Order
+## Point Values (matching classic/fixed)
 
-1. Create `InFlightTip.tsx` component (simpler, existing pattern)
-2. Create `src/lib/inFlightGuide.ts` for tip state management
-3. Add In Flight Guide toggle to Player Menu footer
-4. Integrate tip triggers into `GameEngine.tsx`
-5. Integrate tip triggers into `SurvivalEngine.tsx`
-6. Create `GuidePopup.tsx` main container
-7. Create guide page components (8 pages)
-8. Create animation components
-9. Replace LEADERBOARDS with GUIDE in Player Menu
-10. Test gamepad/keyboard navigation
+| Style Move | Points |
+|------------|--------|
+| 360° rotation | 360 |
+| 720° rotation (2x consecutive) | 720 |
+| 1080° rotation (3x consecutive) | 1080 |
+| Near miss | 250 |
 
 ---
 
-## File Changes Summary
+## Visual Effects Summary
 
-| File | Action |
-|------|--------|
-| `src/components/game/PlayerMenu.tsx` | Modify: Replace LEADERBOARDS with GUIDE, add TIPS toggle, add GuidePopup state |
-| `src/components/game/GameEngine.tsx` | Modify: Add tip trigger points, import InFlightTip |
-| `src/components/game/SurvivalEngine.tsx` | Modify: Add survival-specific tip triggers |
-| `src/components/game/GuidePopup.tsx` | Create: Multi-page guide overlay |
-| `src/components/game/guide/*.tsx` | Create: 8 page content components |
-| `src/components/game/guide/LanderAnimation.tsx` | Create: Reusable lander animation |
-| `src/components/game/InFlightTip.tsx` | Create: In-game tip display |
-| `src/lib/inFlightGuide.ts` | Create: Tip state management |
+| Effect | Description |
+|--------|-------------|
+| **360° Burst** | 48 particles explode outward from lander in circular pattern, glow + fade over 1.5s |
+| **Floating Score** | Score points float upward, scale up 30%, fade out over 0.5s |
+| **Near Miss Text** | "NEAR MISS" text floats upward 30px, fades over 2s |
 
----
-
-## Storage Keys
-
-All guide-related localStorage keys:
-- `ll-guide-enabled` - Master toggle for in-flight tips
-- `ll-guide-{tipId}-shown` - Individual tip shown flags
-- `ll-guide-last-page` - Last viewed page in full guide (for resume)
+All effects use the current neon color from the color zone system for visual consistency.
