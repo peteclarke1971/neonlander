@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
 import { PlayerMenuLeaderboard } from "./PlayerMenuLeaderboard";
+import { GuidePopup } from "./GuidePopup";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
 import { loadGraphicsSettings, saveGraphicsSettings, cycleGraphicsLevel, getGraphicsLabel, GraphicsLevel } from "@/lib/graphicsConfig";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { isIOSDevice } from "@/lib/deviceDetection";
+import { isGuideEnabled, setGuideEnabled } from "@/lib/inFlightGuide";
 import { Difficulty, Mode } from "./types";
 
 export type GameModeId = "fixed" | "survival" | "classic" | "timetrial" | "medley";
@@ -24,7 +26,7 @@ export interface GameSettings {
 
 interface PlayerMenuProps {
   onStartGame: (mode: GameModeId, settings: GameSettings, startLevel: number) => void;
-  onLeaderboards: () => void;
+  onLeaderboards?: () => void; // Optional - kept for backwards compatibility
   onSettings: () => void;
   onDevPortal: () => void;
   onInteraction?: () => void;
@@ -34,7 +36,7 @@ const menuItems = [
   { id: "start", label: "START GAME" },
   { id: "modes", label: "CHOOSE GAME MODE" },
   { id: "startLevel", label: "STARTING LEVEL" },
-  { id: "leaderboards", label: "LEADERBOARDS" },
+  { id: "guide", label: "GUIDE" },
   { id: "settings", label: "SETTINGS" },
 ] as const;
 
@@ -113,6 +115,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showLevelMenu, setShowLevelMenu] = useState(false);
+  const [showGuidePopup, setShowGuidePopup] = useState(false);
   const [modeFocusedIndex, setModeFocusedIndex] = useState(0);
   const [levelFocusedIndex, setLevelFocusedIndex] = useState(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -122,6 +125,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const levelBackButtonRef = useRef<HTMLButtonElement | null>(null);
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
+  
+  // In-flight tips toggle
+  const [tipsEnabled, setTipsEnabled] = useState(isGuideEnabled);
   
   // Ghost mode settings - persisted to localStorage
   const [ghostModeEnabled, setGhostModeEnabled] = useState(() => {
@@ -493,7 +499,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         setShowLevelMenu(true);
         setLevelFocusedIndex(startingLevelOptions.indexOf(startingLevel as typeof startingLevelOptions[number]) || 0);
         break;
-      case "leaderboards": onLeaderboards(); break;
+      case "guide": 
+        setShowGuidePopup(true);
+        break;
       case "settings": onSettings(); break;
     }
   };
@@ -697,9 +705,15 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         </div>
       )}
 
-      {/* Footer - Ghost toggles, Fullscreen, GFX toggle and Dev Portal link */}
+      {/* Guide Popup */}
+      <GuidePopup 
+        isOpen={showGuidePopup} 
+        onClose={() => setShowGuidePopup(false)} 
+      />
+
+      {/* Footer - Ghost toggles, Tips, Fullscreen, GFX toggle and Dev Portal link */}
       <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
-        {/* Ghost Mode Toggles - Left side */}
+        {/* Ghost Mode Toggles + Tips - Left side */}
         <div className="flex items-center gap-2">
           {/* Ghost Mode Toggle */}
           <button
@@ -740,6 +754,25 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               GLOBAL {challengeGlobalGhosts ? "ON" : "OFF"}
             </button>
           )}
+          
+          {/* In-Flight Tips Toggle */}
+          <button
+            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            onClick={() => {
+              resetIdle();
+              const newVal = !tipsEnabled;
+              setTipsEnabled(newVal);
+              setGuideEnabled(newVal);
+            }}
+            style={{ 
+              color: tipsEnabled ? "hsl(120, 100%, 60%)" : "hsl(var(--neon))",
+              borderColor: tipsEnabled ? "hsl(120, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
+              opacity: tipsEnabled ? 0.9 : 0.5,
+              textShadow: tipsEnabled ? "0 0 8px hsl(120, 100%, 60%)" : "none"
+            }}
+          >
+            TIPS {tipsEnabled ? "ON" : "OFF"}
+          </button>
         </div>
         
         {/* Right side controls */}

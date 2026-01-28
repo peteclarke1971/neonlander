@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HUD } from "./HUD";
+import { InFlightTip } from "./InFlightTip";
 import { getGlobalAudioManager } from "./AudioManager";
 import { CavernFXRenderer } from "./CavernFXRenderer";
 import { WaterFXRenderer } from "./WaterFXRenderer";
@@ -88,6 +89,7 @@ import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
+import { showTip, TipDefinition } from "@/lib/inFlightGuide";
 
 interface Props {
   difficulty: Difficulty;
@@ -405,6 +407,36 @@ export const GameEngine: React.FC<Props> = ({
     }
   });
   
+  // In-flight tip state
+  const [currentTip, setCurrentTip] = useState<TipDefinition | null>(null);
+  const tipShownThisLevel = useRef(false);
+  
+  // Show contextual tips based on level and mode
+  useEffect(() => {
+    if (isDemo || tipShownThisLevel.current) return;
+    
+    // Delay tip to not overlap with countdown
+    const tipTimeout = setTimeout(() => {
+      let tip: TipDefinition | null = null;
+      
+      // Time trial specific tip
+      if (mode === 'timetrial') {
+        tip = showTip('timetrial');
+      }
+      // Basic controls on level 1
+      else if (level === 1 || level === 0) {
+        tip = showTip('basic');
+      }
+      
+      if (tip) {
+        setCurrentTip(tip);
+        tipShownThisLevel.current = true;
+      }
+    }, 2500); // Wait for countdown to finish
+    
+    return () => clearTimeout(tipTimeout);
+  }, [level, mode, isDemo]);
+
   // Time Trial state
   const [timeTrialState, setTimeTrialState] = useState({
     sequencedPads: [] as SequencedPad[],
@@ -6468,6 +6500,16 @@ export const GameEngine: React.FC<Props> = ({
             setSpecialLevelMessage("");
             setWaitingForSpecialMessage(false); // Signal to continue initialization
           }}
+        />
+      )}
+      
+      {/* In-Flight Tips */}
+      {currentTip && (
+        <InFlightTip
+          message={currentTip.message}
+          neonColor={neonColor}
+          duration={currentTip.duration}
+          onComplete={() => setCurrentTip(null)}
         />
       )}
       
