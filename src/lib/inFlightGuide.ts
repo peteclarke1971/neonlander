@@ -9,62 +9,62 @@ export interface TipDefinition {
   duration?: number; // ms, default 4000
 }
 
-// All available tips
+// All available tips (durations increased by 2s for better readability)
 export const TIPS: Record<string, TipDefinition> = {
   basic: {
     id: 'basic',
     message: 'THRUST to ascend, ROTATE to aim. Land gently on pads!',
-    duration: 5000,
+    duration: 7000,
   },
   landing: {
     id: 'landing',
     message: 'Green pads = safe. Land at low speed with level angle.',
-    duration: 4000,
+    duration: 6000,
   },
   junk: {
     id: 'junk',
     message: 'Collect SPACE JUNK for fuel! 3 items opens WORMHOLE.',
-    duration: 4500,
+    duration: 6500,
   },
   shield: {
     id: 'shield',
     message: 'SHIELD protects from one crash. Bounces you to safety.',
-    duration: 4000,
+    duration: 6000,
   },
   volcano: {
     id: 'volcano',
     message: 'VOLCANOES erupt! Avoid lava particles.',
-    duration: 4000,
+    duration: 6000,
   },
   ufo: {
     id: 'ufo',
     message: 'UFO ALERT! Dodge projectiles or use shield.',
-    duration: 4000,
+    duration: 6000,
   },
   timetrial: {
     id: 'timetrial',
     message: 'Land on pads IN ORDER! Timer starts at first takeoff.',
-    duration: 5000,
+    duration: 7000,
   },
   survival: {
     id: 'survival',
     message: 'Travel as far as you can! Land on pads to refuel.',
-    duration: 5000,
+    duration: 7000,
   },
   blackout: {
     id: 'blackout',
     message: 'BLACKOUT! Use your spotlight to navigate.',
-    duration: 4000,
+    duration: 6000,
   },
   storm: {
     id: 'storm',
     message: 'LIGHTNING STORM! Watch for strikes.',
-    duration: 4000,
+    duration: 6000,
   },
   comet: {
     id: 'comet',
     message: 'COMET! Catch it for bonus points.',
-    duration: 3500,
+    duration: 5500,
   },
 };
 
@@ -145,4 +145,13 @@ export function showTip(tipId: string): TipDefinition | null {
     return tip;
   }
   return null;
+}
+
+/**
+ * Show a tip every time if guide is enabled (ignores shown state)
+ * Use this for tips that should appear on every level/mode start
+ */
+export function showTipAlways(tipId: string): TipDefinition | null {
+  if (!isGuideEnabled()) return null;
+  return TIPS[tipId] || null;
 }

@@ -26,7 +26,7 @@ import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLig
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
 import { SectorMessageDisplay } from "./SectorMessageDisplay";
 import { getSectorName, getSectorIndex } from "./systems/survivalSectors";
-import { showTip, TipDefinition } from "@/lib/inFlightGuide";
+import { showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
 import { 
   createStylePointsState, 
   update360Tracking, 
@@ -278,6 +278,20 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'retro-burst' | null>(null);
   const fireworkTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   
+  // Terrain-masked fireworks setting
+  const [terrainMaskedFireworks] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-terrain-masked-fireworks');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+  
+  // Camera state refs for fireworks masking
+  const cameraStateRef = useRef({ cameraX: 0, anchor: 0, zoom: 1 });
+  const terrainPointsRef = useRef<{ x: number; y: number }[]>([]);
+  
   // Off-screen canvas for spotlight masking
   const offscreenTerrainCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const offscreenTerrainCtxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -424,10 +438,10 @@ export const SurvivalEngine: React.FC<Props> = ({
     };
   }, []);
   
-  // Show survival intro tip on mount
+  // Show survival intro tip on mount (shows every time if tips enabled)
   useEffect(() => {
     if (!hasShownSurvivalTip.current) {
-      const tip = showTip('survival');
+      const tip = showTipAlways('survival');
       if (tip) {
         setCurrentTip(tip);
         hasShownSurvivalTip.current = true;
@@ -2562,6 +2576,16 @@ export const SurvivalEngine: React.FC<Props> = ({
       smoothedAnchor += (anchorTarget - smoothedAnchor) * aAlpha;
       const anchor = smoothedAnchor;
       
+      // Update camera state refs for fireworks terrain masking
+      cameraStateRef.current = { cameraX, anchor: smoothedAnchor, zoom };
+      
+      // Aggregate terrain points from all chunks for fireworks masking
+      const allTerrainPoints: { x: number; y: number }[] = [];
+      for (const chunk of chunks) {
+        allTerrainPoints.push(...chunk.points);
+      }
+      terrainPointsRef.current = allTerrainPoints;
+      
       // Render
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.save();
@@ -3901,6 +3925,12 @@ export const SurvivalEngine: React.FC<Props> = ({
           onSkip={() => setShowFireworks(false)}
           lowGraphics={lowGraphics}
           allowSkip={false}
+          terrainMaskEnabled={terrainMaskedFireworks}
+          terrainPoints={terrainPointsRef.current}
+          terrainWorldWidth={CHUNK_WIDTH * 3}
+          cameraX={cameraStateRef.current.cameraX}
+          cameraAnchor={cameraStateRef.current.anchor}
+          zoom={cameraStateRef.current.zoom}
         />
       )}
       
