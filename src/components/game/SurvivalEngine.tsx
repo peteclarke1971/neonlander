@@ -44,6 +44,11 @@ const BASE_HEIGHT = 360;
 const AMPLITUDE = 180;
 const CHUNK_WIDTH = 2000;
 
+// Abort system configuration (matching GameEngine)
+const ABORT_ROTATION_DURATION = 0.4;
+const ABORT_FUEL_COST = 50;
+const ABORT_CAMERA_SHAKE = 12;
+
 // Smooth easing function for blackout transitions (ease-in-out cubic)
 const easeInOutCubic = (t: number): number => {
   return t < 0.5
@@ -243,7 +248,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const prevFuelPercentRef = useRef(1);
   const fuelBeforeLandingRef = useRef(50);
   
-  const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false });
+  const keys = useRef({ left: false, right: false, thrust: false, rotateBoost: false, abort: false });
   const audio = useRef(getGlobalAudioManager());
   
   // Style points tracking (rotation bonuses & near misses)
@@ -255,6 +260,14 @@ export const SurvivalEngine: React.FC<Props> = ({
   const gpDeviceIdRef = useRef<string | null>(getLastDeviceId());
   const rotBoostActive = useRef(0);
   const gamepadInputRef = useRef<any>(null);
+  
+  // Abort system state
+  const abortAssist = useRef(false);
+  const abortRotationActive = useRef(false);
+  const abortStartAngle = useRef(0);
+  const abortRotationProgress = useRef(0);
+  const abortPenaltyCharged = useRef(false);
+  const lastAbortDown = useRef(false);
   
   // Cursor management
   const cursorManagerRef = useRef<CursorManager>();
@@ -372,6 +385,16 @@ export const SurvivalEngine: React.FC<Props> = ({
       if (["shift"].includes(k)) {
         keys.current.rotateBoost = down;
         if (down) {
+          setIsUsingPCControls(true);
+          setPCControlsPreference(true);
+        }
+      }
+      
+      // Abort: Arrow Down or X
+      if (["arrowdown", "x"].includes(k)) {
+        keys.current.abort = down;
+        if (down) {
+          abortAssist.current = true;
           setIsUsingPCControls(true);
           setPCControlsPreference(true);
         }
@@ -1267,6 +1290,13 @@ export const SurvivalEngine: React.FC<Props> = ({
           if (input.buttons.pause && !paused) {
             setPaused(true);
           }
+          
+          // Abort button handling (matches main game - Y/Triangle button)
+          if (input.buttons.abort && !lastAbortDown.current) {
+            abortAssist.current = true;
+            keys.current.abort = true;
+          }
+          lastAbortDown.current = input.buttons.abort;
         }
         
         // Keyboard rotation boost (matches gamepad boost) - only when boost key held
@@ -1332,7 +1362,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             isRotatingLeft,
             isRotatingRight,
             dt,
-            false, // No abort in survival mode
+            abortRotationActive.current, // Pass abort state to reset rotation tracking
             currentTime
           );
           
@@ -1374,6 +1404,77 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Thrust controls and physics (only when alive)
       if (!isDead) {
+        // Enhanced abort assist: smooth rotation, instant boost, fixed fuel penalty
+        if (!isLanded && (keys.current.abort || abortAssist.current) && fuelAmount > 0) {
+          // On first activation frame: charge fuel penalty and stabilize
+          if (keys.current.abort && !abortPenaltyCharged.current) {
+            // Charge fixed fuel penalty once per activation
+            fuelAmount -= ABORT_FUEL_COST;
+            fuelAmount = Math.max(0, fuelAmount);
+            
+            // Rapidly dampen velocities to stabilize
+            shipVx *= 0.5;
+            shipVy *= 0.4;
+            
+            // Start smooth rotation animation
+            abortRotationActive.current = true;
+            abortStartAngle.current = shipAngle;
+            abortRotationProgress.current = 0;
+            abortPenaltyCharged.current = true;
+            
+            // Camera shake and audio
+            cameraShake = Math.max(cameraShake, ABORT_CAMERA_SHAKE);
+            audio.current.abort();
+            
+            // Reset style points (rotation tracking)
+            resetStylePoints(stylePointsStateRef.current);
+          }
+          
+          // Animate rotation smoothly with cubic ease-out
+          if (abortRotationActive.current) {
+            abortRotationProgress.current += dt / ABORT_ROTATION_DURATION;
+            const t = Math.min(1, abortRotationProgress.current);
+            const eased = 1 - Math.pow(1 - t, 3); // cubic ease-out curve
+            shipAngle = abortStartAngle.current * (1 - eased);
+            shipAngularVel = 0; // Lock angular velocity during rotation
+            
+            if (t >= 1) {
+              shipAngle = 0; // Ensure exactly level at end
+              abortRotationActive.current = false;
+            }
+          } else {
+            // If not animating, keep level
+            shipAngle = 0;
+            shipAngularVel = 0;
+          }
+          
+          // Apply hover thrust to maintain altitude
+          const hoverThrust = Math.min(1, (GRAVITY * 60) / THRUST_ACCEL);
+          const thrustX = Math.sin(shipAngle) * THRUST_ACCEL * hoverThrust;
+          const thrustY = -Math.cos(shipAngle) * THRUST_ACCEL * hoverThrust;
+          shipVx += thrustX * dt;
+          shipVy += thrustY * dt;
+          
+          // Consume hover fuel
+          if (!unlimitedFuelRef.current) {
+            fuelAmount -= 25 * dt;
+            fuelAmount = Math.max(0, fuelAmount);
+          }
+          
+          // Auto turn off when stabilized
+          const stabilized = Math.abs(shipAngle) < 0.08 && Math.abs(shipAngularVel) < 0.05 && Math.abs(shipVx) < 8 && shipVy < 8;
+          if (stabilized) {
+            abortAssist.current = false;
+            keys.current.abort = false;
+            abortRotationActive.current = false;
+          }
+        }
+        
+        // Reset penalty flag when abort button released
+        if (!keys.current.abort) {
+          abortPenaltyCharged.current = false;
+        }
+        
         // Thrust controls (works both landed and in-flight to allow takeoff)
         if (keys.current.thrust && fuelAmount > 0) {
           // Only apply thrust physics when not landed
