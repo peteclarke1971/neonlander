@@ -1,182 +1,255 @@
 
-
-# Add "Show FPS" Toggle Implementation Plan
+# Comprehensive In-Game Guide System Implementation Plan
 
 ## Overview
-Add a new toggle in Settings (Controls page) that allows users to show FPS independently of the main HUD visibility. When enabled, FPS will display in the bottom-right corner across all game modes including Survival, even when the "Full HUD" toggle is off.
+
+This plan implements a two-part instruction system:
+1. **GUIDE Popup** - A comprehensive multi-page guide accessible from the Player Menu (replaces LEADERBOARDS button)
+2. **In Flight Guide Toggle** - Progressive contextual tips displayed during gameplay as elements are introduced
 
 ---
 
-## Current Behavior
-- **GameEngine**: FPS is displayed when `showFullHUD` is true (line 6010-6016)
-- **SurvivalEngine**: FPS is always displayed (lines 3474-3481), independent of HUD setting
-- Both engines already calculate FPS and have the `fps` state variable
+## Part 1: GUIDE Popup System
 
----
+### Architecture
 
-## Implementation
+Create a new `GuidePopup.tsx` component that displays as an overlay on the Player Menu with:
+- Multiple scrollable/swipeable pages
+- Animated visual representations of game elements
+- Gamepad and keyboard navigation support (consistent with existing menu systems)
 
-### 1. Add Setting State in Controls.tsx
+### Menu Integration
 
-**Location**: After `liquidFuelEnabled` state declaration (~line 46)
+**File: `src/components/game/PlayerMenu.tsx`**
 
-Add new state:
+Replace the "LEADERBOARDS" menu item with "GUIDE":
+
 ```typescript
-const [showFPS, setShowFPS] = useState<boolean>(() => {
-  try {
-    const saved = localStorage.getItem('ll-show-fps');
-    return saved ? JSON.parse(saved) : true; // Default to true
-  } catch {
-    return true;
-  }
-});
+const menuItems = [
+  { id: "start", label: "START GAME" },
+  { id: "modes", label: "CHOOSE GAME MODE" },
+  { id: "startLevel", label: "STARTING LEVEL" },
+  { id: "guide", label: "GUIDE" },  // Changed from "leaderboards"
+  { id: "settings", label: "SETTINGS" },
+];
 ```
 
-Add corresponding useEffect to persist (~after line 212):
+Update `handleAction` to show the guide popup instead of calling `onLeaderboards()`.
+
+### Guide Content Structure (8 Pages)
+
+| Page | Title | Content |
+|------|-------|---------|
+| 1 | **BASIC CONTROLS** | Thrust, rotate left/right, abort. Animated lander with thrust particles. Touch vs keyboard/gamepad layouts. |
+| 2 | **LANDING** | Safe landing requirements: angle, velocity thresholds. Animated landing sequence showing good vs crash. Bullseye bonus (centered), Speed bonus (< 10s). |
+| 3 | **FUEL & SHIELDS** | Fuel consumption mechanics. Shield pickup (bubble visual). Shield bounce physics. Post-break invulnerability. |
+| 4 | **SPACE JUNK** | Collectible items with rainbow cycling animation. 3 items unlock wormhole. 6 items in Collection levels. Fuel reward per pickup. |
+| 5 | **HAZARDS** | Volcanoes (eruption warning), gravity wells (attraction zones), lightning storms (weather). UFOs (small/medium/large from level 10+). |
+| 6 | **SCORING** | Points breakdown: landing base + finesse, Bullseye (+500), Speed Bonus (+500), Perfect Landing (+1000), 360 Rotation, Near Miss. |
+| 7 | **GAME MODES** | Campaign, Classic, Time Trial, Survival, Medley. Brief description of each with distinctive visual. |
+| 8 | **SURVIVAL MODE** | Endless terrain, distance tracking, sector milestones, comet bonuses, blackout zones, light storms. |
+
+### Visual Animations (Canvas-based)
+
+Each page will include small animated canvas elements:
+- **Lander Animation**: Rotating ship with thrust particles
+- **Landing Sequence**: Ship approaching pad with velocity indicator
+- **Shield Bubble**: Pulsing pink/purple bubble around ship
+- **Space Junk**: Spinning collectible with rainbow color cycling
+- **Volcano**: Erupting particles
+- **UFO Patrol**: Side-scrolling UFO with projectile
+
+### New Files
+
+```text
+src/components/game/GuidePopup.tsx           - Main guide overlay component
+src/components/game/guide/GuidePageControls.tsx    - Page 1 content
+src/components/game/guide/GuidePageLanding.tsx     - Page 2 content  
+src/components/game/guide/GuidePageFuelShields.tsx - Page 3 content
+src/components/game/guide/GuidePageJunk.tsx        - Page 4 content
+src/components/game/guide/GuidePageHazards.tsx     - Page 5 content
+src/components/game/guide/GuidePageScoring.tsx     - Page 6 content
+src/components/game/guide/GuidePageModes.tsx       - Page 7 content
+src/components/game/guide/GuidePageSurvival.tsx    - Page 8 content
+src/components/game/guide/LanderAnimation.tsx      - Reusable animated lander
+```
+
+### Navigation
+
+- Left/Right arrows or swipe to change pages
+- Page indicator dots at bottom
+- Gamepad D-pad left/right for page navigation
+- Back button or Escape to close
+- Consistent `player-menu-btn` styling
+
+---
+
+## Part 2: In Flight Guide System
+
+### Architecture
+
+Create a progressive tip system that shows contextual instructions during gameplay based on:
+1. First time playing (global)
+2. Current level number
+3. Current game mode
+4. Elements being encountered for the first time
+
+### State Management
+
+**LocalStorage Keys** (prefix: `ll-guide-`):
 ```typescript
-useEffect(() => {
-  try {
-    localStorage.setItem('ll-show-fps', JSON.stringify(showFPS));
-  } catch {}
-}, [showFPS]);
+ll-guide-enabled: boolean           // Master toggle
+ll-guide-basic-shown: boolean       // Controls tip shown
+ll-guide-landing-shown: boolean     // Landing tip shown
+ll-guide-junk-shown-{mode}: boolean // Space junk tip per mode
+ll-guide-shield-shown: boolean      // Shield tip shown
+ll-guide-volcano-shown: boolean     // Volcano tip shown
+ll-guide-ufo-shown: boolean         // UFO tip shown
+ll-guide-timetrial-shown: boolean   // Time trial rules
+ll-guide-survival-shown: boolean    // Survival mode intro
+ll-guide-blackout-shown: boolean    // Blackout zone tip
+ll-guide-storm-shown: boolean       // Lightning storm tip
 ```
 
----
+### Tip Trigger Points
 
-### 2. Add UI Toggle in Controls.tsx
+| Level/Event | Tip Shown | Content |
+|-------------|-----------|---------|
+| Level 1 (any mode) | Basic Controls | "THRUST to ascend, ROTATE to aim. Land gently on pads!" |
+| First landing | Landing Mechanics | "Green pads = safe. Land at low speed with level angle." |
+| First space junk spawn | Collectibles | "Collect SPACE JUNK for fuel! 3 items opens WORMHOLE." |
+| First shield pickup | Shield | "SHIELD protects from one crash. Bounces you to safety." |
+| First volcano visible | Hazards | "VOLCANOES erupt! Avoid lava particles." |
+| Level 10+ (first UFO) | UFOs | "UFO ALERT! Dodge projectiles or use shield." |
+| Time Trial Level 1 | Time Trial | "Land on pads IN ORDER! Timer starts at first takeoff." |
+| Survival Start | Survival | "Travel as far as you can! Land to refuel." |
+| First blackout zone | Blackout | "BLACKOUT! Use your spotlight to navigate." |
+| First storm level | Storm | "LIGHTNING STORM! Watch for strikes!" |
 
-**Location**: After the "Full HUD" toggle (~line 752), add a new toggle:
+### Display Component
 
+**File: `src/components/game/InFlightTip.tsx`**
+
+A non-intrusive tip display positioned at top-center, similar to `SectorMessageDisplay.tsx`:
+- Fade in/out animation
+- Auto-dismiss after 4 seconds OR on any input
+- Semi-transparent background
+- Neon glow text matching level color
+- Skip with any button press
+
+### Integration Points
+
+**File: `src/components/game/GameEngine.tsx`**
+
+Add tip trigger checks at key points:
+1. After countdown intro completes (level start)
+2. When collectibles first spawned
+3. When UFO first spawned
+4. When volcano first becomes visible
+5. On first successful landing
+
+**File: `src/components/game/SurvivalEngine.tsx`**
+
+Add survival-specific tips:
+1. On game start (survival intro)
+2. First blackout zone
+3. First light storm
+4. First comet bonus
+
+### Player Menu Toggle
+
+**File: `src/components/game/PlayerMenu.tsx`**
+
+Add toggle in footer (near Ghost toggles):
 ```tsx
-<div className="flex items-center justify-between">
-  <div>
-    <Label>Show FPS</Label>
-    <div className="text-xs text-muted-foreground">Display FPS counter in bottom-right (visible even when HUD is hidden)</div>
-  </div>
-  <Switch 
-    checked={showFPS}
-    onCheckedChange={setShowFPS}
-  />
-</div>
+<button
+  className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+  onClick={() => toggleInFlightGuide()}
+  style={{ 
+    color: inFlightGuideEnabled ? "hsl(120, 100%, 60%)" : "hsl(var(--neon))",
+    borderColor: inFlightGuideEnabled ? "hsl(120, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
+    opacity: inFlightGuideEnabled ? 0.9 : 0.5,
+  }}
+>
+  TIPS {inFlightGuideEnabled ? "ON" : "OFF"}
+</button>
+```
+
+### New Files
+
+```text
+src/components/game/InFlightTip.tsx          - Tip display component
+src/lib/inFlightGuide.ts                     - State management and tip definitions
 ```
 
 ---
 
-### 3. Update GameEngine.tsx
+## Technical Details
 
-**Add showFPS prop** to Props interface (~line 92-110):
-```typescript
-showFPS?: boolean;
-```
+### Guide Popup Styling
 
-**Read showFPS from localStorage** as fallback if not passed (~line 274):
-```typescript
-const [showFPSSetting] = useState<boolean>(() => {
-  try {
-    const saved = localStorage.getItem('ll-show-fps');
-    return saved ? JSON.parse(saved) : true;
-  } catch {
-    return true;
-  }
-});
-```
+Consistent with existing Player Menu aesthetic:
+- `bg-background/80` with `backdrop-blur-[2px]`
+- Border: `hsl(var(--neon) / 0.5)`
+- Text: Orbitron font family
+- Neon glow text shadows
+- Responsive sizing for mobile
 
-**Update FPS display condition** (line 6010-6016):
+### Animation Specifications
 
-Change from:
-```tsx
-{showFullHUD && (
-  <div className="pointer-events-none absolute bottom-2 right-3 z-40">
-    ...FPS: {Math.round(fps)}...
-  </div>
-)}
-```
+**Lander Animation Canvas** (120x120px):
+- 30 FPS animation loop
+- Ship rotation demonstration
+- Thrust particle system (simplified)
+- requestAnimationFrame based
 
-To:
-```tsx
-{showFPSSetting && (
-  <div className="pointer-events-none absolute bottom-2 right-3 z-40">
-    <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-      FPS: {Math.round(fps)}{showFullHUD && <> • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}</>}
-    </div>
-  </div>
-)}
-```
+**Landing Sequence Canvas** (200x100px):
+- Ship descending to pad
+- Velocity vectors shown
+- Color change: green (safe) to red (crash)
 
-This shows:
-- FPS only → when HUD is hidden but showFPS is true
-- FPS + Seed → when both showFullHUD and showFPS are true
+### Accessibility
+
+- All text readable without animations
+- Pause/skip option for animations
+- Keyboard navigable throughout
+- Screen reader labels for visual elements
 
 ---
 
-### 4. Update SurvivalEngine.tsx
+## Implementation Order
 
-**Read showFPS from localStorage** (~after line 73):
-```typescript
-const [showFPS] = useState<boolean>(() => {
-  try {
-    const saved = localStorage.getItem('ll-show-fps');
-    return saved ? JSON.parse(saved) : true;
-  } catch {
-    return true;
-  }
-});
-```
-
-**Update FPS display condition** (lines 3474-3481):
-
-Change from:
-```tsx
-{/* FPS Counter */}
-<div className="fixed bottom-4 right-4 z-20 pointer-events-none select-none">
-  <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-3 py-1.5">
-    <div className="text-xs font-mono text-muted-foreground">
-      {fps} FPS
-    </div>
-  </div>
-</div>
-```
-
-To:
-```tsx
-{/* FPS Counter - Independent of HUD setting */}
-{showFPS && (
-  <div className="fixed bottom-4 right-4 z-20 pointer-events-none select-none">
-    <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-3 py-1.5">
-      <div className="text-xs font-mono text-muted-foreground">
-        FPS: {fps}
-      </div>
-    </div>
-  </div>
-)}
-```
+1. Create `InFlightTip.tsx` component (simpler, existing pattern)
+2. Create `src/lib/inFlightGuide.ts` for tip state management
+3. Add In Flight Guide toggle to Player Menu footer
+4. Integrate tip triggers into `GameEngine.tsx`
+5. Integrate tip triggers into `SurvivalEngine.tsx`
+6. Create `GuidePopup.tsx` main container
+7. Create guide page components (8 pages)
+8. Create animation components
+9. Replace LEADERBOARDS with GUIDE in Player Menu
+10. Test gamepad/keyboard navigation
 
 ---
 
-## Files Modified
+## File Changes Summary
 
-| File | Changes |
-|------|---------|
-| `src/pages/Controls.tsx` | Add `showFPS` state, useEffect for persistence, and UI toggle |
-| `src/components/game/GameEngine.tsx` | Read `showFPS` from localStorage, update FPS display condition |
-| `src/components/game/SurvivalEngine.tsx` | Read `showFPS` from localStorage, conditionally render FPS |
-
----
-
-## Expected Behavior
-
-| Full HUD | Show FPS | Result |
-|----------|----------|--------|
-| ON | ON | FPS + Seed displayed (current behavior) |
-| ON | OFF | No FPS displayed |
-| OFF | ON | **Only FPS displayed** (new behavior) |
-| OFF | OFF | Nothing displayed |
+| File | Action |
+|------|--------|
+| `src/components/game/PlayerMenu.tsx` | Modify: Replace LEADERBOARDS with GUIDE, add TIPS toggle, add GuidePopup state |
+| `src/components/game/GameEngine.tsx` | Modify: Add tip trigger points, import InFlightTip |
+| `src/components/game/SurvivalEngine.tsx` | Modify: Add survival-specific tip triggers |
+| `src/components/game/GuidePopup.tsx` | Create: Multi-page guide overlay |
+| `src/components/game/guide/*.tsx` | Create: 8 page content components |
+| `src/components/game/guide/LanderAnimation.tsx` | Create: Reusable lander animation |
+| `src/components/game/InFlightTip.tsx` | Create: In-game tip display |
+| `src/lib/inFlightGuide.ts` | Create: Tip state management |
 
 ---
 
-## Technical Notes
-- localStorage key: `ll-show-fps`
-- Default value: `true` (matches current behavior where FPS is shown)
-- Format: `FPS: XX` (consistent across all engines)
-- Position: Bottom-right corner, z-index ensures visibility over game canvas
+## Storage Keys
 
+All guide-related localStorage keys:
+- `ll-guide-enabled` - Master toggle for in-flight tips
+- `ll-guide-{tipId}-shown` - Individual tip shown flags
+- `ll-guide-last-page` - Last viewed page in full guide (for resume)
