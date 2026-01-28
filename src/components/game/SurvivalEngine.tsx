@@ -2187,21 +2187,14 @@ export const SurvivalEngine: React.FC<Props> = ({
                   const isMoving = !!movingPad;
                   const isBonus = landingPad.bonus2x;
                   
-                  // Determine if this is a retro-burst trigger (2nd, 12th, 22nd, 32nd, etc.)
-                  const isRetroBurst = currentLandings === 2 || (currentLandings > 2 && (currentLandings - 2) % 10 === 0);
-                  
                   // Clear any existing firework timeouts
                   fireworkTimeoutsRef.current.forEach(t => clearTimeout(t));
                   fireworkTimeoutsRef.current = [];
                   
                   // Show fireworks after brief delay
                   const initialTimeout = setTimeout(() => {
-                    // retro-burst supersedes all other landing types
-                    if (isRetroBurst) {
-                      setLandingType('retro-burst');
-                    } else {
-                      setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
-                    }
+                    // Use standard landing types (fireworkCount determines quantity)
+                    setLandingType(isMoving ? 'moving' : isBonus ? '2x' : 'regular');
                     setShowFireworks(true);
                     setFireworksActive(true);
                     
