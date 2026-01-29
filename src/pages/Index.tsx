@@ -26,11 +26,21 @@ import { DemoTransition } from "@/components/game/DemoTransition";
 import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
 import { PlayerMenu, GameSettings as PlayerMenuSettings } from "@/components/game/PlayerMenu";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
+import { SplashScreen } from "@/components/game/SplashScreen";
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
 
 const Index = () => {
-  const [view, setView] = useState<"home" | "playermenu" | "game" | "gameover" | "demo">("home");
+  const [view, setView] = useState<"splash" | "home" | "playermenu" | "game" | "gameover" | "demo">(() => {
+    // Check if splash has been seen
+    try {
+      const seen = localStorage.getItem('ll-splash-seen');
+      if (seen === 'true') {
+        return "playermenu"; // Default to player menu for returning visitors
+      }
+    } catch {}
+    return "splash"; // Show splash on first visit
+  });
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionReady, setTransitionReady] = useState(false);
   const [gameOriginView, setGameOriginView] = useState<"home" | "playermenu">("home"); // Track where game was launched from
@@ -351,6 +361,14 @@ const Index = () => {
     setLastInteractionTime(Date.now());
     setDemoStartTime(null);
     setDemoTimer(0);
+  };
+
+  // Handle splash screen completion
+  const handleSplashComplete = () => {
+    try {
+      localStorage.setItem('ll-splash-seen', 'true');
+    } catch {}
+    setView("playermenu");
   };
 
   const exitDemo = () => {
@@ -853,6 +871,11 @@ const retryGame = () => {
         isActive={isTransitioning}
         onReady={() => console.log("🎮 GameTransition component ready")}
       />
+      
+      {/* Splash Screen - first visit only */}
+      {view === "splash" && (
+        <SplashScreen onComplete={handleSplashComplete} />
+      )}
       
       {view === "home" && (
         <DemoTransition isVisible={view === "home"}>
