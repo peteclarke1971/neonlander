@@ -338,6 +338,10 @@ export const GameEngine: React.FC<Props> = ({
   const offscreenTerrainCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const offscreenTerrainCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const sweepPhaseRef = useRef(0);
+  
+  // Separate refs for dual ghost support in Fixed/Medley modes
+  const fixedLocalGhost = useRef<any>(null);
+  const fixedGlobalGhost = useRef<any>(null);
   const sweepTimerRef = useRef(0);
   const sweepXRef = useRef(0);
   const sweepActiveRef = useRef(false);
@@ -1176,63 +1180,81 @@ export const GameEngine: React.FC<Props> = ({
     const isGhostMode = isGhostModeFixed || isGhostModeMedley;
     const shouldRecord = (mode === "fixed" && !isCavernLevel) || mode === "medley";
     
-    // Initialize ghost system - load dynamically for current level
-    let activeGhostRecording: any = null;
-    let isUsingGlobalGhost = false;
+    // Initialize ghost system - load BOTH local and global ghosts independently
+    let localGhostRecording: any = null;
+    let globalGhostRecording: any = null;
+    
+    // Check settings
+    const localGhostsEnabled = localStorage.getItem('ll-ghost-mode-enabled') === 'true';
+    const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
 
-    // Fixed mode ghost loading
+    // Fixed mode ghost loading - load BOTH ghosts when enabled
     if (isGhostModeFixed && ghostLevel !== undefined) {
       const difficultyStr = difficulty;
       
-      // Check if global ghosts are enabled
-      const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
-      
-      // Try to load global ghost first if enabled
-      if (globalGhostsEnabled) {
-        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, ghostLevel, 'fixed');
-        if (globalRecording) {
-          activeGhostRecording = globalRecording;
-          isUsingGlobalGhost = true;
-          console.log("🌍 Global ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+      // Load local ghost if local setting enabled
+      if (localGhostsEnabled) {
+        const localRecording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
+        if (localRecording) {
+          localGhostRecording = localRecording;
+          fixedLocalGhost.current = localRecording;
+          console.log("👻 Local ghost loaded for", difficultyStr, "level", ghostLevel, "- time:", (localRecording.completionTime / 1000).toFixed(2) + "s");
         }
       }
       
-      // Fallback to local ghost if no global ghost available
-      if (!activeGhostRecording) {
-        const localRecording = ghostManager.current.loadLunarLanderGhost(difficultyStr, ghostLevel);
-        if (localRecording) {
-          activeGhostRecording = localRecording;
-          isUsingGlobalGhost = false;
-          console.log("👻 Local ghost loaded for", difficultyStr, "level", ghostLevel, "- time to beat:", (localRecording.completionTime / 1000).toFixed(2) + "s");
+      // Load global ghost if global setting enabled
+      if (globalGhostsEnabled) {
+        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, ghostLevel, 'fixed');
+        if (globalRecording) {
+          globalGhostRecording = globalRecording;
+          fixedGlobalGhost.current = globalRecording;
+          console.log("🌍 Global ghost loaded for", difficultyStr, "level", ghostLevel, "- time:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+        }
+      }
+      
+      // Skip local ghost if player holds the world record (times within 50ms)
+      if (localGhostRecording && globalGhostRecording) {
+        const playerHoldsRecord = Math.abs(localGhostRecording.completionTime - globalGhostRecording.completionTime) < 50;
+        if (playerHoldsRecord) {
+          fixedLocalGhost.current = null;
+          localGhostRecording = null;
+          console.log("🏆 Player holds world record - showing only gold ghost");
         }
       }
     }
     
-    // Medley mode ghost loading (uses level as stage number)
+    // Medley mode ghost loading - load BOTH ghosts when enabled
     if (isGhostModeMedley) {
       const difficultyStr = difficulty;
-      const medleyStage = level; // In medley mode, level represents the stage
+      const medleyStage = level;
       
-      // Check if global ghosts are enabled
-      const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
-      
-      // Try to load global ghost first if enabled
-      if (globalGhostsEnabled) {
-        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, medleyStage, 'medley');
-        if (globalRecording) {
-          activeGhostRecording = globalRecording;
-          isUsingGlobalGhost = true;
-          console.log("🌍 Global medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time to beat:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+      // Load local ghost if local setting enabled
+      if (localGhostsEnabled) {
+        const localRecording = ghostManager.current.loadMedleyGhost(difficultyStr, medleyStage);
+        if (localRecording) {
+          localGhostRecording = localRecording;
+          fixedLocalGhost.current = localRecording;
+          console.log("👻 Local medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time:", (localRecording.completionTime / 1000).toFixed(2) + "s");
         }
       }
       
-      // Fallback to local ghost if no global ghost available
-      if (!activeGhostRecording) {
-        const localRecording = ghostManager.current.loadMedleyGhost(difficultyStr, medleyStage);
-        if (localRecording) {
-          activeGhostRecording = localRecording;
-          isUsingGlobalGhost = false;
-          console.log("👻 Local medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time to beat:", (localRecording.completionTime / 1000).toFixed(2) + "s");
+      // Load global ghost if global setting enabled
+      if (globalGhostsEnabled) {
+        const globalRecording = await ghostManager.current.loadGlobalGhost(difficultyStr, medleyStage, 'medley');
+        if (globalRecording) {
+          globalGhostRecording = globalRecording;
+          fixedGlobalGhost.current = globalRecording;
+          console.log("🌍 Global medley ghost loaded for", difficultyStr, "stage", medleyStage, "- time:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+        }
+      }
+      
+      // Skip local ghost if player holds the world record
+      if (localGhostRecording && globalGhostRecording) {
+        const playerHoldsRecord = Math.abs(localGhostRecording.completionTime - globalGhostRecording.completionTime) < 50;
+        if (playerHoldsRecord) {
+          fixedLocalGhost.current = null;
+          localGhostRecording = null;
+          console.log("🏆 Player holds world record - showing only gold ghost");
         }
       }
     }
@@ -1314,8 +1336,11 @@ export const GameEngine: React.FC<Props> = ({
     
     // Load best time for HUD display
     if (mode === "fixed" && !isCavernLevel) {
-      if (isUsingGlobalGhost && activeGhostRecording) {
-        setBestTime(activeGhostRecording.completionTime);
+      // Prefer global ghost time if available, otherwise use local
+      if (fixedGlobalGhost.current) {
+        setBestTime(fixedGlobalGhost.current.completionTime);
+      } else if (fixedLocalGhost.current) {
+        setBestTime(fixedLocalGhost.current.completionTime);
       } else {
         const currentBest = ghostManager.current.getLunarLanderBestTime(difficulty, level);
         setBestTime(currentBest);
@@ -1339,11 +1364,18 @@ export const GameEngine: React.FC<Props> = ({
     let prevTargetZoom = 1;
     let loggedMovingPadStart = false;
     
-    // Ghost state
-    let ghostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
-    // Initialize ghost for fixed mode (needs ghostLevel) OR medley mode (uses level directly)
+    // Ghost state - separate for local and global ghosts
+    let localGhostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
+    let globalGhostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
+    
+    // Initialize ghost ships based on which ghosts are loaded
     if ((isGhostModeFixed && ghostLevel !== undefined) || isGhostModeMedley) {
-      ghostShip = { x: 0, y: 0, angle: 0, visible: false };
+      if (fixedLocalGhost.current) {
+        localGhostShip = { x: 0, y: 0, angle: 0, visible: false };
+      }
+      if (fixedGlobalGhost.current) {
+        globalGhostShip = { x: 0, y: 0, angle: 0, visible: false };
+      }
     }
     
     // Particles (extended with bubble support)
@@ -1904,28 +1936,58 @@ export const GameEngine: React.FC<Props> = ({
         lastRecordTime.current = gameTime;
       }
       
-      // Ghost playback - update ghost state (fixed and medley modes)
+      // Ghost playback - update BOTH ghost states (fixed and medley modes)
       if (isGhostMode) {
-        let ghostStateUpdate = null;
-        if (isUsingGlobalGhost && activeGhostRecording) {
-          ghostStateUpdate = ghostManager.current.getGlobalGhostState(activeGhostRecording, gameTime);
-        } else if (mode === "fixed" && ghostLevel !== undefined) {
-          ghostStateUpdate = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
-        } else if (mode === "medley") {
-          ghostStateUpdate = ghostManager.current.getMedleyGhostState(difficulty, level, gameTime);
+        // Update LOCAL ghost state
+        if (fixedLocalGhost.current && localGhostShip) {
+          let localState = null;
+          if (mode === "medley") {
+            localState = ghostManager.current.getMedleyGhostState(difficulty, level, gameTime);
+          } else if (mode === "fixed" && ghostLevel !== undefined) {
+            localState = ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel, gameTime);
+          }
+          
+          if (localState) {
+            localGhostShip.x = localState.x;
+            localGhostShip.y = localState.y;
+            localGhostShip.angle = localState.angle;
+            localGhostShip.visible = localState.visible;
+          } else {
+            localGhostShip.visible = false;
+          }
         }
         
-        // Update ghostShip object for rendering
-        if (ghostShip && ghostStateUpdate) {
-          ghostShip.x = ghostStateUpdate.x;
-          ghostShip.y = ghostStateUpdate.y;
-          ghostShip.angle = ghostStateUpdate.angle;
-          ghostShip.visible = ghostStateUpdate.visible;
-        } else if (ghostShip) {
-          ghostShip.visible = false;
+        // Update GLOBAL ghost state
+        if (fixedGlobalGhost.current && globalGhostShip) {
+          const globalState = ghostManager.current.getGlobalGhostState(fixedGlobalGhost.current, gameTime);
+          
+          if (globalState) {
+            globalGhostShip.x = globalState.x;
+            globalGhostShip.y = globalState.y;
+            globalGhostShip.angle = globalState.angle;
+            globalGhostShip.visible = globalState.visible;
+          } else {
+            globalGhostShip.visible = false;
+          }
         }
         
-        setGhostState(ghostStateUpdate);
+        // For backward compatibility, set ghostState to the global ghost if available, else local
+        // For backward compatibility, set ghostState to the global ghost if available, else local
+        const primaryGhostState = globalGhostShip?.visible ? {
+          x: globalGhostShip.x,
+          y: globalGhostShip.y,
+          angle: globalGhostShip.angle,
+          visible: globalGhostShip.visible,
+          thrust: false
+        } : localGhostShip?.visible ? {
+          x: localGhostShip.x,
+          y: localGhostShip.y,
+          angle: localGhostShip.angle,
+          visible: localGhostShip.visible,
+          thrust: false
+        } : null;
+        
+        setGhostState(primaryGhostState);
       }
       if (!worldPausedRef.current && elapsed >= nextShooting) { spawnShooting(); nextShooting = elapsed + (0.6 + Math.random() * 1.6); }
       if (elapsed >= nextBgSat && mode !== "caverns") {
@@ -5076,22 +5138,46 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // Ghost ship (render before player)
-      if (ghostShip && ghostShip.visible) {
+      // Ghost ships (render before player) - render BOTH local and global ghosts
+      // Local ghost (green)
+      if (localGhostShip && localGhostShip.visible) {
         for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
           ctx.save();
-          ctx.translate(ghostShip.x + offset, ghostShip.y);
-          ctx.rotate(ghostShip.angle);
-          ctx.globalAlpha = 0.5; // Translucent
+          ctx.translate(localGhostShip.x + offset, localGhostShip.y);
+          ctx.rotate(localGhostShip.angle);
+          ctx.globalAlpha = 0.4;
           ctx.beginPath();
           ctx.moveTo(0, -10);
           ctx.lineTo(8, 10);
           ctx.lineTo(-8, 10);
           ctx.closePath();
-          ctx.strokeStyle = isUsingGlobalGhost ? '#FFD700' : '#00ff80'; // Gold for global, green for local
+          ctx.strokeStyle = '#00ff80'; // Green for local
           ctx.lineWidth = 2;
           ctx.stroke();
-
+          // Ghost legs
+          ctx.beginPath();
+          ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+          ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      
+      // Global ghost (gold)
+      if (globalGhostShip && globalGhostShip.visible) {
+        for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+          ctx.save();
+          ctx.translate(globalGhostShip.x + offset, globalGhostShip.y);
+          ctx.rotate(globalGhostShip.angle);
+          ctx.globalAlpha = 0.4;
+          ctx.beginPath();
+          ctx.moveTo(0, -10);
+          ctx.lineTo(8, 10);
+          ctx.lineTo(-8, 10);
+          ctx.closePath();
+          ctx.strokeStyle = '#FFD700'; // Gold for global
+          ctx.lineWidth = 2;
+          ctx.stroke();
           // Ghost legs
           ctx.beginPath();
           ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
