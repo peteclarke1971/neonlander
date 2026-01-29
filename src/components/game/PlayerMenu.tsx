@@ -9,7 +9,7 @@ import { useFullscreen } from "@/hooks/use-fullscreen";
 import { isIOSDevice } from "@/lib/deviceDetection";
 import { isGuideEnabled, setGuideEnabled } from "@/lib/inFlightGuide";
 import { Difficulty, Mode } from "./types";
-
+import { getGlobalAudioManager } from "./AudioManager";
 export type GameModeId = "fixed" | "survival" | "classic" | "timetrial" | "medley";
 
 export interface GameSettings {
@@ -185,6 +185,47 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     const timeout = setTimeout(() => setAssetsLoaded(true), 3000);
     return () => clearTimeout(timeout);
   }, []);
+  
+  // Start title music - same as HomeScreen
+  const audioRef = useRef(getGlobalAudioManager());
+  const [musicOn] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ll-music-on");
+      return saved ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  
+  useEffect(() => {
+    let removed = false;
+    const tryStart = async () => {
+      try {
+        if (!musicOn) return;
+        audioRef.current.resume();
+        await audioRef.current.playTitleMusic();
+        audioRef.current.setTitleMusicMuted(false);
+      } catch {}
+    };
+    // Attempt immediately (will be ignored by browsers that require gesture)
+    tryStart();
+    const startOnInteract = () => {
+      tryStart();
+      // Preload all sound effects on first user interaction for instant playback
+      audioRef.current.preloadSFX();
+    };
+    window.addEventListener("pointerdown", startOnInteract, { once: true });
+    window.addEventListener("touchstart", startOnInteract, { once: true });
+    window.addEventListener("keydown", startOnInteract, { once: true });
+    return () => {
+      if (!removed) {
+        window.removeEventListener("pointerdown", startOnInteract as any);
+        window.removeEventListener("touchstart", startOnInteract as any);
+        window.removeEventListener("keydown", startOnInteract as any);
+        removed = true;
+      }
+    };
+  }, [musicOn]);
   
   // Idle timer - separate from demo timer
   useEffect(() => {
