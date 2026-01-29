@@ -809,12 +809,6 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           >
             Dev Portal
           </button>
-          <span 
-            className="text-sm opacity-30"
-            style={{ color: "hsl(var(--neon))" }}
-          >
-            ✦
-          </span>
         </div>
       </footer>
     </main>
