@@ -1,135 +1,236 @@
 
+# Restore Dual Ghost Display in Fixed/Medley Modes
 
-# Update Tips Text and Trigger Locations
+## Problem
+When both local and global ghost modes are enabled, players should see two ghosts:
+- **Green ghost**: Their personal best time (local)
+- **Gold ghost**: The global world record
 
-## Summary
-This plan updates the text content of several in-flight tips and assigns them to specific levels in Classic/Fixed modes, plus one tip for Survival mode's first comet event.
+Currently, the system only displays ONE ghost - it prioritizes global over local as a fallback, rather than showing both simultaneously.
 
----
+## Current Behavior
+| Local Setting | Global Setting | What Shows |
+|---------------|----------------|------------|
+| ON | OFF | Green local ghost ✓ |
+| OFF | ON | Gold global ghost ✓ |
+| ON | ON | Only gold global ghost ✗ |
 
-## Text Changes Required
+## Desired Behavior
+| Local Setting | Global Setting | What Shows |
+|---------------|----------------|------------|
+| ON | OFF | Green local ghost |
+| OFF | ON | Gold global ghost |
+| ON | ON | Both green AND gold (unless player holds world record) |
 
-| Tip ID | Current Text | New Text |
-|--------|--------------|----------|
-| `landing` | "Green pads = safe. Land at low speed with level angle." | "Land on the glowing pads. 2x gives double points" |
-| `junk` | "Collect SPACE JUNK for fuel! 3 items opens WORMHOLE." | "Collect SPACE JUNK for fuel, getting it all awards shield!" |
-| `shield` | "SHIELD protects from one crash. Bounces you to safety." | "SHIELDS can take one hit and bounce you to safety." |
-| `comet` | "COMET! Catch it for bonus points." | "COMET! Land when active for bonus points." |
-
----
-
-## Trigger Assignments
-
-| Tip ID | Trigger Location | Notes |
-|--------|------------------|-------|
-| `landing` | Level 2 | Classic/Fixed modes, after countdown |
-| `junk` | Level 3 | Classic/Fixed modes, after countdown |
-| `shield` | Level 4 | Classic/Fixed modes, after countdown |
-| `blackout` | Level 9 | First blackout level (level 9 is where `darkside` type starts) |
-| `storm` | Level 4 | First storm/lightning level (level 4 is configured as lightning) |
-| `comet` | First comet appearance | Survival mode only, when comet first activates |
-
-**Note on Level 10 vs Level 9**: The game code shows blackout ("darkside") levels occur at level 9, 19, 29, etc. (formula: `level % 10 === 9`). Level 10 is actually a normal level. If you specifically want level 10, I can adjust, but level 9 is the first blackout level.
-
----
-
-## Technical Implementation
-
-### File: `src/lib/inFlightGuide.ts`
-
-Update the `TIPS` object with new text:
-
+## Root Cause Analysis
+The code in `GameEngine.tsx` lines 1183-1237 uses a "fallback" pattern:
 ```typescript
-landing: {
-  id: 'landing',
-  message: 'Land on the glowing pads. 2x gives double points',
-  duration: 6000,
-},
-junk: {
-  id: 'junk',
-  message: 'Collect SPACE JUNK for fuel, getting it all awards shield!',
-  duration: 6500,
-},
-shield: {
-  id: 'shield',
-  message: 'SHIELDS can take one hit and bounce you to safety.',
-  duration: 6000,
-},
-comet: {
-  id: 'comet',
-  message: 'COMET! Land when active for bonus points.',
-  duration: 5500,
-},
-```
+let activeGhostRecording: any = null;
+let isUsingGlobalGhost = false;
 
-### File: `src/components/game/GameEngine.tsx`
+if (globalGhostsEnabled) {
+  globalRecording = await loadGlobalGhost();
+  if (globalRecording) {
+    activeGhostRecording = globalRecording; // Uses global
+    isUsingGlobalGhost = true;
+  }
+}
 
-Expand the tip logic in the level initialization useEffect (around line 414-438) to include new level-specific tips:
-
-```typescript
-useEffect(() => {
-  if (isDemo || tipShownThisLevel.current) return;
-  
-  const tipTimeout = setTimeout(() => {
-    let tip: TipDefinition | null = null;
-    
-    // Time trial specific tip
-    if (mode === 'timetrial') {
-      tip = showTipAlways('timetrial');
-    }
-    // Level-specific tips for classic/fixed modes
-    else if (mode === 'classic' || mode === 'fixed') {
-      if (level === 1) {
-        tip = showTipAlways('basic');
-      } else if (level === 2) {
-        tip = showTipAlways('landing');
-      } else if (level === 3) {
-        tip = showTipAlways('junk');
-      } else if (level === 4) {
-        // Level 4 is also a storm level - show shield tip instead
-        // (storm tip shows on subsequent storm levels)
-        tip = showTipAlways('shield');
-      } else if (level === 9) {
-        // First blackout level
-        tip = showTipAlways('blackout');
-      } else if (isLightningLevel(mode, level) && level !== 4) {
-        // Storm levels after level 4
-        tip = showTipAlways('storm');
-      }
-    }
-    
-    if (tip) {
-      setCurrentTip(tip);
-      tipShownThisLevel.current = true;
-    }
-  }, 2500);
-  
-  return () => clearTimeout(tipTimeout);
-}, [level, mode, isDemo]);
-```
-
-### File: `src/components/game/SurvivalEngine.tsx`
-
-Add a ref to track if comet tip has been shown this session (around line 176):
-
-```typescript
-const cometTipShownRef = useRef(false);
-```
-
-Add comet tip trigger when first comet activates (around line 1769, after `firstCometSpawnedRef.current = true`):
-
-```typescript
-// Show comet tip on first comet appearance
-if (!cometTipShownRef.current) {
-  const tip = showTipAlways('comet');
-  if (tip) {
-    setCurrentTip(tip);
-    cometTipShownRef.current = true;
+// Fallback to local if no global
+if (!activeGhostRecording) {
+  localRecording = loadLocalGhost();
+  if (localRecording) {
+    activeGhostRecording = localRecording; // Uses local only if no global
   }
 }
 ```
 
-This needs to be added in all places where the first comet spawns (chunks 5-8 spawn and the fallback >8 spawn).
+This "either/or" logic prevents both ghosts from being displayed.
+
+**Time Trial mode already works correctly** because it uses separate variables (`timeTrialLocalGhost` and `timeTrialLoadedGhost`) and renders them independently.
+
+---
+
+## Solution
+
+### Part 1: Add Separate Ghost Variables for Fixed/Medley Modes
+
+**File: `src/components/game/GameEngine.tsx`**
+
+Add refs for separate ghost recordings (around line 330):
+
+```typescript
+// Separate refs for dual ghost support in Fixed/Medley modes
+const fixedLocalGhost = useRef<any>(null);
+const fixedGlobalGhost = useRef<any>(null);
+```
+
+### Part 2: Update Ghost Loading Logic
+
+Replace the current single-ghost loading logic (lines ~1179-1237) with dual-ghost loading:
+
+```typescript
+// Initialize ghost system - load BOTH local and global ghosts
+let localGhostRecording: any = null;
+let globalGhostRecording: any = null;
+
+// Check settings
+const localGhostsEnabled = localStorage.getItem('ll-ghost-mode-enabled') === 'true';
+const globalGhostsEnabled = localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+
+// Fixed mode ghost loading
+if (isGhostModeFixed && ghostLevel !== undefined) {
+  // Load local ghost if local setting enabled
+  if (localGhostsEnabled) {
+    const localRecording = ghostManager.current.loadLunarLanderGhost(difficulty, ghostLevel);
+    if (localRecording) {
+      localGhostRecording = localRecording;
+      fixedLocalGhost.current = localRecording;
+      console.log("👻 Local ghost loaded:", (localRecording.completionTime / 1000).toFixed(2) + "s");
+    }
+  }
+  
+  // Load global ghost if global setting enabled
+  if (globalGhostsEnabled) {
+    const globalRecording = await ghostManager.current.loadGlobalGhost(difficulty, ghostLevel, 'fixed');
+    if (globalRecording) {
+      globalGhostRecording = globalRecording;
+      fixedGlobalGhost.current = globalRecording;
+      console.log("🌍 Global ghost loaded:", (globalRecording.completionTime / 1000).toFixed(2) + "s");
+    }
+  }
+}
+
+// Same pattern for Medley mode...
+```
+
+### Part 3: Add Separate Ghost State Objects
+
+Replace single `ghostShip` with two separate ghost ship objects:
+
+```typescript
+// Ghost state - separate for local and global
+let localGhostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
+let globalGhostShip: { x: number; y: number; angle: number; visible: boolean } | null = null;
+
+if ((isGhostModeFixed && ghostLevel !== undefined) || isGhostModeMedley) {
+  if (localGhostsEnabled) {
+    localGhostShip = { x: 0, y: 0, angle: 0, visible: false };
+  }
+  if (globalGhostsEnabled) {
+    globalGhostShip = { x: 0, y: 0, angle: 0, visible: false };
+  }
+}
+```
+
+### Part 4: Update Ghost Playback Logic
+
+Replace the current ghost playback (lines ~1908-1928):
+
+```typescript
+// Ghost playback - update BOTH ghost states (fixed and medley modes)
+if (isGhostMode) {
+  // Update local ghost state
+  if (fixedLocalGhost.current && localGhostShip) {
+    const localState = mode === "medley" 
+      ? ghostManager.current.getMedleyGhostState(difficulty, level, gameTime)
+      : ghostManager.current.getLunarLanderGhostState(difficulty, ghostLevel!, gameTime);
+    
+    if (localState) {
+      localGhostShip.x = localState.x;
+      localGhostShip.y = localState.y;
+      localGhostShip.angle = localState.angle;
+      localGhostShip.visible = localState.visible;
+    } else {
+      localGhostShip.visible = false;
+    }
+  }
+  
+  // Update global ghost state
+  if (fixedGlobalGhost.current && globalGhostShip) {
+    const globalState = ghostManager.current.getGlobalGhostState(fixedGlobalGhost.current, gameTime);
+    
+    if (globalState) {
+      globalGhostShip.x = globalState.x;
+      globalGhostShip.y = globalState.y;
+      globalGhostShip.angle = globalState.angle;
+      globalGhostShip.visible = globalState.visible;
+    } else {
+      globalGhostShip.visible = false;
+    }
+  }
+}
+```
+
+### Part 5: Update Ghost Rendering
+
+Replace single ghost rendering (lines ~5079-5101) with dual ghost rendering:
+
+```typescript
+// Ghost ships (render before player)
+// Local ghost (green)
+if (localGhostShip && localGhostShip.visible) {
+  for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+    ctx.save();
+    ctx.translate(localGhostShip.x + offset, localGhostShip.y);
+    ctx.rotate(localGhostShip.angle);
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -10);
+    ctx.lineTo(8, 10);
+    ctx.lineTo(-8, 10);
+    ctx.closePath();
+    ctx.strokeStyle = '#00ff80'; // Green for local
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+    ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Global ghost (gold)
+if (globalGhostShip && globalGhostShip.visible) {
+  for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+    ctx.save();
+    ctx.translate(globalGhostShip.x + offset, globalGhostShip.y);
+    ctx.rotate(globalGhostShip.angle);
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -10);
+    ctx.lineTo(8, 10);
+    ctx.lineTo(-8, 10);
+    ctx.closePath();
+    ctx.strokeStyle = '#FFD700'; // Gold for global
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-6, 8); ctx.lineTo(-12, 12);
+    ctx.moveTo(6, 8); ctx.lineTo(12, 12);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+```
+
+### Part 6: Skip Duplicate Ghost When Player Holds Record
+
+Add logic to skip local ghost if player's time equals global record:
+
+```typescript
+// During loading, check if local time matches global time
+const playerHoldsRecord = localGhostRecording && globalGhostRecording &&
+  Math.abs(localGhostRecording.completionTime - globalGhostRecording.completionTime) < 50;
+
+// If player holds the record, only show global (gold) ghost
+if (playerHoldsRecord) {
+  fixedLocalGhost.current = null;
+  localGhostShip = null;
+  console.log("🏆 Player holds world record - showing only gold ghost");
+}
+```
 
 ---
 
@@ -137,23 +238,23 @@ This needs to be added in all places where the first comet spawns (chunks 5-8 sp
 
 | File | Changes |
 |------|---------|
-| `src/lib/inFlightGuide.ts` | Update text for `landing`, `junk`, `shield`, and `comet` tips |
-| `src/components/game/GameEngine.tsx` | Add tip triggers for levels 2, 3, 4, 9, and subsequent storm levels |
-| `src/components/game/SurvivalEngine.tsx` | Add comet tip trigger on first comet spawn |
+| `src/components/game/GameEngine.tsx` | Add dual ghost refs, update loading/playback/rendering logic |
 
 ---
 
-## Tip Schedule Summary
+## Result After Fix
 
-| Level | Mode | Tip Shown |
-|-------|------|-----------|
-| 1 | Classic/Fixed | "THRUST to ascend, ROTATE to aim. Land gently on pads!" |
-| 2 | Classic/Fixed | "Land on the glowing pads. 2x gives double points" |
-| 3 | Classic/Fixed | "Collect SPACE JUNK for fuel, getting it all awards shield!" |
-| 4 | Classic/Fixed | "SHIELDS can take one hit and bounce you to safety." |
-| 9 | Classic/Fixed | "BLACKOUT! Use your spotlight to navigate." |
-| 14+ storm levels | Classic/Fixed | "LIGHTNING STORM! Watch for strikes." |
-| Start | Survival | "Travel as far as you can! Land on pads to refuel." |
-| First comet | Survival | "COMET! Land when active for bonus points." |
-| Any | Time Trial | "Land on pads IN ORDER! Timer starts at first takeoff." |
+| Local Setting | Global Setting | What Shows |
+|---------------|----------------|------------|
+| ON | OFF | Green local ghost only |
+| OFF | ON | Gold global ghost only |
+| ON | ON (player doesn't hold record) | Both green AND gold ghosts |
+| ON | ON (player holds record) | Gold ghost only (as their local IS the global) |
 
+---
+
+## Technical Notes
+
+- This mirrors the existing Time Trial implementation which already supports dual ghosts
+- Ghost time difference calculation for HUD will need adjustment to show both times
+- The ghost rendering order (local first, then global) ensures gold ghost renders on top if they overlap
