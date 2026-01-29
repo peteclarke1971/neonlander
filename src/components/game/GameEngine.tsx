@@ -423,7 +423,27 @@ export const GameEngine: React.FC<Props> = ({
       if (mode === 'timetrial') {
         tip = showTipAlways('timetrial');
       }
-      // Basic controls on level 1
+      // Level-specific tips for classic/fixed modes
+      else if (mode === 'classic' || mode === 'fixed') {
+        if (level === 1 || level === 0) {
+          tip = showTipAlways('basic');
+        } else if (level === 2) {
+          tip = showTipAlways('landing');
+        } else if (level === 3) {
+          tip = showTipAlways('junk');
+        } else if (level === 4) {
+          // Level 4 is also a storm level - show shield tip instead
+          // (storm tip shows on subsequent storm levels)
+          tip = showTipAlways('shield');
+        } else if (level === 9) {
+          // First blackout level
+          tip = showTipAlways('blackout');
+        } else if (isLightningLevel(mode, level) && level !== 4) {
+          // Storm levels after level 4
+          tip = showTipAlways('storm');
+        }
+      }
+      // Basic controls on level 1 for other modes
       else if (level === 1 || level === 0) {
         tip = showTipAlways('basic');
       }

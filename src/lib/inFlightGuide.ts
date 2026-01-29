@@ -18,17 +18,17 @@ export const TIPS: Record<string, TipDefinition> = {
   },
   landing: {
     id: 'landing',
-    message: 'Green pads = safe. Land at low speed with level angle.',
+    message: 'Land on the glowing pads. 2x gives double points',
     duration: 6000,
   },
   junk: {
     id: 'junk',
-    message: 'Collect SPACE JUNK for fuel! 3 items opens WORMHOLE.',
+    message: 'Collect SPACE JUNK for fuel, getting it all awards shield!',
     duration: 6500,
   },
   shield: {
     id: 'shield',
-    message: 'SHIELD protects from one crash. Bounces you to safety.',
+    message: 'SHIELDS can take one hit and bounce you to safety.',
     duration: 6000,
   },
   volcano: {
@@ -63,7 +63,7 @@ export const TIPS: Record<string, TipDefinition> = {
   },
   comet: {
     id: 'comet',
-    message: 'COMET! Catch it for bonus points.',
+    message: 'COMET! Land when active for bonus points.',
     duration: 5500,
   },
 };

@@ -175,6 +175,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const chunksGeneratedRef = useRef(0);
   const firstCometSpawnedRef = useRef(false);
   const nextCometBlockRef = useRef(0); // Block number for next comet spawn
+  const cometTipShownRef = useRef(false); // Track if comet tip has been shown
   
   // Blackout zone state
   const blackoutActiveRef = useRef(false);
@@ -1769,6 +1770,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 firstCometSpawnedRef.current = true;
                 audio.current.playCometArrival();
                 
+                // Show comet tip on first comet appearance
+                if (!cometTipShownRef.current) {
+                  const tip = showTipAlways('comet');
+                  if (tip) {
+                    setCurrentTip(tip);
+                    cometTipShownRef.current = true;
+                  }
+                }
+                
                 // Set next comet target: 8-16 blocks from now
                 const gap = 8 + Math.floor(Math.random() * 9); // Random 8-16
                 nextCometBlockRef.current = chunksGeneratedRef.current + gap;
@@ -1785,6 +1795,15 @@ export const SurvivalEngine: React.FC<Props> = ({
                 cometPositionRef.current = { x: 0, y: 0, progress: 0 };
                 firstCometSpawnedRef.current = true;
                 audio.current.playCometArrival();
+                
+                // Show comet tip on first comet appearance
+                if (!cometTipShownRef.current) {
+                  const tip = showTipAlways('comet');
+                  if (tip) {
+                    setCurrentTip(tip);
+                    cometTipShownRef.current = true;
+                  }
+                }
                 
                 // Set next comet target
                 const gap = 8 + Math.floor(Math.random() * 9);
