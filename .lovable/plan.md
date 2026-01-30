@@ -1,229 +1,313 @@
 
-
-# Plan: Guide System Updates - Text, Emojis, and Navigation Fix
+# Plan: Guide System Final Tweaks
 
 ## Summary
 
-This plan implements the following changes to the Guide popup:
-1. Add text under pulsing pad on LANDING page: "The lander must be completely on the pad"
-2. Increase all text size by 40% across the entire guide
-3. Remove all emoji icons EXCEPT:
-   - 🎮 on CONTROLS page (Gamepad supported)
-   - ∞ on SURVIVAL page title
-4. Fix left/right arrow key navigation for guide pages
+This plan implements several refinements to the Guide popup:
+1. **Scroll to top on page change** - Reset scroll position when navigating between pages
+2. **Always start at first page** - Reset to page 0 when opening the guide
+3. **Pause demo timer** - Emit callback to pause demo timer when guide is open
+4. **Auto-scroll feature** - After 3 seconds, slowly scroll down; at bottom, wait 3s and scroll back up
+5. **Landing page text** - Add "Land in the glowing pads" above existing pad text
+6. **Hazards page text** - Update Gravity Wells description
 
 ---
 
-## Part 1: LANDING Page - Add Text Under Pulsing Pad
+## Part 1: Scroll to Top on Page Change
+
+### File: `src/components/game/GuidePopup.tsx`
+
+Add a ref for the scroll container and reset scroll position whenever `currentPage` changes.
+
+**Changes:**
+- Add `scrollContainerRef` ref for the content div
+- Add useEffect that resets scrollTop to 0 when `currentPage` changes
+
+```typescript
+const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+// Scroll to top when page changes
+useEffect(() => {
+  if (scrollContainerRef.current) {
+    scrollContainerRef.current.scrollTop = 0;
+  }
+}, [currentPage]);
+```
+
+**Apply ref to content div (line 220):**
+```tsx
+<div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 guide-scroll">
+```
+
+---
+
+## Part 2: Always Start at First Page
+
+### File: `src/components/game/GuidePopup.tsx`
+
+Currently the guide loads the last viewed page from localStorage (lines 33-45). Change this to always start at page 0.
+
+**Before (lines 33-45):**
+```typescript
+useEffect(() => {
+  if (isOpen) {
+    try {
+      const saved = localStorage.getItem('ll-guide-last-page');
+      if (saved) {
+        const pageIndex = parseInt(saved, 10);
+        if (pageIndex >= 0 && pageIndex < PAGES.length) {
+          setCurrentPage(pageIndex);
+        }
+      }
+    } catch {}
+  }
+}, [isOpen]);
+```
+
+**After:**
+```typescript
+useEffect(() => {
+  if (isOpen) {
+    setCurrentPage(0); // Always start at first page
+  }
+}, [isOpen]);
+```
+
+Also remove the "save current page to storage" effect (lines 47-52) since we no longer persist page position.
+
+---
+
+## Part 3: Pause Demo Timer When Guide is Open
+
+### File: `src/components/game/GuidePopup.tsx`
+
+Add an optional `onOpenChange` callback prop that notifies parent when guide opens/closes.
+
+**Updated props interface:**
+```typescript
+interface GuidePopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenChange?: (isOpen: boolean) => void; // New prop
+}
+```
+
+**Add effect to notify parent:**
+```typescript
+useEffect(() => {
+  onOpenChange?.(isOpen);
+}, [isOpen, onOpenChange]);
+```
+
+### File: `src/components/game/PlayerMenu.tsx`
+
+Track when guide is open and pass to parent via `onInteraction` or a new callback.
+
+**Add state (around line 118):**
+```typescript
+const [guideOpen, setGuideOpen] = useState(false);
+```
+
+**Pass callback to GuidePopup:**
+```tsx
+<GuidePopup 
+  isOpen={showGuidePopup} 
+  onClose={() => setShowGuidePopup(false)}
+  onOpenChange={setGuideOpen}
+/>
+```
+
+**Modify idle timer effect (around line 251) to not run when guide is open:**
+```typescript
+useEffect(() => {
+  // Don't run idle timer if mode/level menu is open, assets not loaded, showing leaderboards, or guide is open
+  if (showModeMenu || showLevelMenu || !assetsLoaded || showLeaderboards || showGuidePopup) {
+    return;
+  }
+  // ... rest of effect
+}, [showModeMenu, showLevelMenu, assetsLoaded, showLeaderboards, showGuidePopup]);
+```
+
+### File: `src/pages/Index.tsx`
+
+The demo timer runs based on `lastInteractionTime`. When guide is open, we need to pause it.
+
+**Option: Pass guideOpen state up from PlayerMenu and pause demo timer**
+
+Add prop to PlayerMenu:
+```typescript
+interface PlayerMenuProps {
+  // ... existing props
+  onGuideOpen?: (isOpen: boolean) => void;
+}
+```
+
+In Index.tsx, track guide state:
+```typescript
+const [guideOpen, setGuideOpen] = useState(false);
+```
+
+In demo timer effect (line 733), add condition:
+```typescript
+useEffect(() => {
+  // Don't run demo timer during active gameplay or when guide is open
+  if (view === "game" || view === "gameover" || guideOpen) {
+    return;
+  }
+  // ... rest of effect
+}, [view, lastInteractionTime, demoSequenceIndex, demoStartTime, demoOriginView, guideOpen]);
+```
+
+Also reset lastInteractionTime when guide closes to restart the 60-second countdown.
+
+---
+
+## Part 4: Auto-Scroll Feature
+
+### File: `src/components/game/GuidePopup.tsx`
+
+Add auto-scroll logic that:
+1. Waits 3 seconds after page loads
+2. Slowly scrolls down
+3. Waits 3 seconds at bottom
+4. Slowly scrolls back up
+5. Repeats
+
+**Implementation:**
+
+```typescript
+// Auto-scroll state
+const autoScrollRef = useRef<{
+  direction: 'down' | 'up' | 'waiting';
+  waitStart: number;
+  rafId: number;
+}>({ direction: 'waiting', waitStart: 0, rafId: 0 });
+
+useEffect(() => {
+  if (!isOpen) return;
+  
+  const container = scrollContainerRef.current;
+  if (!container) return;
+  
+  // Check if scrolling is needed
+  const hasScroll = container.scrollHeight > container.clientHeight;
+  if (!hasScroll) return;
+  
+  const SCROLL_SPEED = 30; // pixels per second
+  const WAIT_TIME = 3000; // 3 seconds
+  
+  let lastTime = performance.now();
+  autoScrollRef.current = { direction: 'waiting', waitStart: performance.now(), rafId: 0 };
+  
+  const animate = (time: number) => {
+    const delta = time - lastTime;
+    lastTime = time;
+    
+    const state = autoScrollRef.current;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const maxScroll = scrollHeight - clientHeight;
+    
+    if (state.direction === 'waiting') {
+      if (time - state.waitStart >= WAIT_TIME) {
+        // Determine direction based on current position
+        if (scrollTop >= maxScroll - 1) {
+          state.direction = 'up';
+        } else if (scrollTop <= 1) {
+          state.direction = 'down';
+        } else {
+          state.direction = 'down'; // Default to down
+        }
+      }
+    } else if (state.direction === 'down') {
+      const newScroll = scrollTop + (SCROLL_SPEED * delta / 1000);
+      container.scrollTop = newScroll;
+      if (container.scrollTop >= maxScroll - 1) {
+        state.direction = 'waiting';
+        state.waitStart = time;
+      }
+    } else if (state.direction === 'up') {
+      const newScroll = scrollTop - (SCROLL_SPEED * delta / 1000);
+      container.scrollTop = newScroll;
+      if (container.scrollTop <= 1) {
+        state.direction = 'waiting';
+        state.waitStart = time;
+      }
+    }
+    
+    state.rafId = requestAnimationFrame(animate);
+  };
+  
+  autoScrollRef.current.rafId = requestAnimationFrame(animate);
+  
+  return () => {
+    cancelAnimationFrame(autoScrollRef.current.rafId);
+  };
+}, [isOpen, currentPage]); // Reset on page change
+```
+
+**User interaction pauses auto-scroll:**
+Add touch/scroll event listeners that reset the wait timer when user manually scrolls.
+
+---
+
+## Part 5: Landing Page Text Update
 
 ### File: `src/components/game/guide/GuidePageLanding.tsx`
 
-Add a text description below the `PulsingPadCanvas` component.
+Add "Land in the glowing pads" text above "The lander must be completely on the pad".
 
-**Current (lines 89-98):**
+**Current (lines 96-101):**
 ```tsx
-{/* Pulsing landing pad graphic */}
+<PulsingPadCanvas width={180} />
+<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+  The lander must be completely on the pad
+</span>
+```
+
+**After:**
+```tsx
+<PulsingPadCanvas width={180} />
+<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+  Land in the glowing pads
+</span>
+<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+  The lander must be completely on the pad
+</span>
+```
+
+---
+
+## Part 6: Hazards Page Text Update
+
+### File: `src/components/game/guide/GuidePageHazards.tsx`
+
+Update Gravity Wells section text.
+
+**Current (lines 47-55):**
+```tsx
+<div className="text-xs sm:text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+  Pull your ship toward them. Fight the pull!
+</div>
 <div 
-  className="p-3 rounded border flex justify-center"
-  style={{ 
-    borderColor: 'hsl(var(--neon) / 0.3)',
-    background: 'hsl(var(--neon) / 0.05)'
-  }}
+  className="text-xs sm:text-base mt-2"
+  style={{ color: 'hsl(var(--neon))' }}
 >
-  <PulsingPadCanvas width={180} />
+  Purple swirl effect
 </div>
 ```
 
 **After:**
 ```tsx
-{/* Pulsing landing pad graphic */}
+<div className="text-xs sm:text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+  Pulls or pushes your Lander
+</div>
 <div 
-  className="p-3 rounded border flex flex-col items-center gap-2"
-  style={{ 
-    borderColor: 'hsl(var(--neon) / 0.3)',
-    background: 'hsl(var(--neon) / 0.05)'
-  }}
+  className="text-xs sm:text-base mt-2"
+  style={{ color: 'hsl(var(--neon))' }}
 >
-  <PulsingPadCanvas width={180} />
-  <span className="text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
-    The lander must be completely on the pad
-  </span>
+  Size equals power
 </div>
 ```
-
----
-
-## Part 2: Increase Text Size by 40% Globally
-
-Current text sizes and their 40% larger equivalents:
-- `text-xs` (12px) → `text-base` (16px) - approximately 33% increase, closest Tailwind match
-- `text-sm` (14px) → `text-lg` (18px) - approximately 29% increase, closest match
-- `text-base` (16px) → `text-xl` (20px) - 25% increase
-- `text-2xl` (24px) → `text-4xl` (36px) - 50% increase, close enough
-
-**Changes across all guide pages:**
-
-### GuidePageControls.tsx
-- Line 9: `text-sm` → `text-lg`
-- Line 88: `text-sm` → `text-lg`
-
-### GuidePageLanding.tsx
-- Line 70: `text-sm` → `text-lg`
-- Line 81, 85: `text-xs` → `text-base`
-- Line 104: `text-sm` → `text-lg`
-- Line 110: `text-xs` → `text-base`
-- Line 113, 114, 118, 119, 123, 124, 128: various `opacity` spans → `text-base`
-
-### GuidePageFuelShields.tsx
-- Line 9: `text-sm` → `text-lg`
-- Line 15: `text-sm` → `text-lg`
-- Line 34: `text-sm` → `text-lg`
-- Line 41: `text-sm` → `text-lg`
-- Line 64: `text-xs` → `text-base`
-
-### GuidePageHazards.tsx
-- Line 17: `text-sm` → `text-lg`
-- Line 22: `text-xs` → `text-base`
-- Line 26: `text-xs` → `text-base`
-- (Similar changes for all hazard boxes and UFO types section)
-
-### GuidePageScoring.tsx
-- Line 9: `text-sm` → `text-lg`
-- Line 22: `text-sm` → `text-lg`
-- Line 33: `text-xs` → `text-base`
-- Line 44: `text-sm` → `text-lg`
-- Line 50: `text-sm` → `text-lg`
-- (Similar changes throughout)
-
-### GuidePageModes.tsx
-- Line 7: `text-sm` → `text-lg`
-- Line 22: `text-sm` → `text-lg`
-- Line 27: `text-xs` → `text-base`
-- (Similar changes for all mode boxes)
-
-### GuidePageSurvival.tsx
-- Line 7: `text-2xl` → `text-4xl`
-- Line 16: `text-sm` → `text-lg`
-- Line 23: `text-sm` → `text-lg`
-- Line 37: `text-sm` → `text-lg`
-- Line 43: `text-xs` → `text-base`
-- (Similar changes throughout)
-
----
-
-## Part 3: Remove Emoji Icons (Keep Only 🎮 and ∞)
-
-### GuidePageControls.tsx
-- Keep 🎮 on line 91 (Gamepad note)
-
-### GuidePageLanding.tsx
-Remove emojis from:
-- Line 80: `✓ SPEED` → `SPEED`
-- Line 84: `✓ ANGLE` → `ANGLE`
-- Line 112: `🎯 BULLSEYE` → `BULLSEYE`
-- Line 117: `⚡ SPEED` → `SPEED`
-- Line 122: `✨ PERFECT` → `PERFECT`
-
-### GuidePageFuelShields.tsx
-Remove emojis from:
-- Line 17: `⛽` → remove
-- Line 21: `↻` → remove
-- Line 25: `✦` → remove
-- Line 49: `🛡️` → remove
-- Line 53: `💥` → remove
-- Line 57: `✨` → remove
-
-### GuidePageSurvival.tsx
-- Keep `∞` on line 10 (SURVIVAL MODE title)
-- Remove from:
-  - Line 48: `⛽ FUEL` → `FUEL`
-  - Line 55: `📍 SECTORS` → `SECTORS`
-  - Line 62: `☄️ COMETS` → `COMETS`
-  - Line 69: `🌀 WEATHER` → `WEATHER`
-  - Line 93: `🌑` → remove
-  - Line 109: `💡` → remove
-  - Line 124: `💡 Conserve fuel...` → `Conserve fuel...`
-
-### GuidePageScoring.tsx
-Remove emojis from:
-- Line 55: `🎯 Bullseye` → `Bullseye`
-- Line 62: `⚡ Speed Bonus` → `Speed Bonus`
-- Line 69: `✨ Perfect` → `Perfect`
-- Line 76: `🔄 360° Rotation` → `360° Rotation`
-- Line 83: `💨 Near Miss` → `Near Miss`
-
-### GuidePageModes.tsx
-Remove emojis from:
-- Line 25: `🚀 CAMPAIGN` → `CAMPAIGN`
-- Line 44: `🕹️ CLASSIC` → `CLASSIC`
-- Line 63: `⏱️ TIME TRIAL` → `TIME TRIAL`
-- Line 82: `🎲 MEDLEY` → `MEDLEY`
-- Keep `∞` on line 101 (SURVIVAL)
-
----
-
-## Part 4: Fix Left/Right Arrow Key Navigation
-
-### Analysis
-The keyboard navigation code in `GuidePopup.tsx` (lines 62-81) looks correct:
-
-```tsx
-useEffect(() => {
-  if (!isOpen) return;
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-      e.preventDefault();
-      goToPrevPage();
-    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-      e.preventDefault();
-      goToNextPage();
-    }
-  };
-
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, [isOpen, onClose, goToPrevPage, goToNextPage]);
-```
-
-### Issue
-The problem could be that other event listeners in the parent component are catching and handling the events first, or the focus is being captured by interactive elements within the guide. 
-
-### Solution
-Use the capture phase for event listening to ensure we handle keyboard events before other handlers. Also add `stopPropagation()` to prevent event bubbling:
-
-```tsx
-useEffect(() => {
-  if (!isOpen) return;
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-    } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-      e.preventDefault();
-      e.stopPropagation();
-      goToPrevPage();
-    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-      e.preventDefault();
-      e.stopPropagation();
-      goToNextPage();
-    }
-  };
-
-  // Use capture phase to handle events before other listeners
-  window.addEventListener('keydown', handleKeyDown, true);
-  return () => window.removeEventListener('keydown', handleKeyDown, true);
-}, [isOpen, onClose, goToPrevPage, goToNextPage]);
-```
-
-The key changes:
-1. Add `e.stopPropagation()` to prevent events from reaching other handlers
-2. Add `true` as third parameter to `addEventListener` to use capture phase
 
 ---
 
@@ -231,26 +315,42 @@ The key changes:
 
 | File | Changes |
 |------|---------|
-| `src/components/game/GuidePopup.tsx` | Fix keyboard navigation with capture phase and stopPropagation |
-| `src/components/game/guide/GuidePageControls.tsx` | Increase text sizes |
-| `src/components/game/guide/GuidePageLanding.tsx` | Add pad text, increase sizes, remove emojis (keep none) |
-| `src/components/game/guide/GuidePageFuelShields.tsx` | Increase text sizes, remove all emojis |
-| `src/components/game/guide/GuidePageHazards.tsx` | Increase text sizes |
-| `src/components/game/guide/GuidePageScoring.tsx` | Increase text sizes, remove all emojis |
-| `src/components/game/guide/GuidePageModes.tsx` | Increase text sizes, remove emojis except ∞ |
-| `src/components/game/guide/GuidePageSurvival.tsx` | Increase text sizes, remove emojis except ∞ |
+| `src/components/game/GuidePopup.tsx` | Scroll to top, always start at page 0, auto-scroll, notify parent of open state |
+| `src/components/game/PlayerMenu.tsx` | Track guide open state, pause idle timer when guide open, pass callback to parent |
+| `src/pages/Index.tsx` | Pause demo timer when guide is open |
+| `src/components/game/guide/GuidePageLanding.tsx` | Add "Land in the glowing pads" text |
+| `src/components/game/guide/GuidePageHazards.tsx` | Update Gravity Wells text |
 
 ---
 
-## Summary of Emoji Changes
+## Technical Notes
 
-| Page | Before | After |
-|------|--------|-------|
-| CONTROLS | 🎮 | 🎮 (kept) |
-| LANDING | ✓, 🎯, ⚡, ✨ | All removed |
-| FUEL & SHIELDS | ⛽, ↻, ✦, 🛡️, 💥, ✨ | All removed |
-| HAZARDS | None | None |
-| SCORING | 🎯, ⚡, ✨, 🔄, 💨 | All removed |
-| MODES | 🚀, 🕹️, ⏱️, 🎲, ∞ | Only ∞ kept |
-| SURVIVAL | ∞, ⛽, 📍, ☄️, 🌀, 🌑, 💡 | Only ∞ (title) kept |
+### Auto-Scroll Behavior
+- Uses `requestAnimationFrame` for smooth animation
+- Scroll speed: 30 pixels/second (adjustable)
+- Wait time: 3 seconds at top and bottom
+- Resets when user changes page or manually scrolls
+- Only activates if page has scrollable content
 
+### Demo Timer Pause
+- When guide opens, the demo timer is effectively paused by not running the interval
+- When guide closes, `lastInteractionTime` is reset to restart the 60-second countdown
+- This prevents demo mode from triggering while reading the guide
+
+### Scroll Reset
+- Every page change resets scroll to top immediately
+- This ensures users always see the beginning of each page
+- Works on both touch swipe and button/keyboard navigation
+
+---
+
+## Result After Changes
+
+| Feature | Before | After |
+|---------|--------|-------|
+| Page scroll position | Retained between pages | Resets to top on each page |
+| Initial page | Loads last viewed page | Always starts at page 1 (Controls) |
+| Demo timer | Runs while guide is open | Pauses when guide is open |
+| Auto-scroll | None | Scrolls down after 3s, back up after reaching bottom |
+| Landing page | Single line of text | Two lines: "Land in the glowing pads" + "The lander must be completely on the pad" |
+| Gravity Wells | "Pull your ship toward them" + "Purple swirl effect" | "Pulls or pushes your Lander" + "Size equals power" |
