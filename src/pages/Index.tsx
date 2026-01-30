@@ -46,6 +46,7 @@ const Index = () => {
   const [demoOriginView, setDemoOriginView] = useState<"home" | "playermenu">("home"); // Track where demo started
   const demoSequence = [1, 4, 5, 6, 9, 10, 14, 19, 31, 50]; // Demo levels to cycle through
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [guideOpen, setGuideOpen] = useState(false); // Track guide popup state for demo timer
   const [mode, setMode] = useState<Mode>("classic");
   const [lastResult, setLastResult] = useState<GameOverData | null>(null);
   const audioRef = useRef(getGlobalAudioManager());
@@ -732,8 +733,8 @@ const retryGame = () => {
 
   // Demo timer system - 60 seconds on menu (home or playermenu), 15 seconds per demo
   useEffect(() => {
-    // Don't run demo timer during active gameplay
-    if (view === "game" || view === "gameover") {
+    // Don't run demo timer during active gameplay or when guide is open
+    if (view === "game" || view === "gameover" || guideOpen) {
       return;
     }
     
@@ -760,7 +761,16 @@ const retryGame = () => {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [view, lastInteractionTime, demoSequenceIndex, demoStartTime, demoOriginView]);
+  }, [view, lastInteractionTime, demoSequenceIndex, demoStartTime, demoOriginView, guideOpen]);
+
+  // Reset interaction timer when guide closes
+  const handleGuideOpenChange = (isOpen: boolean) => {
+    setGuideOpen(isOpen);
+    if (!isOpen) {
+      // Reset interaction time when guide closes to restart 60-second countdown
+      setLastInteractionTime(Date.now());
+    }
+  };
 
   // User interaction detection for home/playermenu screens (demo timer reset)
   useEffect(() => {
@@ -908,6 +918,7 @@ const retryGame = () => {
           }}
           onDevPortal={() => setView("home")}
           onInteraction={() => setLastInteractionTime(Date.now())}
+          onGuideOpenChange={handleGuideOpenChange}
         />
       )}
       {view === "game" && (

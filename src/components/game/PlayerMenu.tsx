@@ -30,6 +30,7 @@ interface PlayerMenuProps {
   onSettings: () => void;
   onDevPortal: () => void;
   onInteraction?: () => void;
+  onGuideOpenChange?: (isOpen: boolean) => void;
 }
 
 const menuItems = [
@@ -111,6 +112,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   onSettings,
   onDevPortal,
   onInteraction,
+  onGuideOpenChange,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [showModeMenu, setShowModeMenu] = useState(false);
@@ -249,8 +251,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   
   // Idle timer - separate from demo timer
   useEffect(() => {
-    // Don't run idle timer if mode/level menu is open, assets not loaded, or already showing leaderboards
-    if (showModeMenu || showLevelMenu || !assetsLoaded || showLeaderboards) {
+    // Don't run idle timer if mode/level menu is open, assets not loaded, showing leaderboards, or guide is open
+    if (showModeMenu || showLevelMenu || !assetsLoaded || showLeaderboards || showGuidePopup) {
       return;
     }
     
@@ -259,7 +261,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [showModeMenu, showLevelMenu, assetsLoaded, showLeaderboards]);
+  }, [showModeMenu, showLevelMenu, assetsLoaded, showLeaderboards, showGuidePopup]);
   
   // Trigger leaderboard display after 10s idle
   useEffect(() => {
@@ -780,7 +782,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       {/* Guide Popup */}
       <GuidePopup 
         isOpen={showGuidePopup} 
-        onClose={() => setShowGuidePopup(false)} 
+        onClose={() => setShowGuidePopup(false)}
+        onOpenChange={onGuideOpenChange}
       />
 
       {/* Footer - Ghost toggles, Tips, Fullscreen, GFX toggle and Dev Portal link */}

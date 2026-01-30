@@ -11,6 +11,7 @@ import { anyGamepad, loadProfile, readGamepad, vibrate, getLastDeviceId } from '
 interface GuidePopupProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 const PAGES = [
@@ -23,33 +24,115 @@ const PAGES = [
   { id: 'survival', title: 'SURVIVAL', Component: GuidePageSurvival },
 ];
 
-export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose }) => {
+export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenChange }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const gpPrevRef = useRef({ left: false, right: false, back: false, select: false });
   const gpLastFireRef = useRef({ left: 0, right: 0, back: 0, select: 0 });
 
-  // Load last viewed page from storage
+  // Always start at first page when opening
   useEffect(() => {
     if (isOpen) {
-      try {
-        const saved = localStorage.getItem('ll-guide-last-page');
-        if (saved) {
-          const pageIndex = parseInt(saved, 10);
-          if (pageIndex >= 0 && pageIndex < PAGES.length) {
-            setCurrentPage(pageIndex);
-          }
-        }
-      } catch {}
+      setCurrentPage(0);
     }
   }, [isOpen]);
 
-  // Save current page to storage
+  // Notify parent of open state changes
   useEffect(() => {
-    try {
-      localStorage.setItem('ll-guide-last-page', String(currentPage));
-    } catch {}
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
   }, [currentPage]);
+
+  // Auto-scroll feature
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    // Small delay to let content render
+    const checkTimeout = setTimeout(() => {
+      const hasScroll = container.scrollHeight > container.clientHeight;
+      if (!hasScroll) return;
+      
+      const SCROLL_SPEED = 30; // pixels per second
+      const WAIT_TIME = 3000; // 3 seconds
+      
+      let lastTime = performance.now();
+      let direction: 'down' | 'up' | 'waiting' = 'waiting';
+      let waitStart = performance.now();
+      let rafId = 0;
+      let userInteracted = false;
+      
+      const resetAutoScroll = () => {
+        userInteracted = true;
+        waitStart = performance.now();
+        direction = 'waiting';
+        // Resume after 3 seconds of no interaction
+        setTimeout(() => { userInteracted = false; }, 3000);
+      };
+      
+      container.addEventListener('touchstart', resetAutoScroll, { passive: true });
+      container.addEventListener('wheel', resetAutoScroll, { passive: true });
+      
+      const animate = (time: number) => {
+        if (userInteracted) {
+          lastTime = time;
+          rafId = requestAnimationFrame(animate);
+          return;
+        }
+        
+        const delta = time - lastTime;
+        lastTime = time;
+        
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const maxScroll = scrollHeight - clientHeight;
+        
+        if (direction === 'waiting') {
+          if (time - waitStart >= WAIT_TIME) {
+            if (scrollTop >= maxScroll - 1) {
+              direction = 'up';
+            } else {
+              direction = 'down';
+            }
+          }
+        } else if (direction === 'down') {
+          const newScroll = scrollTop + (SCROLL_SPEED * delta / 1000);
+          container.scrollTop = newScroll;
+          if (container.scrollTop >= maxScroll - 1) {
+            direction = 'waiting';
+            waitStart = time;
+          }
+        } else if (direction === 'up') {
+          const newScroll = scrollTop - (SCROLL_SPEED * delta / 1000);
+          container.scrollTop = newScroll;
+          if (container.scrollTop <= 1) {
+            direction = 'waiting';
+            waitStart = time;
+          }
+        }
+        
+        rafId = requestAnimationFrame(animate);
+      };
+      
+      rafId = requestAnimationFrame(animate);
+      
+      return () => {
+        cancelAnimationFrame(rafId);
+        container.removeEventListener('touchstart', resetAutoScroll);
+        container.removeEventListener('wheel', resetAutoScroll);
+      };
+    }, 100);
+    
+    return () => clearTimeout(checkTimeout);
+  }, [isOpen, currentPage]);
 
   const goToPrevPage = useCallback(() => {
     setCurrentPage(p => Math.max(0, p - 1));
@@ -217,7 +300,7 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 guide-scroll">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 guide-scroll">
           <CurrentPageComponent />
         </div>
 
