@@ -28,9 +28,9 @@ export interface GravityWaveParams {
   instanceId?: number;
   seedOverride?: number | string;
   // Enhanced effects
-  energyBursts?: boolean; // default true
+  energyBursts?: boolean; // default false (performance)
   centerVortex?: boolean; // default true
-  chromaticPulse?: boolean; // default true
+  chromaticPulse?: boolean; // default false (performance)
   spokeTwinkle?: boolean; // default true
   trailColorMode?: 'black' | 'hue-tinted'; // default 'hue-tinted'
 }
@@ -75,14 +75,14 @@ function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
-// Default presets
+// Default presets - OPTIMIZED: reduced grid density
 const PRESETS: Record<GravityWavePreset, GravityWaveParams> = {
   Calm: {
     speed: 0.22,
     amplitude: 0.35,
     wavelength: 0.35,
     warpStrength: 0.45,
-    gridDensity: 24,
+    gridDensity: 20, // Was 24
     noiseAmount: 0.08,
     colorMode: "cyan",
     glow: 0.6,
@@ -93,7 +93,7 @@ const PRESETS: Record<GravityWavePreset, GravityWaveParams> = {
     amplitude: 0.6,
     wavelength: 0.28,
     warpStrength: 0.75,
-    gridDensity: 32,
+    gridDensity: 24, // Was 32
     noiseAmount: 0.15,
     colorMode: "cyan",
     glow: 0.85,
@@ -104,7 +104,7 @@ const PRESETS: Record<GravityWavePreset, GravityWaveParams> = {
     amplitude: 0.85,
     wavelength: 0.22,
     warpStrength: 0.95,
-    gridDensity: 42,
+    gridDensity: 32, // Was 42
     noiseAmount: 0.2,
     colorMode: "two-tone",
     glow: 1.0,
@@ -151,6 +151,16 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
   const nextTrailAtRef = useRef<number>(performance.now() + 3000 + (randRef.current() * 2000));
   const saturationPhaseRef = useRef<number>(85); // Pulsing saturation 85-100%
   
+  // PERFORMANCE: Cached CSS variables
+  const cachedNeonRef = useRef<{ neon: string; neon2: string }>({ neon: "180 100% 55%", neon2: "180 100% 55%" });
+  
+  // PERFORMANCE: Performance tracking flags
+  const perfRef = useRef<{ skipGlow: boolean; skipWarp: boolean; currentFps: number }>({ 
+    skipGlow: false, 
+    skipWarp: false, 
+    currentFps: 60 
+  });
+  
   // Energy burst system
   const energyBurstsRef = useRef<Array<{ angle: number; distance: number; speed: number; createdAt: number; duration: number; hueOffset: number }>>([]);
   const nextBurstAtRef = useRef<number>(performance.now() + 8000 + (randRef.current() * 4000));
@@ -163,6 +173,22 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
 
   // Grid cache (polar lattice positions)
   const gridRef = useRef<{ rings: number; spokes: number; maxR: number; ringRs: Float32Array; spokeAngles: Float32Array } | null>(null);
+
+  // PERFORMANCE: Cache CSS variables on mount and theme changes
+  useEffect(() => {
+    const updateCache = () => {
+      const css = getComputedStyle(document.documentElement);
+      cachedNeonRef.current = {
+        neon: css.getPropertyValue("--neon").trim() || "180 100% 55%",
+        neon2: css.getPropertyValue("--neon-2").trim() || cachedNeonRef.current.neon
+      };
+    };
+    updateCache();
+    // Listen for theme changes
+    const observer = new MutationObserver(updateCache);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Build/Rebuild grid on size/params change
   const buildScene = () => {
@@ -180,8 +206,8 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       bgCtx.fillRect(0, 0, w, h);
     }
 
-    // Grid
-    const gd = Math.max(12, Math.floor(paramsRef.current.gridDensity));
+    // Grid - OPTIMIZED: stricter caps
+    const gd = Math.max(12, Math.min(36, Math.floor(paramsRef.current.gridDensity)));
     const rings = gd;
     const spokes = gd;
     const maxR = 0.92 * 0.5 * Math.hypot(w, h); // reach near corners by using half-diagonal
@@ -198,11 +224,11 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     gridBuiltRef.current = true;
   };
 
+  // OPTIMIZED: Uses cached CSS variables instead of getComputedStyle per frame
   const colorForMode = (alphaCore: number, alphaGlow: number, ringOrSpoke?: 'ring' | 'spoke') => {
     const p = paramsRef.current;
-    const css = getComputedStyle(document.documentElement);
-    const neon = css.getPropertyValue("--neon").trim() || "180 100% 55%"; // fallback cyan
-    const neon2 = css.getPropertyValue("--neon-2").trim() || neon;
+    const neon = cachedNeonRef.current.neon;
+    const neon2 = cachedNeonRef.current.neon2;
 
     if (p.colorMode === "rainbow" || p.colorMode === "dual-rainbow") {
       // Parse H S% L% from CSS var to keep S/L anchored to theme
@@ -303,6 +329,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     return { x: (dx / len) * mag * minDim, y: (dy / len) * mag * minDim };
   };
 
+  // OPTIMIZED: Reduced shadowBlur usage - only every 3rd ring gets glow when FPS is good
   const drawGrid = (ctx: CanvasRenderingContext2D, tSec: number) => {
     const grid = gridRef.current!;
     const p = paramsRef.current;
@@ -310,6 +337,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const h = ctx.canvas.height;
     const cx = (p.cx ?? 0.5) * w;
     const cy = (p.cy ?? 0.5) * h;
+    const skipGlow = perfRef.current.skipGlow;
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -322,7 +350,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const step = grid.rings > 1 ? grid.ringRs[1] - grid.ringRs[0] : grid.maxR;
     const off = ((tunnelOffsetRef.current || 0) % (step || 1));
 
-    // Rings with variable glow intensity
+    // OPTIMIZED: Batch rings with selective glow
     for (let i = 0; i < grid.rings; i++) {
       const r0 = grid.ringRs[i] + off;
       const hgt = computePhase(r0, tSec);
@@ -334,8 +362,14 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const glowMult = 0.8 + 0.4 * glowPhase;
       const ringColors = colorForMode(0.95, (0.28 * p.glow * glowMult), 'ring');
       
-      ctx.shadowColor = ringColors.core as any;
-      ctx.shadowBlur = 8 * p.glow * glowMult;
+      // PERFORMANCE: Only apply shadowBlur to every 3rd ring, skip entirely if low FPS
+      const shouldGlow = !skipGlow && i % 3 === 0;
+      if (shouldGlow) {
+        ctx.shadowColor = ringColors.core as any;
+        ctx.shadowBlur = 8 * p.glow * glowMult;
+      } else {
+        ctx.shadowBlur = 0;
+      }
 
       // Glow ring
       ctx.beginPath();
@@ -352,7 +386,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       ctx.stroke();
     }
 
-    // Spokes with twinkle effect
+    // Spokes with twinkle effect - OPTIMIZED: selective glow
     const now = performance.now();
     const spokeTwinkle = p.spokeTwinkle !== false;
     
@@ -369,15 +403,21 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const bend = hgt * 28 + twist * Math.sin(ang0 * 2 + tSec * 0.7);
       
       const spokeColors = colorForMode(0.95, 0.28 * p.glow, 'spoke');
-      ctx.shadowColor = spokeColors.core as any;
-      ctx.shadowBlur = 8 * p.glow;
+      
+      // PERFORMANCE: Only apply shadowBlur to every 4th spoke
+      const shouldGlowSpoke = !skipGlow && i % 4 === 0;
+      if (shouldGlowSpoke) {
+        ctx.shadowColor = spokeColors.core as any;
+        ctx.shadowBlur = 8 * p.glow;
+      } else {
+        ctx.shadowBlur = 0;
+      }
       
       // Twinkle effect
       let lineWidthGlow = 2;
       let lineWidthCore = 1;
-      let extraGlow = 1;
       
-      if (spokeTwinkle) {
+      if (spokeTwinkle && !skipGlow) {
         // Random chance to start twinkle
         if (!spokeTwinkleRef.current.has(i) && Math.random() < 0.03) {
           spokeTwinkleRef.current.set(i, {
@@ -396,8 +436,9 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
             const intensity = Math.sin(progress * Math.PI);
             lineWidthGlow = 2 + intensity * 1;
             lineWidthCore = 1 + intensity * 2;
-            extraGlow = 1 + intensity;
-            ctx.shadowBlur = 8 * p.glow * (1 + intensity);
+            if (shouldGlowSpoke) {
+              ctx.shadowBlur = 8 * p.glow * (1 + intensity);
+            }
           } else {
             spokeTwinkleRef.current.delete(i);
           }
@@ -468,12 +509,13 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     ctx.restore();
   };
   
-  // Energy burst particle system (30 FPS update optimization)
+  // Energy burst particle system - DISABLED BY DEFAULT for performance
   const burstLastUpdateRef = useRef<number>(0);
   
   const drawEnergyBursts = (ctx: CanvasRenderingContext2D, tSec: number, now: number) => {
     const p = paramsRef.current;
-    if (p.energyBursts === false) return;
+    // PERFORMANCE: Disabled by default
+    if (p.energyBursts !== true) return;
     
     const w = ctx.canvas.width;
     const h = ctx.canvas.height;
@@ -553,10 +595,12 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     ctx.restore();
   };
 
-  // Screen-space warp (CPU-friendly tile draw)
+  // Screen-space warp - OPTIMIZED: Much larger tiles (24px min instead of 6px)
   const warpBackground = (dst: CanvasRenderingContext2D, src: HTMLCanvasElement, tSec: number) => {
     const p = paramsRef.current;
-    if (failSoftRef.current.warpOff || p.warpStrength <= 0.001) {
+    
+    // PERFORMANCE: Skip warp entirely when FPS is low
+    if (failSoftRef.current.warpOff || p.warpStrength <= 0.001 || perfRef.current.skipWarp) {
       dst.drawImage(src, 0, 0);
       return;
     }
@@ -566,8 +610,8 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     const cx = (p.cx ?? 0.5) * w;
     const cy = (p.cy ?? 0.5) * h;
 
-    // Tile size scales with resolution
-    const tile = Math.max(6, Math.floor(Math.min(w, h) / 120));
+    // OPTIMIZED: Much larger tile size (24px min instead of 6px) - reduces calls by 16x
+    const tile = Math.max(24, Math.floor(Math.min(w, h) / 40));
 
     for (let y = 0; y < h; y += tile) {
       const yh = y + tile * 0.5;
@@ -588,7 +632,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     }
   };
 
-  // Perf auto-governor
+  // Perf auto-governor - ENHANCED: Sets skipGlow and skipWarp flags
   const autoGovernor = (now: number) => {
     const fps = fpsRef.current;
     fps.frames++;
@@ -596,6 +640,12 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       const rate = fps.frames / ((now - fps.last) / 1000);
       fps.frames = 0;
       fps.last = now;
+      
+      // PERFORMANCE: Update performance flags
+      perfRef.current.currentFps = rate;
+      perfRef.current.skipGlow = rate < 50;
+      perfRef.current.skipWarp = rate < 40;
+      
       const p = paramsRef.current;
       if (rate < 55) {
         if (fps.lowSince == null) fps.lowSince = now;
@@ -606,8 +656,8 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
         }
       } else {
         fps.lowSince = null;
-        // slow restore
-        p.gridDensity = Math.min(p.gridDensity + 1, (PRESETS.Normal.gridDensity * 1.3) | 0);
+        // slow restore - OPTIMIZED: lower caps
+        p.gridDensity = Math.min(p.gridDensity + 1, 36);
         p.amplitude = Math.min(p.amplitude * 1.01, PRESETS.Storm.amplitude);
         p.warpStrength = Math.min(p.warpStrength * 1.01, PRESETS.Storm.warpStrength);
       }
@@ -678,87 +728,12 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     
-    // Chromatic aberration during pulses (edge-only optimization)
-    const chromatic = pDyn.chromaticPulse !== false && pulseRef.current;
-    if (chromatic) {
-      const { t0, dur } = pulseRef.current!;
-      const tt = Math.min(1, Math.max(0, (now - t0) / dur));
-      // Only active during middle 50% of pulse
-      const inPeak = tt > 0.25 && tt < 0.75;
-      
-      if (inPeak) {
-        // Optimized: Only apply chromatic aberration to outer 30% of screen
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
-        const edgeThreshold = maxDist * 0.7; // Inner 70% normal, outer 30% chromatic
-        
-        ctx.save();
-        
-        try {
-          // Create a radial mask for edge-only effect
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = canvas.height;
-          const tempCtx = tempCanvas.getContext('2d')!;
-          
-          // Draw normal warp to temp canvas
-          warpBackground(tempCtx, bg, tSec);
-          
-          // Draw center region (70%) with normal warp
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, edgeThreshold, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(tempCanvas, 0, 0);
-          ctx.restore();
-          
-          // Draw outer region (30%) with chromatic aberration
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, maxDist * 1.5, 0, Math.PI * 2);
-          ctx.arc(centerX, centerY, edgeThreshold, 0, Math.PI * 2, true); // Inverted clip
-          ctx.clip();
-          
-          ctx.globalCompositeOperation = "screen";
-          
-          // Red channel
-          ctx.save();
-          ctx.translate(-2, 0);
-          ctx.drawImage(tempCanvas, 0, 0);
-          ctx.restore();
-          
-          // Green channel
-          ctx.drawImage(tempCanvas, 0, 0);
-          
-          // Blue channel
-          ctx.save();
-          ctx.translate(2, 0);
-          ctx.drawImage(tempCanvas, 0, 0);
-          ctx.restore();
-          
-          ctx.restore();
-        } catch {
-          failSoftRef.current.warpOff = true;
-          ctx.drawImage(bg, 0, 0);
-        }
-        
-        ctx.restore();
-      } else {
-        try {
-          warpBackground(ctx, bg, tSec);
-        } catch {
-          failSoftRef.current.warpOff = true;
-          ctx.drawImage(bg, 0, 0);
-        }
-      }
-    } else {
-      try {
-        warpBackground(ctx, bg, tSec);
-      } catch {
-        failSoftRef.current.warpOff = true;
-        ctx.drawImage(bg, 0, 0);
-      }
+    // OPTIMIZED: Removed chromatic aberration entirely - just do simple warp
+    try {
+      warpBackground(ctx, bg, tSec);
+    } catch {
+      failSoftRef.current.warpOff = true;
+      ctx.drawImage(bg, 0, 0);
     }
 
     // Grid pass
@@ -767,7 +742,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
     // Center vortex glow
     drawCenterVortex(ctx, tSec);
     
-    // Energy burst particles
+    // Energy burst particles (disabled by default)
     drawEnergyBursts(ctx, tSec, now);
 
     // Pulses
@@ -820,13 +795,14 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       seedRef.current = (mixed >>> 0);
       randRef.current = mulberry32(seedRef.current);
 
-      // Seeded randomization for variation per run
+      // Seeded randomization for variation per run - OPTIMIZED: stricter caps
       const rng = randRef.current;
       p.speed = Math.max(0.22, Math.min(0.9, p.speed * (0.75 + rng() * 0.8)));
       p.amplitude = Math.max(0.35, Math.min(1.2, p.amplitude * (0.7 + rng() * 0.9)));
       p.wavelength = Math.max(0.16, Math.min(0.45, p.wavelength * (0.7 + rng() * 0.6)));
       p.warpStrength = Math.max(0.4, Math.min(1.25, p.warpStrength * (0.75 + rng() * 0.8)));
-      p.gridDensity = Math.max(18, Math.min(60, Math.floor(p.gridDensity * (0.85 + rng() * 0.55))));
+      // OPTIMIZED: Stricter grid density cap
+      p.gridDensity = Math.max(16, Math.min(36, Math.floor(p.gridDensity * (0.85 + rng() * 0.35))));
       p.noiseAmount = Math.max(0.06, Math.min(0.3, p.noiseAmount * (0.8 + rng() * 0.6)));
       p.twistStrength = (rng() < 0.7) ? (0.2 + rng() * 0.6) : 0;
       p.rotateSpeed = (rng() < 0.8) ? (rng() * 0.6) : 0; // rad/s
@@ -842,10 +818,10 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
         p.colorMode = "theme";
       }
       
-      // Enable enhanced effects by default
-      p.energyBursts = p.energyBursts !== false;
+      // PERFORMANCE: Disable expensive effects by default
+      p.energyBursts = p.energyBursts === true; // Was: p.energyBursts !== false
       p.centerVortex = p.centerVortex !== false;
-      p.chromaticPulse = p.chromaticPulse !== false;
+      p.chromaticPulse = false; // Was: p.chromaticPulse !== false
       p.spokeTwinkle = p.spokeTwinkle !== false;
       p.trailColorMode = p.trailColorMode ?? 'hue-tinted';
 
@@ -915,7 +891,7 @@ export const GravityDistortionWave = forwardRef<GravityWaveHandle, GravityDistor
       }
       if (e.key === "F10") {
         const p = paramsRef.current;
-        console.log("[GW] perf", { gridDensity: p.gridDensity, warpStrength: p.warpStrength, preset, seed: seedRef.current });
+        console.log("[GW] perf", { gridDensity: p.gridDensity, warpStrength: p.warpStrength, preset, seed: seedRef.current, fps: perfRef.current.currentFps });
       }
     };
     window.addEventListener("keydown", onKey);
