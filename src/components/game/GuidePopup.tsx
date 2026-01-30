@@ -217,7 +217,7 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 guide-scroll">
           <CurrentPageComponent />
         </div>
 

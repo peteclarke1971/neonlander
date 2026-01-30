@@ -393,4 +393,25 @@ All colors MUST be HSL.
     background: hsl(var(--neon) / 0.1);
     box-shadow: 0 0 15px hsl(var(--neon) / 0.3);
   }
+
+  /* Guide popup scrollbar - thin and neon colored */
+  .guide-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .guide-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--neon) / 0.1);
+    border-radius: 2px;
+  }
+  .guide-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--neon) / 0.4);
+    border-radius: 2px;
+  }
+  .guide-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--neon) / 0.6);
+  }
+  /* Firefox */
+  .guide-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--neon) / 0.4) hsl(var(--neon) / 0.1);
+  }
 }

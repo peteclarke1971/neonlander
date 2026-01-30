@@ -4,7 +4,7 @@ export const GuidePageSurvival: React.FC = () => {
   return (
     <div className="flex flex-col gap-4">
       <div 
-        className="text-center text-4xl"
+        className="text-center text-2xl sm:text-4xl"
         style={{ color: 'hsl(var(--neon))' }}
       >
         ∞ SURVIVAL MODE
@@ -13,14 +13,14 @@ export const GuidePageSurvival: React.FC = () => {
       {/* Core mechanics */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           OBJECTIVE
         </h3>
         
         <div 
-          className="p-3 rounded border text-lg text-center"
+          className="p-3 rounded border text-sm sm:text-lg text-center"
           style={{ 
             borderColor: 'hsl(var(--neon) / 0.3)',
             background: 'hsl(var(--neon) / 0.05)',
@@ -34,13 +34,13 @@ export const GuidePageSurvival: React.FC = () => {
       {/* Key features */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           KEY FEATURES
         </h3>
         
-        <div className="grid grid-cols-2 gap-2 text-base">
+        <div className="grid grid-cols-2 gap-2 text-xs sm:text-base">
           <div 
             className="p-2 rounded text-center"
             style={{ background: 'hsl(var(--muted) / 0.3)' }}
@@ -75,13 +75,13 @@ export const GuidePageSurvival: React.FC = () => {
       {/* Special zones */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           SPECIAL ZONES
         </h3>
         
-        <div className="space-y-2 text-lg">
+        <div className="space-y-2 text-sm sm:text-lg">
           <div 
             className="p-2 rounded border"
             style={{ 
@@ -92,7 +92,7 @@ export const GuidePageSurvival: React.FC = () => {
             <div className="flex items-center gap-2">
               <span style={{ color: 'hsl(var(--neon))' }}>BLACKOUT</span>
             </div>
-            <div className="text-base opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+            <div className="text-xs sm:text-base opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
               Visibility drops to spotlight only. Navigate by your ship's light!
             </div>
           </div>
@@ -107,7 +107,7 @@ export const GuidePageSurvival: React.FC = () => {
             <div className="flex items-center gap-2">
               <span style={{ color: 'hsl(var(--neon))' }}>LIGHT STORM</span>
             </div>
-            <div className="text-base opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+            <div className="text-xs sm:text-base opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
               Sweeping light beam reveals terrain. Follow the light!
             </div>
           </div>
@@ -116,7 +116,7 @@ export const GuidePageSurvival: React.FC = () => {
 
       {/* Tip */}
       <div 
-        className="text-base text-center mt-2"
+        className="text-xs sm:text-base text-center mt-2"
         style={{ color: 'hsl(var(--neon))' }}
       >
         Conserve fuel by gliding when safe. Land often to refuel!

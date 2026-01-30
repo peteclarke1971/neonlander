@@ -6,13 +6,13 @@ export const GuidePageFuelShields: React.FC = () => {
       {/* Fuel section */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           FUEL MANAGEMENT
         </h3>
         
-        <div className="text-lg space-y-2" style={{ color: 'hsl(var(--neon))' }}>
+        <div className="text-sm sm:text-lg space-y-2" style={{ color: 'hsl(var(--neon))' }}>
           <div className="flex items-start gap-3">
             <span>Thrusting consumes fuel. When empty, you fall!</span>
           </div>
@@ -28,14 +28,14 @@ export const GuidePageFuelShields: React.FC = () => {
       {/* Shield section */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           SHIELD SYSTEM
         </h3>
         
         <div 
-          className="p-3 rounded border text-lg"
+          className="p-3 rounded border text-sm sm:text-lg"
           style={{ 
             borderColor: 'hsl(var(--neon) / 0.4)',
             background: 'hsl(var(--neon) / 0.05)'
@@ -55,7 +55,7 @@ export const GuidePageFuelShields: React.FC = () => {
         </div>
         
         <div 
-          className="text-base text-center"
+          className="text-xs sm:text-base text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           Shield lasts 75 seconds or until impact
