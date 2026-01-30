@@ -188,6 +188,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   
   // Start title music - same as HomeScreen
   const audioRef = useRef(getGlobalAudioManager());
+  const musicStartedRef = useRef(false);
   const [musicOn] = useState(() => {
     try {
       const saved = localStorage.getItem("ll-music-on");
@@ -197,33 +198,52 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }
   });
   
+  // Proactively preload audio config and SFX for faster music start
   useEffect(() => {
-    let removed = false;
+    const timer = setTimeout(() => {
+      audioRef.current.initializeConfig().then(() => {
+        audioRef.current.preloadSFX().catch(() => {});
+      }).catch(() => {});
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Music start effect - keeps retrying until successful
+  useEffect(() => {
     const tryStart = async () => {
+      if (musicStartedRef.current) return; // Already started
       try {
         if (!musicOn) return;
-        audioRef.current.resume();
+        await audioRef.current.resume();
         await audioRef.current.playTitleMusic();
         audioRef.current.setTitleMusicMuted(false);
-      } catch {}
+        musicStartedRef.current = true;
+        console.log('🎵 Player Menu music started');
+      } catch (e) {
+        // Will retry on next interaction
+      }
     };
+    
     // Attempt immediately (will be ignored by browsers that require gesture)
     tryStart();
+    
     const startOnInteract = () => {
       tryStart();
-      // Preload all sound effects on first user interaction for instant playback
-      audioRef.current.preloadSFX();
-    };
-    window.addEventListener("pointerdown", startOnInteract, { once: true });
-    window.addEventListener("touchstart", startOnInteract, { once: true });
-    window.addEventListener("keydown", startOnInteract, { once: true });
-    return () => {
-      if (!removed) {
-        window.removeEventListener("pointerdown", startOnInteract as any);
-        window.removeEventListener("touchstart", startOnInteract as any);
-        window.removeEventListener("keydown", startOnInteract as any);
-        removed = true;
+      if (!musicStartedRef.current) {
+        audioRef.current.preloadSFX();
       }
+    };
+    
+    // Don't use { once: true } - keep trying until music starts
+    window.addEventListener("pointerdown", startOnInteract);
+    window.addEventListener("touchstart", startOnInteract);
+    window.addEventListener("keydown", startOnInteract);
+    
+    return () => {
+      window.removeEventListener("pointerdown", startOnInteract);
+      window.removeEventListener("touchstart", startOnInteract);
+      window.removeEventListener("keydown", startOnInteract);
     };
   }, [musicOn]);
   
@@ -512,6 +532,17 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     // Reset idle and notify parent of user interaction (for demo timer reset)
     resetIdle();
     onInteraction?.();
+    
+    // Ensure music starts on any menu interaction (belt-and-suspenders)
+    if (!musicStartedRef.current && musicOn) {
+      audioRef.current.resume().then(() => {
+        audioRef.current.playTitleMusic().then(() => {
+          audioRef.current.setTitleMusicMuted(false);
+          musicStartedRef.current = true;
+          console.log('🎵 Player Menu music started via menu action');
+        }).catch(() => {});
+      }).catch(() => {});
+    }
     
     switch (id) {
       case "start": {
