@@ -14,17 +14,17 @@ export const GuidePageModes: React.FC = () => {
       <div 
         className="p-3 rounded border"
         style={{ 
-          borderColor: 'hsl(180, 100%, 50% / 0.4)',
-          background: 'hsl(180, 100%, 50% / 0.05)'
+          borderColor: 'hsl(var(--neon) / 0.4)',
+          background: 'hsl(var(--neon) / 0.05)'
         }}
       >
         <div 
           className="font-bold text-sm"
-          style={{ color: 'hsl(180, 100%, 50%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           🚀 CAMPAIGN
         </div>
-        <div className="text-xs opacity-80 mt-1">
+        <div className="text-xs opacity-80 mt-1" style={{ color: 'hsl(var(--neon))' }}>
           Progressive difficulty with curated levels. Face volcanoes, UFOs, and special challenges as you advance.
         </div>
       </div>
@@ -33,17 +33,17 @@ export const GuidePageModes: React.FC = () => {
       <div 
         className="p-3 rounded border"
         style={{ 
-          borderColor: 'hsl(45, 100%, 60% / 0.4)',
-          background: 'hsl(45, 100%, 60% / 0.05)'
+          borderColor: 'hsl(var(--neon) / 0.4)',
+          background: 'hsl(var(--neon) / 0.05)'
         }}
       >
         <div 
           className="font-bold text-sm"
-          style={{ color: 'hsl(45, 100%, 60%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           🕹️ CLASSIC
         </div>
-        <div className="text-xs opacity-80 mt-1">
+        <div className="text-xs opacity-80 mt-1" style={{ color: 'hsl(var(--neon))' }}>
           Random terrain generation for endless variety. Pure arcade experience with increasing challenge.
         </div>
       </div>
@@ -52,17 +52,17 @@ export const GuidePageModes: React.FC = () => {
       <div 
         className="p-3 rounded border"
         style={{ 
-          borderColor: 'hsl(0, 100%, 60% / 0.4)',
-          background: 'hsl(0, 100%, 60% / 0.05)'
+          borderColor: 'hsl(var(--neon) / 0.4)',
+          background: 'hsl(var(--neon) / 0.05)'
         }}
       >
         <div 
           className="font-bold text-sm"
-          style={{ color: 'hsl(0, 100%, 60%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           ⏱️ TIME TRIAL
         </div>
-        <div className="text-xs opacity-80 mt-1">
+        <div className="text-xs opacity-80 mt-1" style={{ color: 'hsl(var(--neon))' }}>
           Race against the clock! Land on numbered pads in order. Compete against ghost replays.
         </div>
       </div>
@@ -71,17 +71,17 @@ export const GuidePageModes: React.FC = () => {
       <div 
         className="p-3 rounded border"
         style={{ 
-          borderColor: 'hsl(280, 100%, 70% / 0.4)',
-          background: 'hsl(280, 100%, 70% / 0.05)'
+          borderColor: 'hsl(var(--neon) / 0.4)',
+          background: 'hsl(var(--neon) / 0.05)'
         }}
       >
         <div 
           className="font-bold text-sm"
-          style={{ color: 'hsl(280, 100%, 70%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           🎲 MEDLEY
         </div>
-        <div className="text-xs opacity-80 mt-1">
+        <div className="text-xs opacity-80 mt-1" style={{ color: 'hsl(var(--neon))' }}>
           Mix of all level types! Normal, Dark Side, Storm, Collection, and Time Trial levels rotate.
         </div>
       </div>
@@ -90,17 +90,17 @@ export const GuidePageModes: React.FC = () => {
       <div 
         className="p-3 rounded border"
         style={{ 
-          borderColor: 'hsl(120, 100%, 50% / 0.4)',
-          background: 'hsl(120, 100%, 50% / 0.05)'
+          borderColor: 'hsl(var(--neon) / 0.4)',
+          background: 'hsl(var(--neon) / 0.05)'
         }}
       >
         <div 
           className="font-bold text-sm"
-          style={{ color: 'hsl(120, 100%, 50%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           ∞ SURVIVAL
         </div>
-        <div className="text-xs opacity-80 mt-1">
+        <div className="text-xs opacity-80 mt-1" style={{ color: 'hsl(var(--neon))' }}>
           Endless scrolling terrain. How far can you travel? See next page for details →
         </div>
       </div>

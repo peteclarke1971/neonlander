@@ -1,21 +1,15 @@
 import React from 'react';
-import { LanderAnimation } from './LanderAnimation';
 
 export const GuidePageControls: React.FC = () => {
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Animated lander demo */}
-      <div className="flex justify-center">
-        <LanderAnimation showThrust showRotation size={100} />
-      </div>
-
       {/* Control descriptions */}
-      <div className="space-y-3 text-sm" style={{ color: 'hsl(var(--foreground) / 0.9)' }}>
+      <div className="space-y-3 text-sm" style={{ color: 'hsl(var(--neon))' }}>
         <div className="flex items-start gap-3">
           <div 
-            className="w-16 text-right font-bold shrink-0"
+            className="w-20 text-right font-bold shrink-0"
             style={{ color: 'hsl(var(--neon))' }}
           >
             THRUST
@@ -26,8 +20,7 @@ export const GuidePageControls: React.FC = () => {
             ) : (
               <>
                 <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">W</kbd> / 
-                <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs ml-1">↑</kbd> / 
-                <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs ml-1">Space</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs ml-1">↑</kbd>
               </>
             )}
           </div>
@@ -35,7 +28,7 @@ export const GuidePageControls: React.FC = () => {
 
         <div className="flex items-start gap-3">
           <div 
-            className="w-16 text-right font-bold shrink-0"
+            className="w-20 text-right font-bold shrink-0"
             style={{ color: 'hsl(var(--neon))' }}
           >
             ROTATE
@@ -54,8 +47,8 @@ export const GuidePageControls: React.FC = () => {
 
         <div className="flex items-start gap-3">
           <div 
-            className="w-16 text-right font-bold shrink-0"
-            style={{ color: 'hsl(180, 100%, 50%)' }}
+            className="w-20 text-right font-bold shrink-0"
+            style={{ color: 'hsl(var(--neon))' }}
           >
             BOOST
           </div>
@@ -72,17 +65,18 @@ export const GuidePageControls: React.FC = () => {
 
         <div className="flex items-start gap-3">
           <div 
-            className="w-16 text-right font-bold shrink-0"
-            style={{ color: 'hsl(0, 100%, 65%)' }}
+            className="w-20 text-right font-bold shrink-0"
+            style={{ color: 'hsl(var(--neon))' }}
           >
-            ABORT
+            ABORT (STABILIZE SHIP)
           </div>
           <div>
             {isTouch ? (
               'Double-tap thrust when in danger'
             ) : (
               <>
-                Double-tap <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">W</kbd> for emergency boost
+                <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">↓</kbd> / 
+                <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs ml-1">SPACE</kbd> for emergency brake
               </>
             )}
           </div>
@@ -91,8 +85,8 @@ export const GuidePageControls: React.FC = () => {
 
       {/* Gamepad note */}
       <div 
-        className="text-xs text-center mt-2 opacity-60"
-        style={{ color: 'hsl(var(--muted-foreground))' }}
+        className="text-sm text-center mt-2"
+        style={{ color: 'hsl(var(--neon))' }}
       >
         🎮 Gamepad supported: D-pad/stick to rotate, A/trigger to thrust
       </div>
