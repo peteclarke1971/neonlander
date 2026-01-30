@@ -1,226 +1,229 @@
 
 
-# Plan: Guide System Comprehensive Updates
+# Plan: Guide System Updates - Text, Emojis, and Navigation Fix
 
 ## Summary
 
-This plan implements multiple changes across the GUIDE popup pages:
-1. **Controls Page** - Update controls text, remove lander animation, adjust gamepad text size
-2. **Landing Page** - Replace "GREEN PADS = SAFE" with animated pulsing pad graphic, remove "Orange pads" text
-3. **Fuel & Shields Page** - Remove lander graphic, update fuel text
-4. **Remove Space Junk Page** - Delete from PAGES array
-5. **Hazards Page** - Remove emoji graphics
-6. **Survival Page** - Update comet text
-7. **Navigation** - Confirm left/right arrow and gamepad navigation works
-8. **Styling** - Apply NEON color to all text and key borders
+This plan implements the following changes to the Guide popup:
+1. Add text under pulsing pad on LANDING page: "The lander must be completely on the pad"
+2. Increase all text size by 40% across the entire guide
+3. Remove all emoji icons EXCEPT:
+   - 🎮 on CONTROLS page (Gamepad supported)
+   - ∞ on SURVIVAL page title
+4. Fix left/right arrow key navigation for guide pages
 
 ---
 
-## Part 1: Controls Page Updates
-
-### File: `src/components/game/guide/GuidePageControls.tsx`
-
-**Changes:**
-
-1. **Remove lander animation** - Delete the `<LanderAnimation>` component at the top
-2. **THRUST row** - Remove `/ Space` from the controls
-3. **ABORT row** - Change label to `ABORT (STABILIZE SHIP)` and change instruction to show down arrow + `/ SPACE for emergency brake`
-4. **Gamepad note** - Change from `text-xs` to `text-sm` to match other text size
-
-**Updated structure:**
-```tsx
-// Remove this:
-<div className="flex justify-center">
-  <LanderAnimation showThrust showRotation size={100} />
-</div>
-
-// THRUST: W / ↑ (no Space)
-// ABORT (STABILIZE SHIP): ↓ / SPACE for emergency brake
-// Gamepad text: text-sm instead of text-xs
-```
-
----
-
-## Part 2: Landing Page Updates
+## Part 1: LANDING Page - Add Text Under Pulsing Pad
 
 ### File: `src/components/game/guide/GuidePageLanding.tsx`
 
-**Changes:**
+Add a text description below the `PulsingPadCanvas` component.
 
-1. **Replace "GREEN PADS = SAFE" box** with an animated canvas showing a pulsing green landing pad
-2. **Remove "Orange pads" text** from the 2× PAD bonus box
-
-**New component: PulsingPadAnimation**
-
-Create a small canvas component that renders a pulsing green landing pad, similar to how pads are rendered in the game:
-
+**Current (lines 89-98):**
 ```tsx
-// Pulsing pad animation - uses same pulse formula as game
-// pulse = 1 + 0.6 * Math.sin(elapsed * 4)
-// Green color with glow effect
-```
-
-**Updated 2× PAD box:**
-```tsx
-<div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
-  <span style={{ color: 'hsl(30, 100%, 55%)' }}>2× PAD</span>
-  <span className="opacity-70">Double points</span>
-  {/* Remove: <span className="opacity-50">Orange pads</span> */}
-</div>
-```
-
----
-
-## Part 3: Fuel & Shields Page Updates
-
-### File: `src/components/game/guide/GuidePageFuelShields.tsx`
-
-**Changes:**
-
-1. **Remove lander/shield animation** at the top
-2. **Update fuel text** on line 28: "Landing on pads gives fuel boost in time trial and survival modes"
-3. **Update space junk text** on line 32: "Collect Space Junk for fuel boost"
-
----
-
-## Part 4: Remove Space Junk Page
-
-### File: `src/components/game/GuidePopup.tsx`
-
-**Changes:**
-
-1. Remove the import for `GuidePageJunk`
-2. Remove the 'junk' entry from the PAGES array
-
-**Updated PAGES array:**
-```tsx
-const PAGES = [
-  { id: 'controls', title: 'CONTROLS', Component: GuidePageControls },
-  { id: 'landing', title: 'LANDING', Component: GuidePageLanding },
-  { id: 'fuel', title: 'FUEL & SHIELDS', Component: GuidePageFuelShields },
-  // REMOVED: { id: 'junk', title: 'SPACE JUNK', Component: GuidePageJunk },
-  { id: 'hazards', title: 'HAZARDS', Component: GuidePageHazards },
-  { id: 'scoring', title: 'SCORING', Component: GuidePageScoring },
-  { id: 'modes', title: 'GAME MODES', Component: GuidePageModes },
-  { id: 'survival', title: 'SURVIVAL', Component: GuidePageSurvival },
-];
-```
-
-This reduces pages from 8 to 7.
-
----
-
-## Part 5: Hazards Page Updates
-
-### File: `src/components/game/guide/GuidePageHazards.tsx`
-
-**Changes:**
-
-Remove the emoji graphics (🌋, 🕳️, ⚡, 🛸) from above each hazard title.
-
-**Before:**
-```tsx
-<div className="text-2xl mb-1">🌋</div>
-<div className="font-bold text-sm" style={{ color: 'hsl(15, 100%, 55%)' }}>
-  VOLCANOES
+{/* Pulsing landing pad graphic */}
+<div 
+  className="p-3 rounded border flex justify-center"
+  style={{ 
+    borderColor: 'hsl(var(--neon) / 0.3)',
+    background: 'hsl(var(--neon) / 0.05)'
+  }}
+>
+  <PulsingPadCanvas width={180} />
 </div>
 ```
 
 **After:**
 ```tsx
-<div className="font-bold text-sm" style={{ color: 'hsl(15, 100%, 55%)' }}>
-  VOLCANOES
+{/* Pulsing landing pad graphic */}
+<div 
+  className="p-3 rounded border flex flex-col items-center gap-2"
+  style={{ 
+    borderColor: 'hsl(var(--neon) / 0.3)',
+    background: 'hsl(var(--neon) / 0.05)'
+  }}
+>
+  <PulsingPadCanvas width={180} />
+  <span className="text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+    The lander must be completely on the pad
+  </span>
 </div>
 ```
 
-Remove all four emoji divs (lines 16, 42, 68, 94).
+---
+
+## Part 2: Increase Text Size by 40% Globally
+
+Current text sizes and their 40% larger equivalents:
+- `text-xs` (12px) → `text-base` (16px) - approximately 33% increase, closest Tailwind match
+- `text-sm` (14px) → `text-lg` (18px) - approximately 29% increase, closest match
+- `text-base` (16px) → `text-xl` (20px) - 25% increase
+- `text-2xl` (24px) → `text-4xl` (36px) - 50% increase, close enough
+
+**Changes across all guide pages:**
+
+### GuidePageControls.tsx
+- Line 9: `text-sm` → `text-lg`
+- Line 88: `text-sm` → `text-lg`
+
+### GuidePageLanding.tsx
+- Line 70: `text-sm` → `text-lg`
+- Line 81, 85: `text-xs` → `text-base`
+- Line 104: `text-sm` → `text-lg`
+- Line 110: `text-xs` → `text-base`
+- Line 113, 114, 118, 119, 123, 124, 128: various `opacity` spans → `text-base`
+
+### GuidePageFuelShields.tsx
+- Line 9: `text-sm` → `text-lg`
+- Line 15: `text-sm` → `text-lg`
+- Line 34: `text-sm` → `text-lg`
+- Line 41: `text-sm` → `text-lg`
+- Line 64: `text-xs` → `text-base`
+
+### GuidePageHazards.tsx
+- Line 17: `text-sm` → `text-lg`
+- Line 22: `text-xs` → `text-base`
+- Line 26: `text-xs` → `text-base`
+- (Similar changes for all hazard boxes and UFO types section)
+
+### GuidePageScoring.tsx
+- Line 9: `text-sm` → `text-lg`
+- Line 22: `text-sm` → `text-lg`
+- Line 33: `text-xs` → `text-base`
+- Line 44: `text-sm` → `text-lg`
+- Line 50: `text-sm` → `text-lg`
+- (Similar changes throughout)
+
+### GuidePageModes.tsx
+- Line 7: `text-sm` → `text-lg`
+- Line 22: `text-sm` → `text-lg`
+- Line 27: `text-xs` → `text-base`
+- (Similar changes for all mode boxes)
+
+### GuidePageSurvival.tsx
+- Line 7: `text-2xl` → `text-4xl`
+- Line 16: `text-sm` → `text-lg`
+- Line 23: `text-sm` → `text-lg`
+- Line 37: `text-sm` → `text-lg`
+- Line 43: `text-xs` → `text-base`
+- (Similar changes throughout)
 
 ---
 
-## Part 6: Survival Page Updates
+## Part 3: Remove Emoji Icons (Keep Only 🎮 and ∞)
 
-### File: `src/components/game/guide/GuidePageSurvival.tsx`
+### GuidePageControls.tsx
+- Keep 🎮 on line 91 (Gamepad note)
 
-**Changes:**
+### GuidePageLanding.tsx
+Remove emojis from:
+- Line 80: `✓ SPEED` → `SPEED`
+- Line 84: `✓ ANGLE` → `ANGLE`
+- Line 112: `🎯 BULLSEYE` → `BULLSEYE`
+- Line 117: `⚡ SPEED` → `SPEED`
+- Line 122: `✨ PERFECT` → `PERFECT`
 
-Update the COMETS text (currently "Catch for bonus points!") to "Land when active for bonus"
+### GuidePageFuelShields.tsx
+Remove emojis from:
+- Line 17: `⛽` → remove
+- Line 21: `↻` → remove
+- Line 25: `✦` → remove
+- Line 49: `🛡️` → remove
+- Line 53: `💥` → remove
+- Line 57: `✨` → remove
 
-**Line 62:**
+### GuidePageSurvival.tsx
+- Keep `∞` on line 10 (SURVIVAL MODE title)
+- Remove from:
+  - Line 48: `⛽ FUEL` → `FUEL`
+  - Line 55: `📍 SECTORS` → `SECTORS`
+  - Line 62: `☄️ COMETS` → `COMETS`
+  - Line 69: `🌀 WEATHER` → `WEATHER`
+  - Line 93: `🌑` → remove
+  - Line 109: `💡` → remove
+  - Line 124: `💡 Conserve fuel...` → `Conserve fuel...`
+
+### GuidePageScoring.tsx
+Remove emojis from:
+- Line 55: `🎯 Bullseye` → `Bullseye`
+- Line 62: `⚡ Speed Bonus` → `Speed Bonus`
+- Line 69: `✨ Perfect` → `Perfect`
+- Line 76: `🔄 360° Rotation` → `360° Rotation`
+- Line 83: `💨 Near Miss` → `Near Miss`
+
+### GuidePageModes.tsx
+Remove emojis from:
+- Line 25: `🚀 CAMPAIGN` → `CAMPAIGN`
+- Line 44: `🕹️ CLASSIC` → `CLASSIC`
+- Line 63: `⏱️ TIME TRIAL` → `TIME TRIAL`
+- Line 82: `🎲 MEDLEY` → `MEDLEY`
+- Keep `∞` on line 101 (SURVIVAL)
+
+---
+
+## Part 4: Fix Left/Right Arrow Key Navigation
+
+### Analysis
+The keyboard navigation code in `GuidePopup.tsx` (lines 62-81) looks correct:
+
 ```tsx
-<div className="opacity-70 mt-1">Land when active for bonus</div>
+useEffect(() => {
+  if (!isOpen) return;
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      goToPrevPage();
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      goToNextPage();
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [isOpen, onClose, goToPrevPage, goToNextPage]);
 ```
 
----
+### Issue
+The problem could be that other event listeners in the parent component are catching and handling the events first, or the focus is being captured by interactive elements within the guide. 
 
-## Part 7: Navigation Verification
+### Solution
+Use the capture phase for event listening to ensure we handle keyboard events before other handlers. Also add `stopPropagation()` to prevent event bubbling:
 
-The guide already supports left/right arrow keys and gamepad navigation. This is implemented in `GuidePopup.tsx`:
+```tsx
+useEffect(() => {
+  if (!isOpen) return;
 
-**Keyboard (lines 68-78):**
-```typescript
-if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-  goToPrevPage();
-} else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-  goToNextPage();
-}
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      e.stopPropagation();
+      goToPrevPage();
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      e.stopPropagation();
+      goToNextPage();
+    }
+  };
+
+  // Use capture phase to handle events before other listeners
+  window.addEventListener('keydown', handleKeyDown, true);
+  return () => window.removeEventListener('keydown', handleKeyDown, true);
+}, [isOpen, onClose, goToPrevPage, goToNextPage]);
 ```
 
-**Gamepad (lines 112-122):**
-```typescript
-// D-pad left/right for page navigation
-if (input.ui.left && !prev.left && canFire('left')) {
-  goToPrevPage();
-  vibrate(30, 0.15, 0.3);
-}
-if (input.ui.right && !prev.right && canFire('right')) {
-  goToNextPage();
-  vibrate(30, 0.15, 0.3);
-}
-```
-
-No changes needed - this already works as requested.
-
----
-
-## Part 8: NEON Color Styling
-
-### Files: All guide page components
-
-**Changes across all pages:**
-
-1. Change all white text (`color: 'hsl(var(--foreground) / 0.9)'`) to NEON (`color: 'hsl(var(--neon))'`)
-2. Change specific colored text (yellows, greens, etc.) to NEON
-3. Change key border colors from various colors to NEON
-
-**Specific files and updates:**
-
-**GuidePageControls.tsx:**
-- Line 15: Text color from `foreground` to `neon`
-- Line 58: BOOST color from `hsl(180, 100%, 50%)` to `neon`
-- Line 76: ABORT color from `hsl(0, 100%, 65%)` to `neon`
-- Gamepad note: color to `neon` and remove `opacity-60`
-
-**GuidePageLanding.tsx:**
-- Line 13: Text color from `foreground` to `neon`
-- Lines 22, 26: Border colors to `neon`
-- Lines 23, 27: Checkmark colors from green to `neon`
-- Lines 52, 64, 69, 74: Section title and item colors to `neon`
-- Box backgrounds: Keep with neon-based styling
-
-**GuidePageFuelShields.tsx:**
-- Line 21: Text color from `foreground` to `neon`
-- All section headers and icons: Change to `neon`
-- Shield section border: Change to `neon`
-
-**GuidePageHazards.tsx:**
-- All hazard titles: Change to `neon`
-- All borders: Change to `neon`
-- UFO types section: Change to `neon`
-
-**GuidePageSurvival.tsx:**
-- Main title and headers: Change to `neon`
-- Feature icons and borders: Change to `neon`
-- Special zone borders: Change to `neon`
+The key changes:
+1. Add `e.stopPropagation()` to prevent events from reaching other handlers
+2. Add `true` as third parameter to `addEventListener` to use capture phase
 
 ---
 
@@ -228,87 +231,26 @@ No changes needed - this already works as requested.
 
 | File | Changes |
 |------|---------|
-| `src/components/game/guide/GuidePageControls.tsx` | Remove lander, fix THRUST/ABORT, fix gamepad text size, apply NEON colors |
-| `src/components/game/guide/GuidePageLanding.tsx` | Add pulsing pad canvas, remove "Orange pads", apply NEON colors |
-| `src/components/game/guide/GuidePageFuelShields.tsx` | Remove lander, update fuel text, apply NEON colors |
-| `src/components/game/GuidePopup.tsx` | Remove Space Junk page from PAGES array |
-| `src/components/game/guide/GuidePageHazards.tsx` | Remove emojis, apply NEON colors |
-| `src/components/game/guide/GuidePageSurvival.tsx` | Update comet text, apply NEON colors |
+| `src/components/game/GuidePopup.tsx` | Fix keyboard navigation with capture phase and stopPropagation |
+| `src/components/game/guide/GuidePageControls.tsx` | Increase text sizes |
+| `src/components/game/guide/GuidePageLanding.tsx` | Add pad text, increase sizes, remove emojis (keep none) |
+| `src/components/game/guide/GuidePageFuelShields.tsx` | Increase text sizes, remove all emojis |
+| `src/components/game/guide/GuidePageHazards.tsx` | Increase text sizes |
+| `src/components/game/guide/GuidePageScoring.tsx` | Increase text sizes, remove all emojis |
+| `src/components/game/guide/GuidePageModes.tsx` | Increase text sizes, remove emojis except ∞ |
+| `src/components/game/guide/GuidePageSurvival.tsx` | Increase text sizes, remove emojis except ∞ |
 
 ---
 
-## Technical Details
-
-### Pulsing Pad Animation Component
-
-```tsx
-const PulsingPadCanvas: React.FC<{ size?: number }> = ({ size = 60 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>(0);
-  const startTimeRef = useRef<number>(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = size * dpr;
-    canvas.height = 30 * dpr;
-    ctx.scale(dpr, dpr);
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp;
-      const elapsed = (timestamp - startTimeRef.current) / 1000;
-      
-      ctx.clearRect(0, 0, size, 30);
-      
-      // Pulse formula from GameEngine: 1 + 0.6 * Math.sin(elapsed * 4)
-      const pulse = 1 + 0.6 * Math.sin(elapsed * 4);
-      const padWidth = size * 0.8;
-      const padX = (size - padWidth) / 2;
-      
-      // Outer glow
-      ctx.beginPath();
-      ctx.moveTo(padX, 15);
-      ctx.lineTo(padX + padWidth, 15);
-      ctx.strokeStyle = 'hsl(120, 100%, 50%)';
-      ctx.lineWidth = 6 * pulse;
-      ctx.shadowColor = 'hsl(120, 100%, 50%)';
-      ctx.shadowBlur = 20 * pulse;
-      ctx.globalAlpha = 0.6;
-      ctx.stroke();
-      
-      // Core line
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = 10;
-      ctx.stroke();
-      
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationRef.current);
-  }, [size]);
-
-  return <canvas ref={canvasRef} style={{ width: size, height: 30 }} />;
-};
-```
-
----
-
-## Result After Changes
+## Summary of Emoji Changes
 
 | Page | Before | After |
 |------|--------|-------|
-| CONTROLS | Lander animation, Space in THRUST, wrong ABORT text, small gamepad text | No lander, THRUST: W / ↑, ABORT (STABILIZE SHIP): ↓ / SPACE for emergency brake, larger gamepad text |
-| LANDING | "GREEN PADS = SAFE" text, "Orange pads" shown | Animated pulsing green pad, no "Orange pads" |
-| FUEL & SHIELDS | Lander animation, old fuel text | No lander, updated fuel text |
-| SPACE JUNK | Entire page exists | Page removed entirely |
-| HAZARDS | Emoji graphics above each hazard | No emojis |
-| SURVIVAL | "Catch for bonus points!" | "Land when active for bonus" |
-| All pages | Mixed colors (green, yellow, cyan, etc.) | NEON color theme throughout |
-| Navigation | Already working | Confirmed working (no changes needed) |
+| CONTROLS | 🎮 | 🎮 (kept) |
+| LANDING | ✓, 🎯, ⚡, ✨ | All removed |
+| FUEL & SHIELDS | ⛽, ↻, ✦, 🛡️, 💥, ✨ | All removed |
+| HAZARDS | None | None |
+| SCORING | 🎯, ⚡, ✨, 🔄, 💨 | All removed |
+| MODES | 🚀, 🕹️, ⏱️, 🎲, ∞ | Only ∞ kept |
+| SURVIVAL | ∞, ⛽, 📍, ☄️, 🌀, 🌑, 💡 | Only ∞ (title) kept |
 
