@@ -376,6 +376,8 @@ export const GameEngine: React.FC<Props> = ({
   const isIPad = isIPadDevice();
   const shouldOptimizePerformance = isOptimizedGraphics(graphicsLevel);
   const shouldOptimizeLightBeam = isIPad && isOptimizedGraphics(graphicsLevel);
+  // iPad thruster optimization: use fast fillRect rendering on mid/high GFX (matches SurvivalEngine approach)
+  const useIPadThrusterOptimization = isIPad && !shouldOptimizePerformance;
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
@@ -1463,8 +1465,10 @@ export const GameEngine: React.FC<Props> = ({
     // Performance optimization constants
     const PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 4;
     // iPhone-optimized particle count: 10 particles for 60fps with impressive effect
-    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : (isIPhone ? 10 : 25);
-    const THRUSTER_SHADOW_BLUR = shouldOptimizePerformance ? 0 : (isIPhone ? 0 : 25); // No shadow on iPhone for 60fps
+    // iPad gets 15 particles with optimized fillRect rendering for 60fps; iPhone gets 10; desktop gets 25
+    const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : (isIPhone ? 10 : (useIPadThrusterOptimization ? 15 : 25));
+    // iPad uses fillRect path with shadowBlur:6, not this value; iPhone uses no shadow; desktop uses full 25
+    const THRUSTER_SHADOW_BLUR = shouldOptimizePerformance ? 0 : (isIPhone ? 0 : (useIPadThrusterOptimization ? 6 : 25));
     const STAR_COUNT = shouldOptimizePerformance ? 150 : 320;
     const SHADOW_BLUR_DESKTOP = 14;
     const SHADOW_BLUR_MOBILE = 6;
@@ -3849,7 +3853,8 @@ export const GameEngine: React.FC<Props> = ({
       }
       
       // Enhanced particles update with thruster-friendly limits
-      const maxParticles = shouldOptimizePerformance ? 30 : (isUnderwater ? 150 : 300); // Lower limit for water levels
+      // iPad capped at 150 particles to reduce draw calls while maintaining visuals
+      const maxParticles = shouldOptimizePerformance ? 30 : (useIPadThrusterOptimization ? 150 : (isUnderwater ? 150 : 300));
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += dt;
@@ -5656,8 +5661,21 @@ export const GameEngine: React.FC<Props> = ({
             
             ctx.restore();
             
+          } else if (useIPadThrusterOptimization) {
+            // === iPAD OPTIMIZED: Fast fillRect rendering (matches SurvivalEngine) ===
+            // Uses fillRect instead of stroke() - much faster on iPad GPU
+            // shadowBlur:6 vs 25 = ~17x fewer GPU samples per particle
+            const t = p.life / p.max;
+            const alpha = 1 - t;
+            const size = 3 - t * 2; // Shrinks from 3 to 1 over lifetime
+            
+            ctx.fillStyle = p.color as any;
+            ctx.shadowColor = neonColor as any;
+            ctx.shadowBlur = 6; // Moderate glow - key to performance!
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
           } else {
-            // === REGULAR PARTICLE RENDERING (LINES) ===
+            // === REGULAR PARTICLE RENDERING (LINES) - Desktop/iPhone ===
             const isThruster = p.color === neonColor || p.color.includes('hsla');
             const alpha = shouldOptimizePerformance ? 1 : (1 - ageRatio * 0.7);
             
