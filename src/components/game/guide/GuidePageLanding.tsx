@@ -67,9 +67,9 @@ export const GuidePageLanding: React.FC = () => {
   return (
     <div className="flex flex-col gap-4">
       {/* Landing requirements */}
-      <div className="space-y-3 text-sm" style={{ color: 'hsl(var(--neon))' }}>
+      <div className="space-y-3 text-lg" style={{ color: 'hsl(var(--neon))' }}>
         <h3 
-          className="font-bold text-center"
+          className="font-bold text-center text-xl"
           style={{ color: 'hsl(var(--neon))' }}
         >
           SAFE LANDING REQUIREMENTS
@@ -77,55 +77,58 @@ export const GuidePageLanding: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col items-center p-2 rounded border" style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}>
-            <span style={{ color: 'hsl(var(--neon))' }}>✓ SPEED</span>
-            <span className="text-xs opacity-70">Land slowly</span>
+            <span style={{ color: 'hsl(var(--neon))' }}>SPEED</span>
+            <span className="text-base opacity-70">Land slowly</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded border" style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}>
-            <span style={{ color: 'hsl(var(--neon))' }}>✓ ANGLE</span>
-            <span className="text-xs opacity-70">Stay level</span>
+            <span style={{ color: 'hsl(var(--neon))' }}>ANGLE</span>
+            <span className="text-base opacity-70">Stay level</span>
           </div>
         </div>
 
         {/* Pulsing landing pad graphic */}
         <div 
-          className="p-3 rounded border flex justify-center"
+          className="p-3 rounded border flex flex-col items-center gap-2"
           style={{ 
             borderColor: 'hsl(var(--neon) / 0.3)',
             background: 'hsl(var(--neon) / 0.05)'
           }}
         >
           <PulsingPadCanvas width={180} />
+          <span className="text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+            The lander must be completely on the pad
+          </span>
         </div>
       </div>
 
       {/* Bonuses */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-sm text-center"
+          className="font-bold text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           LANDING BONUSES
         </h3>
         
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 text-base">
           <div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
-            <span style={{ color: 'hsl(var(--neon))' }}>🎯 BULLSEYE</span>
-            <span className="opacity-70">+500 pts</span>
-            <span className="opacity-50">Land centered</span>
+            <span style={{ color: 'hsl(var(--neon))' }}>BULLSEYE</span>
+            <span className="opacity-70" style={{ color: 'hsl(var(--neon))' }}>+500 pts</span>
+            <span className="opacity-50" style={{ color: 'hsl(var(--neon))' }}>Land centered</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
-            <span style={{ color: 'hsl(var(--neon))' }}>⚡ SPEED</span>
-            <span className="opacity-70">+500 pts</span>
-            <span className="opacity-50">Land in &lt;10s</span>
+            <span style={{ color: 'hsl(var(--neon))' }}>SPEED</span>
+            <span className="opacity-70" style={{ color: 'hsl(var(--neon))' }}>+500 pts</span>
+            <span className="opacity-50" style={{ color: 'hsl(var(--neon))' }}>Land in &lt;10s</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
-            <span style={{ color: 'hsl(var(--neon))' }}>✨ PERFECT</span>
-            <span className="opacity-70">+1000 pts</span>
-            <span className="opacity-50">Bullseye + Speed</span>
+            <span style={{ color: 'hsl(var(--neon))' }}>PERFECT</span>
+            <span className="opacity-70" style={{ color: 'hsl(var(--neon))' }}>+1000 pts</span>
+            <span className="opacity-50" style={{ color: 'hsl(var(--neon))' }}>Bullseye + Speed</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
             <span style={{ color: 'hsl(var(--neon))' }}>2× PAD</span>
-            <span className="opacity-70">Double points</span>
+            <span className="opacity-70" style={{ color: 'hsl(var(--neon))' }}>Double points</span>
           </div>
         </div>
       </div>

@@ -59,25 +59,29 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose }) => {
     setCurrentPage(p => Math.min(PAGES.length - 1, p + 1));
   }, []);
 
-  // Keyboard navigation
+  // Keyboard navigation - use capture phase to intercept before game
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
         e.preventDefault();
+        e.stopPropagation();
         goToPrevPage();
       } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
         e.preventDefault();
+        e.stopPropagation();
         goToNextPage();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to handle events before other listeners
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose, goToPrevPage, goToNextPage]);
 
   // Gamepad navigation
