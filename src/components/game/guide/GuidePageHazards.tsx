@@ -14,16 +14,16 @@ export const GuidePageHazards: React.FC = () => {
           }}
         >
           <div 
-            className="font-bold text-sm"
+            className="font-bold text-lg"
             style={{ color: 'hsl(var(--neon))' }}
           >
             VOLCANOES
           </div>
-          <div className="text-xs opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+          <div className="text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
             Erupt periodically. Avoid the lava particles!
           </div>
           <div 
-            className="text-xs mt-2"
+            className="text-base mt-2"
             style={{ color: 'hsl(var(--neon))' }}
           >
             Watch for glow = warning
@@ -39,16 +39,16 @@ export const GuidePageHazards: React.FC = () => {
           }}
         >
           <div 
-            className="font-bold text-sm"
+            className="font-bold text-lg"
             style={{ color: 'hsl(var(--neon))' }}
           >
             GRAVITY WELLS
           </div>
-          <div className="text-xs opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+          <div className="text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
             Pull your ship toward them. Fight the pull!
           </div>
           <div 
-            className="text-xs mt-2"
+            className="text-base mt-2"
             style={{ color: 'hsl(var(--neon))' }}
           >
             Purple swirl effect
@@ -64,16 +64,16 @@ export const GuidePageHazards: React.FC = () => {
           }}
         >
           <div 
-            className="font-bold text-sm"
+            className="font-bold text-lg"
             style={{ color: 'hsl(var(--neon))' }}
           >
             STORMS
           </div>
-          <div className="text-xs opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+          <div className="text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
             Lightning can strike! HUD may flicker.
           </div>
           <div 
-            className="text-xs mt-2"
+            className="text-base mt-2"
             style={{ color: 'hsl(var(--neon))' }}
           >
             Random electric bolts
@@ -89,16 +89,16 @@ export const GuidePageHazards: React.FC = () => {
           }}
         >
           <div 
-            className="font-bold text-sm"
+            className="font-bold text-lg"
             style={{ color: 'hsl(var(--neon))' }}
           >
             UFOs
           </div>
-          <div className="text-xs opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
+          <div className="text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
             Appear from Level 10+. Fire projectiles!
           </div>
           <div 
-            className="text-xs mt-2"
+            className="text-base mt-2"
             style={{ color: 'hsl(var(--neon))' }}
           >
             Shield blocks 1 hit
@@ -109,13 +109,13 @@ export const GuidePageHazards: React.FC = () => {
       {/* UFO types */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-sm text-center"
+          className="font-bold text-lg text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           UFO TYPES
         </h3>
         
-        <div className="grid grid-cols-3 gap-2 text-xs text-center">
+        <div className="grid grid-cols-3 gap-2 text-base text-center">
           <div className="p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
             <div style={{ color: 'hsl(var(--neon))' }}>SMALL</div>
             <div className="opacity-60" style={{ color: 'hsl(var(--neon))' }}>Level 10+</div>
