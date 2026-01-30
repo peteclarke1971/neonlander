@@ -57,6 +57,10 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
     const container = scrollContainerRef.current;
     if (!container) return;
     
+    // Track cleanup resources at effect level
+    let rafId = 0;
+    let resetAutoScroll: (() => void) | null = null;
+    
     // Small delay to let content render
     const checkTimeout = setTimeout(() => {
       const hasScroll = container.scrollHeight > container.clientHeight;
@@ -69,11 +73,10 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
       let lastTime = performance.now();
       let direction: 'down' | 'up' | 'waiting' = 'waiting';
       let waitStart = performance.now();
-      let rafId = 0;
       let userInteracted = false;
       let currentVelocity = 0; // Smoothed velocity
       
-      const resetAutoScroll = () => {
+      resetAutoScroll = () => {
         userInteracted = true;
         waitStart = performance.now();
         direction = 'waiting';
@@ -136,15 +139,17 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
       };
       
       rafId = requestAnimationFrame(animate);
-      
-      return () => {
-        cancelAnimationFrame(rafId);
-        container.removeEventListener('touchstart', resetAutoScroll);
-        container.removeEventListener('wheel', resetAutoScroll);
-      };
     }, 100);
     
-    return () => clearTimeout(checkTimeout);
+    // Proper cleanup at effect level
+    return () => {
+      clearTimeout(checkTimeout);
+      cancelAnimationFrame(rafId);
+      if (resetAutoScroll) {
+        container.removeEventListener('touchstart', resetAutoScroll);
+        container.removeEventListener('wheel', resetAutoScroll);
+      }
+    };
   }, [isOpen, currentPage]);
 
   const goToPrevPage = useCallback(() => {
