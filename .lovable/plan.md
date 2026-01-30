@@ -1,312 +1,199 @@
 
-# Plan: Guide System Final Tweaks
+# Plan: Optimize GravityDistortionWave Performance
 
 ## Summary
 
-This plan implements several refinements to the Guide popup:
-1. **Scroll to top on page change** - Reset scroll position when navigating between pages
-2. **Always start at first page** - Reset to page 0 when opening the guide
-3. **Pause demo timer** - Emit callback to pause demo timer when guide is open
-4. **Auto-scroll feature** - After 3 seconds, slowly scroll down; at bottom, wait 3s and scroll back up
-5. **Landing page text** - Add "Land in the glowing pads" above existing pad text
-6. **Hazards page text** - Update Gravity Wells description
+The `GravityDistortionWave` component is causing severe frame rate drops on the "Mission Successful" screen due to several expensive operations running every frame. This plan implements major performance optimizations while maintaining the visual appeal of the effect.
 
 ---
 
-## Part 1: Scroll to Top on Page Change
+## Root Cause Analysis
 
-### File: `src/components/game/GuidePopup.tsx`
+The component has these critical performance bottlenecks:
 
-Add a ref for the scroll container and reset scroll position whenever `currentPage` changes.
-
-**Changes:**
-- Add `scrollContainerRef` ref for the content div
-- Add useEffect that resets scrollTop to 0 when `currentPage` changes
-
-```typescript
-const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-// Scroll to top when page changes
-useEffect(() => {
-  if (scrollContainerRef.current) {
-    scrollContainerRef.current.scrollTop = 0;
-  }
-}, [currentPage]);
-```
-
-**Apply ref to content div (line 220):**
-```tsx
-<div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 guide-scroll">
-```
+| Issue | Impact | Location |
+|-------|--------|----------|
+| **warpBackground loop** | 57,600+ drawImage calls per frame at 1080p | Lines 556-589 |
+| **Chromatic aberration** | Creates temp canvas every pulse frame | Lines 698-744 |
+| **colorForMode CSS access** | getComputedStyle called multiple times per frame | Lines 201-254 |
+| **Gradient creation** | New gradient objects every frame | Lines 535-543, 451-461 |
+| **shadowBlur on every stroke** | GPU-intensive glow on every line | Lines 338, 373, 400 |
+| **High ring/spoke count** | 32+ rings × 32+ spokes = 1000+ draw calls | Lines 326-420 |
 
 ---
 
-## Part 2: Always Start at First Page
+## Optimization Strategy
 
-### File: `src/components/game/GuidePopup.tsx`
+### 1. Remove or Simplify warpBackground
 
-Currently the guide loads the last viewed page from localStorage (lines 33-45). Change this to always start at page 0.
+The `warpBackground` function performs tens of thousands of small `drawImage` calls to create a subtle lens distortion. This is extremely GPU/CPU intensive for minimal visual impact.
 
-**Before (lines 33-45):**
+**Solution:** Either:
+- A) Remove warp entirely and keep the grid effect (recommended - most visual impact is from grid)
+- B) Use a much larger tile size (24px instead of 6px) reducing calls by 16x
+
+**Implementation (Option B - larger tiles):**
 ```typescript
-useEffect(() => {
-  if (isOpen) {
-    try {
-      const saved = localStorage.getItem('ll-guide-last-page');
-      if (saved) {
-        const pageIndex = parseInt(saved, 10);
-        if (pageIndex >= 0 && pageIndex < PAGES.length) {
-          setCurrentPage(pageIndex);
-        }
-      }
-    } catch {}
-  }
-}, [isOpen]);
-```
+// Line 570: Increase minimum tile size significantly
+const tile = Math.max(24, Math.floor(Math.min(w, h) / 40)); // Was 6, now minimum 24
 
-**After:**
-```typescript
-useEffect(() => {
-  if (isOpen) {
-    setCurrentPage(0); // Always start at first page
-  }
-}, [isOpen]);
-```
-
-Also remove the "save current page to storage" effect (lines 47-52) since we no longer persist page position.
-
----
-
-## Part 3: Pause Demo Timer When Guide is Open
-
-### File: `src/components/game/GuidePopup.tsx`
-
-Add an optional `onOpenChange` callback prop that notifies parent when guide opens/closes.
-
-**Updated props interface:**
-```typescript
-interface GuidePopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onOpenChange?: (isOpen: boolean) => void; // New prop
+// Skip warp on lower-end detection or when fps drops
+if (perfRef.current.skipWarp) {
+  ctx.drawImage(src, 0, 0);
+  return;
 }
 ```
 
-**Add effect to notify parent:**
+---
+
+### 2. Cache getComputedStyle Result
+
+Currently `colorForMode` calls `getComputedStyle` potentially multiple times per frame.
+
+**Solution:** Cache CSS variables once on component mount and when theme changes.
+
 ```typescript
+// Add to refs section (around line 140)
+const cachedNeonRef = useRef<{ neon: string; neon2: string }>({ neon: "180 100% 55%", neon2: "180 100% 55%" });
+
+// Add useEffect to cache CSS vars
 useEffect(() => {
-  onOpenChange?.(isOpen);
-}, [isOpen, onOpenChange]);
+  const updateCache = () => {
+    const css = getComputedStyle(document.documentElement);
+    cachedNeonRef.current = {
+      neon: css.getPropertyValue("--neon").trim() || "180 100% 55%",
+      neon2: css.getPropertyValue("--neon-2").trim() || cachedNeonRef.current.neon
+    };
+  };
+  updateCache();
+  // Listen for theme changes
+  const observer = new MutationObserver(updateCache);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
+  return () => observer.disconnect();
+}, []);
+
+// Update colorForMode to use cache (line 201-254)
+const colorForMode = (alphaCore: number, alphaGlow: number, ringOrSpoke?: 'ring' | 'spoke') => {
+  const neon = cachedNeonRef.current.neon;  // Use cached value
+  const neon2 = cachedNeonRef.current.neon2;
+  // ... rest of function
+};
 ```
 
-### File: `src/components/game/PlayerMenu.tsx`
+---
 
-Track when guide is open and pass to parent via `onInteraction` or a new callback.
+### 3. Reduce Grid Complexity with Performance Governor
 
-**Add state (around line 118):**
+Currently the grid density can be up to 60 lines in each direction.
+
+**Solution:** Cap grid density based on FPS and start with lower values.
+
 ```typescript
-const [guideOpen, setGuideOpen] = useState(false);
+// Update PRESETS (lines 79-113) with lower defaults
+Normal: {
+  // ... existing
+  gridDensity: 24,  // Was 32
+},
+Storm: {
+  // ... existing
+  gridDensity: 32,  // Was 42
+},
+
+// In Play() method (around line 829), apply stricter limits
+p.gridDensity = Math.max(16, Math.min(36, Math.floor(p.gridDensity * (0.85 + rng() * 0.35))));
 ```
 
-**Pass callback to GuidePopup:**
-```tsx
-<GuidePopup 
-  isOpen={showGuidePopup} 
-  onClose={() => setShowGuidePopup(false)}
-  onOpenChange={setGuideOpen}
-/>
-```
+---
 
-**Modify idle timer effect (around line 251) to not run when guide is open:**
+### 4. Disable shadowBlur or Use Sparingly
+
+`shadowBlur` is extremely expensive on canvas operations.
+
+**Solution:** Only apply glow to every Nth ring/spoke, or disable during low FPS.
+
 ```typescript
-useEffect(() => {
-  // Don't run idle timer if mode/level menu is open, assets not loaded, showing leaderboards, or guide is open
-  if (showModeMenu || showLevelMenu || !assetsLoaded || showLeaderboards || showGuidePopup) {
-    return;
-  }
-  // ... rest of effect
-}, [showModeMenu, showLevelMenu, assetsLoaded, showLeaderboards, showGuidePopup]);
+// Add performance tracking ref
+const perfRef = useRef<{ skipGlow: boolean; skipWarp: boolean; currentFps: number }>({ 
+  skipGlow: false, 
+  skipWarp: false, 
+  currentFps: 60 
+});
+
+// In drawGrid (around line 337-338), conditionally apply glow
+const shouldGlow = !perfRef.current.skipGlow && i % 3 === 0; // Only every 3rd ring gets glow
+if (shouldGlow) {
+  ctx.shadowColor = ringColors.core as any;
+  ctx.shadowBlur = 8 * p.glow * glowMult;
+} else {
+  ctx.shadowBlur = 0;
+}
+
+// Update autoGovernor to set these flags based on FPS
+const autoGovernor = (now: number) => {
+  // ... existing fps tracking
+  const rate = fps.frames / ((now - fps.last) / 1000);
+  perfRef.current.currentFps = rate;
+  perfRef.current.skipGlow = rate < 50;
+  perfRef.current.skipWarp = rate < 40;
+  // ... rest of function
+};
 ```
 
-### File: `src/pages/Index.tsx`
+---
 
-The demo timer runs based on `lastInteractionTime`. When guide is open, we need to pause it.
+### 5. Remove Chromatic Aberration or Simplify
 
-**Option: Pass guideOpen state up from PlayerMenu and pause demo timer**
+The chromatic aberration effect creates a temporary canvas every frame during pulses.
 
-Add prop to PlayerMenu:
+**Solution:** Remove this effect entirely or only run it on desktop with high FPS.
+
 ```typescript
-interface PlayerMenuProps {
-  // ... existing props
-  onGuideOpen?: (isOpen: boolean) => void;
+// In step() function, around lines 682-762, simplify:
+// Remove the entire chromatic aberration block and just do:
+try {
+  warpBackground(ctx, bg, tSec);
+} catch {
+  failSoftRef.current.warpOff = true;
+  ctx.drawImage(bg, 0, 0);
 }
 ```
 
-In Index.tsx, track guide state:
-```typescript
-const [guideOpen, setGuideOpen] = useState(false);
-```
-
-In demo timer effect (line 733), add condition:
-```typescript
-useEffect(() => {
-  // Don't run demo timer during active gameplay or when guide is open
-  if (view === "game" || view === "gameover" || guideOpen) {
-    return;
-  }
-  // ... rest of effect
-}, [view, lastInteractionTime, demoSequenceIndex, demoStartTime, demoOriginView, guideOpen]);
-```
-
-Also reset lastInteractionTime when guide closes to restart the 60-second countdown.
-
 ---
 
-## Part 4: Auto-Scroll Feature
+### 6. Batch Draw Operations
 
-### File: `src/components/game/GuidePopup.tsx`
+Currently each ring and spoke is drawn with separate beginPath/stroke calls.
 
-Add auto-scroll logic that:
-1. Waits 3 seconds after page loads
-2. Slowly scrolls down
-3. Waits 3 seconds at bottom
-4. Slowly scrolls back up
-5. Repeats
-
-**Implementation:**
+**Solution:** Batch all rings into a single path, then stroke once.
 
 ```typescript
-// Auto-scroll state
-const autoScrollRef = useRef<{
-  direction: 'down' | 'up' | 'waiting';
-  waitStart: number;
-  rafId: number;
-}>({ direction: 'waiting', waitStart: 0, rafId: 0 });
-
-useEffect(() => {
-  if (!isOpen) return;
-  
-  const container = scrollContainerRef.current;
-  if (!container) return;
-  
-  // Check if scrolling is needed
-  const hasScroll = container.scrollHeight > container.clientHeight;
-  if (!hasScroll) return;
-  
-  const SCROLL_SPEED = 30; // pixels per second
-  const WAIT_TIME = 3000; // 3 seconds
-  
-  let lastTime = performance.now();
-  autoScrollRef.current = { direction: 'waiting', waitStart: performance.now(), rafId: 0 };
-  
-  const animate = (time: number) => {
-    const delta = time - lastTime;
-    lastTime = time;
-    
-    const state = autoScrollRef.current;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const maxScroll = scrollHeight - clientHeight;
-    
-    if (state.direction === 'waiting') {
-      if (time - state.waitStart >= WAIT_TIME) {
-        // Determine direction based on current position
-        if (scrollTop >= maxScroll - 1) {
-          state.direction = 'up';
-        } else if (scrollTop <= 1) {
-          state.direction = 'down';
-        } else {
-          state.direction = 'down'; // Default to down
-        }
-      }
-    } else if (state.direction === 'down') {
-      const newScroll = scrollTop + (SCROLL_SPEED * delta / 1000);
-      container.scrollTop = newScroll;
-      if (container.scrollTop >= maxScroll - 1) {
-        state.direction = 'waiting';
-        state.waitStart = time;
-      }
-    } else if (state.direction === 'up') {
-      const newScroll = scrollTop - (SCROLL_SPEED * delta / 1000);
-      container.scrollTop = newScroll;
-      if (container.scrollTop <= 1) {
-        state.direction = 'waiting';
-        state.waitStart = time;
-      }
-    }
-    
-    state.rafId = requestAnimationFrame(animate);
-  };
-  
-  autoScrollRef.current.rafId = requestAnimationFrame(animate);
-  
-  return () => {
-    cancelAnimationFrame(autoScrollRef.current.rafId);
-  };
-}, [isOpen, currentPage]); // Reset on page change
-```
-
-**User interaction pauses auto-scroll:**
-Add touch/scroll event listeners that reset the wait timer when user manually scrolls.
-
----
-
-## Part 5: Landing Page Text Update
-
-### File: `src/components/game/guide/GuidePageLanding.tsx`
-
-Add "Land in the glowing pads" text above "The lander must be completely on the pad".
-
-**Current (lines 96-101):**
-```tsx
-<PulsingPadCanvas width={180} />
-<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
-  The lander must be completely on the pad
-</span>
-```
-
-**After:**
-```tsx
-<PulsingPadCanvas width={180} />
-<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
-  Land in the glowing pads
-</span>
-<span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
-  The lander must be completely on the pad
-</span>
+// drawGrid optimization - batch rings
+ctx.beginPath();
+for (let i = 0; i < grid.rings; i++) {
+  const r0 = grid.ringRs[i] + off;
+  const hgt = computePhase(r0, tSec);
+  const wob = 1 + 0.15 * Math.sin(0.6 * tSec + r0 * 0.003);
+  const rr = Math.max(1, (r0 + hgt * 22) * wob);
+  ctx.moveTo(rr, 0);
+  ctx.arc(0, 0, rr, 0, Math.PI * 2);
+}
+// Single stroke for all rings
+ctx.strokeStyle = ringColors.glow;
+ctx.lineWidth = 2;
+ctx.stroke();
 ```
 
 ---
 
-## Part 6: Hazards Page Text Update
+### 7. Remove Energy Bursts or Make Optional
 
-### File: `src/components/game/guide/GuidePageHazards.tsx`
+The energy burst system creates gradients every frame.
 
-Update Gravity Wells section text.
+**Solution:** Disable by default or cache gradients.
 
-**Current (lines 47-55):**
-```tsx
-<div className="text-xs sm:text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
-  Pull your ship toward them. Fight the pull!
-</div>
-<div 
-  className="text-xs sm:text-base mt-2"
-  style={{ color: 'hsl(var(--neon))' }}
->
-  Purple swirl effect
-</div>
-```
-
-**After:**
-```tsx
-<div className="text-xs sm:text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
-  Pulls or pushes your Lander
-</div>
-<div 
-  className="text-xs sm:text-base mt-2"
-  style={{ color: 'hsl(var(--neon))' }}
->
-  Size equals power
-</div>
+```typescript
+// In Play() method, disable energy bursts by default
+p.energyBursts = false; // Was: p.energyBursts !== false
 ```
 
 ---
@@ -315,42 +202,52 @@ Update Gravity Wells section text.
 
 | File | Changes |
 |------|---------|
-| `src/components/game/GuidePopup.tsx` | Scroll to top, always start at page 0, auto-scroll, notify parent of open state |
-| `src/components/game/PlayerMenu.tsx` | Track guide open state, pause idle timer when guide open, pass callback to parent |
-| `src/pages/Index.tsx` | Pause demo timer when guide is open |
-| `src/components/game/guide/GuidePageLanding.tsx` | Add "Land in the glowing pads" text |
-| `src/components/game/guide/GuidePageHazards.tsx` | Update Gravity Wells text |
+| `src/components/game/GravityDistortionWave.tsx` | All optimizations listed above |
 
 ---
 
-## Technical Notes
+## Expected Performance Improvement
 
-### Auto-Scroll Behavior
-- Uses `requestAnimationFrame` for smooth animation
-- Scroll speed: 30 pixels/second (adjustable)
-- Wait time: 3 seconds at top and bottom
-- Resets when user changes page or manually scrolls
-- Only activates if page has scrollable content
+| Optimization | Estimated FPS Gain |
+|-------------|-------------------|
+| Larger warp tiles (24px vs 6px) | +15-25 FPS |
+| Cache CSS vars | +2-3 FPS |
+| Reduce grid density | +5-10 FPS |
+| Selective shadowBlur | +10-15 FPS |
+| Remove chromatic aberration | +5-8 FPS |
+| Batch draw calls | +3-5 FPS |
+| Disable energy bursts | +2-3 FPS |
 
-### Demo Timer Pause
-- When guide opens, the demo timer is effectively paused by not running the interval
-- When guide closes, `lastInteractionTime` is reset to restart the 60-second countdown
-- This prevents demo mode from triggering while reading the guide
-
-### Scroll Reset
-- Every page change resets scroll to top immediately
-- This ensures users always see the beginning of each page
-- Works on both touch swipe and button/keyboard navigation
+**Total estimated improvement: 40-70 FPS** (from ~20 FPS to 60+ FPS)
 
 ---
 
-## Result After Changes
+## Visual Impact Assessment
 
-| Feature | Before | After |
-|---------|--------|-------|
-| Page scroll position | Retained between pages | Resets to top on each page |
-| Initial page | Loads last viewed page | Always starts at page 1 (Controls) |
-| Demo timer | Runs while guide is open | Pauses when guide is open |
-| Auto-scroll | None | Scrolls down after 3s, back up after reaching bottom |
-| Landing page | Single line of text | Two lines: "Land in the glowing pads" + "The lander must be completely on the pad" |
-| Gravity Wells | "Pull your ship toward them" + "Purple swirl effect" | "Pulls or pushes your Lander" + "Size equals power" |
+| Change | Visual Impact |
+|--------|---------------|
+| Larger warp tiles | Barely noticeable - warp is subtle |
+| Fewer rings/spokes | Slightly less dense grid - still looks good |
+| Less glow | Slightly less bloom - retains neon aesthetic |
+| No chromatic aberration | Removes minor edge color split during pulses |
+| No energy bursts | Removes occasional radial streaks |
+
+The core visual effect (pulsing concentric rings with radiating spokes, rainbow color cycling) remains fully intact. The optimizations primarily remove subtle secondary effects that are expensive but not essential to the visual identity.
+
+---
+
+## Implementation Priority
+
+1. **High Priority (biggest gains):**
+   - Increase warp tile size
+   - Add skipWarp flag for low FPS
+   - Reduce shadowBlur usage
+
+2. **Medium Priority:**
+   - Cache CSS variables
+   - Remove chromatic aberration
+   - Reduce grid density
+
+3. **Low Priority (polish):**
+   - Batch draw operations
+   - Remove energy bursts
