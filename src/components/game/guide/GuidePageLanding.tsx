@@ -67,9 +67,9 @@ export const GuidePageLanding: React.FC = () => {
   return (
     <div className="flex flex-col gap-4">
       {/* Landing requirements */}
-      <div className="space-y-3 text-lg" style={{ color: 'hsl(var(--neon))' }}>
+      <div className="space-y-3 text-sm sm:text-lg" style={{ color: 'hsl(var(--neon))' }}>
         <h3 
-          className="font-bold text-center text-xl"
+          className="font-bold text-center text-base sm:text-xl"
           style={{ color: 'hsl(var(--neon))' }}
         >
           SAFE LANDING REQUIREMENTS
@@ -78,11 +78,11 @@ export const GuidePageLanding: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col items-center p-2 rounded border" style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}>
             <span style={{ color: 'hsl(var(--neon))' }}>SPEED</span>
-            <span className="text-base opacity-70">Land slowly</span>
+            <span className="text-xs sm:text-base opacity-70">Land slowly</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded border" style={{ borderColor: 'hsl(var(--neon) / 0.3)' }}>
             <span style={{ color: 'hsl(var(--neon))' }}>ANGLE</span>
-            <span className="text-base opacity-70">Stay level</span>
+            <span className="text-xs sm:text-base opacity-70">Stay level</span>
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export const GuidePageLanding: React.FC = () => {
           }}
         >
           <PulsingPadCanvas width={180} />
-          <span className="text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+          <span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
             The lander must be completely on the pad
           </span>
         </div>
@@ -104,13 +104,13 @@ export const GuidePageLanding: React.FC = () => {
       {/* Bonuses */}
       <div className="space-y-2">
         <h3 
-          className="font-bold text-xl text-center"
+          className="font-bold text-base sm:text-xl text-center"
           style={{ color: 'hsl(var(--neon))' }}
         >
           LANDING BONUSES
         </h3>
         
-        <div className="grid grid-cols-2 gap-2 text-base">
+        <div className="grid grid-cols-2 gap-2 text-xs sm:text-base">
           <div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
             <span style={{ color: 'hsl(var(--neon))' }}>BULLSEYE</span>
             <span className="opacity-70" style={{ color: 'hsl(var(--neon))' }}>+500 pts</span>
