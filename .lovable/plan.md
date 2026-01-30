@@ -1,123 +1,226 @@
 
 
-# Fix: Player Menu Music Not Starting on First Visit
+# Plan: Guide System Comprehensive Updates
 
-## Problem
-Music does not play on the Player Menu when first starting the game. Even after interacting with menus like "Game Modes" or "Guide", the music still doesn't start. It only works correctly after playing a game mode and returning to the Player Menu.
+## Summary
 
-## Root Cause Analysis
-
-The current implementation in PlayerMenu uses `{ once: true }` event listeners:
-
-```typescript
-window.addEventListener("pointerdown", startOnInteract, { once: true });
-window.addEventListener("touchstart", startOnInteract, { once: true });
-window.addEventListener("keydown", startOnInteract, { once: true });
-```
-
-**Problems:**
-1. `{ once: true }` removes the listener after the FIRST event fires
-2. The first click (e.g., on "Game Modes") triggers the listener, but `tryStart()` might fail silently because:
-   - AudioContext might not fully resume synchronously
-   - Title music buffer is still loading asynchronously
-   - The async `playTitleMusic()` call hasn't completed when the click event completes
-3. Subsequent clicks don't trigger music start because the listeners are already removed
-
-**Why it works after playing a game:** The game mode (GameEngine) properly warms up the AudioContext with actual audio playback. When returning to PlayerMenu, the AudioContext is already in "running" state and buffers may be cached.
-
-**HomeScreen has an additional safety:** It proactively initializes audio config and preloads SFX in the background, giving the async operations time to complete before user interaction.
+This plan implements multiple changes across the GUIDE popup pages:
+1. **Controls Page** - Update controls text, remove lander animation, adjust gamepad text size
+2. **Landing Page** - Replace "GREEN PADS = SAFE" with animated pulsing pad graphic, remove "Orange pads" text
+3. **Fuel & Shields Page** - Remove lander graphic, update fuel text
+4. **Remove Space Junk Page** - Delete from PAGES array
+5. **Hazards Page** - Remove emoji graphics
+6. **Survival Page** - Update comet text
+7. **Navigation** - Confirm left/right arrow and gamepad navigation works
+8. **Styling** - Apply NEON color to all text and key borders
 
 ---
 
-## Solution
+## Part 1: Controls Page Updates
 
-### Part 1: Add Proactive Audio Initialization (like HomeScreen)
+### File: `src/components/game/guide/GuidePageControls.tsx`
 
-Add background audio config initialization that runs after page load:
+**Changes:**
 
-```typescript
-// Proactively preload audio config and SFX for faster music start
-useEffect(() => {
-  const timer = setTimeout(() => {
-    audioRef.current.initializeConfig().then(() => {
-      audioRef.current.preloadSFX().catch(() => {});
-    }).catch(() => {});
-  }, 1500); // Slight delay to let page render
-  
-  return () => clearTimeout(timer);
-}, []);
+1. **Remove lander animation** - Delete the `<LanderAnimation>` component at the top
+2. **THRUST row** - Remove `/ Space` from the controls
+3. **ABORT row** - Change label to `ABORT (STABILIZE SHIP)` and change instruction to show down arrow + `/ SPACE for emergency brake`
+4. **Gamepad note** - Change from `text-xs` to `text-sm` to match other text size
+
+**Updated structure:**
+```tsx
+// Remove this:
+<div className="flex justify-center">
+  <LanderAnimation showThrust showRotation size={100} />
+</div>
+
+// THRUST: W / ↑ (no Space)
+// ABORT (STABILIZE SHIP): ↓ / SPACE for emergency brake
+// Gamepad text: text-sm instead of text-xs
 ```
 
-### Part 2: Track Music Started State and Remove `{ once: true }`
+---
 
-Replace the problematic pattern with one that:
-1. Tracks whether music has successfully started
-2. Keeps retrying on each interaction until successful
-3. Only removes listeners after confirmed success
+## Part 2: Landing Page Updates
 
-```typescript
-const musicStartedRef = useRef(false);
+### File: `src/components/game/guide/GuidePageLanding.tsx`
 
-useEffect(() => {
-  const tryStart = async () => {
-    if (musicStartedRef.current) return; // Already started
-    try {
-      if (!musicOn) return;
-      await audioRef.current.resume();
-      await audioRef.current.playTitleMusic();
-      audioRef.current.setTitleMusicMuted(false);
-      musicStartedRef.current = true;
-      console.log('🎵 Player Menu music started');
-    } catch (e) {
-      console.warn('Music start attempt failed, will retry on next interaction');
-    }
-  };
-  
-  // Attempt immediately
-  tryStart();
-  
-  const startOnInteract = () => {
-    tryStart();
-    if (!musicStartedRef.current) {
-      audioRef.current.preloadSFX();
-    }
-  };
-  
-  // Don't use { once: true } - keep trying until music starts
-  window.addEventListener("pointerdown", startOnInteract);
-  window.addEventListener("touchstart", startOnInteract);
-  window.addEventListener("keydown", startOnInteract);
-  
-  return () => {
-    window.removeEventListener("pointerdown", startOnInteract);
-    window.removeEventListener("touchstart", startOnInteract);
-    window.removeEventListener("keydown", startOnInteract);
-  };
-}, [musicOn]);
+**Changes:**
+
+1. **Replace "GREEN PADS = SAFE" box** with an animated canvas showing a pulsing green landing pad
+2. **Remove "Orange pads" text** from the 2× PAD bonus box
+
+**New component: PulsingPadAnimation**
+
+Create a small canvas component that renders a pulsing green landing pad, similar to how pads are rendered in the game:
+
+```tsx
+// Pulsing pad animation - uses same pulse formula as game
+// pulse = 1 + 0.6 * Math.sin(elapsed * 4)
+// Green color with glow effect
 ```
 
-### Part 3: Add Direct Trigger on Menu Button Clicks
-
-As a belt-and-suspenders approach, also trigger music start directly when any menu action is taken:
-
-```typescript
-const handleAction = (id: string) => {
-  resetIdle();
-  onInteraction?.();
-  
-  // Ensure music starts on any menu interaction
-  if (!musicStartedRef.current && musicOn) {
-    audioRef.current.resume().then(() => {
-      audioRef.current.playTitleMusic().then(() => {
-        audioRef.current.setTitleMusicMuted(false);
-        musicStartedRef.current = true;
-      }).catch(() => {});
-    }).catch(() => {});
-  }
-  
-  // ... rest of handleAction
-};
+**Updated 2× PAD box:**
+```tsx
+<div className="flex flex-col items-center p-2 rounded" style={{ background: 'hsl(var(--muted) / 0.3)' }}>
+  <span style={{ color: 'hsl(30, 100%, 55%)' }}>2× PAD</span>
+  <span className="opacity-70">Double points</span>
+  {/* Remove: <span className="opacity-50">Orange pads</span> */}
+</div>
 ```
+
+---
+
+## Part 3: Fuel & Shields Page Updates
+
+### File: `src/components/game/guide/GuidePageFuelShields.tsx`
+
+**Changes:**
+
+1. **Remove lander/shield animation** at the top
+2. **Update fuel text** on line 28: "Landing on pads gives fuel boost in time trial and survival modes"
+3. **Update space junk text** on line 32: "Collect Space Junk for fuel boost"
+
+---
+
+## Part 4: Remove Space Junk Page
+
+### File: `src/components/game/GuidePopup.tsx`
+
+**Changes:**
+
+1. Remove the import for `GuidePageJunk`
+2. Remove the 'junk' entry from the PAGES array
+
+**Updated PAGES array:**
+```tsx
+const PAGES = [
+  { id: 'controls', title: 'CONTROLS', Component: GuidePageControls },
+  { id: 'landing', title: 'LANDING', Component: GuidePageLanding },
+  { id: 'fuel', title: 'FUEL & SHIELDS', Component: GuidePageFuelShields },
+  // REMOVED: { id: 'junk', title: 'SPACE JUNK', Component: GuidePageJunk },
+  { id: 'hazards', title: 'HAZARDS', Component: GuidePageHazards },
+  { id: 'scoring', title: 'SCORING', Component: GuidePageScoring },
+  { id: 'modes', title: 'GAME MODES', Component: GuidePageModes },
+  { id: 'survival', title: 'SURVIVAL', Component: GuidePageSurvival },
+];
+```
+
+This reduces pages from 8 to 7.
+
+---
+
+## Part 5: Hazards Page Updates
+
+### File: `src/components/game/guide/GuidePageHazards.tsx`
+
+**Changes:**
+
+Remove the emoji graphics (🌋, 🕳️, ⚡, 🛸) from above each hazard title.
+
+**Before:**
+```tsx
+<div className="text-2xl mb-1">🌋</div>
+<div className="font-bold text-sm" style={{ color: 'hsl(15, 100%, 55%)' }}>
+  VOLCANOES
+</div>
+```
+
+**After:**
+```tsx
+<div className="font-bold text-sm" style={{ color: 'hsl(15, 100%, 55%)' }}>
+  VOLCANOES
+</div>
+```
+
+Remove all four emoji divs (lines 16, 42, 68, 94).
+
+---
+
+## Part 6: Survival Page Updates
+
+### File: `src/components/game/guide/GuidePageSurvival.tsx`
+
+**Changes:**
+
+Update the COMETS text (currently "Catch for bonus points!") to "Land when active for bonus"
+
+**Line 62:**
+```tsx
+<div className="opacity-70 mt-1">Land when active for bonus</div>
+```
+
+---
+
+## Part 7: Navigation Verification
+
+The guide already supports left/right arrow keys and gamepad navigation. This is implemented in `GuidePopup.tsx`:
+
+**Keyboard (lines 68-78):**
+```typescript
+if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+  goToPrevPage();
+} else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+  goToNextPage();
+}
+```
+
+**Gamepad (lines 112-122):**
+```typescript
+// D-pad left/right for page navigation
+if (input.ui.left && !prev.left && canFire('left')) {
+  goToPrevPage();
+  vibrate(30, 0.15, 0.3);
+}
+if (input.ui.right && !prev.right && canFire('right')) {
+  goToNextPage();
+  vibrate(30, 0.15, 0.3);
+}
+```
+
+No changes needed - this already works as requested.
+
+---
+
+## Part 8: NEON Color Styling
+
+### Files: All guide page components
+
+**Changes across all pages:**
+
+1. Change all white text (`color: 'hsl(var(--foreground) / 0.9)'`) to NEON (`color: 'hsl(var(--neon))'`)
+2. Change specific colored text (yellows, greens, etc.) to NEON
+3. Change key border colors from various colors to NEON
+
+**Specific files and updates:**
+
+**GuidePageControls.tsx:**
+- Line 15: Text color from `foreground` to `neon`
+- Line 58: BOOST color from `hsl(180, 100%, 50%)` to `neon`
+- Line 76: ABORT color from `hsl(0, 100%, 65%)` to `neon`
+- Gamepad note: color to `neon` and remove `opacity-60`
+
+**GuidePageLanding.tsx:**
+- Line 13: Text color from `foreground` to `neon`
+- Lines 22, 26: Border colors to `neon`
+- Lines 23, 27: Checkmark colors from green to `neon`
+- Lines 52, 64, 69, 74: Section title and item colors to `neon`
+- Box backgrounds: Keep with neon-based styling
+
+**GuidePageFuelShields.tsx:**
+- Line 21: Text color from `foreground` to `neon`
+- All section headers and icons: Change to `neon`
+- Shield section border: Change to `neon`
+
+**GuidePageHazards.tsx:**
+- All hazard titles: Change to `neon`
+- All borders: Change to `neon`
+- UFO types section: Change to `neon`
+
+**GuidePageSurvival.tsx:**
+- Main title and headers: Change to `neon`
+- Feature icons and borders: Change to `neon`
+- Special zone borders: Change to `neon`
 
 ---
 
@@ -125,24 +228,87 @@ const handleAction = (id: string) => {
 
 | File | Changes |
 |------|---------|
-| `src/components/game/PlayerMenu.tsx` | Add proactive audio init, fix listener pattern, add direct trigger |
+| `src/components/game/guide/GuidePageControls.tsx` | Remove lander, fix THRUST/ABORT, fix gamepad text size, apply NEON colors |
+| `src/components/game/guide/GuidePageLanding.tsx` | Add pulsing pad canvas, remove "Orange pads", apply NEON colors |
+| `src/components/game/guide/GuidePageFuelShields.tsx` | Remove lander, update fuel text, apply NEON colors |
+| `src/components/game/GuidePopup.tsx` | Remove Space Junk page from PAGES array |
+| `src/components/game/guide/GuidePageHazards.tsx` | Remove emojis, apply NEON colors |
+| `src/components/game/guide/GuidePageSurvival.tsx` | Update comet text, apply NEON colors |
 
 ---
 
-## Technical Notes
+## Technical Details
 
-- The `await` in `tryStart` now properly waits for `resume()` to complete before playing music
-- The `musicStartedRef` ref persists across re-renders without causing effect re-runs
-- Removing `{ once: true }` means listeners stay active but only trigger music start attempts until successful
-- Adding direct trigger in `handleAction` ensures menu clicks also try to start music
-- Proactive config initialization (1.5s delay) gives async operations time to complete before typical user interaction
+### Pulsing Pad Animation Component
 
-## Result After Fix
+```tsx
+const PulsingPadCanvas: React.FC<{ size?: number }> = ({ size = 60 }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| First page load, click "Game Modes" | No music | Music starts |
-| Open Guide, close Guide | No music | Music starts |
-| Click any menu item | No music | Music starts |
-| Return from game mode | Music works | Music works |
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = 30 * dpr;
+    ctx.scale(dpr, dpr);
+
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed = (timestamp - startTimeRef.current) / 1000;
+      
+      ctx.clearRect(0, 0, size, 30);
+      
+      // Pulse formula from GameEngine: 1 + 0.6 * Math.sin(elapsed * 4)
+      const pulse = 1 + 0.6 * Math.sin(elapsed * 4);
+      const padWidth = size * 0.8;
+      const padX = (size - padWidth) / 2;
+      
+      // Outer glow
+      ctx.beginPath();
+      ctx.moveTo(padX, 15);
+      ctx.lineTo(padX + padWidth, 15);
+      ctx.strokeStyle = 'hsl(120, 100%, 50%)';
+      ctx.lineWidth = 6 * pulse;
+      ctx.shadowColor = 'hsl(120, 100%, 50%)';
+      ctx.shadowBlur = 20 * pulse;
+      ctx.globalAlpha = 0.6;
+      ctx.stroke();
+      
+      // Core line
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [size]);
+
+  return <canvas ref={canvasRef} style={{ width: size, height: 30 }} />;
+};
+```
+
+---
+
+## Result After Changes
+
+| Page | Before | After |
+|------|--------|-------|
+| CONTROLS | Lander animation, Space in THRUST, wrong ABORT text, small gamepad text | No lander, THRUST: W / ↑, ABORT (STABILIZE SHIP): ↓ / SPACE for emergency brake, larger gamepad text |
+| LANDING | "GREEN PADS = SAFE" text, "Orange pads" shown | Animated pulsing green pad, no "Orange pads" |
+| FUEL & SHIELDS | Lander animation, old fuel text | No lander, updated fuel text |
+| SPACE JUNK | Entire page exists | Page removed entirely |
+| HAZARDS | Emoji graphics above each hazard | No emojis |
+| SURVIVAL | "Catch for bonus points!" | "Land when active for bonus" |
+| All pages | Mixed colors (green, yellow, cyan, etc.) | NEON color theme throughout |
+| Navigation | Already working | Confirmed working (no changes needed) |
 
