@@ -43,43 +43,38 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
-  // Auto-scroll feature with smooth interpolation (includes scroll-to-top)
+  // Scroll to top when page changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [currentPage]);
+
+  // Auto-scroll feature
   useEffect(() => {
     if (!isOpen) return;
     
     const container = scrollContainerRef.current;
     if (!container) return;
     
-    // Reset scroll to top immediately when page changes
-    container.scrollTop = 0;
-    
-    // Track cleanup resources at effect level
-    let rafId = 0;
-    let resetAutoScroll: (() => void) | null = null;
-    let cancelled = false;
-    
-    // Longer delay to let content fully render before checking scroll
+    // Small delay to let content render
     const checkTimeout = setTimeout(() => {
-      if (cancelled || !scrollContainerRef.current) return;
-      
       const hasScroll = container.scrollHeight > container.clientHeight;
       if (!hasScroll) return;
       
-      const SCROLL_SPEED = 25; // pixels per second (base speed)
+      const SCROLL_SPEED = 30; // pixels per second
       const WAIT_TIME = 3000; // 3 seconds
-      const SMOOTHING = 0.92; // Higher = smoother (0.9-0.98 range)
       
       let lastTime = performance.now();
       let direction: 'down' | 'up' | 'waiting' = 'waiting';
       let waitStart = performance.now();
+      let rafId = 0;
       let userInteracted = false;
-      let currentVelocity = 0; // Smoothed velocity
       
-      resetAutoScroll = () => {
+      const resetAutoScroll = () => {
         userInteracted = true;
         waitStart = performance.now();
         direction = 'waiting';
-        currentVelocity = 0; // Reset velocity on interaction
         // Resume after 3 seconds of no interaction
         setTimeout(() => { userInteracted = false; }, 3000);
       };
@@ -88,21 +83,17 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
       container.addEventListener('wheel', resetAutoScroll, { passive: true });
       
       const animate = (time: number) => {
-        if (cancelled) return; // Stop if effect was cleaned up
-        
-        const delta = Math.min(time - lastTime, 50); // Cap delta to prevent jumps
-        lastTime = time;
-        
         if (userInteracted) {
-          currentVelocity = 0;
+          lastTime = time;
           rafId = requestAnimationFrame(animate);
           return;
         }
         
+        const delta = time - lastTime;
+        lastTime = time;
+        
         const { scrollTop, scrollHeight, clientHeight } = container;
         const maxScroll = scrollHeight - clientHeight;
-        
-        let targetVelocity = 0;
         
         if (direction === 'waiting') {
           if (time - waitStart >= WAIT_TIME) {
@@ -113,45 +104,34 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
             }
           }
         } else if (direction === 'down') {
-          targetVelocity = SCROLL_SPEED;
-          if (scrollTop >= maxScroll - 1) {
+          const newScroll = scrollTop + (SCROLL_SPEED * delta / 1000);
+          container.scrollTop = newScroll;
+          if (container.scrollTop >= maxScroll - 1) {
             direction = 'waiting';
             waitStart = time;
-            targetVelocity = 0;
           }
         } else if (direction === 'up') {
-          targetVelocity = -SCROLL_SPEED;
-          if (scrollTop <= 1) {
+          const newScroll = scrollTop - (SCROLL_SPEED * delta / 1000);
+          container.scrollTop = newScroll;
+          if (container.scrollTop <= 1) {
             direction = 'waiting';
             waitStart = time;
-            targetVelocity = 0;
           }
-        }
-        
-        // Smooth interpolation of velocity
-        currentVelocity = currentVelocity * SMOOTHING + targetVelocity * (1 - SMOOTHING);
-        
-        // Apply smoothed scroll
-        if (Math.abs(currentVelocity) > 0.1) {
-          container.scrollTop += currentVelocity * delta / 1000;
         }
         
         rafId = requestAnimationFrame(animate);
       };
       
       rafId = requestAnimationFrame(animate);
-    }, 300); // Increased delay for content to render
-    
-    // Proper cleanup at effect level
-    return () => {
-      cancelled = true;
-      clearTimeout(checkTimeout);
-      cancelAnimationFrame(rafId);
-      if (resetAutoScroll && container) {
+      
+      return () => {
+        cancelAnimationFrame(rafId);
         container.removeEventListener('touchstart', resetAutoScroll);
         container.removeEventListener('wheel', resetAutoScroll);
-      }
-    };
+      };
+    }, 100);
+    
+    return () => clearTimeout(checkTimeout);
   }, [isOpen, currentPage]);
 
   const goToPrevPage = useCallback(() => {
