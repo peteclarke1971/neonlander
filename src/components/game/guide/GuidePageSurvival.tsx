@@ -5,7 +5,7 @@ export const GuidePageSurvival: React.FC = () => {
     <div className="flex flex-col gap-4">
       <div 
         className="text-center text-2xl"
-        style={{ color: 'hsl(120, 100%, 50%)' }}
+        style={{ color: 'hsl(var(--neon))' }}
       >
         ∞ SURVIVAL MODE
       </div>
@@ -23,7 +23,8 @@ export const GuidePageSurvival: React.FC = () => {
           className="p-3 rounded border text-sm text-center"
           style={{ 
             borderColor: 'hsl(var(--neon) / 0.3)',
-            background: 'hsl(var(--neon) / 0.05)'
+            background: 'hsl(var(--neon) / 0.05)',
+            color: 'hsl(var(--neon))'
           }}
         >
           Travel as far as possible! Distance is tracked in meters.
@@ -34,7 +35,7 @@ export const GuidePageSurvival: React.FC = () => {
       <div className="space-y-2">
         <h3 
           className="font-bold text-sm text-center"
-          style={{ color: 'hsl(45, 100%, 60%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           KEY FEATURES
         </h3>
@@ -44,29 +45,29 @@ export const GuidePageSurvival: React.FC = () => {
             className="p-2 rounded text-center"
             style={{ background: 'hsl(var(--muted) / 0.3)' }}
           >
-            <span style={{ color: 'hsl(45, 100%, 60%)' }}>⛽ FUEL</span>
-            <div className="opacity-70 mt-1">Land on pads to refuel</div>
+            <span style={{ color: 'hsl(var(--neon))' }}>⛽ FUEL</span>
+            <div className="opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>Land on pads to refuel</div>
           </div>
           <div 
             className="p-2 rounded text-center"
             style={{ background: 'hsl(var(--muted) / 0.3)' }}
           >
-            <span style={{ color: 'hsl(180, 100%, 50%)' }}>📍 SECTORS</span>
-            <div className="opacity-70 mt-1">Named zones every 3000m</div>
+            <span style={{ color: 'hsl(var(--neon))' }}>📍 SECTORS</span>
+            <div className="opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>Named zones every 3000m</div>
           </div>
           <div 
             className="p-2 rounded text-center"
             style={{ background: 'hsl(var(--muted) / 0.3)' }}
           >
-            <span style={{ color: 'hsl(0, 100%, 60%)' }}>☄️ COMETS</span>
-            <div className="opacity-70 mt-1">Catch for bonus points!</div>
+            <span style={{ color: 'hsl(var(--neon))' }}>☄️ COMETS</span>
+            <div className="opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>Land when active for bonus</div>
           </div>
           <div 
             className="p-2 rounded text-center"
             style={{ background: 'hsl(var(--muted) / 0.3)' }}
           >
-            <span style={{ color: 'hsl(280, 100%, 70%)' }}>🌀 WEATHER</span>
-            <div className="opacity-70 mt-1">Dynamic conditions</div>
+            <span style={{ color: 'hsl(var(--neon))' }}>🌀 WEATHER</span>
+            <div className="opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>Dynamic conditions</div>
           </div>
         </div>
       </div>
@@ -75,7 +76,7 @@ export const GuidePageSurvival: React.FC = () => {
       <div className="space-y-2">
         <h3 
           className="font-bold text-sm text-center"
-          style={{ color: 'hsl(280, 100%, 70%)' }}
+          style={{ color: 'hsl(var(--neon))' }}
         >
           SPECIAL ZONES
         </h3>
@@ -84,15 +85,15 @@ export const GuidePageSurvival: React.FC = () => {
           <div 
             className="p-2 rounded border"
             style={{ 
-              borderColor: 'hsl(0, 0%, 20%)',
+              borderColor: 'hsl(var(--neon) / 0.3)',
               background: 'hsl(0, 0%, 5%)'
             }}
           >
             <div className="flex items-center gap-2">
               <span>🌑</span>
-              <span style={{ color: 'hsl(0, 0%, 70%)' }}>BLACKOUT</span>
+              <span style={{ color: 'hsl(var(--neon))' }}>BLACKOUT</span>
             </div>
-            <div className="text-xs opacity-60 mt-1">
+            <div className="text-xs opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
               Visibility drops to spotlight only. Navigate by your ship's light!
             </div>
           </div>
@@ -100,15 +101,15 @@ export const GuidePageSurvival: React.FC = () => {
           <div 
             className="p-2 rounded border"
             style={{ 
-              borderColor: 'hsl(45, 100%, 60% / 0.4)',
-              background: 'hsl(45, 100%, 60% / 0.05)'
+              borderColor: 'hsl(var(--neon) / 0.4)',
+              background: 'hsl(var(--neon) / 0.05)'
             }}
           >
             <div className="flex items-center gap-2">
               <span>💡</span>
-              <span style={{ color: 'hsl(45, 100%, 60%)' }}>LIGHT STORM</span>
+              <span style={{ color: 'hsl(var(--neon))' }}>LIGHT STORM</span>
             </div>
-            <div className="text-xs opacity-60 mt-1">
+            <div className="text-xs opacity-60 mt-1" style={{ color: 'hsl(var(--neon))' }}>
               Sweeping light beam reveals terrain. Follow the light!
             </div>
           </div>
@@ -117,8 +118,8 @@ export const GuidePageSurvival: React.FC = () => {
 
       {/* Tip */}
       <div 
-        className="text-xs text-center opacity-60 mt-2"
-        style={{ color: 'hsl(var(--muted-foreground))' }}
+        className="text-xs text-center mt-2"
+        style={{ color: 'hsl(var(--neon))' }}
       >
         💡 Conserve fuel by gliding when safe. Land often to refuel!
       </div>

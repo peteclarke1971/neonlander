@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GuidePageControls } from './guide/GuidePageControls';
 import { GuidePageLanding } from './guide/GuidePageLanding';
 import { GuidePageFuelShields } from './guide/GuidePageFuelShields';
-import { GuidePageJunk } from './guide/GuidePageJunk';
 import { GuidePageHazards } from './guide/GuidePageHazards';
 import { GuidePageScoring } from './guide/GuidePageScoring';
 import { GuidePageModes } from './guide/GuidePageModes';
@@ -18,7 +17,6 @@ const PAGES = [
   { id: 'controls', title: 'CONTROLS', Component: GuidePageControls },
   { id: 'landing', title: 'LANDING', Component: GuidePageLanding },
   { id: 'fuel', title: 'FUEL & SHIELDS', Component: GuidePageFuelShields },
-  { id: 'junk', title: 'SPACE JUNK', Component: GuidePageJunk },
   { id: 'hazards', title: 'HAZARDS', Component: GuidePageHazards },
   { id: 'scoring', title: 'SCORING', Component: GuidePageScoring },
   { id: 'modes', title: 'GAME MODES', Component: GuidePageModes },
