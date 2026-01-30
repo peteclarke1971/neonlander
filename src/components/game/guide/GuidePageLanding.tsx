@@ -96,6 +96,9 @@ export const GuidePageLanding: React.FC = () => {
         >
           <PulsingPadCanvas width={180} />
           <span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
+            Land in the glowing pads
+          </span>
+          <span className="text-xs sm:text-base opacity-80" style={{ color: 'hsl(var(--neon))' }}>
             The lander must be completely on the pad
           </span>
         </div>

@@ -45,13 +45,13 @@ export const GuidePageHazards: React.FC = () => {
             GRAVITY WELLS
           </div>
           <div className="text-xs sm:text-base opacity-70 mt-1" style={{ color: 'hsl(var(--neon))' }}>
-            Pull your ship toward them. Fight the pull!
+            Pulls or pushes your Lander
           </div>
           <div 
             className="text-xs sm:text-base mt-2"
             style={{ color: 'hsl(var(--neon))' }}
           >
-            Purple swirl effect
+            Size equals power
           </div>
         </div>
 
