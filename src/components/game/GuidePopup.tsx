@@ -43,26 +43,25 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
-  // Scroll to top when page changes
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = 0;
-    }
-  }, [currentPage]);
-
-  // Auto-scroll feature with smooth interpolation
+  // Auto-scroll feature with smooth interpolation (includes scroll-to-top)
   useEffect(() => {
     if (!isOpen) return;
     
     const container = scrollContainerRef.current;
     if (!container) return;
     
+    // Reset scroll to top immediately when page changes
+    container.scrollTop = 0;
+    
     // Track cleanup resources at effect level
     let rafId = 0;
     let resetAutoScroll: (() => void) | null = null;
+    let cancelled = false;
     
-    // Small delay to let content render
+    // Longer delay to let content fully render before checking scroll
     const checkTimeout = setTimeout(() => {
+      if (cancelled || !scrollContainerRef.current) return;
+      
       const hasScroll = container.scrollHeight > container.clientHeight;
       if (!hasScroll) return;
       
@@ -89,6 +88,8 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
       container.addEventListener('wheel', resetAutoScroll, { passive: true });
       
       const animate = (time: number) => {
+        if (cancelled) return; // Stop if effect was cleaned up
+        
         const delta = Math.min(time - lastTime, 50); // Cap delta to prevent jumps
         lastTime = time;
         
@@ -139,13 +140,14 @@ export const GuidePopup: React.FC<GuidePopupProps> = ({ isOpen, onClose, onOpenC
       };
       
       rafId = requestAnimationFrame(animate);
-    }, 100);
+    }, 300); // Increased delay for content to render
     
     // Proper cleanup at effect level
     return () => {
+      cancelled = true;
       clearTimeout(checkTimeout);
       cancelAnimationFrame(rafId);
-      if (resetAutoScroll) {
+      if (resetAutoScroll && container) {
         container.removeEventListener('touchstart', resetAutoScroll);
         container.removeEventListener('wheel', resetAutoScroll);
       }
