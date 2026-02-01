@@ -145,10 +145,11 @@ export const InFlightTip = ({
   // Subtle scale effect
   const scaleAmt = 0.95 + Math.min(t * 2, 1) * 0.05; // Scale from 0.95 to 1.0
 
-  // Adjust sizes for iPhone
-  const textSize = isIPhone ? 'text-sm' : 'text-base md:text-lg';
-  const shadowBlur = isIPhone ? 8 : 12;
-  const padding = isIPhone ? 'px-3 py-1.5' : 'px-4 py-2';
+  // Adjust sizes for devices - 25% larger than before
+  // Before: iPhone 14px, Other 16px/18px → After: iPhone 18px, Other 20px/22px
+  const textSize = isIPhone ? 'text-[18px]' : 'text-[20px] md:text-[22px]';
+  const shadowBlur = isIPhone ? 10 : 15;
+  const padding = isIPhone ? 'px-4 py-2' : 'px-5 py-2.5';
 
   return (
     <div 
