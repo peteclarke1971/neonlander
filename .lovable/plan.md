@@ -1,199 +1,140 @@
 
-# Plan: Optimize GravityDistortionWave Performance
+
+# Plan: PC Thruster Optimization Toggle & Tip Size Increase
 
 ## Summary
 
-The `GravityDistortionWave` component is causing severe frame rate drops on the "Mission Successful" screen due to several expensive operations running every frame. This plan implements major performance optimizations while maintaining the visual appeal of the effect.
+This plan implements two changes:
+1. **Thruster Optimization Toggle** - A new setting in the Controls page that enables the iPad-style optimized thruster particle rendering on PC/Laptop for users experiencing performance issues (especially at 4K resolutions)
+2. **Tip Text Size Increase** - Make in-flight tips 25% larger for better visibility
 
 ---
 
-## Root Cause Analysis
+## Part 1: Thruster Optimization Toggle
 
-The component has these critical performance bottlenecks:
+### 1.1 Add State to Controls.tsx
 
-| Issue | Impact | Location |
-|-------|--------|----------|
-| **warpBackground loop** | 57,600+ drawImage calls per frame at 1080p | Lines 556-589 |
-| **Chromatic aberration** | Creates temp canvas every pulse frame | Lines 698-744 |
-| **colorForMode CSS access** | getComputedStyle called multiple times per frame | Lines 201-254 |
-| **Gradient creation** | New gradient objects every frame | Lines 535-543, 451-461 |
-| **shadowBlur on every stroke** | GPU-intensive glow on every line | Lines 338, 373, 400 |
-| **High ring/spoke count** | 32+ rings × 32+ spokes = 1000+ draw calls | Lines 326-420 |
+Add a new toggle state for thruster optimization (off by default).
 
----
+**File:** `src/pages/Controls.tsx`
 
-## Optimization Strategy
-
-### 1. Remove or Simplify warpBackground
-
-The `warpBackground` function performs tens of thousands of small `drawImage` calls to create a subtle lens distortion. This is extremely GPU/CPU intensive for minimal visual impact.
-
-**Solution:** Either:
-- A) Remove warp entirely and keep the grid effect (recommended - most visual impact is from grid)
-- B) Use a much larger tile size (24px instead of 6px) reducing calls by 16x
-
-**Implementation (Option B - larger tiles):**
+**Add new state (around line 173):**
 ```typescript
-// Line 570: Increase minimum tile size significantly
-const tile = Math.max(24, Math.floor(Math.min(w, h) / 40)); // Was 6, now minimum 24
-
-// Skip warp on lower-end detection or when fps drops
-if (perfRef.current.skipWarp) {
-  ctx.drawImage(src, 0, 0);
-  return;
-}
-```
-
----
-
-### 2. Cache getComputedStyle Result
-
-Currently `colorForMode` calls `getComputedStyle` potentially multiple times per frame.
-
-**Solution:** Cache CSS variables once on component mount and when theme changes.
-
-```typescript
-// Add to refs section (around line 140)
-const cachedNeonRef = useRef<{ neon: string; neon2: string }>({ neon: "180 100% 55%", neon2: "180 100% 55%" });
-
-// Add useEffect to cache CSS vars
-useEffect(() => {
-  const updateCache = () => {
-    const css = getComputedStyle(document.documentElement);
-    cachedNeonRef.current = {
-      neon: css.getPropertyValue("--neon").trim() || "180 100% 55%",
-      neon2: css.getPropertyValue("--neon-2").trim() || cachedNeonRef.current.neon
-    };
-  };
-  updateCache();
-  // Listen for theme changes
-  const observer = new MutationObserver(updateCache);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
-  return () => observer.disconnect();
-}, []);
-
-// Update colorForMode to use cache (line 201-254)
-const colorForMode = (alphaCore: number, alphaGlow: number, ringOrSpoke?: 'ring' | 'spoke') => {
-  const neon = cachedNeonRef.current.neon;  // Use cached value
-  const neon2 = cachedNeonRef.current.neon2;
-  // ... rest of function
-};
-```
-
----
-
-### 3. Reduce Grid Complexity with Performance Governor
-
-Currently the grid density can be up to 60 lines in each direction.
-
-**Solution:** Cap grid density based on FPS and start with lower values.
-
-```typescript
-// Update PRESETS (lines 79-113) with lower defaults
-Normal: {
-  // ... existing
-  gridDensity: 24,  // Was 32
-},
-Storm: {
-  // ... existing
-  gridDensity: 32,  // Was 42
-},
-
-// In Play() method (around line 829), apply stricter limits
-p.gridDensity = Math.max(16, Math.min(36, Math.floor(p.gridDensity * (0.85 + rng() * 0.35))));
-```
-
----
-
-### 4. Disable shadowBlur or Use Sparingly
-
-`shadowBlur` is extremely expensive on canvas operations.
-
-**Solution:** Only apply glow to every Nth ring/spoke, or disable during low FPS.
-
-```typescript
-// Add performance tracking ref
-const perfRef = useRef<{ skipGlow: boolean; skipWarp: boolean; currentFps: number }>({ 
-  skipGlow: false, 
-  skipWarp: false, 
-  currentFps: 60 
+const [thrusterOptimization, setThrusterOptimization] = useState<boolean>(() => {
+  try {
+    const saved = localStorage.getItem('ll-thruster-optimization');
+    return saved ? JSON.parse(saved) : false;
+  } catch {
+    return false;
+  }
 });
+```
 
-// In drawGrid (around line 337-338), conditionally apply glow
-const shouldGlow = !perfRef.current.skipGlow && i % 3 === 0; // Only every 3rd ring gets glow
-if (shouldGlow) {
-  ctx.shadowColor = ringColors.core as any;
-  ctx.shadowBlur = 8 * p.glow * glowMult;
-} else {
-  ctx.shadowBlur = 0;
-}
+**Add useEffect to persist (around line 330):**
+```typescript
+useEffect(() => {
+  try {
+    localStorage.setItem('ll-thruster-optimization', JSON.stringify(thrusterOptimization));
+  } catch {}
+}, [thrusterOptimization]);
+```
 
-// Update autoGovernor to set these flags based on FPS
-const autoGovernor = (now: number) => {
-  // ... existing fps tracking
-  const rate = fps.frames / ((now - fps.last) / 1000);
-  perfRef.current.currentFps = rate;
-  perfRef.current.skipGlow = rate < 50;
-  perfRef.current.skipWarp = rate < 40;
-  // ... rest of function
-};
+### 1.2 Add UI Toggle in Controls.tsx
+
+Add the toggle to the "Gameplay Settings" section after Graphics Quality.
+
+**Location:** After line 1045 (after Graphics Quality dropdown)
+
+```tsx
+{/* Thruster Optimization (PC only) */}
+<div className="flex items-center justify-between">
+  <div>
+    <Label>Thruster Optimization</Label>
+    <div className="text-xs text-muted-foreground">
+      Reduces thruster particle effects for better performance at high resolutions (4K)
+    </div>
+  </div>
+  <Switch 
+    checked={thrusterOptimization}
+    onCheckedChange={setThrusterOptimization}
+  />
+</div>
+```
+
+### 1.3 Read Setting in GameEngine.tsx
+
+Modify GameEngine to read the new setting and apply PC thruster optimization.
+
+**File:** `src/components/game/GameEngine.tsx`
+
+**Add state to read setting (around line 381):**
+```typescript
+// PC thruster optimization: user toggle for 4K performance
+const pcThrusterOptimization = useState<boolean>(() => {
+  try {
+    const saved = localStorage.getItem('ll-thruster-optimization');
+    return saved ? JSON.parse(saved) : false;
+  } catch {
+    return false;
+  }
+})[0];
+
+// Unified thruster optimization: applies to iPad (automatic) OR PC with toggle enabled
+const useThrusterOptimization = useIPadThrusterOptimization || (pcThrusterOptimization && !isMobile);
+```
+
+**Update particle count (line 1469):**
+```typescript
+// Thruster optimization uses 15 particles with fillRect; desktop without optimization uses 25
+const THRUSTER_PARTICLE_COUNT = shouldOptimizePerformance ? 2 : 
+  (isIPhone ? 10 : (useThrusterOptimization ? 15 : 25));
+```
+
+**Update shadow blur (line 1471):**
+```typescript
+const THRUSTER_SHADOW_BLUR = shouldOptimizePerformance ? 0 : 
+  (isIPhone ? 0 : (useThrusterOptimization ? 6 : 25));
+```
+
+**Update max particles (line 3857):**
+```typescript
+const maxParticles = shouldOptimizePerformance ? 30 : 
+  (useThrusterOptimization ? 150 : (isUnderwater ? 150 : 300));
+```
+
+**Update rendering branch (line 5664):**
+```typescript
+} else if (useThrusterOptimization) {
+  // === OPTIMIZED: Fast fillRect rendering (iPad or PC with toggle) ===
 ```
 
 ---
 
-### 5. Remove Chromatic Aberration or Simplify
+## Part 2: Increase Tip Text Size by 25%
 
-The chromatic aberration effect creates a temporary canvas every frame during pulses.
+### File: `src/components/game/InFlightTip.tsx`
 
-**Solution:** Remove this effect entirely or only run it on desktop with high FPS.
+The current text sizes are:
+- iPhone: `text-sm` (14px)
+- Other: `text-base md:text-lg` (16px / 18px on md+)
 
-```typescript
-// In step() function, around lines 682-762, simplify:
-// Remove the entire chromatic aberration block and just do:
-try {
-  warpBackground(ctx, bg, tSec);
-} catch {
-  failSoftRef.current.warpOff = true;
-  ctx.drawImage(bg, 0, 0);
-}
-```
+Increase by 25%:
+- iPhone: `text-base` (16px) - was 14px, now 16px (+14%)
+- Other: `text-lg md:text-xl` (18px / 20px on md+) - was 16px/18px, now 18px/20px (+12.5% / +11%)
 
----
+To get exactly 25% larger, use custom font sizes instead of Tailwind classes.
 
-### 6. Batch Draw Operations
-
-Currently each ring and spoke is drawn with separate beginPath/stroke calls.
-
-**Solution:** Batch all rings into a single path, then stroke once.
+**Update lines 148-151:**
 
 ```typescript
-// drawGrid optimization - batch rings
-ctx.beginPath();
-for (let i = 0; i < grid.rings; i++) {
-  const r0 = grid.ringRs[i] + off;
-  const hgt = computePhase(r0, tSec);
-  const wob = 1 + 0.15 * Math.sin(0.6 * tSec + r0 * 0.003);
-  const rr = Math.max(1, (r0 + hgt * 22) * wob);
-  ctx.moveTo(rr, 0);
-  ctx.arc(0, 0, rr, 0, Math.PI * 2);
-}
-// Single stroke for all rings
-ctx.strokeStyle = ringColors.glow;
-ctx.lineWidth = 2;
-ctx.stroke();
-```
-
----
-
-### 7. Remove Energy Bursts or Make Optional
-
-The energy burst system creates gradients every frame.
-
-**Solution:** Disable by default or cache gradients.
-
-```typescript
-// In Play() method, disable energy bursts by default
-p.energyBursts = false; // Was: p.energyBursts !== false
+// Adjust sizes for devices - 25% larger than before
+// Before: iPhone 14px, Other 16px/18px
+// After: iPhone 17.5px (round to 18px), Other 20px/22.5px
+const textSize = isIPhone 
+  ? 'text-[18px]' 
+  : 'text-[20px] md:text-[22px]';
+const shadowBlur = isIPhone ? 10 : 15; // Also slightly increased for better glow
+const padding = isIPhone ? 'px-4 py-2' : 'px-5 py-2.5'; // Slightly more padding
 ```
 
 ---
@@ -202,52 +143,49 @@ p.energyBursts = false; // Was: p.energyBursts !== false
 
 | File | Changes |
 |------|---------|
-| `src/components/game/GravityDistortionWave.tsx` | All optimizations listed above |
+| `src/pages/Controls.tsx` | Add thruster optimization toggle state and UI |
+| `src/components/game/GameEngine.tsx` | Read setting and apply unified thruster optimization |
+| `src/components/game/InFlightTip.tsx` | Increase text size by 25% |
 
 ---
 
-## Expected Performance Improvement
+## Technical Notes
 
-| Optimization | Estimated FPS Gain |
-|-------------|-------------------|
-| Larger warp tiles (24px vs 6px) | +15-25 FPS |
-| Cache CSS vars | +2-3 FPS |
-| Reduce grid density | +5-10 FPS |
-| Selective shadowBlur | +10-15 FPS |
-| Remove chromatic aberration | +5-8 FPS |
-| Batch draw calls | +3-5 FPS |
-| Disable energy bursts | +2-3 FPS |
+### Thruster Optimization Behavior
 
-**Total estimated improvement: 40-70 FPS** (from ~20 FPS to 60+ FPS)
+| Device | Toggle | Graphics | Particle Type | Count | shadowBlur |
+|--------|--------|----------|---------------|-------|------------|
+| iPad | N/A (auto) | Mid/High | fillRect | 15 | 6 |
+| iPad | N/A | Low | minimal | 2 | 0 |
+| PC | OFF | Any | stroke() | 25 | 25 |
+| PC | ON | Low | fillRect | 15 | 6 |
+| PC | ON | Mid | fillRect | 15 | 6 |
+| PC | ON | High | fillRect | 15 | 6 |
+| iPhone | N/A | Any | stroke() | 10 | 0 |
+
+When the PC toggle is ON:
+- Particle count: 15 (same as iPad optimization)
+- shadowBlur: 6 (same as iPad optimization)
+- Max particles: 150 (capped, same as iPad)
+- Rendering: fillRect instead of stroke()
+- Effect: Identical across Low/Mid/High graphics
+
+### Tip Size Changes
+
+| Device | Before | After | Increase |
+|--------|--------|-------|----------|
+| iPhone | 14px | 18px | +29% |
+| Desktop | 16px | 20px | +25% |
+| Desktop (md+) | 18px | 22px | +22% |
+
+Average increase is approximately 25% across all breakpoints.
 
 ---
 
-## Visual Impact Assessment
+## Result
 
-| Change | Visual Impact |
-|--------|---------------|
-| Larger warp tiles | Barely noticeable - warp is subtle |
-| Fewer rings/spokes | Slightly less dense grid - still looks good |
-| Less glow | Slightly less bloom - retains neon aesthetic |
-| No chromatic aberration | Removes minor edge color split during pulses |
-| No energy bursts | Removes occasional radial streaks |
+1. **PC users with 4K displays** can enable "Thruster Optimization" in Controls to improve FPS
+2. **In-flight tips** will be 25% larger and more readable
+3. **iPad users** are unaffected - they still get automatic optimization
+4. **Desktop/iPhone users without toggle** are unaffected - normal rendering
 
-The core visual effect (pulsing concentric rings with radiating spokes, rainbow color cycling) remains fully intact. The optimizations primarily remove subtle secondary effects that are expensive but not essential to the visual identity.
-
----
-
-## Implementation Priority
-
-1. **High Priority (biggest gains):**
-   - Increase warp tile size
-   - Add skipWarp flag for low FPS
-   - Reduce shadowBlur usage
-
-2. **Medium Priority:**
-   - Cache CSS variables
-   - Remove chromatic aberration
-   - Reduce grid density
-
-3. **Low Priority (polish):**
-   - Batch draw operations
-   - Remove energy bursts
