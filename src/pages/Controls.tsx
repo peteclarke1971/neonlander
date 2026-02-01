@@ -169,6 +169,16 @@ export default function ControlsSettings() {
     }
   });
   
+  // Thruster optimization toggle (for PC/Laptop at high resolutions like 4K)
+  const [thrusterOptimization, setThrusterOptimization] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-thruster-optimization');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+  
   // Graphics quality setting
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   
@@ -320,6 +330,13 @@ export default function ControlsSettings() {
       localStorage.setItem('ll-terrain-masked-fireworks', JSON.stringify(terrainMaskedFireworks));
     } catch {}
   }, [terrainMaskedFireworks]);
+  
+  // Save thruster optimization setting
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-thruster-optimization', JSON.stringify(thrusterOptimization));
+    } catch {}
+  }, [thrusterOptimization]);
 
   useEffect(() => {
     try {
@@ -1042,6 +1059,20 @@ export default function ControlsSettings() {
                   <SelectItem value="high">High</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            
+            {/* Thruster Optimization (PC only) */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Thruster Optimization</Label>
+                <div className="text-xs text-muted-foreground">
+                  Reduces thruster particle effects for better performance at high resolutions (4K)
+                </div>
+              </div>
+              <Switch 
+                checked={thrusterOptimization}
+                onCheckedChange={setThrusterOptimization}
+              />
             </div>
           </div>
         </div>
