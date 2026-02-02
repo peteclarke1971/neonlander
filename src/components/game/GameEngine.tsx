@@ -3019,8 +3019,11 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // UFO collision checks - with shield protection and bounce
-      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && ufoLevelConfigRef.current) {
+      // UFO collision checks - with shield protection and bounce (includes early UFOs level 5+)
+      const hasAnyActiveUFO = ufoSpawnStateRef.current.activeSmall?.active || 
+                              ufoSpawnStateRef.current.activeMedium?.active || 
+                              ufoSpawnStateRef.current.activeLarge?.active;
+      if (running && !crashed && !playerLockedRef.current && invulnerabilityTimer.current <= 0 && !shieldInvulnerableRef.current && hasAnyActiveUFO) {
         const state = ufoSpawnStateRef.current;
         const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge];
         

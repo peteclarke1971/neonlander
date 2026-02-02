@@ -47,14 +47,15 @@ export const PortraitWarning: React.FC<Props> = ({ onDismiss }) => {
       style={{ touchAction: 'none' }}
     >
       <div className="text-center px-8">
-        <div className="text-6xl mb-6">📱↔️</div>
-        <h2 className="text-2xl font-bold text-accent mb-3 tracking-wide">
+        <h2 className="text-2xl font-mono font-bold text-[hsl(120,100%,50%)] mb-4 tracking-wide uppercase"
+            style={{ textShadow: '0 0 10px hsl(120, 100%, 50%), 0 0 20px hsl(120, 100%, 40%)' }}>
           Game played best in LANDSCAPE mode
         </h2>
-        <p className="text-lg text-muted-foreground mb-4">
+        <p className="text-lg font-mono text-[hsl(120,100%,50%)] mb-4 uppercase"
+           style={{ textShadow: '0 0 8px hsl(120, 100%, 50%)' }}>
           Please rotate your device
         </p>
-        <p className="text-sm text-muted-foreground/60 animate-pulse">
+        <p className="text-sm font-mono text-[hsl(120,100%,40%)] animate-pulse uppercase">
           Tap anywhere to dismiss
         </p>
       </div>
