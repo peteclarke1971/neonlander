@@ -41,6 +41,7 @@ interface FireworksDisplayProps {
   debugCycleTrigger?: number; // Trigger for debug cycling on home screen
   forceSeason?: 'halloween' | 'christmas' | null; // Force specific seasonal theme
   allowSkip?: boolean; // Control whether skip is enabled (default: true)
+  autoSkip?: boolean; // Auto-trigger skip (for 6-second timeout)
   // Terrain masking props (optional)
   terrainMaskEnabled?: boolean;
   terrainPoints?: { x: number; y: number }[];
@@ -83,6 +84,7 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   debugCycleTrigger,
   forceSeason,
   allowSkip = true,
+  autoSkip = false,
   terrainMaskEnabled = false,
   terrainPoints,
   terrainWorldWidth,
@@ -104,6 +106,14 @@ const FireworksDisplay: React.FC<FireworksDisplayProps> = ({
   const activeTimeouts = useRef<number[]>([]);
   const flashElements = useRef<HTMLDivElement[]>([]);
   
+  // Auto-skip effect for 6-second timeout from GameEngine
+  useEffect(() => {
+    if (autoSkip && allowSkip) {
+      console.log('⏱️ FireworksDisplay: autoSkip triggered, calling onSkip');
+      onSkip();
+    }
+  }, [autoSkip, allowSkip, onSkip]);
+
   // Debug cycling state for F key
   const [debugCycleIndex, setDebugCycleIndex] = useState(0);
   const debugCycleOrder = useRef([

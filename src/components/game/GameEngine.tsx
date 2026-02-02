@@ -287,7 +287,8 @@ export const GameEngine: React.FC<Props> = ({
   });
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showFireworks, setShowFireworks] = useState(false);
-  
+  const [autoSkipFireworks, setAutoSkipFireworks] = useState(false);
+
   // Fireworks system state
   const [fireworksActive, setFireworksActive] = useState(false);
   const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'ghost-beaten' | null>(null);
@@ -3773,9 +3774,10 @@ export const GameEngine: React.FC<Props> = ({
                 setLandingType(padType);
                 setShowFireworks(true);
                 
-                // Start 6-second mission success timeout
+                // Start 6-second mission success timeout - triggers auto-skip to complete mission
                 missionSuccessTimeoutRef.current = setTimeout(() => {
-                  setShowFireworks(false);
+                  console.log('⏱️ 6-second mission success timeout - triggering auto-skip');
+                  setAutoSkipFireworks(true);
                 }, 6000);
                 
                 // Trigger bonus message display
@@ -5193,11 +5195,11 @@ export const GameEngine: React.FC<Props> = ({
       });
       drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
       
-      // UFO rendering
-      if (ufoLevelConfigRef.current) {
-        const state = ufoSpawnStateRef.current;
-        const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge].filter(u => u?.active) as LanderUFO[];
-        
+      // UFO rendering - render any active UFOs (both scheduled level 10+ and early level 5+ spawns)
+      const ufoState = ufoSpawnStateRef.current;
+      const activeUFOs = [ufoState.activeSmall, ufoState.activeMedium, ufoState.activeLarge].filter(u => u?.active) as LanderUFO[];
+      
+      if (activeUFOs.length > 0) {
         drawAllUFOs(
           ctx,
           activeUFOs,
@@ -6409,7 +6411,14 @@ export const GameEngine: React.FC<Props> = ({
           cameraX={cameraState.cameraX}
           cameraAnchor={cameraState.anchor}
           zoom={cameraState.zoom}
+          autoSkip={autoSkipFireworks}
         onComplete={async () => {
+          // Clear the timeout since we're completing naturally
+          if (missionSuccessTimeoutRef.current) {
+            clearTimeout(missionSuccessTimeoutRef.current);
+            missionSuccessTimeoutRef.current = null;
+          }
+          setAutoSkipFireworks(false);
           setShowFireworks(false);
           
               // Handle Time Trial completion
@@ -6610,6 +6619,13 @@ export const GameEngine: React.FC<Props> = ({
               difficulty,
               level
             });
+            
+            // Clear the timeout since we're skipping
+            if (missionSuccessTimeoutRef.current) {
+              clearTimeout(missionSuccessTimeoutRef.current);
+              missionSuccessTimeoutRef.current = null;
+            }
+            setAutoSkipFireworks(false);
             
             // Immediately hide all celebration components
             setShowFireworks(false);
