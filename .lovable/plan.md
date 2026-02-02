@@ -1,263 +1,253 @@
 
 
-# Plan: Fix Mission Success Timer, Early UFO Rendering, and InitialsFireworks Balance
+# Plan: Fix UFO Behavior, InitialsFireworks Physics, Portrait Warning, and Fullscreen Reminder
 
 ## Summary
 
-Three issues need to be fixed:
-1. **Mission success 6-second timer freezes game** instead of triggering mission success
-2. **Early UFOs (level 5+) not rendering** because the rendering condition only checks `ufoLevelConfigRef.current`
-3. **InitialsFireworks too sparse** - need to rebalance between "impressive" and "60fps"
+Four issues need to be addressed:
+1. **Early UFOs don't move** - They spawn but are never updated
+2. **InitialsFireworks have wrong physics** - They move too fast and don't have the same feel as main fireworks
+3. **iPhone portrait warning not appearing** - Component may not be detecting iPhone correctly
+4. **PC fullscreen reminder** - Need to add an occasional message on PlayerMenu
 
 ---
 
-## Issue 1: Mission Success 6-Second Timer Freeze
+## Issue 1: Early UFOs Don't Move
 
 ### Root Cause
 
-The timeout at line 3777-3779 only sets `setShowFireworks(false)` but doesn't call `onGameOver()` to transition to the mission success screen. When fireworks are hidden without calling onGameOver, the game loop is already stopped (running = false) and nothing triggers the next screen.
-
-The FireworksDisplay `onComplete` callback (lines 6412-6605) contains all the complex logic for saving ghosts, checking records, and calling `onGameOver()`. The 6-second timeout bypasses all of this.
-
-### Solution
-
-Instead of just hiding fireworks, the 6-second timeout should trigger the same skip/complete logic that the FireworksDisplay `onComplete` callback uses. The cleanest approach is to:
-
-1. **Store a ref flag** to indicate the timeout triggered
-2. **Use the same logic path** as FireworksDisplay onComplete by setting a "force complete" flag that the fireworks component respects
-
-Alternatively, extract the onComplete logic into a shared function that both timeout and component can call.
-
-### Implementation
-
-**File:** `src/components/game/GameEngine.tsx`
-
-1. **Add a forceFireworksComplete ref** (around line 586):
-```typescript
-const forceFireworksCompleteRef = useRef(false);
-```
-
-2. **Modify the timeout** (line 3777) to set this flag and let the component handle it:
-```typescript
-missionSuccessTimeoutRef.current = setTimeout(() => {
-  console.log('⏱️ 6-second mission success timeout triggered');
-  forceFireworksCompleteRef.current = true;
-  // Force the fireworks to complete via a re-render trigger
-  setForceCompleteCounter(prev => prev + 1);
-}, 6000);
-```
-
-3. **Add state to trigger force complete**:
-```typescript
-const [forceCompleteCounter, setForceCompleteCounter] = useState(0);
-```
-
-4. **Pass to FireworksDisplay** and have it check this prop to auto-complete:
-```typescript
-<FireworksDisplay 
-  ...
-  forceComplete={forceCompleteCounter > 0}
-  ...
-/>
-```
-
-5. **In FireworksDisplay**, add a useEffect that calls onComplete when forceComplete becomes true.
-
-**Simpler alternative**: Just call the onSkip callback from the timeout, since onSkip already does everything needed:
-
-```typescript
-missionSuccessTimeoutRef.current = setTimeout(() => {
-  console.log('⏱️ 6-second mission success timeout - auto-completing');
-  // Trigger skip if fireworks are still showing
-  if (showFireworks) {
-    // We can't call onSkip directly since it's defined inside the component
-    // Instead, set a flag that triggers skip
-    setAutoSkipFireworks(true);
-  }
-}, 6000);
-```
-
-And add `autoSkip` state that triggers the onSkip callback when true.
-
----
-
-## Issue 2: Early UFOs Not Rendering
-
-### Root Cause
-
-The UFO rendering code at lines 5197-5209 only renders UFOs when `ufoLevelConfigRef.current` is truthy:
+The early UFO spawn code (lines 2756-2826) only **spawns** UFOs, but never **updates** them. The update logic at lines 2650-2754 is gated by:
 
 ```typescript
 if (ufoLevelConfigRef.current) {
-  const state = ufoSpawnStateRef.current;
-  const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge].filter(u => u?.active) as LanderUFO[];
-  
-  drawAllUFOs(ctx, activeUFOs, ...);
+  // All the UFO update code is inside here
 }
 ```
 
-But the early UFO spawn system (level 5+, after 25 seconds) adds UFOs to `ufoSpawnStateRef.current` WITHOUT setting `ufoLevelConfigRef.current`, so they never get rendered.
+Early UFOs don't set `ufoLevelConfigRef.current`, so they spawn and sit motionless. The rendering was fixed to show them, but they never call `updateSmallUFO()` or `updateUFO()`.
 
 ### Solution
 
-Change the rendering condition to check for active UFOs regardless of whether `ufoLevelConfigRef.current` is set:
-
-```typescript
-// UFO rendering - render any active UFOs (both scheduled and early spawn)
-const state = ufoSpawnStateRef.current;
-const activeUFOs = [state.activeSmall, state.activeMedium, state.activeLarge].filter(u => u?.active) as LanderUFO[];
-
-if (activeUFOs.length > 0) {
-  drawAllUFOs(
-    ctx,
-    activeUFOs,
-    allProjectilesRef.current,
-    neonColor,
-    shouldOptimizePerformance ? 4 : 8,
-    terrain.worldWidth
-  );
-}
-```
-
-### Implementation
+Add update calls for early UFOs **outside** the `ufoLevelConfigRef.current` block. When early UFOs are active but regular scheduled UFOs aren't, we still need to update them:
 
 **File:** `src/components/game/GameEngine.tsx`
 
-**Lines 5196-5209** - Replace the condition:
+After line 2826 (after early UFO destruction tracking), add:
 
 ```typescript
-// UFO rendering - render any active UFOs (both scheduled level 10+ and early level 5+ spawns)
-const ufoState = ufoSpawnStateRef.current;
-const activeUFOs = [ufoState.activeSmall, ufoState.activeMedium, ufoState.activeLarge].filter(u => u?.active) as LanderUFO[];
-
-if (activeUFOs.length > 0) {
-  drawAllUFOs(
-    ctx,
-    activeUFOs,
-    allProjectilesRef.current,
-    neonColor,
-    shouldOptimizePerformance ? 4 : 8,
-    terrain.worldWidth
-  );
+// Update early UFOs when regular UFO system is NOT active
+if (shouldHaveEarlyUFO && earlyUFOTriggered.current && !ufoLevelConfigRef.current) {
+  const state = ufoSpawnStateRef.current;
+  const configs: Record<UFOType, UFOTypeConfig> = {
+    small: { ...UFO_CONFIGS.small, enabled: true, difficulty: Math.min(10, 1 + Math.floor((levelVar - 5) / 3)) },
+    medium: { ...UFO_CONFIGS.medium, enabled: true, difficulty: Math.min(10, 1 + Math.floor((levelVar - 5) / 3)) },
+    large: { ...UFO_CONFIGS.large, enabled: false, difficulty: 1 }
+  };
+  
+  // Update small UFO
+  if (state.activeSmall?.active) {
+    updateSmallUFO(
+      state.activeSmall,
+      dt,
+      elapsed,
+      x, y,
+      terrain.worldWidth,
+      configs.small,
+      terrain.points
+    );
+  }
+  
+  // Update medium UFO  
+  if (state.activeMedium?.active) {
+    const projectile = updateUFO(
+      state.activeMedium,
+      dt,
+      elapsed,
+      x, y,
+      terrain.worldWidth,
+      DEFAULT_UFO_CONFIG
+    );
+    if (projectile) {
+      allProjectilesRef.current.push(projectile);
+    }
+  }
+  
+  // Update projectiles
+  updateProjectiles(allProjectilesRef.current, dt);
 }
 ```
 
 ---
 
-## Issue 3: InitialsFireworks Too Sparse
+## Issue 2: InitialsFireworks Physics Are Wrong
 
 ### Root Cause
 
-The previous optimization reduced particle counts too aggressively:
-- `particleMultiplier`: high `0.4`, medium `0.25`, low `0.12` (was 0.7, 0.45, 0.25)
-- Base counts halved: starburst 24 (was 48), spiral 20 (was 40), etc.
-- `lifeDecayMultiplier` increased: 1.5/1.8/2.5 (was 1.2/1.4/2.0)
-- Secondary explosions disabled for medium
+Comparing the physics constants in both files:
+
+**FireworksDisplay.tsx (main fireworks):**
+- Gravity: `0.03` per frame (applied via `newVy += 0.03 * normalizedDelta`)
+- Air resistance: `0.9995` for vx, `0.9998` for vy
+- Initial speeds: `3-8` range depending on pattern
+
+**InitialsFireworks.tsx (initials fireworks):**
+- Gravity: `0.08` constant
+- Air resistance: `0.99` for both
+- Initial speeds: `4-8` range (similar)
+
+The InitialsFireworks have **2.6x higher gravity** and **much stronger air resistance** (0.99 vs 0.9995-0.9998). This makes particles fall faster and slow down much quicker.
+
+Also, the speeds in createExplosion are applied directly (`4 + Math.random() * 4`) without the lower multiplied velocities used in the main fireworks.
 
 ### Solution
 
-Find a middle ground between the original "impressive but 15fps" and the current "sparse but 60fps":
-
-1. **Increase base particle counts** (but not back to original):
-   - starburst: 36 (was 24, originally 48)
-   - spiral: 30 (was 20, originally 40)
-   - willow: 24 (was 16, originally 32)
-   - chrysanthemum layers: 18 (was 12, originally 24)
-   - sparkle: 18 (was 12, originally 24)
-
-2. **Increase quality tier multipliers**:
-   - high: `0.6` (was 0.4, originally 0.7)
-   - medium: `0.35` (was 0.25, originally 0.45)
-   - low: `0.18` (was 0.12, originally 0.25)
-
-3. **Slightly reduce life decay** to make particles last longer:
-   - high: `1.3` (was 1.5, originally 1.2)
-   - medium: `1.5` (was 1.8, originally 1.4)
-   - low: `2.0` (was 2.5, originally 2.0)
-
-4. **Re-enable secondary explosions for medium** (but keep them off for low)
-
-5. **Increase shadowBlur slightly**:
-   - high: `8` (was 6, originally 10)
-   - medium: `5` (was 4, originally 6)
-   - low: `3` (was 2, originally 3)
-
-### Implementation
+Match the physics constants from FireworksDisplay:
 
 **File:** `src/components/game/InitialsFireworks.tsx`
 
-**Lines 60-88** - Update QUALITY_TIERS:
+1. **Change GRAVITY constant** (line 90):
 ```typescript
-const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
-  high: {
-    particleMultiplier: 0.6,
-    shadowBlur: 8,
-    enableTrails: true,
-    enableSecondaryExplosions: true,
-    lifeDecayMultiplier: 1.3,
-    enableInitialTrails: true,
-    initialTrailLength: 7,
-  },
-  medium: {
-    particleMultiplier: 0.35,
-    shadowBlur: 5,
-    enableTrails: false,
-    enableSecondaryExplosions: true, // Re-enabled
-    lifeDecayMultiplier: 1.5,
-    enableInitialTrails: true,
-    initialTrailLength: 5,
-  },
-  low: {
-    particleMultiplier: 0.18,
-    shadowBlur: 3,
-    enableTrails: false,
-    enableSecondaryExplosions: false,
-    lifeDecayMultiplier: 2.0,
-    enableInitialTrails: false,
-    initialTrailLength: 0,
-  },
-};
+const GRAVITY = 0.03; // Was 0.08 - match main fireworks
 ```
 
-**Lines 161-163** - Update starburst base count:
+2. **Change AIR_RESISTANCE constant** (line 91):
 ```typescript
-case 'starburst': {
-  const baseCount = 36 + Math.floor(Math.random() * 10);
+const AIR_RESISTANCE = 0.998; // Was 0.99 - match main fireworks
 ```
 
-**Lines 192-193** - Update spiral base count:
+3. **Reduce initial speeds in createExplosion** to be more gradual:
+   - starburst: `2.5 + Math.random() * 3` (was `4 + Math.random() * 4`)
+   - spiral: `2 + Math.random() * 2.5` (was `3.5 + Math.random() * 3.5`)
+   - willow: `3 + Math.random() * 3` (was `5 + Math.random() * 4`)
+   - chrysanthemum: speed divisor 1.5 (was direct `3 * layer`)
+   - sparkle: `1.5 + Math.random() * 1.5` (was `3 + Math.random() * 2`)
+
+4. **Increase particle lifetimes** for longer, more graceful trajectories:
+   - life: `1.5` (was `1`) for base particles
+
+---
+
+## Issue 3: iPhone Portrait Warning Not Showing
+
+### Root Cause
+
+The PortraitWarning component uses this detection:
 ```typescript
-case 'spiral': {
-  const baseCount = 30;
+const isIPhone = /iPhone/i.test(navigator.userAgent);
 ```
 
-**Lines 220-221** - Update willow base count:
+This should work for iPhones, but potential issues:
+1. The component is rendered inside GameEngine but only during gameplay, not on the main menu
+2. The z-index `z-[100]` might be overridden
+3. The component relies on `window.innerHeight > window.innerWidth` which should work
+
+### Solution
+
+1. **Also render PortraitWarning in Index.tsx and PlayerMenu.tsx** so it shows even before gameplay starts
+
+2. **Add debug logging** to understand if detection is working
+
+3. **Ensure z-index is high enough** - use `z-[9999]` to be above everything
+
+**File:** `src/components/game/PortraitWarning.tsx`
+
+Update the z-index and add debugging:
+
 ```typescript
-case 'willow': {
-  const baseCount = 24;
+useEffect(() => {
+  if (!isIPhone) {
+    console.log('PortraitWarning: Not iPhone, skipping', navigator.userAgent);
+    return;
+  }
+  
+  console.log('PortraitWarning: iPhone detected, checking orientation');
+  // ... rest of code
+}, [isIPhone]);
 ```
 
-**Lines 251-252** - Update chrysanthemum base count:
-```typescript
-[0.6, 1.0, 1.4, 1.8].forEach((layer) => {
-  const baseCount = 18;
+Also update z-index:
+```tsx
+<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/90 backdrop-blur-sm"
 ```
 
-**Lines 282-283** - Update sparkle base count:
+**File:** `src/pages/Index.tsx`
+
+Import and render PortraitWarning at the top level:
 ```typescript
-case 'sparkle': {
-  const baseCount = 18;
+import { PortraitWarning } from '@/components/game/PortraitWarning';
+
+// In return statement, early in the JSX:
+<PortraitWarning />
 ```
 
-**Lines 316-318** - Update secondary explosion count:
+---
+
+## Issue 4: PC Fullscreen Reminder on PlayerMenu
+
+### Design
+
+After ~5 seconds of idle time on PlayerMenu (PC only, not fullscreen), show a message for 3 seconds:
+- Text: "PILOTS: This simulation is best played FULL SCREEN"
+- Fade in/out animation
+- Match neon aesthetic
+- Don't show on mobile/tablet or when already fullscreen
+- Show occasionally (every ~15-20 seconds of non-fullscreen idle time)
+
+### Solution
+
+**File:** `src/components/game/PlayerMenu.tsx`
+
+1. **Add state for fullscreen reminder** (around line 160):
 ```typescript
-const count = 4 + Math.floor(Math.random() * 4); // Was 3 + random(3)
+const [showFullscreenReminder, setShowFullscreenReminder] = useState(false);
+const fullscreenReminderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const lastReminderTimeRef = useRef(0);
 ```
 
-**Lines 110-145** - Update sparkle re-explosion count:
+2. **Add effect to show reminder** (after idle timer logic):
 ```typescript
-const count = Math.max(6, 10 - generation * 2); // Was max(5, 8 - generation * 2)
+// Fullscreen reminder for PC users (not on mobile/iOS)
+useEffect(() => {
+  // Only on desktop, not fullscreen, and after assets loaded
+  if (!assetsLoaded || isIOSDevice() || isFullscreen || showModeMenu || showLevelMenu || showGuidePopup) {
+    return;
+  }
+  
+  // Show reminder after 5 seconds idle, then repeat every 20 seconds
+  const reminderInterval = setInterval(() => {
+    if (!isFullscreen && idleTime >= 5) {
+      const timeSinceLast = Date.now() - lastReminderTimeRef.current;
+      if (timeSinceLast >= 20000 || lastReminderTimeRef.current === 0) {
+        setShowFullscreenReminder(true);
+        lastReminderTimeRef.current = Date.now();
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+          setShowFullscreenReminder(false);
+        }, 3000);
+      }
+    }
+  }, 5000);
+  
+  return () => clearInterval(reminderInterval);
+}, [assetsLoaded, isFullscreen, idleTime, showModeMenu, showLevelMenu, showGuidePopup]);
 ```
+
+3. **Add the reminder UI** (in the return statement, perhaps after the logo):
+```tsx
+{/* Fullscreen reminder for PC */}
+{showFullscreenReminder && isSupported && !isIOSDevice() && (
+  <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+    <div className="bg-card/80 backdrop-blur-sm border border-accent/50 rounded-lg px-6 py-3 
+                    text-accent text-lg font-mono tracking-wide text-center
+                    shadow-lg shadow-accent/20">
+      PILOTS: This simulation is best played FULL SCREEN
+    </div>
+  </div>
+)}
+```
+
+4. **Add CSS animation** for fade in/out (or use existing Tailwind classes).
 
 ---
 
@@ -265,36 +255,53 @@ const count = Math.max(6, 10 - generation * 2); // Was max(5, 8 - generation * 2
 
 | File | Changes |
 |------|---------|
-| `src/components/game/GameEngine.tsx` | Fix 6-second timeout to trigger proper completion; Fix UFO rendering condition |
-| `src/components/game/InitialsFireworks.tsx` | Rebalance particle counts for impressive-but-performant fireworks |
+| `src/components/game/GameEngine.tsx` | Add early UFO update loop |
+| `src/components/game/InitialsFireworks.tsx` | Match physics to main fireworks |
+| `src/components/game/PortraitWarning.tsx` | Higher z-index, debug logging |
+| `src/pages/Index.tsx` | Render PortraitWarning component |
+| `src/components/game/PlayerMenu.tsx` | Add fullscreen reminder UI and logic |
 
 ---
 
-## Technical Notes
+## Technical Details
 
-### Mission Success Timer Fix
+### Physics Comparison
 
-The key insight is that when showFireworks becomes false without calling onGameOver, the game is in a broken state:
-- `running = false` (game loop stopped)
-- No active animation or input handlers
-- No way to trigger onGameOver
+| Property | FireworksDisplay | InitialsFireworks (Before) | InitialsFireworks (After) |
+|----------|-----------------|---------------------------|---------------------------|
+| Gravity | 0.03 | 0.08 | 0.03 |
+| Air Resistance (vx) | 0.9995 | 0.99 | 0.998 |
+| Air Resistance (vy) | 0.9998 | 0.99 | 0.998 |
+| Base speeds | 2-8 | 4-8 | 1.5-5.5 |
+| Particle life | 120-180 frames | 1.0 (seconds) | 1.5 (seconds) |
 
-The fix ensures the timeout triggers the same completion flow as user input.
+The lower gravity and higher air resistance (closer to 1.0) means particles maintain momentum longer and fall more gracefully - exactly like the main fireworks.
 
-### UFO Rendering Fix
+### Early UFO Update Flow
 
-The early UFO system was correctly adding UFOs to `ufoSpawnStateRef.current` but the rendering code was gated behind `ufoLevelConfigRef.current` which is only set for level 10+ scheduled UFOs.
-
-### InitialsFireworks Balance
-
-The goal is approximately 50% more particles than the current sparse implementation but still ~30-40% less than the original frame-killing implementation. This should achieve "impressive" without grinding framerates.
+```
+Game Loop
+├── if (ufoLevelConfigRef.current) { ... } // Level 10+ scheduled UFOs
+│   ├── Check spawn schedule
+│   ├── updateSmallUFO() / updateUFO() / updateLargeUFO()
+│   └── updateProjectiles()
+│
+├── Early UFO spawn check (level 5+, elapsed >= 25s)
+│   └── Spawn UFO to ufoSpawnStateRef.current
+│
+├── Track early UFO destruction
+│
+└── NEW: if (shouldHaveEarlyUFO && earlyUFOTriggered && !ufoLevelConfigRef.current) {
+    ├── updateSmallUFO() or updateUFO()
+    └── updateProjectiles()
+```
 
 ---
 
 ## Testing Checklist
 
-After implementation:
-1. Land successfully, wait 6 seconds WITHOUT pressing thrust - should auto-transition to mission success
-2. Play level 5+ (Campaign, Fixed, Medley, or Time Trial) for 25+ seconds (not underwater) - UFO should appear and be visible
-3. Get a high score and enter initials - fireworks should be impressive but maintain 60fps
+1. **Early UFOs**: Play level 5+ for 25+ seconds - UFO should appear, move across screen, potentially shoot, and be destroyable
+2. **InitialsFireworks**: Get high score, enter initials - fireworks should have same graceful physics as landing fireworks
+3. **Portrait Warning**: On iPhone in portrait, warning should appear immediately with z-index above everything
+4. **Fullscreen Reminder**: On PC PlayerMenu, wait 5+ seconds without fullscreen - reminder should appear
 
