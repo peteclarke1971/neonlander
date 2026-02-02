@@ -87,8 +87,9 @@ const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
   },
 };
 
-const GRAVITY = 0.08;
-const AIR_RESISTANCE = 0.99;
+// Physics tuned to match main FireworksDisplay for graceful trajectories
+const GRAVITY = 0.03;
+const AIR_RESISTANCE = 0.998;
 
 const selectExplosionType = (): ExplosionType => {
   const rand = Math.random();
@@ -163,13 +164,13 @@ const createExplosion = (
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const speed = (4 + Math.random() * 4) * (0.8 + Math.random() * 0.4) * explosionScale;
-        const isRocket = Math.random() < 0.15; // Reduced from 0.25
+        const speed = (2.5 + Math.random() * 3) * (0.8 + Math.random() * 0.4) * explosionScale;
+        const isRocket = Math.random() < 0.15;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 1,
+          life: 1.5,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
           size: (1.8 + Math.random() * 1.8) * explosionScale, // 60% smaller
@@ -193,12 +194,12 @@ const createExplosion = (
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-        const speed = (3.5 + Math.random() * 3.5) * (0.8 + Math.random() * 0.4) * explosionScale;
+        const speed = (2 + Math.random() * 2.5) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 1,
+          life: 1.5,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
           size: (1.8 + Math.random() * 1.2) * explosionScale, // 60% smaller
@@ -222,12 +223,12 @@ const createExplosion = (
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
-        const speed = (5 + Math.random() * 4) * (0.8 + Math.random() * 0.4) * explosionScale;
+        const speed = (3 + Math.random() * 3) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 1,
+          life: 1.5,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
           size: (1.8 + Math.random() * 1.8) * explosionScale, // 60% smaller
@@ -253,13 +254,13 @@ const createExplosion = (
         const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
         for (let i = 0; i < count; i++) {
           const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-          const speed = (3 * layer) * (0.8 + Math.random() * 0.4) * explosionScale;
-          const isRocket = Math.random() < 0.1; // Reduced from 0.2
+          const speed = (2 * layer) * (0.8 + Math.random() * 0.4) * explosionScale;
+          const isRocket = Math.random() < 0.1;
           particles.push({
             x, y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            life: 1,
+            life: 1.5,
             maxLife: 1,
             color: getRandomFireworkColor(neonColor),
             size: (1.8 + Math.random() * 0.9) * explosionScale, // 60% smaller
@@ -284,12 +285,12 @@ const createExplosion = (
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-        const speed = (3 + Math.random() * 2) * (0.8 + Math.random() * 0.4) * explosionScale;
+        const speed = (1.5 + Math.random() * 1.5) * (0.8 + Math.random() * 0.4) * explosionScale;
         particles.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 1,
+          life: 1.5,
           maxLife: 1,
           color: getRandomFireworkColor(neonColor),
           size: (1.5 + Math.random() * 0.9) * explosionScale, // 60% smaller

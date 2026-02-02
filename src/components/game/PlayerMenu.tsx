@@ -157,6 +157,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [showLeaderboards, setShowLeaderboards] = useState(false);
   const [leaderboardIndex, setLeaderboardIndex] = useState(0);
   
+  // Fullscreen reminder for PC users
+  const [showFullscreenReminder, setShowFullscreenReminder] = useState(false);
+  const lastReminderTimeRef = useRef(0);
+  
   // Persist selected game mode
   const [selectedMode, setSelectedMode] = useState<GameModeId>(() => {
     try {
@@ -290,6 +294,32 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     
     return () => clearInterval(cycleInterval);
   }, [showLeaderboards]);
+
+  // Fullscreen reminder for PC users (not on mobile/iOS)
+  useEffect(() => {
+    // Don't show on iOS/mobile devices, or when modals are open, or already fullscreen
+    if (!assetsLoaded || isIOSDevice() || isFullscreen || showModeMenu || showLevelMenu || showGuidePopup) {
+      return;
+    }
+    
+    // Show reminder after 8 seconds idle, then every 25 seconds
+    const checkReminder = setInterval(() => {
+      if (!isFullscreen && idleTime >= 8 && isSupported) {
+        const timeSinceLast = Date.now() - lastReminderTimeRef.current;
+        if (timeSinceLast >= 25000 || lastReminderTimeRef.current === 0) {
+          setShowFullscreenReminder(true);
+          lastReminderTimeRef.current = Date.now();
+          
+          // Hide after 3 seconds
+          setTimeout(() => {
+            setShowFullscreenReminder(false);
+          }, 3000);
+        }
+      }
+    }, 1000);
+    
+    return () => clearInterval(checkReminder);
+  }, [assetsLoaded, isFullscreen, idleTime, showModeMenu, showLevelMenu, showGuidePopup, isSupported]);
 
   useEffect(() => {
     try {
@@ -638,6 +668,27 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             draggable={false}
           />
         </div>
+        
+        {/* Fullscreen reminder for PC users */}
+        {showFullscreenReminder && isSupported && !isIOSDevice() && (
+          <div 
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in"
+            style={{
+              animation: 'fadeInOut 3s ease-in-out'
+            }}
+          >
+            <div 
+              className="bg-card/80 backdrop-blur-sm border rounded-lg px-6 py-3 text-lg font-mono tracking-wide text-center shadow-lg"
+              style={{ 
+                color: "hsl(var(--neon))",
+                borderColor: "hsl(var(--neon) / 0.5)",
+                boxShadow: "0 0 20px hsl(var(--neon) / 0.3)"
+              }}
+            >
+              PILOTS: This simulation is best played FULL SCREEN
+            </div>
+          </div>
+        )}
 
         {/* Fixed-height container - NEVER changes size, logo above stays locked */}
         <div className="relative w-full flex flex-col items-center h-[340px]">
