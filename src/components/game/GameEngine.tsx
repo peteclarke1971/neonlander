@@ -90,6 +90,7 @@ import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
 import { showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
+import { PortraitWarning } from "./PortraitWarning";
 
 interface Props {
   difficulty: Difficulty;
@@ -262,6 +263,8 @@ export const GameEngine: React.FC<Props> = ({
   const [isTouch, setIsTouch] = useState(false);
   const initialSpawnRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
+    // iPad defaults to touch controls (even though isDesktopDevice returns true for iPad)
+    if (isIPadDevice()) return false;
     // Check localStorage first, then check if desktop device
     return hasPCControlsPreference() || isDesktopDevice();
   });
@@ -579,6 +582,16 @@ export const GameEngine: React.FC<Props> = ({
   const ufoSpawnScheduleRef = useRef<UFOSpawnEvent[]>([]);
   const ufoLevelConfigRef = useRef<LevelUFOConfig | null>(null);
   
+  // Early UFO spawn system (level 5+, after 25 seconds)
+  const earlyUFOTriggered = useRef(false);
+  const earlyUFODestroyed = useRef(false);
+  
+  // Mission success 6-second timeout
+  const missionSuccessTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // CTRL+F7 dev skip flag
+  const devSkipTriggered = useRef(false);
+  
   // Shield invulnerability after shield break (brief immunity)
   const shieldInvulnerableRef = useRef(false);
   const shieldInvulnerableTimerRef = useRef(0);
@@ -620,6 +633,14 @@ export const GameEngine: React.FC<Props> = ({
     const onKey = (e: KeyboardEvent, down: boolean) => {
       // Skip keyboard input in demo mode
       if (isDemo) return;
+      
+      // CTRL+F7: Secret dev skip to mission success
+      if (down && e.ctrlKey && e.key === 'F7') {
+        e.preventDefault();
+        devSkipTriggered.current = true;
+        console.log('🎮 Dev skip triggered (CTRL+F7)');
+        return;
+      }
       
       const k = e.key.toLowerCase();
       if (["a", "arrowleft"].includes(k)) {
@@ -2731,6 +2752,102 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
+      // Early UFO spawn system (level 5+, after 25 seconds, not underwater)
+      // Separate from level 10+ UFO progression - one UFO per level, no respawn
+      const shouldHaveEarlyUFO = levelVar >= 5 && 
+        !isWaterLevel(mode, levelVar) && 
+        (mode === 'fixed' || mode === 'classic' || mode === 'medley' || mode === 'timetrial');
+      
+      if (running && shouldHaveEarlyUFO && elapsed >= 25 && !earlyUFOTriggered.current && !earlyUFODestroyed.current) {
+        // Check if regular UFO system is NOT active (don't double up)
+        if (!ufoLevelConfigRef.current) {
+          earlyUFOTriggered.current = true;
+          
+          // Difficulty: starts at 1 on level 5, +1 every 3 levels, max 10
+          const earlyUFODifficulty = Math.min(10, 1 + Math.floor((levelVar - 5) / 3));
+          
+          // Randomly choose small or medium UFO
+          const earlyUFOType: UFOType = Math.random() > 0.5 ? 'small' : 'medium';
+          
+          // Spawn the early UFO
+          const state = ufoSpawnStateRef.current;
+          const spawnSeed = levelSeed + 77777; // Deterministic but different from regular spawns
+          
+          const configs: Record<UFOType, UFOTypeConfig> = {
+            small: { ...UFO_CONFIGS.small, enabled: true, difficulty: earlyUFODifficulty },
+            medium: { ...UFO_CONFIGS.medium, enabled: true, difficulty: earlyUFODifficulty },
+            large: { ...UFO_CONFIGS.large, enabled: false, difficulty: earlyUFODifficulty }
+          };
+          
+          if (earlyUFOType === 'small' && !state.activeSmall?.active) {
+            const newUFO = spawnSmallUFO(
+              spawnSeed,
+              earlyUFODifficulty,
+              terrain.worldWidth,
+              BASE_HEIGHT,
+              x, y,
+              elapsed,
+              configs.small,
+              terrain.points
+            );
+            state.activeSmall = newUFO;
+            if (!isDemo) { audio.current.startUfoSmallSound(); }
+            console.log(`🛸 Early SMALL UFO spawned at t=${elapsed.toFixed(1)}s (level ${levelVar}, difficulty ${earlyUFODifficulty})`);
+          } else if (earlyUFOType === 'medium' && !state.activeMedium?.active) {
+            const newUFO = spawnUFO(
+              spawnSeed,
+              earlyUFODifficulty,
+              terrain.worldWidth,
+              BASE_HEIGHT,
+              x, y,
+              elapsed,
+              DEFAULT_UFO_CONFIG,
+              terrain.points
+            );
+            newUFO.type = "medium";
+            newUFO.scale = 1.0;
+            newUFO.canShoot = true;
+            state.activeMedium = newUFO;
+            if (!isDemo) { audio.current.startUfoMediumSound(); }
+            console.log(`🛸 Early MEDIUM UFO spawned at t=${elapsed.toFixed(1)}s (level ${levelVar}, difficulty ${earlyUFODifficulty})`);
+          }
+        }
+      }
+      
+      // Track early UFO destruction (no respawn allowed)
+      if (shouldHaveEarlyUFO && earlyUFOTriggered.current && !earlyUFODestroyed.current) {
+        const state = ufoSpawnStateRef.current;
+        const earlyUFOActive = (state.activeSmall?.active || state.activeMedium?.active);
+        if (!earlyUFOActive) {
+          earlyUFODestroyed.current = true;
+          console.log('🛸 Early UFO destroyed/exited - no respawn this level');
+        }
+      }
+      
+      // Dev skip handler (CTRL+F7)
+      if (running && devSkipTriggered.current) {
+        devSkipTriggered.current = false;
+        running = false;
+        if (!isDemo) {
+          audio.current.stopThruster();
+          try { audio.current.stopFuelAlarm(); } catch {}
+          try { audio.current.stopLevelMusic(); } catch {}
+        }
+        // Trigger mission success immediately
+        setLandingType('regular');
+        setShowFireworks(true);
+        setCurrentLandings(landings + 1);
+        
+        // Start 6-second timeout for mission success
+        missionSuccessTimeoutRef.current = setTimeout(() => {
+          if (showFireworks) {
+            setShowFireworks(false);
+          }
+        }, 6000);
+        
+        console.log('🎮 Dev skip: Triggering mission success');
+      }
+      
       // Update moving pads
       if (running) {
         const terrainData = terrain as TerrainData;
@@ -3655,6 +3772,11 @@ export const GameEngine: React.FC<Props> = ({
                 
                 setLandingType(padType);
                 setShowFireworks(true);
+                
+                // Start 6-second mission success timeout
+                missionSuccessTimeoutRef.current = setTimeout(() => {
+                  setShowFireworks(false);
+                }, 6000);
                 
                 // Trigger bonus message display
                 if (messages.length > 0) {
@@ -6136,6 +6258,15 @@ export const GameEngine: React.FC<Props> = ({
         try { audio.current.stopFuelAlarm(); } catch {} 
         try { audio.current.stopLevelMusic(); } catch {}
       }
+      // Clear mission success timeout on cleanup
+      if (missionSuccessTimeoutRef.current) {
+        clearTimeout(missionSuccessTimeoutRef.current);
+        missionSuccessTimeoutRef.current = null;
+      }
+      // Reset early UFO flags for next level
+      earlyUFOTriggered.current = false;
+      earlyUFODestroyed.current = false;
+      devSkipTriggered.current = false;
     };
   }, [difficulty, onGameOver, paused, level, mode, seedOverride, waitingForSpecialMessage]);
 
@@ -6158,8 +6289,11 @@ export const GameEngine: React.FC<Props> = ({
         
         <WaterFXRenderer enabled={isUnderwater && !paused} />
       </div>
+      
+      {/* iPhone Portrait Warning Overlay */}
+      <PortraitWarning />
 
-      {isTouch && !isDemo && (
+      {(isTouch || isIPad) && !isDemo && (
         <div
           className="absolute inset-0 z-10 touch-none select-none"
           onTouchStart={(e) => { 
@@ -6190,8 +6324,8 @@ export const GameEngine: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Controls overlay - Only show if not using PC controls and not in demo mode */}
-      {!isUsingPCControls && !isDemo && (
+      {/* Controls overlay - Show for touch devices OR iPad (even if PC preference saved) */}
+      {(!isUsingPCControls || isIPad) && !isDemo && (
         <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           <div className="flex gap-2">
             <Button 

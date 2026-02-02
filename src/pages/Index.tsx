@@ -1307,11 +1307,8 @@ const retryGame = () => {
                 </div>
               )}
 
-              {/* Global Leaderboard */}
-              <OnlineLeaderboard 
-                mode={mode as "classic" | "fixed"} 
-                highlightScore={recentlySubmittedScore} 
-              />
+              {/* Global Leaderboard - Not shown on Mission Failed */}
+              {/* (This block is only rendered when lastResult.cause !== "success", so we omit the global leaderboard) */}
             </div>
           )}
 
