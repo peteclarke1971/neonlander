@@ -59,29 +59,29 @@ interface FireworksQuality {
 
 const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
   high: {
-    particleMultiplier: 0.7,
-    shadowBlur: 10,
+    particleMultiplier: 0.4,
+    shadowBlur: 6,
     enableTrails: true,
     enableSecondaryExplosions: true,
-    lifeDecayMultiplier: 1.2,
+    lifeDecayMultiplier: 1.5,
     enableInitialTrails: true,
-    initialTrailLength: 8,
+    initialTrailLength: 6,
   },
   medium: {
-    particleMultiplier: 0.45,
-    shadowBlur: 6,
-    enableTrails: false,
-    enableSecondaryExplosions: true,
-    lifeDecayMultiplier: 1.4,
-    enableInitialTrails: true,
-    initialTrailLength: 5,
-  },
-  low: {
     particleMultiplier: 0.25,
-    shadowBlur: 3,
+    shadowBlur: 4,
     enableTrails: false,
     enableSecondaryExplosions: false,
-    lifeDecayMultiplier: 2.0,
+    lifeDecayMultiplier: 1.8,
+    enableInitialTrails: true,
+    initialTrailLength: 4,
+  },
+  low: {
+    particleMultiplier: 0.12,
+    shadowBlur: 2,
+    enableTrails: false,
+    enableSecondaryExplosions: false,
+    lifeDecayMultiplier: 2.5,
     enableInitialTrails: false,
     initialTrailLength: 0,
   },
@@ -114,7 +114,7 @@ const createSparkleExplosion = (
   generation: number
 ): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
-  const count = Math.max(8, 15 - generation * 3);
+  const count = Math.max(5, 8 - generation * 2);
   
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.8;
@@ -124,8 +124,8 @@ const createSparkleExplosion = (
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      life: 0.6 - generation * 0.15,
-      maxLife: 0.6 - generation * 0.15,
+      life: 0.5 - generation * 0.12,
+      maxLife: 0.5 - generation * 0.12,
       color: getRandomFireworkColor(neonColor),
       size: 0.8 + Math.random() * 0.7,
       gravity: true,
@@ -135,8 +135,8 @@ const createSparkleExplosion = (
       isRocket: false,
       rocketExplodeTime: 0,
       hasExploded: false,
-      canReExplode: generation < 2,
-      reExplodeCount: 2 - generation,
+      canReExplode: generation < 1,
+      reExplodeCount: 1 - generation,
       reExplodeThreshold: 0.3 + Math.random() * 0.2,
       generation: generation,
     });
@@ -159,7 +159,7 @@ const createExplosion = (
   
   switch (type) {
     case 'starburst': {
-      const baseCount = 48 + Math.floor(Math.random() * 13);
+      const baseCount = 24 + Math.floor(Math.random() * 8);
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -189,7 +189,7 @@ const createExplosion = (
       break;
     }
     case 'spiral': {
-      const baseCount = 40;
+      const baseCount = 20;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
@@ -218,7 +218,7 @@ const createExplosion = (
       break;
     }
     case 'willow': {
-      const baseCount = 32;
+      const baseCount = 16;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
@@ -249,7 +249,7 @@ const createExplosion = (
     case 'chrysanthemum': {
       // Multi-layer burst
       [0.6, 1.0, 1.4, 1.8].forEach((layer) => {
-        const baseCount = 24;
+        const baseCount = 12;
         const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
         for (let i = 0; i < count; i++) {
           const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -280,7 +280,7 @@ const createExplosion = (
       break;
     }
     case 'sparkle': {
-      const baseCount = 24;
+      const baseCount = 12;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -315,7 +315,7 @@ const createExplosion = (
 
 const createSecondaryExplosion = (x: number, y: number, type: 'mini-starburst' | 'mini-sparkle', neonColor: string): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
-  const count = 5 + Math.floor(Math.random() * 6);
+  const count = 3 + Math.floor(Math.random() * 3);
   
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
@@ -366,11 +366,14 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
   );
   const [skipped, setSkipped] = useState(false);
 
-  // Handle skip input
+  // Handle skip input - gate thrust to prevent restart bug
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore key repeats to prevent held keys from triggering multiple skips
+      if (e.repeat) return;
       if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
         setSkipped(true);
+        gateThrustUntilRelease(); // Prevent button press from carrying over
         onSkip();
       }
     };
