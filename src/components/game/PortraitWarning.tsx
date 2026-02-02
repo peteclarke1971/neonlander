@@ -8,14 +8,21 @@ export const PortraitWarning: React.FC<Props> = ({ onDismiss }) => {
   const [isPortrait, setIsPortrait] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   
-  // Only check for iPhone
-  const isIPhone = /iPhone/i.test(navigator.userAgent);
+  // Check for iPhone (not iPad)
+  const isIPhone = typeof navigator !== 'undefined' && /iPhone/i.test(navigator.userAgent);
   
   useEffect(() => {
-    if (!isIPhone) return;
+    if (!isIPhone) {
+      console.log('PortraitWarning: Not iPhone, skipping. UA:', navigator.userAgent);
+      return;
+    }
+    
+    console.log('PortraitWarning: iPhone detected, monitoring orientation');
     
     const checkOrientation = () => {
       const isNowPortrait = window.innerHeight > window.innerWidth;
+      console.log('PortraitWarning: Orientation check -', isNowPortrait ? 'PORTRAIT' : 'LANDSCAPE', 
+        `(${window.innerWidth}x${window.innerHeight})`);
       setIsPortrait(isNowPortrait);
       // Auto-reset dismissed state when rotating to landscape and back
       if (!isNowPortrait) setDismissed(false);
@@ -35,8 +42,9 @@ export const PortraitWarning: React.FC<Props> = ({ onDismiss }) => {
   
   return (
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-md"
       onClick={() => { setDismissed(true); onDismiss?.(); }}
+      style={{ touchAction: 'none' }}
     >
       <div className="text-center px-8">
         <div className="text-6xl mb-6">📱↔️</div>

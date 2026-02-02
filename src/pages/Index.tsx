@@ -26,6 +26,7 @@ import { DemoTransition } from "@/components/game/DemoTransition";
 import { GameTransition, GameTransitionHandle, TransitionType } from "@/components/game/GameTransition";
 import { PlayerMenu, GameSettings as PlayerMenuSettings } from "@/components/game/PlayerMenu";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
+import { PortraitWarning } from "@/components/game/PortraitWarning";
 
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
@@ -1467,6 +1468,8 @@ const retryGame = () => {
         </main>
       )}
 
+      {/* Global Portrait Warning for iPhone users */}
+      <PortraitWarning />
     </div>
   );
 };

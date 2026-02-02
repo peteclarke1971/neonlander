@@ -2825,6 +2825,49 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
+      // Update early UFOs when regular UFO system (level 10+) is NOT active
+      // This ensures early-spawn UFOs (level 5+) actually move and behave properly
+      if (running && shouldHaveEarlyUFO && earlyUFOTriggered.current && !ufoLevelConfigRef.current) {
+        const state = ufoSpawnStateRef.current;
+        const earlyUFODifficulty = Math.min(10, 1 + Math.floor((levelVar - 5) / 3));
+        
+        // Update small UFO
+        if (state.activeSmall?.active) {
+          const smallConfig: UFOTypeConfig = { 
+            ...UFO_CONFIGS.small, 
+            enabled: true, 
+            difficulty: earlyUFODifficulty 
+          };
+          updateSmallUFO(
+            state.activeSmall,
+            dt,
+            elapsed,
+            x, y,
+            terrain.worldWidth,
+            smallConfig,
+            terrain.points
+          );
+        }
+        
+        // Update medium UFO  
+        if (state.activeMedium?.active) {
+          const projectile = updateUFO(
+            state.activeMedium,
+            dt,
+            elapsed,
+            x, y,
+            terrain.worldWidth,
+            DEFAULT_UFO_CONFIG
+          );
+          if (projectile) {
+            allProjectilesRef.current.push(projectile);
+          }
+        }
+        
+        // Update projectiles for early UFOs
+        updateProjectiles(allProjectilesRef.current, dt);
+      }
+      
       // Dev skip handler (CTRL+F7)
       if (running && devSkipTriggered.current) {
         devSkipTriggered.current = false;
