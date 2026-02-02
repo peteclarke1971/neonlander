@@ -85,7 +85,27 @@ const LanderIcon = ({ size = 14, color = "currentColor" }: { size?: number; colo
 );
 
 /** Load all game settings from localStorage (same keys as Developer Menu) */
+/** Set default settings for first-time players */
+function initializeDefaultSettings() {
+  const setIfMissing = (key: string, value: string) => {
+    if (localStorage.getItem(key) === null) {
+      localStorage.setItem(key, value);
+    }
+  };
+  
+  // First-time defaults as specified
+  setIfMissing("ll-large-rotate-buttons", "true");       // LARGE BUTTONS ON
+  setIfMissing("ll-show-full-hud", "false");             // FULL HUD OFF
+  setIfMissing("ll-liquid-fuel-enabled", "true");        // LIQUID FUEL DISPLAY ON
+  setIfMissing("ll-show-fps", "false");                  // SHOW FPS OFF
+  setIfMissing("ll-terrain-masked-fireworks", "true");   // TERRAIN MASKED FIREWORKS ON
+  setIfMissing("ll-graphics-level", "mid");              // GRAPHICS QUALITY MEDIUM
+}
+
 function loadSettingsFromStorage(): GameSettings {
+  // Initialize defaults for first-time players
+  initializeDefaultSettings();
+  
   const getBool = (key: string, def: boolean) => {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
   };
@@ -100,7 +120,7 @@ function loadSettingsFromStorage(): GameSettings {
     showGhost: getBool("ll-ghost-mode-enabled", false) || getBool("ll-global-ghosts-enabled", false),
     nebulaFxEnabled: getBool("ll-nebula-fx-enabled", false), // Default OFF for new players
     largeRotateButtons: getBool("ll-large-rotate-buttons", true),
-    showFullHUD: getBool("ll-show-full-hud", true),
+    showFullHUD: getBool("ll-show-full-hud", false),     // Default OFF for new players
     graphicsLevel: loadGraphicsSettings(),
     difficulty: getStr("ll-difficulty", "easy") as Difficulty,
   };
@@ -299,14 +319,18 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   useEffect(() => {
     // Don't show on iOS/mobile devices, or when modals are open, or already fullscreen
     if (!assetsLoaded || isIOSDevice() || isFullscreen || showModeMenu || showLevelMenu || showGuidePopup) {
+      setShowFullscreenReminder(false);
       return;
     }
     
-    // Show reminder after 8 seconds idle, then every 25 seconds
+    // Show reminder after 5 seconds idle initially, then every 10 seconds
     const checkReminder = setInterval(() => {
-      if (!isFullscreen && idleTime >= 8 && isSupported) {
+      if (!isFullscreen && isSupported) {
         const timeSinceLast = Date.now() - lastReminderTimeRef.current;
-        if (timeSinceLast >= 25000 || lastReminderTimeRef.current === 0) {
+        // First show after 5 seconds, subsequent shows every 10 seconds
+        const requiredTime = lastReminderTimeRef.current === 0 ? 5000 : 10000;
+        
+        if (timeSinceLast >= requiredTime) {
           setShowFullscreenReminder(true);
           lastReminderTimeRef.current = Date.now();
           
@@ -319,7 +343,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     }, 1000);
     
     return () => clearInterval(checkReminder);
-  }, [assetsLoaded, isFullscreen, idleTime, showModeMenu, showLevelMenu, showGuidePopup, isSupported]);
+  }, [assetsLoaded, isFullscreen, showModeMenu, showLevelMenu, showGuidePopup, isSupported]);
 
   useEffect(() => {
     try {
@@ -669,16 +693,16 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           />
         </div>
         
-        {/* Fullscreen reminder for PC users */}
+        {/* Fullscreen reminder for PC users - positioned to the right, aligned with menu top */}
         {showFullscreenReminder && isSupported && !isIOSDevice() && (
           <div 
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in"
+            className="fixed top-8 right-8 z-50"
             style={{
               animation: 'fadeInOut 3s ease-in-out'
             }}
           >
             <div 
-              className="bg-card/80 backdrop-blur-sm border rounded-lg px-6 py-3 text-lg font-mono tracking-wide text-center shadow-lg"
+              className="bg-card/80 backdrop-blur-sm border rounded-lg px-4 py-2 text-sm font-mono tracking-wide text-center shadow-lg"
               style={{ 
                 color: "hsl(var(--neon))",
                 borderColor: "hsl(var(--neon) / 0.5)",

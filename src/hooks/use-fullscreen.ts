@@ -14,28 +14,42 @@ export function useFullscreen() {
       false
     );
 
-    // Listen for fullscreen changes
-    const handleFullscreenChange = () => {
-      setIsFullscreen(
-        !!(
-          document.fullscreenElement ||
-          (document as any).webkitFullscreenElement ||
-          (document as any).mozFullScreenElement ||
-          (document as any).msFullscreenElement
-        )
+    // Check for fullscreen state (API or F11 browser fullscreen)
+    const checkFullscreen = () => {
+      const apiFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
       );
+      
+      // F11 fullscreen detection: window matches screen size
+      const f11Fullscreen = (
+        window.innerWidth === screen.width &&
+        window.innerHeight === screen.height
+      );
+      
+      setIsFullscreen(apiFullscreen || f11Fullscreen);
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+    // Initial check
+    checkFullscreen();
+
+    // Listen for fullscreen API changes
+    document.addEventListener('fullscreenchange', checkFullscreen);
+    document.addEventListener('webkitfullscreenchange', checkFullscreen);
+    document.addEventListener('mozfullscreenchange', checkFullscreen);
+    document.addEventListener('msfullscreenchange', checkFullscreen);
+    
+    // Listen for resize (catches F11 toggle)
+    window.addEventListener('resize', checkFullscreen);
 
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('fullscreenchange', checkFullscreen);
+      document.removeEventListener('webkitfullscreenchange', checkFullscreen);
+      document.removeEventListener('mozfullscreenchange', checkFullscreen);
+      document.removeEventListener('msfullscreenchange', checkFullscreen);
+      window.removeEventListener('resize', checkFullscreen);
     };
   }, []);
 
