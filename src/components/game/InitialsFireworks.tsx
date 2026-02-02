@@ -59,29 +59,29 @@ interface FireworksQuality {
 
 const QUALITY_TIERS: Record<'high' | 'medium' | 'low', FireworksQuality> = {
   high: {
-    particleMultiplier: 0.4,
-    shadowBlur: 6,
+    particleMultiplier: 0.6,
+    shadowBlur: 8,
     enableTrails: true,
+    enableSecondaryExplosions: true,
+    lifeDecayMultiplier: 1.3,
+    enableInitialTrails: true,
+    initialTrailLength: 7,
+  },
+  medium: {
+    particleMultiplier: 0.35,
+    shadowBlur: 5,
+    enableTrails: false,
     enableSecondaryExplosions: true,
     lifeDecayMultiplier: 1.5,
     enableInitialTrails: true,
-    initialTrailLength: 6,
-  },
-  medium: {
-    particleMultiplier: 0.25,
-    shadowBlur: 4,
-    enableTrails: false,
-    enableSecondaryExplosions: false,
-    lifeDecayMultiplier: 1.8,
-    enableInitialTrails: true,
-    initialTrailLength: 4,
+    initialTrailLength: 5,
   },
   low: {
-    particleMultiplier: 0.12,
-    shadowBlur: 2,
+    particleMultiplier: 0.18,
+    shadowBlur: 3,
     enableTrails: false,
     enableSecondaryExplosions: false,
-    lifeDecayMultiplier: 2.5,
+    lifeDecayMultiplier: 2.0,
     enableInitialTrails: false,
     initialTrailLength: 0,
   },
@@ -114,7 +114,7 @@ const createSparkleExplosion = (
   generation: number
 ): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
-  const count = Math.max(5, 8 - generation * 2);
+  const count = Math.max(6, 10 - generation * 2);
   
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.8;
@@ -159,7 +159,7 @@ const createExplosion = (
   
   switch (type) {
     case 'starburst': {
-      const baseCount = 24 + Math.floor(Math.random() * 8);
+      const baseCount = 36 + Math.floor(Math.random() * 10);
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -189,7 +189,7 @@ const createExplosion = (
       break;
     }
     case 'spiral': {
-      const baseCount = 20;
+      const baseCount = 30;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
@@ -218,7 +218,7 @@ const createExplosion = (
       break;
     }
     case 'willow': {
-      const baseCount = 16;
+      const baseCount = 24;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 3;
@@ -249,7 +249,7 @@ const createExplosion = (
     case 'chrysanthemum': {
       // Multi-layer burst
       [0.6, 1.0, 1.4, 1.8].forEach((layer) => {
-        const baseCount = 12;
+        const baseCount = 18;
         const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
         for (let i = 0; i < count; i++) {
           const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -280,7 +280,7 @@ const createExplosion = (
       break;
     }
     case 'sparkle': {
-      const baseCount = 12;
+      const baseCount = 18;
       const count = Math.floor(baseCount * quality.particleMultiplier * explosionScale);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -315,7 +315,7 @@ const createExplosion = (
 
 const createSecondaryExplosion = (x: number, y: number, type: 'mini-starburst' | 'mini-sparkle', neonColor: string): ExplosionParticle[] => {
   const particles: ExplosionParticle[] = [];
-  const count = 3 + Math.floor(Math.random() * 3);
+  const count = 4 + Math.floor(Math.random() * 4);
   
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
