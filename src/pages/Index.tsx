@@ -15,6 +15,7 @@ import { AsteroidField } from "@/components/game/AsteroidField";
 import type { AsteroidFieldHandle } from "@/components/game/AsteroidField";
 import { MobileStarfield } from "@/components/game/MobileStarfield";
 import { isIOSDevice } from "@/lib/deviceDetection";
+import { AddToHomeScreen } from "@/components/game/AddToHomeScreen";
 import { VectorWormhole } from "@/components/game/VectorWormhole";
 import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
 import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
@@ -1452,6 +1453,9 @@ const retryGame = () => {
           </section>
         </main>
       )}
+
+      {/* iOS Add to Home Screen Prompt (shows before portrait warning) */}
+      <AddToHomeScreen />
 
       {/* Global Portrait Warning for iPhone users */}
       <PortraitWarning />
