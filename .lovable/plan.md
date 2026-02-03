@@ -1,158 +1,211 @@
 
-# Plan: Countdown Display Customization (3, 2, 1, GO)
+# Plan: Style Points, Leaderboard Fixes, UI Cleanup & Survival Countdown
 
 ## Summary
 
-The user wants to:
-1. Make the countdown 33% smaller and position it higher (above the lander)
-2. Change the cyan outline to match the level's neon color
-3. Add new settings in Controls page for customizing the countdown appearance
-
-## Current Implementation Analysis
-
-**CountdownOverlay.tsx** (lines 98-161):
-- Current size: `minDim * 0.24` (24% of viewport)
-- Current position: Centered at ship position or screen center
-- Current colors: Cyan outline (`#00ffff`), white fill (`#ffffff`)
-- Current font: `monospace`
-
-## Changes Required
-
-### 1. CountdownOverlay.tsx - Core Visual Changes
-
-**Size reduction (33% smaller):**
-- Change `baseSize` from `minDim * 0.24` to `minDim * 0.16` (0.24 * 0.67 = 0.16)
-- Apply a size multiplier from settings (localStorage `ll-go-size-multiplier`)
-
-**Position adjustment (higher, above lander):**
-- Add Y offset: `targetY - baseSize * 0.8` to position text above the ship
-- This creates vertical separation between the countdown and the lander
-
-**Outline color (match level neon):**
-- Replace hardcoded `#00ffff` with the `shieldColor` prop (already passed to component)
-- Use the extracted hue to create HSL stroke color
-
-**Fill color options (from settings):**
-- Read `ll-go-fill-enabled` from localStorage
-- If enabled: fill = neon color
-- If disabled: fill = black
-
-**Color cycling:**
-- Read `ll-go-color-cycle` from localStorage
-- If enabled: cycle fill through neon hues based on `performance.now()`
-- Read `ll-go-color-cycle-speed` for cycle rate (1-10 range, default 5)
-
-**Font selection:**
-- Read `ll-go-font` from localStorage
-- Options: `Orbitron`, `monospace`, `sans-serif`, `serif`
-- Default: `Orbitron` (matches PlayerMenu and game UI)
-
-### 2. Controls.tsx - New Settings Section
-
-Add a new "Countdown Display Settings" section with:
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ COUNTDOWN DISPLAY (3, 2, 1, GO)                          │
-├──────────────────────────────────────────────────────────┤
-│ GO Fill                                          [ON/OFF]│
-│ ↳ Fill with level neon color (OFF = black fill)         │
-├──────────────────────────────────────────────────────────┤
-│ GO Color Cycle                                   [ON/OFF]│
-│ ↳ Cycle through all neon colors                          │
-│                                                          │
-│   (if Color Cycle is ON:)                                │
-│   Color Cycle Speed: ████████░░  [slider 1-10]           │
-├──────────────────────────────────────────────────────────┤
-│ GO Font:                              [Dropdown]         │
-│ ↳ Orbitron / Monospace / Sans-serif / Serif             │
-├──────────────────────────────────────────────────────────┤
-│ GO Size:                              [slider 0.33-3.0]  │
-│ ↳ Adjust countdown text size                             │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 3. New Props for CountdownOverlay
-
-Add new props to pass settings:
-
-```typescript
-interface CountdownOverlayProps {
-  state: IntroState;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  lowGraphics?: boolean;
-  photosensitive?: boolean;
-  shipPosition?: { x: number; y: number };
-  shieldColor?: string;
-  // New props for customization:
-  goFillEnabled?: boolean;
-  goColorCycle?: boolean;
-  goColorCycleSpeed?: number;
-  goFont?: string;
-  goSizeMultiplier?: number;
-}
-```
-
-### 4. GameEngine.tsx Updates
-
-Pass the new settings to CountdownOverlay:
-- Read settings from localStorage
-- Pass as props to CountdownOverlay component
+This plan addresses 6 distinct improvements:
+1. Enable stunt modes (360/720/1080 spins, near misses) in Time Trial mode
+2. Fix leaderboard position numbers to use neon color instead of white
+3. Remove leaderboard cycle dots from Player Menu
+4. Remove demo level indicator dots from demo mode
+5. Alternate fullscreen reminder text between two messages
+6. Add 3, 2, 1, GO countdown to Survival mode
 
 ---
 
-## Technical Details
+## 1. Enable Style Points in Time Trial Mode
 
-### localStorage Keys
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `ll-go-fill-enabled` | boolean | false | Use neon color for fill (vs black) |
-| `ll-go-color-cycle` | boolean | false | Enable color cycling |
-| `ll-go-color-cycle-speed` | number | 5 | Speed 1-10 (higher = faster) |
-| `ll-go-font` | string | "Orbitron" | Font family name |
-| `ll-go-size-multiplier` | number | 1.0 | Size multiplier (0.33 to 3.0) |
-
-### Color Cycling Algorithm
-
+### Current State
+In `GameEngine.tsx` line 2132, style points are only enabled for `classic`, `fixed`, and `medley` modes:
 ```typescript
-// Neon colors array (same as game uses)
-const NEON_HUES = [330, 50, 140, 270, 25, 0]; // pink, yellow, green, purple, orange, red
-
-// Calculate current hue based on time
-const cycleSpeed = goColorCycleSpeed || 5;
-const cycleProgress = (performance.now() / 1000) * cycleSpeed * 0.5;
-const hueIndex = Math.floor(cycleProgress) % NEON_HUES.length;
-const nextHueIndex = (hueIndex + 1) % NEON_HUES.length;
-const t = cycleProgress % 1;
-
-// Lerp between hues
-const currentHue = NEON_HUES[hueIndex] + (NEON_HUES[nextHueIndex] - NEON_HUES[hueIndex]) * t;
-const fillColor = `hsl(${currentHue}, 100%, 55%)`;
+if ((mode === "classic" || mode === "fixed" || mode === "medley") && running && !crashed && !playerLockedRef.current)
 ```
 
-### Font Options
-
-| Value | Display Name | Description |
-|-------|--------------|-------------|
-| `"Orbitron", sans-serif` | Orbitron | Default - matches game UI |
-| `monospace` | Monospace | Classic arcade style |
-| `"Arial", sans-serif` | Sans-serif | Clean modern look |
-| `"Times New Roman", serif` | Serif | Traditional style |
-
-### Size Calculation
-
+### Solution
+Add `timetrial` to the condition:
 ```typescript
-// Base size with 33% reduction
-const baseSize = minDim * 0.16;
-
-// Apply user multiplier (0.33 to 3.0)
-const finalSize = baseSize * (goSizeMultiplier || 1.0);
-
-// Position above lander
-const yOffset = finalSize * 0.8;
-const displayY = targetY - yOffset;
+if ((mode === "classic" || mode === "fixed" || mode === "medley" || mode === "timetrial") && running && !crashed && !playerLockedRef.current)
 ```
+
+This single change enables:
+- 360°, 720°, 1080° rotation bonuses
+- Near miss detection and scoring
+- Associated visual effects (particle bursts, floating score text)
+
+---
+
+## 2. Fix Leaderboard Position Number Colors
+
+### Current State
+In `PlayerMenuLeaderboard.tsx` lines 65-68, the position number uses foreground color:
+```typescript
+<span 
+  className="w-5 text-right font-mono opacity-60"
+  style={{ color: "hsl(var(--foreground))" }}
+>
+```
+
+### Solution
+Change to use neon color with matching styling:
+```typescript
+<span 
+  className="w-5 text-right font-mono opacity-60"
+  style={{ 
+    color: "hsl(var(--neon))",
+    textShadow: isEmpty ? "none" : "0 0 8px hsl(var(--neon) / 0.5)"
+  }}
+>
+```
+
+---
+
+## 3. Remove Leaderboard Cycle Indicator Dots
+
+### Current State
+In `PlayerMenu.tsx` lines 740-753, dots show which leaderboard is active:
+```tsx
+{/* Cycle indicator dots */}
+<div className="flex justify-center gap-2">
+  {leaderboardCycle.map((_, i) => (
+    <span 
+      key={i}
+      className="w-2 h-2 rounded-full ..."
+    />
+  ))}
+</div>
+```
+
+### Solution
+Delete the entire `<div className="flex justify-center gap-2">` block containing the dots.
+
+---
+
+## 4. Remove Demo Level Indicator Dots
+
+### Current State
+In `Index.tsx` lines 971-985, dots in the top-right show current demo level:
+```tsx
+{/* Demo indicators */}
+<div className="absolute top-4 right-4 z-50 opacity-70">
+  <div className="flex gap-2">
+    {demoSequence.map((_, idx) => (
+      <div ... />
+    ))}
+  </div>
+</div>
+```
+
+### Solution
+Delete the entire demo indicators div (lines 971-985).
+
+---
+
+## 5. Alternate Fullscreen Reminder Text
+
+### Current State
+In `PlayerMenu.tsx` line 724, the reminder always shows the same text:
+```
+PILOTS: This simulation is best played FULL SCREEN
+```
+
+### Solution
+Add a counter ref and alternate between two messages:
+
+1. Add a ref to track which message to show:
+```typescript
+const fullscreenMessageIndexRef = useRef(0);
+```
+
+2. Update the display logic to alternate:
+```tsx
+const fullscreenMessages = [
+  "PILOTS: This simulation is best played FULL SCREEN",
+  "ENABLE FULL SCREEN USING THE BUTTON OR THE F11 KEY"
+];
+
+// In the render section:
+{fullscreenMessages[fullscreenMessageIndexRef.current % 2]}
+```
+
+3. Increment the counter each time the reminder is shown (in the interval check):
+```typescript
+if (timeSinceLast >= requiredTime) {
+  setShowFullscreenReminder(true);
+  fullscreenMessageIndexRef.current += 1; // Alternate message
+  lastReminderTimeRef.current = Date.now();
+  ...
+}
+```
+
+---
+
+## 6. Add 3, 2, 1, GO Countdown to Survival Mode
+
+This is the most complex change, requiring several additions to `SurvivalEngine.tsx`.
+
+### Required Imports
+```typescript
+import { createCountdownIntro, IntroHandle, mix } from "./intro/CountdownIntro";
+import { CountdownOverlay } from "./intro/CountdownOverlay";
+```
+
+### State Additions
+```typescript
+// Countdown intro state
+const introRef = useRef<IntroHandle | null>(null);
+const [introState, setIntroState] = useState<IntroState>({
+  phase: "inactive",
+  text: "",
+  alpha: 0,
+  scale: 1,
+  variant: "warp"
+});
+const [worldPaused, setWorldPaused] = useState(true);
+const worldPausedRef = useRef(true);
+```
+
+### Initialization in Game Loop Effect
+```typescript
+// Initialize countdown intro
+if (!introRef.current) {
+  introRef.current = createCountdownIntro();
+  introRef.current.onDone(() => {
+    setWorldPaused(false);
+    worldPausedRef.current = false;
+  });
+  // Start with "warp" variant like other modes
+  introRef.current.start("warp");
+}
+```
+
+### Update Intro in Game Loop
+```typescript
+// Update countdown intro
+if (introRef.current) {
+  introRef.current.update(dt);
+  setIntroState(introRef.current.getCurrentState());
+}
+```
+
+### Render CountdownOverlay Component
+Add to the return JSX, after the canvas but before controls:
+```tsx
+<CountdownOverlay 
+  state={introState} 
+  canvasRef={canvasRef}
+  lowGraphics={lowGraphics}
+  shipPosition={/* ship screen position */}
+  shieldColor={/* current neon color */}
+  goFillEnabled={/* from localStorage */}
+  goColorCycle={/* from localStorage */}
+  goColorCycleSpeed={/* from localStorage */}
+  goFont={/* from localStorage */}
+  goSizeMultiplier={/* from localStorage */}
+/>
+```
+
+### Block Input During Countdown
+Update the game loop to check `worldPausedRef.current` before processing physics and player input.
 
 ---
 
@@ -160,30 +213,20 @@ const displayY = targetY - yOffset;
 
 | File | Changes |
 |------|---------|
-| `src/components/game/intro/CountdownOverlay.tsx` | Size, position, colors, font, cycling logic |
-| `src/pages/Controls.tsx` | New "Countdown Display" settings section |
-| `src/components/game/GameEngine.tsx` | Read settings, pass to CountdownOverlay |
-| `src/components/game/PlayerMenu.tsx` | Add defaults for new settings in initializeDefaultSettings() |
-
----
-
-## Implementation Order
-
-1. **Controls.tsx**: Add new settings UI section with state and localStorage persistence
-2. **PlayerMenu.tsx**: Add default settings initialization
-3. **CountdownOverlay.tsx**: Accept new props, implement visual changes
-4. **GameEngine.tsx**: Read settings from localStorage, pass to CountdownOverlay
+| `src/components/game/GameEngine.tsx` | Add `timetrial` to style points condition (line 2132) |
+| `src/components/game/PlayerMenuLeaderboard.tsx` | Change position number color to neon (lines 65-68) |
+| `src/components/game/PlayerMenu.tsx` | Remove cycle dots (lines 740-753), add alternating fullscreen message |
+| `src/pages/Index.tsx` | Remove demo level indicator dots (lines 971-985) |
+| `src/components/game/SurvivalEngine.tsx` | Add countdown intro system with CountdownOverlay |
 
 ---
 
 ## Testing Checklist
 
-1. Verify countdown appears 33% smaller and positioned above the lander
-2. Verify outline matches level neon color
-3. Toggle GO Fill ON - verify fill is neon color
-4. Toggle GO Fill OFF - verify fill is black
-5. Toggle GO Color Cycle ON - verify smooth color cycling
-6. Adjust Color Cycle Speed slider - verify speed changes
-7. Change GO Font dropdown - verify font changes
-8. Adjust GO Size slider - verify size scales correctly (0.33x to 3x)
-9. Settings persist after page reload
+1. **Time Trial stunts**: Play Time Trial mode and perform 360° rotation - verify points awarded
+2. **Near miss in Time Trial**: Fly close to terrain at speed - verify "NEAR MISS" appears
+3. **Leaderboard numbers**: Wait for idle carousel - verify position numbers are neon colored
+4. **No leaderboard dots**: Verify no dots appear below the leaderboard display
+5. **No demo dots**: Enter demo mode - verify no dots in top-right corner
+6. **Alternating fullscreen message**: Wait for fullscreen reminder - verify messages alternate
+7. **Survival countdown**: Start Survival mode - verify "3, 2, 1, GO" countdown appears with proper styling
