@@ -1,119 +1,189 @@
 
-# Plan: Enlarge Fullscreen Reminder and Fix First-Time Default Settings
+# Plan: Countdown Display Customization (3, 2, 1, GO)
 
 ## Summary
 
-Two issues to fix:
-1. **Fullscreen reminder needs to be twice the size**
-2. **First-time default settings are not being applied correctly**
+The user wants to:
+1. Make the countdown 33% smaller and position it higher (above the lander)
+2. Change the cyan outline to match the level's neon color
+3. Add new settings in Controls page for customizing the countdown appearance
 
----
+## Current Implementation Analysis
 
-## Issue 1: Fullscreen Reminder Size
+**CountdownOverlay.tsx** (lines 98-161):
+- Current size: `minDim * 0.24` (24% of viewport)
+- Current position: Centered at ship position or screen center
+- Current colors: Cyan outline (`#00ffff`), white fill (`#ffffff`)
+- Current font: `monospace`
 
-### Current State
-The reminder uses `text-sm` (14px) with `px-4 py-2` padding.
+## Changes Required
 
-### Solution
-Double the size by changing to `text-xl` (20px) or larger with increased padding:
+### 1. CountdownOverlay.tsx - Core Visual Changes
 
-**File:** `src/components/game/PlayerMenu.tsx`
+**Size reduction (33% smaller):**
+- Change `baseSize` from `minDim * 0.24` to `minDim * 0.16` (0.24 * 0.67 = 0.16)
+- Apply a size multiplier from settings (localStorage `ll-go-size-multiplier`)
 
-**Lines 704-713** - Update the styling:
-```typescript
-<div 
-  className="bg-card/80 backdrop-blur-sm border rounded-lg px-8 py-4 text-xl font-mono tracking-wide text-center shadow-lg"
-  style={{ 
-    color: "hsl(var(--neon))",
-    borderColor: "hsl(var(--neon) / 0.5)",
-    boxShadow: "0 0 30px hsl(var(--neon) / 0.4)"
-  }}
->
-  PILOTS: This simulation is best played FULL SCREEN
-</div>
+**Position adjustment (higher, above lander):**
+- Add Y offset: `targetY - baseSize * 0.8` to position text above the ship
+- This creates vertical separation between the countdown and the lander
+
+**Outline color (match level neon):**
+- Replace hardcoded `#00ffff` with the `shieldColor` prop (already passed to component)
+- Use the extracted hue to create HSL stroke color
+
+**Fill color options (from settings):**
+- Read `ll-go-fill-enabled` from localStorage
+- If enabled: fill = neon color
+- If disabled: fill = black
+
+**Color cycling:**
+- Read `ll-go-color-cycle` from localStorage
+- If enabled: cycle fill through neon hues based on `performance.now()`
+- Read `ll-go-color-cycle-speed` for cycle rate (1-10 range, default 5)
+
+**Font selection:**
+- Read `ll-go-font` from localStorage
+- Options: `Orbitron`, `monospace`, `sans-serif`, `serif`
+- Default: `Orbitron` (matches PlayerMenu and game UI)
+
+### 2. Controls.tsx - New Settings Section
+
+Add a new "Countdown Display Settings" section with:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ COUNTDOWN DISPLAY (3, 2, 1, GO)                          │
+├──────────────────────────────────────────────────────────┤
+│ GO Fill                                          [ON/OFF]│
+│ ↳ Fill with level neon color (OFF = black fill)         │
+├──────────────────────────────────────────────────────────┤
+│ GO Color Cycle                                   [ON/OFF]│
+│ ↳ Cycle through all neon colors                          │
+│                                                          │
+│   (if Color Cycle is ON:)                                │
+│   Color Cycle Speed: ████████░░  [slider 1-10]           │
+├──────────────────────────────────────────────────────────┤
+│ GO Font:                              [Dropdown]         │
+│ ↳ Orbitron / Monospace / Sans-serif / Serif             │
+├──────────────────────────────────────────────────────────┤
+│ GO Size:                              [slider 0.33-3.0]  │
+│ ↳ Adjust countdown text size                             │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Changes:
-- `text-sm` → `text-xl` (from 14px to 20px, roughly 1.4x)
-- `px-4 py-2` → `px-8 py-4` (double the padding)
-- Increased `boxShadow` radius from 20px to 30px for better visibility
+### 3. New Props for CountdownOverlay
 
----
-
-## Issue 2: First-Time Default Settings Not Working
-
-### Root Cause
-
-The `initializeDefaultSettings()` function is correctly written, but it's only called inside `loadSettingsFromStorage()`. That function is only invoked when a game starts (to build the settings object passed to GameEngine). 
-
-For a first-time player:
-1. They visit the site and see PlayerMenu
-2. They go to Controls page
-3. Controls page reads localStorage with its OWN hardcoded defaults (which differ!)
-4. When they toggle a setting and save, those values get written
-5. When they return and start a game, `loadSettingsFromStorage()` → `initializeDefaultSettings()` runs, but now the values EXIST so `setIfMissing()` does nothing
-
-The defaults NEVER get applied because Controls page has different defaults.
-
-### Solution
-
-Call `initializeDefaultSettings()` **immediately on component mount** in PlayerMenu, not just when starting a game. This ensures the defaults are set BEFORE the user can visit the Controls page.
-
-**File:** `src/components/game/PlayerMenu.tsx`
-
-1. **Move initializeDefaultSettings() call to a useEffect at the TOP of the component**:
+Add new props to pass settings:
 
 ```typescript
-// At the start of PlayerMenu component (after all useState declarations):
-useEffect(() => {
-  initializeDefaultSettings();
-}, []); // Empty deps = run once on mount
+interface CountdownOverlayProps {
+  state: IntroState;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  lowGraphics?: boolean;
+  photosensitive?: boolean;
+  shipPosition?: { x: number; y: number };
+  shieldColor?: string;
+  // New props for customization:
+  goFillEnabled?: boolean;
+  goColorCycle?: boolean;
+  goColorCycleSpeed?: number;
+  goFont?: string;
+  goSizeMultiplier?: number;
+}
 ```
 
-2. **Also add graphics level initialization to initializeDefaultSettings()**:
+### 4. GameEngine.tsx Updates
 
-The `ll-graphics-level` setting might not be getting set because `loadGraphicsSettings()` in graphicsConfig.ts may have its own default. Check if it needs to be set via the same pattern.
-
-**File:** `src/lib/graphicsConfig.ts` (if needed)
-
-Check the `loadGraphicsSettings()` function - if it has a default of "high" instead of "mid", the setting won't match what we want.
+Pass the new settings to CountdownOverlay:
+- Read settings from localStorage
+- Pass as props to CountdownOverlay component
 
 ---
 
-## Files Modified
+## Technical Details
+
+### localStorage Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `ll-go-fill-enabled` | boolean | false | Use neon color for fill (vs black) |
+| `ll-go-color-cycle` | boolean | false | Enable color cycling |
+| `ll-go-color-cycle-speed` | number | 5 | Speed 1-10 (higher = faster) |
+| `ll-go-font` | string | "Orbitron" | Font family name |
+| `ll-go-size-multiplier` | number | 1.0 | Size multiplier (0.33 to 3.0) |
+
+### Color Cycling Algorithm
+
+```typescript
+// Neon colors array (same as game uses)
+const NEON_HUES = [330, 50, 140, 270, 25, 0]; // pink, yellow, green, purple, orange, red
+
+// Calculate current hue based on time
+const cycleSpeed = goColorCycleSpeed || 5;
+const cycleProgress = (performance.now() / 1000) * cycleSpeed * 0.5;
+const hueIndex = Math.floor(cycleProgress) % NEON_HUES.length;
+const nextHueIndex = (hueIndex + 1) % NEON_HUES.length;
+const t = cycleProgress % 1;
+
+// Lerp between hues
+const currentHue = NEON_HUES[hueIndex] + (NEON_HUES[nextHueIndex] - NEON_HUES[hueIndex]) * t;
+const fillColor = `hsl(${currentHue}, 100%, 55%)`;
+```
+
+### Font Options
+
+| Value | Display Name | Description |
+|-------|--------------|-------------|
+| `"Orbitron", sans-serif` | Orbitron | Default - matches game UI |
+| `monospace` | Monospace | Classic arcade style |
+| `"Arial", sans-serif` | Sans-serif | Clean modern look |
+| `"Times New Roman", serif` | Serif | Traditional style |
+
+### Size Calculation
+
+```typescript
+// Base size with 33% reduction
+const baseSize = minDim * 0.16;
+
+// Apply user multiplier (0.33 to 3.0)
+const finalSize = baseSize * (goSizeMultiplier || 1.0);
+
+// Position above lander
+const yOffset = finalSize * 0.8;
+const displayY = targetY - yOffset;
+```
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/game/PlayerMenu.tsx` | Double size of fullscreen reminder; Move initializeDefaultSettings() to useEffect on mount |
+| `src/components/game/intro/CountdownOverlay.tsx` | Size, position, colors, font, cycling logic |
+| `src/pages/Controls.tsx` | New "Countdown Display" settings section |
+| `src/components/game/GameEngine.tsx` | Read settings, pass to CountdownOverlay |
+| `src/components/game/PlayerMenu.tsx` | Add defaults for new settings in initializeDefaultSettings() |
 
 ---
 
-## Technical Notes
+## Implementation Order
 
-### Why the Original Approach Failed
-
-The `setIfMissing` function is sound, but it only works if called BEFORE any other code reads the settings and potentially writes different defaults. The execution order was:
-
-1. User visits site → PlayerMenu mounts
-2. User clicks Settings → navigates to Controls page
-3. Controls page reads `ll-show-fps` → finds `null` → uses its fallback `true`
-4. User toggles something and saves → now `ll-show-fps` is stored as `true`
-5. User returns and starts game → `initializeDefaultSettings()` sees `ll-show-fps` exists → does nothing
-
-By calling `initializeDefaultSettings()` on PlayerMenu mount (BEFORE user can navigate away), the defaults will be written to localStorage immediately, and Controls page will read those correct values.
+1. **Controls.tsx**: Add new settings UI section with state and localStorage persistence
+2. **PlayerMenu.tsx**: Add default settings initialization
+3. **CountdownOverlay.tsx**: Accept new props, implement visual changes
+4. **GameEngine.tsx**: Read settings from localStorage, pass to CountdownOverlay
 
 ---
 
 ## Testing Checklist
 
-1. Clear localStorage completely (Application → Storage → Clear site data)
-2. Reload the page
-3. Check localStorage immediately - all settings should be initialized:
-   - `ll-large-rotate-buttons` = `"true"`
-   - `ll-show-full-hud` = `"false"`
-   - `ll-liquid-fuel-enabled` = `"true"`
-   - `ll-show-fps` = `"false"`
-   - `ll-terrain-masked-fireworks` = `"true"`
-   - `ll-graphics-level` = `"mid"`
-4. Navigate to Controls page - settings should show the correct defaults
-5. Verify fullscreen reminder appears at double the size (text ~20px)
+1. Verify countdown appears 33% smaller and positioned above the lander
+2. Verify outline matches level neon color
+3. Toggle GO Fill ON - verify fill is neon color
+4. Toggle GO Fill OFF - verify fill is black
+5. Toggle GO Color Cycle ON - verify smooth color cycling
+6. Adjust Color Cycle Speed slider - verify speed changes
+7. Change GO Font dropdown - verify font changes
+8. Adjust GO Size slider - verify size scales correctly (0.33x to 3x)
+9. Settings persist after page reload
