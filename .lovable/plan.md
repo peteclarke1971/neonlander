@@ -1,232 +1,171 @@
 
-# Plan: Style Points, Leaderboard Fixes, UI Cleanup & Survival Countdown
+# Plan: iOS "Add to Home Screen" Prompt for Safari Users
 
 ## Summary
 
-This plan addresses 6 distinct improvements:
-1. Enable stunt modes (360/720/1080 spins, near misses) in Time Trial mode
-2. Fix leaderboard position numbers to use neon color instead of white
-3. Remove leaderboard cycle dots from Player Menu
-4. Remove demo level indicator dots from demo mode
-5. Alternate fullscreen reminder text between two messages
-6. Add 3, 2, 1, GO countdown to Survival mode
+Create a neon-styled prompt that appears on iPad/iPhone when running in Safari (not as a PWA), encouraging users to install the app to their Home Screen for full-screen support. This prompt will appear **before** the landscape orientation warning.
 
----
+## Detection Logic
 
-## 1. Enable Style Points in Time Trial Mode
+The existing `isPWA()` function in `src/lib/deviceDetection.ts` already handles detection:
+- Returns `true` if `(window.navigator as any).standalone === true` (iOS PWA)
+- Returns `true` if `window.matchMedia('(display-mode: standalone)').matches`
 
-### Current State
-In `GameEngine.tsx` line 2132, style points are only enabled for `classic`, `fixed`, and `medley` modes:
+We need to show the prompt when:
+- `isIOSDevice() === true` (iPad or iPhone)
+- `isPWA() === false` (running in Safari, not installed)
+
+## Component Design
+
+### New Component: `AddToHomeScreen.tsx`
+
+Create `src/components/game/AddToHomeScreen.tsx` with the following structure:
+
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│                                                                   │
+│                      INSTALL THE APP                              │
+│                                                                   │
+│              Install on your iPhone or iPad:                      │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │ 1    Tap [↑] within Safari on iPad or you may need to     │ │
+│  │      tap […] on iPhone                                       │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │ 2    Find & tap [+] "Add to Home Screen"                    │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+│         Launch game from Home Screen for full screen              │
+│              support and best experience                          │
+│                                                                   │
+│                                                                   │
+│                    Tap anywhere to dismiss                        │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Visual Styling
+
+Match the neon green aesthetic from `PortraitWarning.tsx`:
+- Background: `bg-background/95 backdrop-blur-md`
+- Text color: `hsl(120, 100%, 50%)` (neon green)
+- Text shadow: `0 0 10px hsl(120, 100%, 50%), 0 0 20px hsl(120, 100%, 40%)`
+- Font: `font-mono` with uppercase tracking
+- Step boxes: Semi-transparent background with neon border (`bg-[hsl(120,100%,50%,0.08)]` with `border-[hsl(120,100%,50%,0.3)]`)
+- Step numbers: Circular badges with neon styling
+- Icons: Unicode characters for share (↑), more (…), and plus (+) with neon styling
+
+### z-index Layering
+
+The new prompt needs to appear **before** the landscape warning:
+- `AddToHomeScreen`: `z-[10000]` (higher than PortraitWarning's `z-[9999]`)
+- This ensures it blocks the portrait warning until dismissed
+
+### Persistence
+
+- Store dismissal in `localStorage` with key `ll-add-to-homescreen-dismissed`
+- Once dismissed, don't show again for that browser session/device
+- Could add option to reset this in settings if needed
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/game/AddToHomeScreen.tsx` | **CREATE** | New component for the install prompt |
+| `src/pages/Index.tsx` | **MODIFY** | Import and render `AddToHomeScreen` above `PortraitWarning` |
+| `src/lib/deviceDetection.ts` | **MODIFY** | Add helper `isIPhoneDevice()` to distinguish iPhone from iPad for text variation |
+
+## Technical Implementation
+
+### AddToHomeScreen.tsx Structure
+
 ```typescript
-if ((mode === "classic" || mode === "fixed" || mode === "medley") && running && !crashed && !playerLockedRef.current)
-```
+import React, { useState, useEffect } from "react";
+import { isIOSDevice, isPWA, isIPadDevice } from "@/lib/deviceDetection";
 
-### Solution
-Add `timetrial` to the condition:
-```typescript
-if ((mode === "classic" || mode === "fixed" || mode === "medley" || mode === "timetrial") && running && !crashed && !playerLockedRef.current)
-```
+const DISMISSED_KEY = 'll-add-to-homescreen-dismissed';
 
-This single change enables:
-- 360°, 720°, 1080° rotation bonuses
-- Near miss detection and scoring
-- Associated visual effects (particle bursts, floating score text)
-
----
-
-## 2. Fix Leaderboard Position Number Colors
-
-### Current State
-In `PlayerMenuLeaderboard.tsx` lines 65-68, the position number uses foreground color:
-```typescript
-<span 
-  className="w-5 text-right font-mono opacity-60"
-  style={{ color: "hsl(var(--foreground))" }}
->
-```
-
-### Solution
-Change to use neon color with matching styling:
-```typescript
-<span 
-  className="w-5 text-right font-mono opacity-60"
-  style={{ 
-    color: "hsl(var(--neon))",
-    textShadow: isEmpty ? "none" : "0 0 8px hsl(var(--neon) / 0.5)"
-  }}
->
-```
-
----
-
-## 3. Remove Leaderboard Cycle Indicator Dots
-
-### Current State
-In `PlayerMenu.tsx` lines 740-753, dots show which leaderboard is active:
-```tsx
-{/* Cycle indicator dots */}
-<div className="flex justify-center gap-2">
-  {leaderboardCycle.map((_, i) => (
-    <span 
-      key={i}
-      className="w-2 h-2 rounded-full ..."
-    />
-  ))}
-</div>
-```
-
-### Solution
-Delete the entire `<div className="flex justify-center gap-2">` block containing the dots.
-
----
-
-## 4. Remove Demo Level Indicator Dots
-
-### Current State
-In `Index.tsx` lines 971-985, dots in the top-right show current demo level:
-```tsx
-{/* Demo indicators */}
-<div className="absolute top-4 right-4 z-50 opacity-70">
-  <div className="flex gap-2">
-    {demoSequence.map((_, idx) => (
-      <div ... />
-    ))}
-  </div>
-</div>
-```
-
-### Solution
-Delete the entire demo indicators div (lines 971-985).
-
----
-
-## 5. Alternate Fullscreen Reminder Text
-
-### Current State
-In `PlayerMenu.tsx` line 724, the reminder always shows the same text:
-```
-PILOTS: This simulation is best played FULL SCREEN
-```
-
-### Solution
-Add a counter ref and alternate between two messages:
-
-1. Add a ref to track which message to show:
-```typescript
-const fullscreenMessageIndexRef = useRef(0);
-```
-
-2. Update the display logic to alternate:
-```tsx
-const fullscreenMessages = [
-  "PILOTS: This simulation is best played FULL SCREEN",
-  "ENABLE FULL SCREEN USING THE BUTTON OR THE F11 KEY"
-];
-
-// In the render section:
-{fullscreenMessages[fullscreenMessageIndexRef.current % 2]}
-```
-
-3. Increment the counter each time the reminder is shown (in the interval check):
-```typescript
-if (timeSinceLast >= requiredTime) {
-  setShowFullscreenReminder(true);
-  fullscreenMessageIndexRef.current += 1; // Alternate message
-  lastReminderTimeRef.current = Date.now();
-  ...
-}
-```
-
----
-
-## 6. Add 3, 2, 1, GO Countdown to Survival Mode
-
-This is the most complex change, requiring several additions to `SurvivalEngine.tsx`.
-
-### Required Imports
-```typescript
-import { createCountdownIntro, IntroHandle, mix } from "./intro/CountdownIntro";
-import { CountdownOverlay } from "./intro/CountdownOverlay";
-```
-
-### State Additions
-```typescript
-// Countdown intro state
-const introRef = useRef<IntroHandle | null>(null);
-const [introState, setIntroState] = useState<IntroState>({
-  phase: "inactive",
-  text: "",
-  alpha: 0,
-  scale: 1,
-  variant: "warp"
-});
-const [worldPaused, setWorldPaused] = useState(true);
-const worldPausedRef = useRef(true);
-```
-
-### Initialization in Game Loop Effect
-```typescript
-// Initialize countdown intro
-if (!introRef.current) {
-  introRef.current = createCountdownIntro();
-  introRef.current.onDone(() => {
-    setWorldPaused(false);
-    worldPausedRef.current = false;
+export const AddToHomeScreen: React.FC = () => {
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(DISMISSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
   });
-  // Start with "warp" variant like other modes
-  introRef.current.start("warp");
-}
+  
+  // Only show on iOS devices running in Safari (not PWA)
+  const shouldShow = isIOSDevice() && !isPWA() && !dismissed;
+  
+  // Detect if iPad vs iPhone for text variation
+  const isIPad = isIPadDevice();
+  
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(DISMISSED_KEY, 'true');
+    } catch {}
+  };
+  
+  if (!shouldShow) return null;
+  
+  return (
+    <div 
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-background/95 backdrop-blur-md"
+      onClick={handleDismiss}
+      style={{ touchAction: 'none' }}
+    >
+      {/* Content with neon green styling */}
+    </div>
+  );
+};
 ```
 
-### Update Intro in Game Loop
-```typescript
-// Update countdown intro
-if (introRef.current) {
-  introRef.current.update(dt);
-  setIntroState(introRef.current.getCurrentState());
-}
-```
+### Icon Rendering
 
-### Render CountdownOverlay Component
-Add to the return JSX, after the canvas but before controls:
+Use inline SVG or Unicode for the icons:
+- **Share icon (↑)**: Unicode `\u{2191}` or custom SVG box with arrow
+- **Three dots (…)**: Unicode `\u{2026}` or `•••` 
+- **Plus icon (+)**: Unicode `+` in a box styling
+
+The icons should be rendered inside small bordered boxes matching the neon aesthetic, similar to the reference screenshot.
+
+### Index.tsx Changes
+
 ```tsx
-<CountdownOverlay 
-  state={introState} 
-  canvasRef={canvasRef}
-  lowGraphics={lowGraphics}
-  shipPosition={/* ship screen position */}
-  shieldColor={/* current neon color */}
-  goFillEnabled={/* from localStorage */}
-  goColorCycle={/* from localStorage */}
-  goColorCycleSpeed={/* from localStorage */}
-  goFont={/* from localStorage */}
-  goSizeMultiplier={/* from localStorage */}
-/>
+import { AddToHomeScreen } from "@/components/game/AddToHomeScreen";
+
+// In the JSX, render before PortraitWarning:
+{/* iOS Add to Home Screen Prompt (shows before portrait warning) */}
+<AddToHomeScreen />
+
+{/* Global Portrait Warning for iPhone users */}
+<PortraitWarning />
 ```
 
-### Block Input During Countdown
-Update the game loop to check `worldPausedRef.current` before processing physics and player input.
+## Text Content (Exact Wording)
 
----
+**Title**: `INSTALL THE APP`
 
-## Files to Modify
+**Subtitle**: `Install on your iPhone or iPad:`
 
-| File | Changes |
-|------|---------|
-| `src/components/game/GameEngine.tsx` | Add `timetrial` to style points condition (line 2132) |
-| `src/components/game/PlayerMenuLeaderboard.tsx` | Change position number color to neon (lines 65-68) |
-| `src/components/game/PlayerMenu.tsx` | Remove cycle dots (lines 740-753), add alternating fullscreen message |
-| `src/pages/Index.tsx` | Remove demo level indicator dots (lines 971-985) |
-| `src/components/game/SurvivalEngine.tsx` | Add countdown intro system with CountdownOverlay |
+**Step 1**: `Tap` [↑ icon] `within Safari on iPad or you may need to tap` [...icon] `on iPhone`
 
----
+**Step 2**: `Find & tap` [+ icon] `"Add to Home Screen"`
+
+**Footer**: `Launch game from Home Screen for full screen support and best experience`
+
+**Dismiss hint**: `Tap anywhere to dismiss`
 
 ## Testing Checklist
 
-1. **Time Trial stunts**: Play Time Trial mode and perform 360° rotation - verify points awarded
-2. **Near miss in Time Trial**: Fly close to terrain at speed - verify "NEAR MISS" appears
-3. **Leaderboard numbers**: Wait for idle carousel - verify position numbers are neon colored
-4. **No leaderboard dots**: Verify no dots appear below the leaderboard display
-5. **No demo dots**: Enter demo mode - verify no dots in top-right corner
-6. **Alternating fullscreen message**: Wait for fullscreen reminder - verify messages alternate
-7. **Survival countdown**: Start Survival mode - verify "3, 2, 1, GO" countdown appears with proper styling
+1. **Safari on iPad**: Prompt appears with correct text variant
+2. **Safari on iPhone**: Prompt appears with correct text variant  
+3. **PWA on iOS**: Prompt does NOT appear (already installed)
+4. **Desktop browsers**: Prompt does NOT appear
+5. **Android browsers**: Prompt does NOT appear
+6. **Dismiss persists**: After dismissing, prompt doesn't show on reload
+7. **z-index works**: Prompt blocks portrait warning until dismissed
+8. **Styling matches**: Neon green aesthetic consistent with game
