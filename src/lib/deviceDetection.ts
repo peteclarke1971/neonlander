@@ -31,6 +31,13 @@ export function isIPadDevice(): boolean {
 }
 
 /**
+ * Detects if the current device is an iPhone (not iPad or iPod)
+ */
+export function isIPhoneDevice(): boolean {
+  return /iPhone/i.test(navigator.userAgent);
+}
+
+/**
  * Detects if the current device is a desktop (not mobile/tablet)
  */
 export function isDesktopDevice(): boolean {
