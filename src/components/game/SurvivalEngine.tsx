@@ -34,6 +34,8 @@ import {
   resetStylePoints, 
   StylePointsState 
 } from "./systems/stylePoints";
+import { createCountdownIntro, IntroHandle, IntroState } from "./intro/CountdownIntro";
+import { CountdownOverlay } from "./intro/CountdownOverlay";
 
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
@@ -255,6 +257,42 @@ export const SurvivalEngine: React.FC<Props> = ({
   // Style points tracking (rotation bonuses & near misses)
   const stylePointsStateRef = useRef<StylePointsState>(createStylePointsState());
   
+  // Countdown intro state
+  const introRef = useRef<IntroHandle | null>(null);
+  const [introState, setIntroState] = useState<IntroState>({
+    phase: "inactive",
+    currentWord: "",
+    wordIndex: 0,
+    timeInPhase: 0,
+    totalTime: 0,
+    canSkip: false,
+    variant: "warp"
+  });
+  const worldPausedRef = useRef(true); // Start paused until countdown finishes
+  const countdownInitialized = useRef(false);
+  
+  // Countdown settings (loaded from localStorage)
+  const goFillEnabled = useRef(false);
+  const goColorCycle = useRef(false);
+  const goColorCycleSpeed = useRef(5);
+  const goFont = useRef('"Orbitron", sans-serif');
+  const goSizeMultiplier = useRef(1.0);
+  
+  // Load countdown settings once on mount
+  useEffect(() => {
+    try {
+      goFillEnabled.current = localStorage.getItem('ll-go-fill-enabled') === 'true';
+      goColorCycle.current = localStorage.getItem('ll-go-color-cycle') === 'true';
+      const speed = parseFloat(localStorage.getItem('ll-go-color-cycle-speed') || '5');
+      goColorCycleSpeed.current = isNaN(speed) ? 5 : speed;
+      goFont.current = localStorage.getItem('ll-go-font') || '"Orbitron", sans-serif';
+      const size = parseFloat(localStorage.getItem('ll-go-size-multiplier') || '1');
+      goSizeMultiplier.current = isNaN(size) ? 1 : size;
+    } catch {
+      // Use defaults
+    }
+  }, []);
+
   // Gamepad state
   const gamepadRef = useRef<Gamepad | null>(null);
   const profileRef = useRef(loadProfile(getLastDeviceId()));
@@ -456,6 +494,22 @@ export const SurvivalEngine: React.FC<Props> = ({
     const ctx = c.getContext("2d")!;
     const styles = getComputedStyle(document.documentElement);
     let neonColor = classicColorsMode.current ? `hsl(${styles.getPropertyValue('--neon')})` : currentPalette.accent;
+    
+    // Initialize countdown intro (only once)
+    if (!countdownInitialized.current) {
+      countdownInitialized.current = true;
+      introRef.current = createCountdownIntro();
+      introRef.current.onDone(() => {
+        worldPausedRef.current = false;
+      });
+      // Start with "warp" variant like other modes, using onTick/onGo for audio
+      introRef.current.start({
+        variant: "warp",
+        onTick: () => { try { audio.current.playIntroTick(); } catch {} },
+        onGo: () => { try { audio.current.playIntroGo(); } catch {} },
+        onWarp: () => { try { audio.current.playIntroWarp(); } catch {} }
+      });
+    }
     
     // Create off-screen canvas for terrain masking
     offscreenTerrainCanvasRef.current = document.createElement('canvas');
@@ -923,6 +977,18 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       if (paused) return;
+      
+      // Update countdown intro state for rendering
+      if (introRef.current && introRef.current.isActive()) {
+        setIntroState(introRef.current.getCurrentState());
+      }
+      
+      // Skip physics/game logic during countdown
+      if (worldPausedRef.current) {
+        // Still render the scene but don't update physics
+        lastTime = now;
+        return;
+      }
       
       // Frame rate limiting with clamped dt (matching main game)
       let dt = (now - lastTime) / 1000;
@@ -3962,6 +4028,23 @@ export const SurvivalEngine: React.FC<Props> = ({
             : currentPalette.accent}
           duration={currentTip.duration}
           onComplete={() => setCurrentTip(null)}
+        />
+      )}
+      
+      {/* Countdown Overlay */}
+      {introState.phase !== "inactive" && introState.phase !== "done" && (
+        <CountdownOverlay
+          state={introState}
+          canvasRef={canvasRef}
+          lowGraphics={lowGraphics}
+          shieldColor={classicColorsMode.current 
+            ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})` 
+            : currentPalette.accent}
+          goFillEnabled={goFillEnabled.current}
+          goColorCycle={goColorCycle.current}
+          goColorCycleSpeed={goColorCycleSpeed.current}
+          goFont={goFont.current}
+          goSizeMultiplier={goSizeMultiplier.current}
         />
       )}
     </div>

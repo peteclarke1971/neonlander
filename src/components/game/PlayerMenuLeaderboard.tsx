@@ -63,7 +63,10 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
                 <div className="flex items-center gap-3">
                   <span 
                     className="w-5 text-right font-mono opacity-60"
-                    style={{ color: "hsl(var(--foreground))" }}
+                    style={{ 
+                      color: "hsl(var(--neon))",
+                      textShadow: isEmpty ? "none" : "0 0 8px hsl(var(--neon) / 0.5)"
+                    }}
                   >
                     {i + 1}.
                   </span>

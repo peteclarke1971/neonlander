@@ -2128,8 +2128,8 @@ export const GameEngine: React.FC<Props> = ({
         rumbleNext = now;
       }
 
-      // Style points tracking (for classic, fixed, and medley modes)
-      if ((mode === "classic" || mode === "fixed" || mode === "medley") && running && !crashed && !playerLockedRef.current) {
+      // Style points tracking (for classic, fixed, medley, and timetrial modes)
+      if ((mode === "classic" || mode === "fixed" || mode === "medley" || mode === "timetrial") && running && !crashed && !playerLockedRef.current) {
         // Detect rotation input from keyboard OR gamepad analog stick
         // Gamepad analog: input.rotation is -1 to 1, negative = left, positive = right
         const gp = anyGamepad?.();
