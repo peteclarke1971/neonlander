@@ -181,6 +181,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [showFullscreenReminder, setShowFullscreenReminder] = useState(false);
   const lastReminderTimeRef = useRef(0);
   
+  // Initialize default settings on mount (before user can navigate away)
+  useEffect(() => {
+    initializeDefaultSettings();
+  }, []);
+  
   // Persist selected game mode
   const [selectedMode, setSelectedMode] = useState<GameModeId>(() => {
     try {
@@ -702,11 +707,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             }}
           >
             <div 
-              className="bg-card/80 backdrop-blur-sm border rounded-lg px-4 py-2 text-sm font-mono tracking-wide text-center shadow-lg"
+              className="bg-card/80 backdrop-blur-sm border rounded-lg px-8 py-4 text-xl font-mono tracking-wide text-center shadow-lg"
               style={{ 
                 color: "hsl(var(--neon))",
                 borderColor: "hsl(var(--neon) / 0.5)",
-                boxShadow: "0 0 20px hsl(var(--neon) / 0.3)"
+                boxShadow: "0 0 30px hsl(var(--neon) / 0.4)"
               }}
             >
               PILOTS: This simulation is best played FULL SCREEN
