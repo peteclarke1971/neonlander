@@ -8,7 +8,16 @@ interface CountdownOverlayProps {
   photosensitive?: boolean;
   shipPosition?: { x: number; y: number };
   shieldColor?: string; // HSL color string for level-colored shield
+  // New customization props
+  goFillEnabled?: boolean;
+  goColorCycle?: boolean;
+  goColorCycleSpeed?: number;
+  goFont?: string;
+  goSizeMultiplier?: number;
 }
+
+// Neon hues for color cycling (matches game palette)
+const NEON_HUES = [330, 50, 140, 270, 25, 0]; // pink, yellow, green, purple, orange, red
 
 // Parse shield color to extract hue, fallback to pink/purple (280)
 function getShieldHue(color?: string): number {
@@ -28,13 +37,41 @@ function mulberry32(a: number) {
   };
 }
 
+// Get cycling hue based on time
+function getCyclingHue(speed: number): number {
+  const cycleProgress = (performance.now() / 1000) * speed * 0.5;
+  const hueIndex = Math.floor(cycleProgress) % NEON_HUES.length;
+  const nextHueIndex = (hueIndex + 1) % NEON_HUES.length;
+  const t = cycleProgress % 1;
+  
+  // Handle hue wrapping (e.g., 350 -> 10)
+  let currentHue = NEON_HUES[hueIndex];
+  let nextHue = NEON_HUES[nextHueIndex];
+  
+  // If wrapping around the color wheel, adjust for smooth interpolation
+  if (Math.abs(nextHue - currentHue) > 180) {
+    if (nextHue > currentHue) {
+      currentHue += 360;
+    } else {
+      nextHue += 360;
+    }
+  }
+  
+  return (currentHue + (nextHue - currentHue) * t) % 360;
+}
+
 export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
   state,
   canvasRef,
   lowGraphics = false,
   photosensitive = false,
   shipPosition,
-  shieldColor
+  shieldColor,
+  goFillEnabled = false,
+  goColorCycle = false,
+  goColorCycleSpeed = 5,
+  goFont = '"Orbitron", sans-serif',
+  goSizeMultiplier = 1.0
 }) => {
   // Get shield hue from color prop or use default pink/purple
   const shieldHue = getShieldHue(shieldColor);
@@ -98,10 +135,13 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       const centerX = width / 2;
       const centerY = height / 2;
       const minDim = Math.min(width, height);
-      const baseSize = minDim * 0.24; // 24% of viewport
+      // Base size with 33% reduction, then apply user multiplier
+      const baseSize = minDim * 0.16 * goSizeMultiplier;
 
       const targetX = (shipPosition?.x ?? centerX);
-      const targetY = (shipPosition?.y ?? centerY);
+      // Position above the lander (offset by 80% of the text size)
+      const yOffset = baseSize * 0.8;
+      const targetY = (shipPosition?.y ?? centerY) - yOffset;
 
       // Create deterministic randomness for this state
       const rng = mulberry32(mix(0, "INTRO_RENDER", state.wordIndex));
@@ -138,17 +178,20 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
         
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = `${fontSize}px monospace`;
+        ctx.font = `bold ${fontSize}px ${goFont}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
+        // Determine stroke color (level neon color)
+        const strokeColor = `hsl(${shieldHue}, 100%, 60%)`;
+        
         // Apply glow effect (but disable on iOS to prevent performance issues)
         if (!isIOS && !photosensitive && !lowGraphics) {
-          ctx.shadowColor = isGO ? '#ff6b6b' : '#4a9eff';
-          ctx.shadowBlur = Math.min(baseSize * 0.2, 20); // Reduced from 0.4 and 40
+          ctx.shadowColor = strokeColor;
+          ctx.shadowBlur = Math.min(baseSize * 0.2, 20);
         }
         
-        ctx.strokeStyle = '#00ffff';
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 3;
         ctx.strokeText(state.currentWord, targetX + jiggleX, targetY + jiggleY);
         
@@ -156,7 +199,18 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
           ctx.shadowBlur = 0;
         }
         
-        ctx.fillStyle = '#ffffff';
+        // Determine fill color based on settings
+        let fillColor = '#000000'; // Default: black fill
+        if (goColorCycle) {
+          // Color cycling through neon hues
+          const cyclingHue = getCyclingHue(goColorCycleSpeed);
+          fillColor = `hsl(${cyclingHue}, 100%, 55%)`;
+        } else if (goFillEnabled) {
+          // Fill with level neon color
+          fillColor = `hsl(${shieldHue}, 100%, 55%)`;
+        }
+        
+        ctx.fillStyle = fillColor;
         ctx.fillText(state.currentWord, targetX + jiggleX, targetY + jiggleY);
         
         ctx.restore();
@@ -272,7 +326,7 @@ export const CountdownOverlay: React.FC<CountdownOverlayProps> = ({
       ctx.globalAlpha = 1;
       goPhaseStartRef.current = null;
     };
-  }, [state, lowGraphics, photosensitive]);
+  }, [state, lowGraphics, photosensitive, goFillEnabled, goColorCycle, goColorCycleSpeed, goFont, goSizeMultiplier, shieldHue]);
 
   // Only render canvas during countdown and go phases - completely remove from DOM during active gameplay
   if (state.phase === "inactive" || state.phase === "done") {

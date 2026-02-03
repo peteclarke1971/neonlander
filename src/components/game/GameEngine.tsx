@@ -6441,6 +6441,21 @@ export const GameEngine: React.FC<Props> = ({
         lowGraphics={graphicsLevel === "low"}
         shipPosition={shipScreenPos ?? undefined}
         shieldColor={neonColor}
+        goFillEnabled={(() => {
+          try { return localStorage.getItem('ll-go-fill-enabled') === 'true'; } catch { return false; }
+        })()}
+        goColorCycle={(() => {
+          try { return localStorage.getItem('ll-go-color-cycle') === 'true'; } catch { return false; }
+        })()}
+        goColorCycleSpeed={(() => {
+          try { const v = localStorage.getItem('ll-go-color-cycle-speed'); return v ? parseFloat(v) : 5; } catch { return 5; }
+        })()}
+        goFont={(() => {
+          try { return localStorage.getItem('ll-go-font') || '"Orbitron", sans-serif'; } catch { return '"Orbitron", sans-serif'; }
+        })()}
+        goSizeMultiplier={(() => {
+          try { const v = localStorage.getItem('ll-go-size-multiplier'); return v ? parseFloat(v) : 1; } catch { return 1; }
+        })()}
       />
       
       {/* Fireworks overlay for successful landing */}
