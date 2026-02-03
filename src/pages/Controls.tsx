@@ -169,6 +169,47 @@ export default function ControlsSettings() {
     }
   });
   
+  // Countdown display settings
+  const [goFillEnabled, setGoFillEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-go-fill-enabled');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [goColorCycle, setGoColorCycle] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ll-go-color-cycle');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [goColorCycleSpeed, setGoColorCycleSpeed] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-go-color-cycle-speed');
+      return saved ? parseFloat(saved) : 5;
+    } catch {
+      return 5;
+    }
+  });
+  const [goFont, setGoFont] = useState<string>(() => {
+    try {
+      return localStorage.getItem('ll-go-font') || '"Orbitron", sans-serif';
+    } catch {
+      return '"Orbitron", sans-serif';
+    }
+  });
+  const [goSizeMultiplier, setGoSizeMultiplier] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ll-go-size-multiplier');
+      return saved ? parseFloat(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
+  
   // Thruster optimization toggle (for PC/Laptop at high resolutions like 4K)
   const [thrusterOptimization, setThrusterOptimization] = useState<boolean>(() => {
     try {
@@ -337,6 +378,27 @@ export default function ControlsSettings() {
       localStorage.setItem('ll-thruster-optimization', JSON.stringify(thrusterOptimization));
     } catch {}
   }, [thrusterOptimization]);
+  
+  // Save countdown display settings
+  useEffect(() => {
+    try { localStorage.setItem('ll-go-fill-enabled', goFillEnabled ? 'true' : 'false'); } catch {}
+  }, [goFillEnabled]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-go-color-cycle', goColorCycle ? 'true' : 'false'); } catch {}
+  }, [goColorCycle]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-go-color-cycle-speed', goColorCycleSpeed.toString()); } catch {}
+  }, [goColorCycleSpeed]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-go-font', goFont); } catch {}
+  }, [goFont]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-go-size-multiplier', goSizeMultiplier.toString()); } catch {}
+  }, [goSizeMultiplier]);
 
   useEffect(() => {
     try {
@@ -961,6 +1023,93 @@ export default function ControlsSettings() {
                 checked={terrainMaskedFireworks}
                 onCheckedChange={setTerrainMaskedFireworks}
               />
+            </div>
+            
+            {/* Countdown Display Settings */}
+            <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
+              <div>
+                <Label className="text-base font-semibold">Countdown Display (3, 2, 1, GO)</Label>
+                <div className="text-xs text-muted-foreground">Customize the countdown that appears at level start</div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>GO Fill</Label>
+                  <div className="text-xs text-muted-foreground">Fill with level neon color (OFF = black fill)</div>
+                </div>
+                <Switch 
+                  checked={goFillEnabled}
+                  onCheckedChange={setGoFillEnabled}
+                  disabled={goColorCycle}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>GO Color Cycle</Label>
+                  <div className="text-xs text-muted-foreground">Cycle through all neon colors</div>
+                </div>
+                <Switch 
+                  checked={goColorCycle}
+                  onCheckedChange={setGoColorCycle}
+                />
+              </div>
+              
+              {goColorCycle && (
+                <div className="space-y-2 pl-4 border-l-2 border-border/40">
+                  <div className="flex items-center justify-between">
+                    <Label>Color Cycle Speed</Label>
+                    <span className="text-sm text-muted-foreground">{goColorCycleSpeed}</span>
+                  </div>
+                  <Slider
+                    value={[goColorCycleSpeed]}
+                    onValueChange={(values) => setGoColorCycleSpeed(values[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Slow</span>
+                    <span>Fast</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label>GO Font</Label>
+                <Select value={goFont} onValueChange={setGoFont}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='"Orbitron", sans-serif'>Orbitron (Default)</SelectItem>
+                    <SelectItem value="monospace">Monospace</SelectItem>
+                    <SelectItem value='"Arial", sans-serif'>Sans-serif</SelectItem>
+                    <SelectItem value='"Times New Roman", serif'>Serif</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Font style for countdown numbers</div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>GO Size</Label>
+                  <span className="text-sm text-muted-foreground">{goSizeMultiplier.toFixed(2)}x</span>
+                </div>
+                <Slider
+                  value={[goSizeMultiplier]}
+                  onValueChange={(values) => setGoSizeMultiplier(values[0])}
+                  min={0.33}
+                  max={3}
+                  step={0.01}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>0.33x (Small)</span>
+                  <span>3x (Large)</span>
+                </div>
+              </div>
             </div>
             
             <div className="flex items-center justify-between">

@@ -100,6 +100,13 @@ function initializeDefaultSettings() {
   setIfMissing("ll-show-fps", "false");                  // SHOW FPS OFF
   setIfMissing("ll-terrain-masked-fireworks", "true");   // TERRAIN MASKED FIREWORKS ON
   setIfMissing("ll-graphics-level", "mid");              // GRAPHICS QUALITY MEDIUM
+  
+  // Countdown display defaults
+  setIfMissing("ll-go-fill-enabled", "false");           // GO Fill OFF (black fill)
+  setIfMissing("ll-go-color-cycle", "false");            // GO Color Cycle OFF
+  setIfMissing("ll-go-color-cycle-speed", "5");          // Color Cycle Speed: 5
+  setIfMissing("ll-go-font", '"Orbitron", sans-serif');  // Font: Orbitron (matches game UI)
+  setIfMissing("ll-go-size-multiplier", "1");            // Size: 1x (default)
 }
 
 function loadSettingsFromStorage(): GameSettings {
