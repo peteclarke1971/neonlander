@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { isIOSDevice, isPWA } from "@/lib/deviceDetection";
+import { MobileStarfield } from "./MobileStarfield";
 
 const DISMISSED_KEY = 'll-add-to-homescreen-dismissed';
 
@@ -50,17 +51,35 @@ export const AddToHomeScreen: React.FC = () => {
   
   return (
     <div 
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-background/95 backdrop-blur-md p-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       onClick={handleDismiss}
       style={{ touchAction: 'none' }}
     >
-      <div className="text-center max-w-md w-full">
+      {/* Mobile Starfield Background */}
+      <div className="absolute inset-0 z-0">
+        <MobileStarfield starCount={300} speed={0.3} />
+      </div>
+      
+      {/* Content overlay */}
+      <div className="relative z-10 text-center max-w-md w-full">
+        {/* LANDER Logo */}
+        <div className="flex justify-center mb-4">
+          <img 
+            src="/images/lander-logo.png" 
+            alt="LANDER"
+            className="w-48 sm:w-56 md:w-64 h-auto select-none pointer-events-none"
+            style={{
+              filter: "drop-shadow(0 0 20px hsl(120, 100%, 50%))"
+            }}
+          />
+        </div>
+        
         {/* Title */}
         <h2 
           className="text-2xl sm:text-3xl font-mono font-bold tracking-wider uppercase mb-4"
           style={{ color: neonGreen, textShadow: neonGlow }}
         >
-          INSTALL THE APP
+          INSTALL THE GAME
         </h2>
         
         {/* Subtitle */}
