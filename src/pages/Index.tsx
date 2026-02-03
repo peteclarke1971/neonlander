@@ -968,21 +968,6 @@ const retryGame = () => {
               </div>
             </div>
             
-            {/* Demo indicators */}
-            <div className="absolute top-4 right-4 z-50 opacity-70">
-              <div className="flex gap-2">
-                {demoSequence.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-3 h-3 rounded-full border ${
-                      idx === demoSequenceIndex
-                        ? 'bg-accent border-accent'
-                        : 'bg-transparent border-accent/30'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
             
             <div className="opacity-80">
               <GameEngine

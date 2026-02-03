@@ -187,6 +187,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Fullscreen reminder for PC users
   const [showFullscreenReminder, setShowFullscreenReminder] = useState(false);
   const lastReminderTimeRef = useRef(0);
+  const fullscreenMessageIndexRef = useRef(0);
   
   // Initialize default settings on mount (before user can navigate away)
   useEffect(() => {
@@ -344,6 +345,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         
         if (timeSinceLast >= requiredTime) {
           setShowFullscreenReminder(true);
+          fullscreenMessageIndexRef.current += 1; // Alternate message next time
           lastReminderTimeRef.current = Date.now();
           
           // Hide after 3 seconds
@@ -721,7 +723,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
                 boxShadow: "0 0 30px hsl(var(--neon) / 0.4)"
               }}
             >
-              PILOTS: This simulation is best played FULL SCREEN
+              {fullscreenMessageIndexRef.current % 2 === 0 
+                ? "PILOTS: This simulation is best played FULL SCREEN"
+                : "ENABLE FULL SCREEN USING THE BUTTON OR THE F11 KEY"}
             </div>
           </div>
         )}
@@ -737,20 +741,6 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               mode={leaderboardCycle[leaderboardIndex].mode} 
               label={leaderboardCycle[leaderboardIndex].label}
             />
-            {/* Cycle indicator dots */}
-            <div className="flex justify-center gap-2">
-              {leaderboardCycle.map((_, i) => (
-                <span 
-                  key={i}
-                  className="w-2 h-2 rounded-full transition-colors duration-500"
-                  style={{ 
-                    backgroundColor: i === leaderboardIndex 
-                      ? "hsl(var(--neon))" 
-                      : "hsl(var(--neon) / 0.3)"
-                  }}
-                />
-              ))}
-            </div>
           </div>
           
           {/* Menu buttons - ALWAYS absolute positioned */}
