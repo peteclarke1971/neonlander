@@ -657,15 +657,26 @@ export const GameEngine: React.FC<Props> = ({
       }
       
       const k = e.key.toLowerCase();
+      // Check if rotation should be inverted (from Control Settings)
+      const invertRotation = localStorage.getItem('ll-invert-rotation') === 'true';
+      
       if (["a", "arrowleft"].includes(k)) {
-        keys.current.left = down;
+        if (invertRotation) {
+          keys.current.right = down; // Inverted
+        } else {
+          keys.current.left = down;
+        }
         if (down) {
           setIsUsingPCControls(true);
           setPCControlsPreference(true);
         }
       }
       if (["d", "arrowright"].includes(k)) {
-        keys.current.right = down;
+        if (invertRotation) {
+          keys.current.left = down; // Inverted
+        } else {
+          keys.current.right = down;
+        }
         if (down) {
           setIsUsingPCControls(true);
           setPCControlsPreference(true);
@@ -6387,11 +6398,21 @@ export const GameEngine: React.FC<Props> = ({
 
       {/* Controls overlay - Show for touch devices (hides when keyboard/gamepad detected) */}
       {!isUsingPCControls && !isDemo && (
-        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
+        <div 
+          className="absolute z-20 flex items-end justify-between gap-3 select-none"
+          style={{ 
+            bottom: `${32 + (parseInt(localStorage.getItem('ll-touch-controls-offset-y') || '0') || 0)}px`,
+            left: `${16 + (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
+            right: `${16 - (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
+            transform: `scale(${parseFloat(localStorage.getItem('ll-touch-controls-scale') || '1') || 1})`,
+            transformOrigin: 'bottom left',
+            opacity: 0.025 + (touchOpacity - 1) * 0.108333 
+          }}
+        >
           <div className="flex gap-2">
             <Button 
               variant="neon" 
-              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center' : ''}`}
+              className={`select-none font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
               onMouseDown={() => (keys.current.left = true)} 
               onMouseUp={() => (keys.current.left = false)} 
               onMouseLeave={() => (keys.current.left = false)}
@@ -6399,11 +6420,11 @@ export const GameEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
             >
-              <span className="select-none">{largeRotateButtons ? '◄' : 'Rotate ◄'}</span>
+              <span className="select-none flex items-center justify-center">{largeRotateButtons ? '◄' : 'Rotate ◄'}</span>
             </Button>
             <Button 
               variant="neon" 
-              className={`select-none ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center' : ''}`}
+              className={`select-none font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
               onMouseDown={() => (keys.current.right = true)} 
               onMouseUp={() => (keys.current.right = false)} 
               onMouseLeave={() => (keys.current.right = false)}
@@ -6411,11 +6432,11 @@ export const GameEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
             >
-              <span className="select-none">{largeRotateButtons ? '►' : 'Rotate ►'}</span>
+              <span className="select-none flex items-center justify-center">{largeRotateButtons ? '►' : 'Rotate ►'}</span>
             </Button>
             <Button 
               variant="destructive" 
-              className="select-none"
+              className="select-none font-['Orbitron'] uppercase"
               onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
               onMouseUp={() => (keys.current.abort = false)} 
               onMouseLeave={() => (keys.current.abort = false)}
@@ -6423,7 +6444,7 @@ export const GameEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.abort = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.abort = false; }}
             >
-              <span className="select-none">Abort</span>
+              <span className="select-none">ABORT</span>
             </Button>
           </div>
         </div>

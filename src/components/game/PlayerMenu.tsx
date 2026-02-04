@@ -155,6 +155,13 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   const { isFullscreen, isSupported, toggleFullscreen } = useFullscreen();
   
+  // Dev Portal visibility (hidden by default, revealed with CTRL+F8)
+  const [devPortalEnabled, setDevPortalEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('ll-dev-portal-enabled') === 'true';
+    } catch { return false; }
+  });
+  
   // In-flight tips toggle
   const [tipsEnabled, setTipsEnabled] = useState(isGuideEnabled);
   
@@ -398,6 +405,19 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Auto-focus first button on mount
   useEffect(() => {
     buttonRefs.current[0]?.focus();
+  }, []);
+
+  // CTRL+F8 to reveal Dev Portal
+  useEffect(() => {
+    const handleKeyCombo = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'F8') {
+        e.preventDefault();
+        setDevPortalEnabled(true);
+        try { localStorage.setItem('ll-dev-portal-enabled', 'true'); } catch {}
+      }
+    };
+    window.addEventListener('keydown', handleKeyCombo);
+    return () => window.removeEventListener('keydown', handleKeyCombo);
   }, []);
 
   // Set UI mode for gamepad thrust gating
@@ -954,13 +974,15 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             {getGraphicsLabel(graphicsLevel)}
           </button>
           
-          <button
-            className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
-            onClick={() => { resetIdle(); onDevPortal(); }}
-            style={{ color: "hsl(var(--neon))" }}
-          >
-            Dev Portal
-          </button>
+          {devPortalEnabled && (
+            <button
+              className="text-xs uppercase tracking-widest opacity-30 hover:opacity-60 transition-opacity"
+              onClick={() => { resetIdle(); onDevPortal(); }}
+              style={{ color: "hsl(var(--neon))" }}
+            >
+              Dev Portal
+            </button>
+          )}
         </div>
       </footer>
     </main>

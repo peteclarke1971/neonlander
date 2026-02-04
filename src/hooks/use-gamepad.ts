@@ -141,10 +141,17 @@ export const readGamepad = (gp: Gamepad, profile: ControlProfile): NormalizedInp
   rx = Math.sign(rx) * Math.pow(Math.abs(rx), 1.5);
   if (profile.invertRotation) rx = -rx;
 
-  const left = btn(m.rotateLeftBtn);
-  const right = btn(m.rotateRightBtn);
+  let left = btn(m.rotateLeftBtn);
+  let right = btn(m.rotateRightBtn);
   const abort = btn(m.abortBtn);
   const pause = btn(m.pauseBtn);
+  
+  // Swap LB/RB when invert rotation is enabled
+  if (profile.invertRotation) {
+    const temp = left;
+    left = right;
+    right = temp;
+  }
   
   // Rotation boost from RT trigger (prefer axis over button)
   let rotateBoost = false;
