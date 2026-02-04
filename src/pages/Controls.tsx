@@ -237,6 +237,23 @@ export default function ControlsSettings() {
   // Graphics quality setting
   const [graphicsLevel, setGraphicsLevel] = useState<GraphicsLevel>(loadGraphicsSettings);
   
+  // Touch control layout settings (developer menu only)
+  const [touchOffsetY, setTouchOffsetY] = useState<number>(() => {
+    try {
+      return parseInt(localStorage.getItem('ll-touch-controls-offset-y') || '0');
+    } catch { return 0; }
+  });
+  const [touchOffsetX, setTouchOffsetX] = useState<number>(() => {
+    try {
+      return parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0');
+    } catch { return 0; }
+  });
+  const [touchScale, setTouchScale] = useState<number>(() => {
+    try {
+      return parseFloat(localStorage.getItem('ll-touch-controls-scale') || '1');
+    } catch { return 1; }
+  });
+  
   // Audio testing state
   const audioManagerRef = useRef(getGlobalAudioManager());
   const [selectedMusic, setSelectedMusic] = useState<string>("title.mp3");
@@ -421,6 +438,19 @@ export default function ControlsSettings() {
       console.warn('Failed to save large UFO difficulty:', e);
     }
   }, [largeUFODifficulty]);
+  
+  // Save touch control layout settings
+  useEffect(() => {
+    try { localStorage.setItem('ll-touch-controls-offset-y', touchOffsetY.toString()); } catch {}
+  }, [touchOffsetY]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-touch-controls-offset-x', touchOffsetX.toString()); } catch {}
+  }, [touchOffsetX]);
+  
+  useEffect(() => {
+    try { localStorage.setItem('ll-touch-controls-scale', touchScale.toString()); } catch {}
+  }, [touchScale]);
 
   // SEO
   useEffect(() => {
@@ -750,7 +780,7 @@ export default function ControlsSettings() {
         <Glyphs />
 
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
-          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Analog Settings</h2>
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Control Settings</h2>
           <div className="grid grid-cols-1 gap-4">
             {/* Deadzone - hidden in player menu mode */}
             {!isPlayerMenuMode && (
@@ -763,8 +793,15 @@ export default function ControlsSettings() {
               </div>
             )}
             <div className="flex items-center justify-between">
-              <Label>Invert Rotation</Label>
-              <Switch checked={profile.invertRotation} onCheckedChange={(v) => setProfile(p => ({ ...p, invertRotation: v }))} />
+              <div>
+                <Label>Invert Rotation</Label>
+                <div className="text-xs text-muted-foreground">Inverts analog, keyboard, and d-pad rotation</div>
+              </div>
+              <Switch checked={profile.invertRotation} onCheckedChange={(v) => {
+                setProfile(p => ({ ...p, invertRotation: v }));
+                // Also save to global localStorage key for keyboard/d-pad inversion
+                try { localStorage.setItem('ll-invert-rotation', v ? 'true' : 'false'); } catch {}
+              }} />
             </div>
             {/* Invert Thrust - hidden in player menu mode */}
             {!isPlayerMenuMode && (
@@ -1333,6 +1370,77 @@ export default function ControlsSettings() {
             </div>
           </div>
         </div>
+        
+        {/* Touch Control Layout - Developer only */}
+        {!isPlayerMenuMode && (
+          <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Touch Control Layout</h2>
+            <div className="text-xs text-muted-foreground mb-4">
+              Customize the position and size of on-screen touch controls (Rotate ◄ ► and ABORT buttons)
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label>Vertical Position</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56">
+                    <Slider 
+                      value={[touchOffsetY]} 
+                      min={-50} 
+                      max={100} 
+                      step={5} 
+                      onValueChange={(v) => setTouchOffsetY(v[0])} 
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-16">{touchOffsetY > 0 ? '+' : ''}{touchOffsetY}px</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Move controls up (+) or down (-) from default position</div>
+              </div>
+              <div>
+                <Label>Horizontal Position</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56">
+                    <Slider 
+                      value={[touchOffsetX]} 
+                      min={-100} 
+                      max={100} 
+                      step={5} 
+                      onValueChange={(v) => setTouchOffsetX(v[0])} 
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-16">{touchOffsetX > 0 ? '+' : ''}{touchOffsetX}px</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Shift controls left (-) or right (+) from default position</div>
+              </div>
+              <div>
+                <Label>Button Scale</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56">
+                    <Slider 
+                      value={[touchScale]} 
+                      min={0.5} 
+                      max={2.0} 
+                      step={0.1} 
+                      onValueChange={(v) => setTouchScale(v[0])} 
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-16">{touchScale.toFixed(1)}x</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Scale buttons smaller (0.5x) or larger (2.0x)</div>
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full mt-2"
+                onClick={() => {
+                  setTouchOffsetY(0);
+                  setTouchOffsetX(0);
+                  setTouchScale(1.0);
+                }}
+              >
+                Reset to Defaults
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Remap Controls</h2>

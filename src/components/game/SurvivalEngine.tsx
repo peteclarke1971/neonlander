@@ -415,16 +415,27 @@ export const SurvivalEngine: React.FC<Props> = ({
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
+      // Check if rotation should be inverted (from Control Settings)
+      const invertRotation = localStorage.getItem('ll-invert-rotation') === 'true';
+      
       // Use same keyboard controls as main game
       if (["a", "arrowleft"].includes(k)) {
-        keys.current.left = down;
+        if (invertRotation) {
+          keys.current.right = down; // Inverted
+        } else {
+          keys.current.left = down;
+        }
         if (down) {
           setIsUsingPCControls(true);
           setPCControlsPreference(true);
         }
       }
       if (["d", "arrowright"].includes(k)) {
-        keys.current.right = down;
+        if (invertRotation) {
+          keys.current.left = down; // Inverted
+        } else {
+          keys.current.right = down;
+        }
         if (down) {
           setIsUsingPCControls(true);
           setPCControlsPreference(true);
@@ -3960,11 +3971,21 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       {/* Touch Controls - Only show if not using PC controls */}
       {!isUsingPCControls && (
-        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
+        <div 
+          className="absolute z-20 flex items-end justify-between gap-3 select-none"
+          style={{ 
+            bottom: `${32 + (parseInt(localStorage.getItem('ll-touch-controls-offset-y') || '0') || 0)}px`,
+            left: `${16 + (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
+            right: `${16 - (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
+            transform: `scale(${parseFloat(localStorage.getItem('ll-touch-controls-scale') || '1') || 1})`,
+            transformOrigin: 'bottom left',
+            opacity: 0.025 + (touchOpacity - 1) * 0.108333 
+          }}
+        >
           <div className="flex gap-2">
             <Button 
               variant="outline" 
-              className="select-none"
+              className="select-none font-['Orbitron']"
               onMouseDown={() => (keys.current.left = true)} 
               onMouseUp={() => (keys.current.left = false)} 
               onMouseLeave={() => (keys.current.left = false)}
@@ -3972,11 +3993,11 @@ export const SurvivalEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
             >
-              <span className="select-none">Rotate ◄</span>
+              <span className="select-none flex items-center justify-center">Rotate ◄</span>
             </Button>
             <Button 
               variant="outline" 
-              className="select-none"
+              className="select-none font-['Orbitron']"
               onMouseDown={() => (keys.current.right = true)} 
               onMouseUp={() => (keys.current.right = false)} 
               onMouseLeave={() => (keys.current.right = false)}
@@ -3984,7 +4005,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
             >
-              <span className="select-none">Rotate ►</span>
+              <span className="select-none flex items-center justify-center">Rotate ►</span>
             </Button>
           </div>
         </div>
