@@ -10,10 +10,24 @@ import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/l
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
-import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
+import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel, detectOptimalGraphics, BenchmarkResult } from "@/lib/graphicsConfig";
 
 export default function ControlsSettings() {
   const navigate = useNavigate();
+  
+  // Detect if accessed from Player Menu (restricted settings mode)
+  const [isPlayerMenuMode] = useState(() => {
+    try {
+      return localStorage.getItem('ll-settings-origin') === 'playermenu';
+    } catch {
+      return false;
+    }
+  });
+  
+  // Auto-detect graphics benchmark state
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
+  
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
   const [platform, setPlatform] = useState<string>(() => getPlatformFromId(deviceId || ""));
   const [profile, setProfile] = useState(() => loadProfile(deviceId || undefined));
@@ -587,6 +601,34 @@ export default function ControlsSettings() {
     setClearDialogOpen(false);
   };
 
+  // Auto-detect graphics benchmark handler
+  const runGraphicsBenchmark = async () => {
+    setIsBenchmarking(true);
+    setBenchmarkResult(null);
+    
+    try {
+      const result = await detectOptimalGraphics();
+      setBenchmarkResult(result);
+      setGraphicsLevel(result.level);
+      saveGraphicsSettings(result.level);
+      
+      toast({
+        title: `Graphics set to ${result.level.toUpperCase()}`,
+        description: result.recommendation,
+      });
+    } catch (error) {
+      toast({
+        title: "Benchmark failed",
+        description: "Defaulting to Mid graphics",
+        variant: "destructive",
+      });
+      setGraphicsLevel('mid');
+      saveGraphicsSettings('mid');
+    } finally {
+      setIsBenchmarking(false);
+    }
+  };
+
   // Audio testing handlers
   const playTestMusic = async (trackName: string) => {
     const audio = audioManagerRef.current;
@@ -710,21 +752,27 @@ export default function ControlsSettings() {
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Analog Settings</h2>
           <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="deadzone">Deadzone</Label>
-              <div className="flex items-center gap-3">
-                <div className="w-56"><Slider id="deadzone" value={[profile.deadzone]} min={0.05} max={0.25} step={0.005} onValueChange={(v) => setProfile(p => ({ ...p, deadzone: v[0] }))} /></div>
-                <span className="text-xs text-muted-foreground">{profile.deadzone.toFixed(3)}</span>
+            {/* Deadzone - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div>
+                <Label htmlFor="deadzone">Deadzone</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56"><Slider id="deadzone" value={[profile.deadzone]} min={0.05} max={0.25} step={0.005} onValueChange={(v) => setProfile(p => ({ ...p, deadzone: v[0] }))} /></div>
+                  <span className="text-xs text-muted-foreground">{profile.deadzone.toFixed(3)}</span>
+                </div>
               </div>
-            </div>
+            )}
             <div className="flex items-center justify-between">
               <Label>Invert Rotation</Label>
               <Switch checked={profile.invertRotation} onCheckedChange={(v) => setProfile(p => ({ ...p, invertRotation: v }))} />
             </div>
-            <div className="flex items-center justify-between">
-              <Label>Invert Thrust</Label>
-              <Switch checked={profile.invertThrust} onCheckedChange={(v) => setProfile(p => ({ ...p, invertThrust: v }))} />
-            </div>
+            {/* Invert Thrust - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="flex items-center justify-between">
+                <Label>Invert Thrust</Label>
+                <Switch checked={profile.invertThrust} onCheckedChange={(v) => setProfile(p => ({ ...p, invertThrust: v }))} />
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <Label>Vibration</Label>
               <Switch checked={profile.vibration} onCheckedChange={(v) => setProfile(p => ({ ...p, vibration: v }))} />
@@ -763,7 +811,8 @@ export default function ControlsSettings() {
                 </div>
               </div>
             )}
-            {isDesktop() && (
+            {/* Mouse Lock - hidden in player menu mode */}
+            {isDesktop() && !isPlayerMenuMode && (
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Mouse Lock</Label>
@@ -790,52 +839,64 @@ export default function ControlsSettings() {
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Gameplay Settings</h2>
           <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center justify-between">
+            {/* Rotation Boost - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Rotation Boost</Label>
+                  <div className="text-xs text-muted-foreground">2× rotation speed while held (RT/Shift)</div>
+                </div>
+                <Switch 
+                  checked={true} // Always enabled for now
+                  onCheckedChange={() => {}}
+                  disabled={true}
+                />
+              </div>
+            )}
+            {/* Rotation Multiplier - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
               <div>
-                <Label>Rotation Boost</Label>
-                <div className="text-xs text-muted-foreground">2× rotation speed while held (RT/Shift)</div>
+                <Label htmlFor="rotmultiplier">Rotation Multiplier</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-56"><Slider id="rotmultiplier" value={[2.0]} min={1.5} max={3.0} step={0.1} onValueChange={() => {}} disabled /></div>
+                  <span className="text-xs text-muted-foreground">2.0×</span>
+                </div>
               </div>
-              <Switch 
-                checked={true} // Always enabled for now
-                onCheckedChange={() => {}}
-                disabled={true}
-              />
-            </div>
-            <div>
-              <Label htmlFor="rotmultiplier">Rotation Multiplier</Label>
-              <div className="flex items-center gap-3">
-                <div className="w-56"><Slider id="rotmultiplier" value={[2.0]} min={1.5} max={3.0} step={0.1} onValueChange={() => {}} disabled /></div>
-                <span className="text-xs text-muted-foreground">2.0×</span>
+            )}
+            {/* Moving Pads - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Moving Pads</Label>
+                  <div className="text-xs text-muted-foreground">Rare, high-value moving landing pads on hard difficulty</div>
+                </div>
+                <select 
+                  className="px-3 py-2 rounded border border-border bg-background text-foreground"
+                  defaultValue="default"
+                  onChange={(e) => {
+                    // This would integrate with the moving pad system settings
+                    console.log('Moving pads setting:', e.target.value);
+                  }}
+                >
+                  <option value="off">Off</option>
+                  <option value="default">Default</option>
+                  <option value="more">More</option>
+                </select>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Moving Pads</Label>
-                <div className="text-xs text-muted-foreground">Rare, high-value moving landing pads on hard difficulty</div>
+            )}
+            {/* Large Buttons - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Large Buttons</Label>
+                  <div className="text-xs text-muted-foreground">Simplified rotate buttons for touch controls (◄ ►)</div>
+                </div>
+                <Switch 
+                  checked={largeRotateButtons}
+                  onCheckedChange={setLargeRotateButtons}
+                />
               </div>
-              <select 
-                className="px-3 py-2 rounded border border-border bg-background text-foreground"
-                defaultValue="default"
-                onChange={(e) => {
-                  // This would integrate with the moving pad system settings
-                  console.log('Moving pads setting:', e.target.value);
-                }}
-              >
-                <option value="off">Off</option>
-                <option value="default">Default</option>
-                <option value="more">More</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Large Buttons</Label>
-                <div className="text-xs text-muted-foreground">Simplified rotate buttons for touch controls (◄ ►)</div>
-              </div>
-              <Switch 
-                checked={largeRotateButtons}
-                onCheckedChange={setLargeRotateButtons}
-              />
-            </div>
+            )}
             <div className="flex items-center justify-between">
               <div>
                 <Label>Full HUD</Label>
@@ -885,110 +946,116 @@ export default function ControlsSettings() {
               />
             </div>
             
-            {/* Small UFO Section */}
-            <div className="space-y-3 p-4 border border-border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-semibold">Small UFO (Scout)</Label>
-                  <div className="text-xs text-muted-foreground">Fast, agile, no weapons - dives at lander</div>
-                </div>
-                <Switch 
-                  checked={smallUFOEnabled}
-                  onCheckedChange={setSmallUFOEnabled}
-                />
-              </div>
-              
-              {smallUFOEnabled && (
-                <div className="space-y-2 pl-4">
-                  <div className="flex justify-between items-center">
-                    <Label>Difficulty</Label>
-                    <span className="text-sm text-muted-foreground">{smallUFODifficulty}</span>
+            {/* Small UFO Section - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="space-y-3 p-4 border border-border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">Small UFO (Scout)</Label>
+                    <div className="text-xs text-muted-foreground">Fast, agile, no weapons - dives at lander</div>
                   </div>
-                  <Slider
-                    value={[smallUFODifficulty]}
-                    onValueChange={(values) => setSmallUFODifficulty(values[0])}
-                    min={1}
-                    max={10}
-                    step={1}
-                    className="w-full"
+                  <Switch 
+                    checked={smallUFOEnabled}
+                    onCheckedChange={setSmallUFOEnabled}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Slow dive, 1 attack</span>
-                    <span>Fast dive, 2 attacks</span>
-                  </div>
                 </div>
-              )}
-            </div>
+                
+                {smallUFOEnabled && (
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between items-center">
+                      <Label>Difficulty</Label>
+                      <span className="text-sm text-muted-foreground">{smallUFODifficulty}</span>
+                    </div>
+                    <Slider
+                      value={[smallUFODifficulty]}
+                      onValueChange={(values) => setSmallUFODifficulty(values[0])}
+                      min={1}
+                      max={10}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Slow dive, 1 attack</span>
+                      <span>Fast dive, 2 attacks</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Medium UFO Section */}
-            <div className="space-y-3 p-4 border border-border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-semibold">Medium UFO (Fighter)</Label>
-                  <div className="text-xs text-muted-foreground">Balanced speed, fires projectiles, weaves horizontally</div>
-                </div>
-                <Switch 
-                  checked={mediumUFOEnabled}
-                  onCheckedChange={setMediumUFOEnabled}
-                />
-              </div>
-              
-              {mediumUFOEnabled && (
-                <div className="space-y-2 pl-4">
-                  <div className="flex justify-between items-center">
-                    <Label>Difficulty</Label>
-                    <span className="text-sm text-muted-foreground">{mediumUFODifficulty}</span>
+            {/* Medium UFO Section - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="space-y-3 p-4 border border-border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">Medium UFO (Fighter)</Label>
+                    <div className="text-xs text-muted-foreground">Balanced speed, fires projectiles, weaves horizontally</div>
                   </div>
-                  <Slider
-                    value={[mediumUFODifficulty]}
-                    onValueChange={(values) => setMediumUFODifficulty(values[0])}
-                    min={1}
-                    max={10}
-                    step={1}
-                    className="w-full"
+                  <Switch 
+                    checked={mediumUFOEnabled}
+                    onCheckedChange={setMediumUFOEnabled}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Slow & inaccurate</span>
-                    <span>Fast & tracking</span>
-                  </div>
                 </div>
-              )}
-            </div>
+                
+                {mediumUFOEnabled && (
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between items-center">
+                      <Label>Difficulty</Label>
+                      <span className="text-sm text-muted-foreground">{mediumUFODifficulty}</span>
+                    </div>
+                    <Slider
+                      value={[mediumUFODifficulty]}
+                      onValueChange={(values) => setMediumUFODifficulty(values[0])}
+                      min={1}
+                      max={10}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Slow & inaccurate</span>
+                      <span>Fast & tracking</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Large UFO Section */}
-            <div className="space-y-3 p-4 border border-border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-semibold">Large UFO (Mothership)</Label>
-                  <div className="text-xs text-muted-foreground">Slow, hovers, fires bullet spray patterns</div>
-                </div>
-                <Switch 
-                  checked={largeUFOEnabled}
-                  onCheckedChange={setLargeUFOEnabled}
-                />
-              </div>
-              
-              {largeUFOEnabled && (
-                <div className="space-y-2 pl-4">
-                  <div className="flex justify-between items-center">
-                    <Label>Difficulty</Label>
-                    <span className="text-sm text-muted-foreground">{largeUFODifficulty}</span>
+            {/* Large UFO Section - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="space-y-3 p-4 border border-border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">Large UFO (Mothership)</Label>
+                    <div className="text-xs text-muted-foreground">Slow, hovers, fires bullet spray patterns</div>
                   </div>
-                  <Slider
-                    value={[largeUFODifficulty]}
-                    onValueChange={(values) => setLargeUFODifficulty(values[0])}
-                    min={1}
-                    max={10}
-                    step={1}
-                    className="w-full"
+                  <Switch 
+                    checked={largeUFOEnabled}
+                    onCheckedChange={setLargeUFOEnabled}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Simple spread, slow</span>
-                    <span>Spirals, fast bursts</span>
-                  </div>
                 </div>
-              )}
-            </div>
+                
+                {largeUFOEnabled && (
+                  <div className="space-y-2 pl-4">
+                    <div className="flex justify-between items-center">
+                      <Label>Difficulty</Label>
+                      <span className="text-sm text-muted-foreground">{largeUFODifficulty}</span>
+                    </div>
+                    <Slider
+                      value={[largeUFODifficulty]}
+                      onValueChange={(values) => setLargeUFODifficulty(values[0])}
+                      min={1}
+                      max={10}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Simple spread, slow</span>
+                      <span>Spirals, fast bursts</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             
             <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
               <div className="flex items-center justify-between">
@@ -1014,103 +1081,108 @@ export default function ControlsSettings() {
               </div>
             </div>
             
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Terrain-Masked Fireworks</Label>
-                <div className="text-xs text-muted-foreground">Fireworks appear behind terrain (experimental)</div>
+            {/* Terrain-Masked Fireworks - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Terrain-Masked Fireworks</Label>
+                  <div className="text-xs text-muted-foreground">Fireworks appear behind terrain (experimental)</div>
+                </div>
+                <Switch 
+                  checked={terrainMaskedFireworks}
+                  onCheckedChange={setTerrainMaskedFireworks}
+                />
               </div>
-              <Switch 
-                checked={terrainMaskedFireworks}
-                onCheckedChange={setTerrainMaskedFireworks}
-              />
-            </div>
+            )}
             
-            {/* Countdown Display Settings */}
-            <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
-              <div>
-                <Label className="text-base font-semibold">Countdown Display (3, 2, 1, GO)</Label>
-                <div className="text-xs text-muted-foreground">Customize the countdown that appears at level start</div>
-              </div>
-              
-              <div className="flex items-center justify-between">
+            {/* Countdown Display Settings - hidden in player menu mode */}
+            {!isPlayerMenuMode && (
+              <div className="space-y-4 border border-border/40 rounded-lg p-4 bg-card/20">
                 <div>
-                  <Label>GO Fill</Label>
-                  <div className="text-xs text-muted-foreground">Fill with level neon color (OFF = black fill)</div>
+                  <Label className="text-base font-semibold">Countdown Display (3, 2, 1, GO)</Label>
+                  <div className="text-xs text-muted-foreground">Customize the countdown that appears at level start</div>
                 </div>
-                <Switch 
-                  checked={goFillEnabled}
-                  onCheckedChange={setGoFillEnabled}
-                  disabled={goColorCycle}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>GO Color Cycle</Label>
-                  <div className="text-xs text-muted-foreground">Cycle through all neon colors</div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>GO Fill</Label>
+                    <div className="text-xs text-muted-foreground">Fill with level neon color (OFF = black fill)</div>
+                  </div>
+                  <Switch 
+                    checked={goFillEnabled}
+                    onCheckedChange={setGoFillEnabled}
+                    disabled={goColorCycle}
+                  />
                 </div>
-                <Switch 
-                  checked={goColorCycle}
-                  onCheckedChange={setGoColorCycle}
-                />
-              </div>
-              
-              {goColorCycle && (
-                <div className="space-y-2 pl-4 border-l-2 border-border/40">
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>GO Color Cycle</Label>
+                    <div className="text-xs text-muted-foreground">Cycle through all neon colors</div>
+                  </div>
+                  <Switch 
+                    checked={goColorCycle}
+                    onCheckedChange={setGoColorCycle}
+                  />
+                </div>
+                
+                {goColorCycle && (
+                  <div className="space-y-2 pl-4 border-l-2 border-border/40">
+                    <div className="flex items-center justify-between">
+                      <Label>Color Cycle Speed</Label>
+                      <span className="text-sm text-muted-foreground">{goColorCycleSpeed}</span>
+                    </div>
+                    <Slider
+                      value={[goColorCycleSpeed]}
+                      onValueChange={(values) => setGoColorCycleSpeed(values[0])}
+                      min={1}
+                      max={10}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Slow</span>
+                      <span>Fast</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label>GO Font</Label>
+                  <Select value={goFont} onValueChange={setGoFont}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='"Orbitron", sans-serif'>Orbitron (Default)</SelectItem>
+                      <SelectItem value="monospace">Monospace</SelectItem>
+                      <SelectItem value='"Arial", sans-serif'>Sans-serif</SelectItem>
+                      <SelectItem value='"Times New Roman", serif'>Serif</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">Font style for countdown numbers</div>
+                </div>
+                
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>Color Cycle Speed</Label>
-                    <span className="text-sm text-muted-foreground">{goColorCycleSpeed}</span>
+                    <Label>GO Size</Label>
+                    <span className="text-sm text-muted-foreground">{goSizeMultiplier.toFixed(2)}x</span>
                   </div>
                   <Slider
-                    value={[goColorCycleSpeed]}
-                    onValueChange={(values) => setGoColorCycleSpeed(values[0])}
-                    min={1}
-                    max={10}
-                    step={1}
+                    value={[goSizeMultiplier]}
+                    onValueChange={(values) => setGoSizeMultiplier(values[0])}
+                    min={0.33}
+                    max={3}
+                    step={0.01}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Slow</span>
-                    <span>Fast</span>
+                    <span>0.33x (Small)</span>
+                    <span>3x (Large)</span>
                   </div>
                 </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label>GO Font</Label>
-                <Select value={goFont} onValueChange={setGoFont}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='"Orbitron", sans-serif'>Orbitron (Default)</SelectItem>
-                    <SelectItem value="monospace">Monospace</SelectItem>
-                    <SelectItem value='"Arial", sans-serif'>Sans-serif</SelectItem>
-                    <SelectItem value='"Times New Roman", serif'>Serif</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="text-xs text-muted-foreground">Font style for countdown numbers</div>
               </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>GO Size</Label>
-                  <span className="text-sm text-muted-foreground">{goSizeMultiplier.toFixed(2)}x</span>
-                </div>
-                <Slider
-                  value={[goSizeMultiplier]}
-                  onValueChange={(values) => setGoSizeMultiplier(values[0])}
-                  min={0.33}
-                  max={3}
-                  step={0.01}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>0.33x (Small)</span>
-                  <span>3x (Large)</span>
-                </div>
-              </div>
-            </div>
+            )}
             
             <div className="flex items-center justify-between">
               <div>
@@ -1210,6 +1282,42 @@ export default function ControlsSettings() {
               </Select>
             </div>
             
+            {/* Auto Detect Graphics - only shown in player menu mode */}
+            {isPlayerMenuMode && (
+              <div className="space-y-3 border border-accent/40 rounded-lg p-4 bg-accent/5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">Auto Detect Best Graphics</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Runs a quick benchmark to determine optimal settings for your device
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="neon"
+                  className="w-full"
+                  onClick={runGraphicsBenchmark}
+                  disabled={isBenchmarking}
+                >
+                  {isBenchmarking ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin">◌</span>
+                      TESTING...
+                    </span>
+                  ) : benchmarkResult ? (
+                    `DETECTED: ${benchmarkResult.level.toUpperCase()}`
+                  ) : (
+                    "AUTO DETECT BEST GRAPHICS"
+                  )}
+                </Button>
+                {benchmarkResult && (
+                  <div className="text-xs text-muted-foreground text-center">
+                    {benchmarkResult.recommendation}
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Thruster Optimization (PC only) */}
             <div className="flex items-center justify-between">
               <div>
@@ -1285,97 +1393,103 @@ export default function ControlsSettings() {
           </div>
         </div>
 
-        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
-          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🎵 Music Testing</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            Preview all music tracks by their code names
-          </p>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="music-select">Select Track</Label>
-              <Select value={selectedMusic} onValueChange={setSelectedMusic}>
-                <SelectTrigger id="music-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card z-50">
-                  <SelectItem value="title.mp3">title.mp3</SelectItem>
-                  <SelectItem value="level1.mp3">level1.mp3</SelectItem>
-                  <SelectItem value="level2.mp3">level2.mp3</SelectItem>
-                  <SelectItem value="level3.mp3">level3.mp3</SelectItem>
-                  <SelectItem value="level4.mp3">level4.mp3</SelectItem>
-                  <SelectItem value="level5.mp3">level5.mp3</SelectItem>
-                  <SelectItem value="level6.mp3">level6.mp3</SelectItem>
-                  <SelectItem value="level7.mp3">level7.mp3</SelectItem>
-                  <SelectItem value="level8.mp3">level8.mp3</SelectItem>
-                  <SelectItem value="mission_success.mp3">mission_success.mp3</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                className="flex-1"
-                onClick={() => playTestMusic(selectedMusic)}
-              >
-                Play
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={stopTestMusic}
-                disabled={!isPlayingMusic}
-              >
-                Stop
-              </Button>
+        {/* Music Testing - hidden in player menu mode */}
+        {!isPlayerMenuMode && (
+          <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🎵 Music Testing</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Preview all music tracks by their code names
+            </p>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label htmlFor="music-select">Select Track</Label>
+                <Select value={selectedMusic} onValueChange={setSelectedMusic}>
+                  <SelectTrigger id="music-select" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card z-50">
+                    <SelectItem value="title.mp3">title.mp3</SelectItem>
+                    <SelectItem value="level1.mp3">level1.mp3</SelectItem>
+                    <SelectItem value="level2.mp3">level2.mp3</SelectItem>
+                    <SelectItem value="level3.mp3">level3.mp3</SelectItem>
+                    <SelectItem value="level4.mp3">level4.mp3</SelectItem>
+                    <SelectItem value="level5.mp3">level5.mp3</SelectItem>
+                    <SelectItem value="level6.mp3">level6.mp3</SelectItem>
+                    <SelectItem value="level7.mp3">level7.mp3</SelectItem>
+                    <SelectItem value="level8.mp3">level8.mp3</SelectItem>
+                    <SelectItem value="mission_success.mp3">mission_success.mp3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="default" 
+                  className="flex-1"
+                  onClick={() => playTestMusic(selectedMusic)}
+                >
+                  Play
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={stopTestMusic}
+                  disabled={!isPlayingMusic}
+                >
+                  Stop
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
-          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🔊 Sound Effects Testing</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            Preview all sound effects by their code names
-          </p>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="sfx-select">Select Sound Effect</Label>
-              <Select value={selectedSFX} onValueChange={setSelectedSFX}>
-                <SelectTrigger id="sfx-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card z-50">
-                  <SelectItem value="thruster.mp3">thruster.mp3</SelectItem>
-                  <SelectItem value="crash1.mp3">crash1.mp3</SelectItem>
-                  <SelectItem value="crash2.mp3">crash2.mp3</SelectItem>
-                  <SelectItem value="landing_on_pad.mp3">landing_on_pad.mp3</SelectItem>
-                  <SelectItem value="fuel_10_percent_loop.mp3">fuel_10_percent_loop.mp3</SelectItem>
-                  <SelectItem value="intro_tick.mp3">intro_tick.mp3</SelectItem>
-                  <SelectItem value="intro_go.mp3">intro_go.mp3</SelectItem>
-                  <SelectItem value="intro_warp.mp3">intro_warp.mp3</SelectItem>
-                  <SelectItem value="abort_whoosh" className="text-muted-foreground italic">abort_whoosh (synthesized)</SelectItem>
-                  <SelectItem value="click" className="text-muted-foreground italic">click (synthesized)</SelectItem>
-                  <SelectItem value="shield_pickup" className="text-muted-foreground italic">shield_pickup (synthesized)</SelectItem>
-                  <SelectItem value="shield_break" className="text-muted-foreground italic">shield_break (synthesized)</SelectItem>
-                  <SelectItem value="collectible_noise" className="text-muted-foreground italic">collectible_noise (synthesized)</SelectItem>
-                  <SelectItem value="set_completion" className="text-muted-foreground italic">set_completion (synthesized)</SelectItem>
-                  <SelectItem value="wormhole_open" className="text-muted-foreground italic">wormhole_open (synthesized)</SelectItem>
-                  <SelectItem value="wormhole_enter" className="text-muted-foreground italic">wormhole_enter (synthesized)</SelectItem>
-                  <SelectItem value="lightning_crack" className="text-muted-foreground italic">lightning_crack (synthesized)</SelectItem>
-                  <SelectItem value="weather_ambient" className="text-muted-foreground italic">weather_ambient (synthesized)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Button 
-                variant="default" 
-                className="w-full"
-                onClick={() => playTestSFX(selectedSFX)}
-              >
-                Play
-              </Button>
+        {/* Sound Effects Testing - hidden in player menu mode */}
+        {!isPlayerMenuMode && (
+          <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">🔊 Sound Effects Testing</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Preview all sound effects by their code names
+            </p>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label htmlFor="sfx-select">Select Sound Effect</Label>
+                <Select value={selectedSFX} onValueChange={setSelectedSFX}>
+                  <SelectTrigger id="sfx-select" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card z-50">
+                    <SelectItem value="thruster.mp3">thruster.mp3</SelectItem>
+                    <SelectItem value="crash1.mp3">crash1.mp3</SelectItem>
+                    <SelectItem value="crash2.mp3">crash2.mp3</SelectItem>
+                    <SelectItem value="landing_on_pad.mp3">landing_on_pad.mp3</SelectItem>
+                    <SelectItem value="fuel_10_percent_loop.mp3">fuel_10_percent_loop.mp3</SelectItem>
+                    <SelectItem value="intro_tick.mp3">intro_tick.mp3</SelectItem>
+                    <SelectItem value="intro_go.mp3">intro_go.mp3</SelectItem>
+                    <SelectItem value="intro_warp.mp3">intro_warp.mp3</SelectItem>
+                    <SelectItem value="abort_whoosh" className="text-muted-foreground italic">abort_whoosh (synthesized)</SelectItem>
+                    <SelectItem value="click" className="text-muted-foreground italic">click (synthesized)</SelectItem>
+                    <SelectItem value="shield_pickup" className="text-muted-foreground italic">shield_pickup (synthesized)</SelectItem>
+                    <SelectItem value="shield_break" className="text-muted-foreground italic">shield_break (synthesized)</SelectItem>
+                    <SelectItem value="collectible_noise" className="text-muted-foreground italic">collectible_noise (synthesized)</SelectItem>
+                    <SelectItem value="set_completion" className="text-muted-foreground italic">set_completion (synthesized)</SelectItem>
+                    <SelectItem value="wormhole_open" className="text-muted-foreground italic">wormhole_open (synthesized)</SelectItem>
+                    <SelectItem value="wormhole_enter" className="text-muted-foreground italic">wormhole_enter (synthesized)</SelectItem>
+                    <SelectItem value="lightning_crack" className="text-muted-foreground italic">lightning_crack (synthesized)</SelectItem>
+                    <SelectItem value="weather_ambient" className="text-muted-foreground italic">weather_ambient (synthesized)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Button 
+                  variant="default" 
+                  className="w-full"
+                  onClick={() => playTestSFX(selectedSFX)}
+                >
+                  Play
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </section>
     </main>
   );
