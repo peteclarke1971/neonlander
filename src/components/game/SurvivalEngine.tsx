@@ -23,7 +23,7 @@ import { getColorForDistance, DEFAULT_PALETTE, isClassicColorsMode, ColorPalette
 import { createWeatherState, updateWeatherTransition, getWeatherIntensity, generateLightningBolt, getLightningLimit, WeatherState, WeatherParticle, LightningBolt } from "./systems/weather";
 import { spawnRainParticles, spawnDustParticles, spawnPlasmaParticles, updateRainParticles, updateDustParticles, updatePlasmaParticles, applyTransitionAlpha } from "./systems/weatherParticles";
 import { renderRainParticles, renderDustClouds, renderPlasmaParticles, renderLightningBolts, renderRainbowDiffraction, renderPadResidue, updateLightningBolts } from "./systems/weatherRenderer";
-import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice } from "@/lib/deviceDetection";
+import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
 import { SectorMessageDisplay } from "./SectorMessageDisplay";
 import { getSectorName, getSectorIndex } from "./systems/survivalSectors";
 import { showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
@@ -67,6 +67,8 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [paused, setPaused] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
+    // iPad defaults to touch controls UNLESS user has previously used keyboard/gamepad
+    if (isIPadDevice()) return hasPCControlsPreference();
     // Check localStorage first, then check if desktop device
     return hasPCControlsPreference() || isDesktopDevice();
   });
