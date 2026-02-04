@@ -30,7 +30,17 @@ export default function ControlsSettings() {
   
   const [deviceId, setDeviceId] = useState<string | null>(getLastDeviceId());
   const [platform, setPlatform] = useState<string>(() => getPlatformFromId(deviceId || ""));
-  const [profile, setProfile] = useState(() => loadProfile(deviceId || undefined));
+  const [profile, setProfile] = useState(() => {
+    const p = loadProfile(deviceId || undefined);
+    // Sync invertRotation from global localStorage key if it exists
+    try {
+      const globalInvert = localStorage.getItem('ll-invert-rotation');
+      if (globalInvert !== null) {
+        p.invertRotation = globalInvert === 'true';
+      }
+    } catch {}
+    return p;
+  });
   const [listening, setListening] = useState<{ field: keyof typeof profile.map | null; type: "button" | "axis" | null }>({ field: null, type: null });
   const [cursorConfig, setCursorConfig] = useState<CursorConfig>(loadCursorConfig);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -1371,76 +1381,74 @@ export default function ControlsSettings() {
           </div>
         </div>
         
-        {/* Touch Control Layout - Developer only */}
-        {!isPlayerMenuMode && (
-          <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
-            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Touch Control Layout</h2>
-            <div className="text-xs text-muted-foreground mb-4">
-              Customize the position and size of on-screen touch controls (Rotate ◄ ► and ABORT buttons)
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label>Vertical Position</Label>
-                <div className="flex items-center gap-3">
-                  <div className="w-56">
-                    <Slider 
-                      value={[touchOffsetY]} 
-                      min={-50} 
-                      max={100} 
-                      step={5} 
-                      onValueChange={(v) => setTouchOffsetY(v[0])} 
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-16">{touchOffsetY > 0 ? '+' : ''}{touchOffsetY}px</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">Move controls up (+) or down (-) from default position</div>
-              </div>
-              <div>
-                <Label>Horizontal Position</Label>
-                <div className="flex items-center gap-3">
-                  <div className="w-56">
-                    <Slider 
-                      value={[touchOffsetX]} 
-                      min={-100} 
-                      max={100} 
-                      step={5} 
-                      onValueChange={(v) => setTouchOffsetX(v[0])} 
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-16">{touchOffsetX > 0 ? '+' : ''}{touchOffsetX}px</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">Shift controls left (-) or right (+) from default position</div>
-              </div>
-              <div>
-                <Label>Button Scale</Label>
-                <div className="flex items-center gap-3">
-                  <div className="w-56">
-                    <Slider 
-                      value={[touchScale]} 
-                      min={0.5} 
-                      max={2.0} 
-                      step={0.1} 
-                      onValueChange={(v) => setTouchScale(v[0])} 
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-16">{touchScale.toFixed(1)}x</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">Scale buttons smaller (0.5x) or larger (2.0x)</div>
-              </div>
-              <Button 
-                variant="outline" 
-                className="w-full mt-2"
-                onClick={() => {
-                  setTouchOffsetY(0);
-                  setTouchOffsetX(0);
-                  setTouchScale(1.0);
-                }}
-              >
-                Reset to Defaults
-              </Button>
-            </div>
+        {/* Touch Control Layout */}
+        <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
+          <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Touch Control Layout</h2>
+          <div className="text-xs text-muted-foreground mb-4">
+            Customize the position and size of on-screen touch controls (Rotate ◄ ► and ABORT buttons)
           </div>
-        )}
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label>Vertical Position</Label>
+              <div className="flex items-center gap-3">
+                <div className="w-56">
+                  <Slider 
+                    value={[touchOffsetY]} 
+                    min={-50} 
+                    max={100} 
+                    step={5} 
+                    onValueChange={(v) => setTouchOffsetY(v[0])} 
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground w-16">{touchOffsetY > 0 ? '+' : ''}{touchOffsetY}px</span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Move controls up (+) or down (-) from default position</div>
+            </div>
+            <div>
+              <Label>Horizontal Position</Label>
+              <div className="flex items-center gap-3">
+                <div className="w-56">
+                  <Slider 
+                    value={[touchOffsetX]} 
+                    min={-100} 
+                    max={100} 
+                    step={5} 
+                    onValueChange={(v) => setTouchOffsetX(v[0])} 
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground w-16">{touchOffsetX > 0 ? '+' : ''}{touchOffsetX}px</span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Shift controls left (-) or right (+) from default position</div>
+            </div>
+            <div>
+              <Label>Button Scale</Label>
+              <div className="flex items-center gap-3">
+                <div className="w-56">
+                  <Slider 
+                    value={[touchScale]} 
+                    min={0.5} 
+                    max={2.0} 
+                    step={0.1} 
+                    onValueChange={(v) => setTouchScale(v[0])} 
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground w-16">{touchScale.toFixed(1)}x</span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">Scale buttons smaller (0.5x) or larger (2.0x)</div>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full mt-2"
+              onClick={() => {
+                setTouchOffsetY(0);
+                setTouchOffsetX(0);
+                setTouchScale(1.0);
+              }}
+            >
+              Reset to Defaults
+            </Button>
+          </div>
+        </div>
 
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Remap Controls</h2>
