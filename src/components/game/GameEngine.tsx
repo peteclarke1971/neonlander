@@ -263,8 +263,8 @@ export const GameEngine: React.FC<Props> = ({
   const [isTouch, setIsTouch] = useState(false);
   const initialSpawnRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isUsingPCControls, setIsUsingPCControls] = useState(() => {
-    // iPad defaults to touch controls (even though isDesktopDevice returns true for iPad)
-    if (isIPadDevice()) return false;
+    // iPad defaults to touch controls UNLESS user has previously used keyboard/gamepad
+    if (isIPadDevice()) return hasPCControlsPreference();
     // Check localStorage first, then check if desktop device
     return hasPCControlsPreference() || isDesktopDevice();
   });
@@ -360,6 +360,7 @@ export const GameEngine: React.FC<Props> = ({
   const [specialLevelMessage, setSpecialLevelMessage] = useState<string>("");
   const [showSpecialMessage, setShowSpecialMessage] = useState(false);
   const [waitingForSpecialMessage, setWaitingForSpecialMessage] = useState(false);
+  const waitingForSpecialMessageRef = useRef(false); // Ref for keyboard handler to avoid stale closure
   const messageShownForLevel = useRef<number>(-1); // Track which level we showed message for
   
   // Camera and cavern state for FX renderer
@@ -630,10 +631,22 @@ export const GameEngine: React.FC<Props> = ({
     return () => window.removeEventListener("resize", resize);
   }, [mode]);
 
+  // Keep ref in sync with state for keyboard handler
+  useEffect(() => {
+    waitingForSpecialMessageRef.current = waitingForSpecialMessage;
+  }, [waitingForSpecialMessage]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
       // Skip keyboard input in demo mode
       if (isDemo) return;
+      
+      // During pre-level message, only track PC controls preference (avoid re-renders)
+      if (waitingForSpecialMessageRef.current && down) {
+        setIsUsingPCControls(true);
+        setPCControlsPreference(true);
+        return; // Don't process key as game input during message display
+      }
       
       // CTRL+F7: Secret dev skip to mission success
       if (down && e.ctrlKey && e.key === 'F7') {
