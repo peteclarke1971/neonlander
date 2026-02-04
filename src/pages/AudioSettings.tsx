@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Play, Square, Upload, Download, RotateCcw, Music, Volume2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Play, Square, Download, RotateCcw, Music, Volume2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { audioConfigService } from '@/lib/audioConfigService';
 import { 
@@ -52,9 +52,8 @@ export default function AudioSettings() {
   const [playingEvent, setPlayingEvent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
 
   // Initialize
   useEffect(() => {
@@ -256,79 +255,6 @@ export default function AudioSettings() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    setIsUploading(true);
-    let successCount = 0;
-    
-    try {
-      for (const file of Array.from(files)) {
-        if (!file.name.endsWith('.mp3') && !file.name.endsWith('.wav') && !file.name.endsWith('.ogg')) {
-          toast.error(`Skipped ${file.name}: unsupported format`);
-          continue;
-        }
-        
-        // Upload to storage
-        const fileName = `${Date.now()}-${file.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('audio')
-          .upload(fileName, file);
-        
-        if (uploadError) {
-          toast.error(`Failed to upload ${file.name}`);
-          continue;
-        }
-        
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('audio')
-          .getPublicUrl(fileName);
-        
-        // Determine type based on file duration (will default to music if >30s)
-        // For now, default to music for longer files, sfx for shorter
-        const audio = new Audio(publicUrl);
-        await new Promise<void>((resolve) => {
-          audio.onloadedmetadata = () => resolve();
-          audio.onerror = () => resolve();
-        });
-        const duration = audio.duration || 0;
-        const type = duration > 30 ? 'music' : 'sfx';
-        
-        // Add to library
-        const displayName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        const { error: insertError } = await supabase
-          .from('audio_library')
-          .insert({
-            filename: fileName,
-            display_name: displayName,
-            type,
-            duration_seconds: duration > 0 ? duration : null,
-            file_path: publicUrl,
-          });
-        
-        if (insertError) {
-          toast.error(`Failed to register ${file.name}`);
-          continue;
-        }
-        
-        successCount++;
-      }
-      
-      if (successCount > 0) {
-        toast.success(`Uploaded ${successCount} file(s)`);
-        await loadData();
-      }
-    } catch (err) {
-      console.error('Upload error:', err);
-      toast.error('Upload failed');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
   const renderEventRow = (eventKey: string, type: 'music' | 'sfx') => {
     const assignment = assignments[eventKey] ?? { audioFileId: null, volume: 1.0 };
     const label = AUDIO_EVENT_LABELS[eventKey as MusicEventKey | SfxEventKey] || eventKey;
@@ -436,29 +362,15 @@ export default function AudioSettings() {
           </ToggleGroup>
         </div>
 
-        {/* Upload Section */}
-        <div className="flex items-center gap-3 mb-6 p-4 border border-dashed border-muted-foreground/30 rounded-lg">
-          <Upload className="h-5 w-5 text-muted-foreground" />
+        {/* Info about audio library */}
+        <div className="flex items-center gap-3 mb-6 p-4 border border-dashed border-muted-foreground/30 rounded-lg bg-muted/20">
+          <Music className="h-5 w-5 text-muted-foreground" />
           <div className="flex-1">
-            <p className="text-sm font-medium">Upload Audio Files</p>
-            <p className="text-xs text-muted-foreground">MP3, WAV, or OGG files</p>
+            <p className="text-sm font-medium">Audio Library</p>
+            <p className="text-xs text-muted-foreground">
+              {library.length} audio files available for assignment
+            </p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".mp3,.wav,.ogg"
-            multiple
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-          >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Choose Files'}
-          </Button>
         </div>
 
         {isLoading ? (
