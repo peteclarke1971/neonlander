@@ -67,7 +67,7 @@ export const AddToHomeScreen: React.FC = () => {
           <img 
             src="/images/lander-logo.png" 
             alt="LANDER"
-            className="w-48 sm:w-56 md:w-64 h-auto select-none pointer-events-none"
+            className="w-72 sm:w-[21rem] md:w-96 h-auto select-none pointer-events-none"
             style={{
               filter: "drop-shadow(0 0 20px hsl(120, 100%, 50%))"
             }}
