@@ -6372,8 +6372,8 @@ export const GameEngine: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Controls overlay - Show for touch devices OR iPad (even if PC preference saved) */}
-      {(!isUsingPCControls || isIPad) && !isDemo && (
+      {/* Controls overlay - Show for touch devices (hides when keyboard/gamepad detected) */}
+      {!isUsingPCControls && !isDemo && (
         <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 select-none" style={{ opacity: 0.025 + (touchOpacity - 1) * 0.108333 }}>
           <div className="flex gap-2">
             <Button 

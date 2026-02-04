@@ -142,3 +142,156 @@ export const GRAPHICS_VALUES = {
   lightBeamGradientStops: { low: 3, mid: 3, high: 5 },
   lightBeamShadowBlur: { low: 0, mid: 0, high: 1.5 }, // multiplier applied to base shadowBlur
 } as const;
+
+// ============================================
+// Auto-detect optimal graphics benchmark
+// ============================================
+
+export interface BenchmarkResult {
+  level: GraphicsLevel;
+  avgFrameTime: number;
+  recommendation: string;
+}
+
+/**
+ * Run a canvas-based performance benchmark to detect optimal graphics level.
+ * Renders particle effects with varying complexity and measures frame times.
+ * 
+ * Thresholds:
+ * - < 8ms average → HIGH graphics
+ * - 8-16ms average → MID graphics
+ * - > 16ms average → LOW graphics
+ */
+export function detectOptimalGraphics(): Promise<BenchmarkResult> {
+  return new Promise((resolve) => {
+    // Create offscreen canvas for benchmarking
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      resolve({ level: 'mid', avgFrameTime: 16, recommendation: 'Mid (fallback - no canvas context)' });
+      return;
+    }
+    
+    const frameTimes: number[] = [];
+    const totalFrames = 100;
+    let frameCount = 0;
+    
+    // Particle simulation data
+    const particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      hue: number;
+      alpha: number;
+    }> = [];
+    
+    // Initialize particles
+    for (let i = 0; i < 200; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        size: 2 + Math.random() * 8,
+        hue: Math.random() * 360,
+        alpha: 0.5 + Math.random() * 0.5,
+      });
+    }
+    
+    const renderFrame = () => {
+      const startTime = performance.now();
+      
+      // Clear with semi-transparent black (motion blur effect)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Update and render particles with expensive effects
+      for (const p of particles) {
+        // Update position
+        p.x += p.vx;
+        p.y += p.vy;
+        
+        // Wrap around
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+        
+        // Expensive glow effect (shadowBlur)
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = `hsla(${p.hue}, 100%, 60%, ${p.alpha})`;
+        
+        // Gradient fill
+        const gradient = ctx.createRadialGradient(
+          p.x, p.y, 0,
+          p.x, p.y, p.size
+        );
+        gradient.addColorStop(0, `hsla(${p.hue}, 100%, 70%, ${p.alpha})`);
+        gradient.addColorStop(0.5, `hsla(${p.hue}, 100%, 50%, ${p.alpha * 0.5})`);
+        gradient.addColorStop(1, `hsla(${p.hue}, 100%, 30%, 0)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // Update hue for color cycling
+        p.hue = (p.hue + 1) % 360;
+      }
+      
+      // Add some additional expensive operations
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(255, 100, 255, 0.5)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        ctx.moveTo(particles[i * 10].x, particles[i * 10].y);
+        ctx.lineTo(particles[i * 10 + 1].x, particles[i * 10 + 1].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+      
+      const endTime = performance.now();
+      frameTimes.push(endTime - startTime);
+      frameCount++;
+      
+      if (frameCount < totalFrames) {
+        requestAnimationFrame(renderFrame);
+      } else {
+        // Calculate results
+        const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+        
+        let level: GraphicsLevel;
+        let recommendation: string;
+        
+        if (avgFrameTime < 8) {
+          level = 'high';
+          recommendation = `High (${avgFrameTime.toFixed(1)}ms avg - excellent performance)`;
+        } else if (avgFrameTime < 16) {
+          level = 'mid';
+          recommendation = `Mid (${avgFrameTime.toFixed(1)}ms avg - good performance)`;
+        } else {
+          level = 'low';
+          recommendation = `Low (${avgFrameTime.toFixed(1)}ms avg - optimized for this device)`;
+        }
+        
+        resolve({ level, avgFrameTime, recommendation });
+      }
+    };
+    
+    // Start benchmark after a small delay to let the page settle
+    setTimeout(() => {
+      requestAnimationFrame(renderFrame);
+    }, 100);
+  });
+}
