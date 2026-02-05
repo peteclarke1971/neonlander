@@ -3,6 +3,8 @@ import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
 import { NeonVortexStarfield } from "./NeonVortexStarfield";
 import { PrismaticWavesStarfield } from "./PrismaticWavesStarfield";
+ import { CosmicTunnelStarfield } from "./CosmicTunnelStarfield";
+ import { NebulaDriftStarfield } from "./NebulaDriftStarfield";
 import { PlayerMenuLeaderboard } from "./PlayerMenuLeaderboard";
 import { GuidePopup } from "./GuidePopup";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
@@ -686,7 +688,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [starfieldStyle] = useState(() => {
     try {
       const saved = localStorage.getItem('ll-starfield-style');
-      if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves') return saved;
+       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula') return saved;
     } catch {}
     return 'auto';
   });
@@ -712,6 +714,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         return <NeonVortexStarfield starCount={280} />;
       case 'waves':
         return <PrismaticWavesStarfield starCount={320} />;
+       case 'tunnel':
+         return <CosmicTunnelStarfield starCount={280} />;
+       case 'nebula':
+         return <NebulaDriftStarfield starCount={250} />;
       case 'auto':
       default:
         // Auto: iOS uses MobileStarfield, others use HyperspaceStarfield
