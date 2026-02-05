@@ -3605,12 +3605,35 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.restore();
         }
         
+        // Low fuel warning - smooth color fade and pulsing glow
+        let shipColor = neonColor;
+        let shipShadowBlur = shouldOptimize ? 8 : 12;
+        
+        const warningFuelPercent = fuelAmount / fuelCap;
+        
+        if (warningFuelPercent <= 0.5 && warningFuelPercent > 0) {
+          const currentTime = performance.now() / 1000;
+          if (warningFuelPercent < 0.08) {
+            // Below 8% - Solid red with pulsing glow
+            shipColor = "#ff0000";
+            const glowPulse = (Math.sin(currentTime * 5 * Math.PI * 2) + 1) / 2;
+            shipShadowBlur = 20 + glowPulse * 20;
+          } else {
+            // 8-50% - Pulsing between neon and red
+            const fuelRatio = (warningFuelPercent - 0.08) / 0.42;
+            const pulseFreq = 2 + (1 - fuelRatio) * 6;
+            const pulse = (Math.sin(currentTime * pulseFreq * Math.PI * 2) + 1) / 2;
+            const redInfluence = 0.3 + (1 - fuelRatio) * 0.7;
+            shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
+          }
+        }
+        
         // Set alpha for ship outline
         ctx.globalAlpha = shipAlpha;
         
-        ctx.strokeStyle = neonColor;
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = 12;
+        ctx.strokeStyle = shipColor;
+        ctx.shadowColor = shipColor;
+        ctx.shadowBlur = shipShadowBlur;
         ctx.lineWidth = 2;
         
         // Ship body outline

@@ -680,6 +680,20 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Detect iOS once on mount
   const [isiOS] = useState(() => isIOSDevice());
 
+  // Read starfield preference
+  const [starfieldStyle] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ll-starfield-style');
+      if (saved === 'hyperspace' || saved === 'mobile') return saved;
+    } catch {}
+    return 'auto';
+  });
+  
+  // Determine which starfield to use
+  const useHyperspace = 
+    starfieldStyle === 'hyperspace' || 
+    (starfieldStyle === 'auto' && !isiOS);
+
   return (
     <main
       className={`fixed inset-0 overflow-hidden flex items-center justify-center transition-opacity duration-500 ${assetsLoaded ? 'opacity-100' : 'opacity-0'}`}
@@ -688,9 +702,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     >
       {/* Starfield background - iOS gets MobileStarfield, others get HyperspaceStarfield */}
       <div className="absolute inset-0 overflow-hidden">
-        {isiOS ? (
-          <MobileStarfield starCount={180} speed={0.5} />
-        ) : (
+        {useHyperspace ? (
           <HyperspaceStarfield 
             speed={0.28}
             density={1600}
@@ -700,6 +712,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             allowBoost={true}
             fullscreen={true}
           />
+        ) : (
+          <MobileStarfield starCount={180} speed={0.5} />
         )}
       </div>
       

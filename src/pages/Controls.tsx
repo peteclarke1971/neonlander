@@ -116,6 +116,13 @@ export default function ControlsSettings() {
       return 'multiply';
     }
   });
+  const [starfieldStyle, setStarfieldStyle] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('ll-starfield-style');
+      if (saved === 'hyperspace' || saved === 'mobile') return saved;
+    } catch {}
+    return 'auto';
+  });
   const [touchOpacity, setTouchOpacity] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('ll-touch-opacity');
@@ -461,6 +468,10 @@ export default function ControlsSettings() {
   useEffect(() => {
     try { localStorage.setItem('ll-touch-controls-scale', touchScale.toString()); } catch {}
   }, [touchScale]);
+
+  useEffect(() => {
+    try { localStorage.setItem('ll-starfield-style', starfieldStyle); } catch {}
+  }, [starfieldStyle]);
 
   // SEO
   useEffect(() => {
@@ -991,6 +1002,24 @@ export default function ControlsSettings() {
                   }
                 }}
               />
+            </div>
+            
+            {/* Starfield Style */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Starfield Style</Label>
+                <div className="text-xs text-muted-foreground">Choose the starfield effect for menus</div>
+              </div>
+              <Select value={starfieldStyle} onValueChange={setStarfieldStyle}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (Default)</SelectItem>
+                  <SelectItem value="hyperspace">Hyperspace (3D)</SelectItem>
+                  <SelectItem value="mobile">Radial Burst</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
             {/* Small UFO Section - hidden in player menu mode */}
