@@ -79,9 +79,10 @@ export function drawHazards(
     // Try each wrap offset to find the visible position
     for (const offset of [-worldWidth, 0, worldWidth]) {
       const screenX = h.x + offset - cameraX;
-      if (screenX > -margin && screenX < viewWidth + margin) {
+      const halfView = viewWidth / 2;
+      if (screenX > -halfView - margin && screenX < halfView + margin) {
         ctx.save();
-        ctx.translate(screenX + cameraX, h.y); // Translate back to world coords for the current transform
+        ctx.translate(h.x + offset, h.y); // World coords
         ctx.rotate(h.angle);
         ctx.beginPath();
         if (h.kind === "debris") {

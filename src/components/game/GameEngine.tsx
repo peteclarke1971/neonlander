@@ -4880,7 +4880,8 @@ export const GameEngine: React.FC<Props> = ({
           // World wrap rendering for coral
           for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
             const screenX = c.x + offset - cameraX;
-            if (screenX < -100 || screenX > viewWCull + 100) continue;
+            const halfView = viewWCull / 2;
+            if (screenX < -halfView - 100 || screenX > halfView + 100) continue;
             
             // Animate sway with elapsed time
             const sway = Math.sin(elapsed * 1.5 + c.swayPhase) * 3; // ±3px horizontal sway
@@ -5013,7 +5014,8 @@ export const GameEngine: React.FC<Props> = ({
           // World wrap rendering for jellyfish
           for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
             const screenX = jf.x + wrapOffset - cameraX;
-            if (screenX < -100 || screenX > viewWCull + 100) continue;
+            const halfView = viewWCull / 2;
+            if (screenX < -halfView - 100 || screenX > halfView + 100) continue;
             
             const drawX = jf.x + wrapOffset;
             const bellRadius = jf.size * 0.6;
@@ -5307,7 +5309,8 @@ export const GameEngine: React.FC<Props> = ({
           // World wrap rendering for space junk
           for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
             const screenX = junk.pos.x + wrapOffset - cameraX;
-            if (screenX < -50 || screenX > viewWCull + 50) continue;
+            const halfView = viewWCull / 2;
+            if (screenX < -halfView - 50 || screenX > halfView + 50) continue;
             
             const asset = SPACE_JUNK_ASSETS[junk.shape];
             const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
@@ -5328,7 +5331,8 @@ export const GameEngine: React.FC<Props> = ({
           
           for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
             const screenX = wormhole.pos.x + wrapOffset - cameraX;
-            if (screenX < -wormhole.radius || screenX > viewWCull + wormhole.radius) continue;
+            const halfView = viewWCull / 2;
+            if (screenX < -halfView - wormhole.radius || screenX > halfView + wormhole.radius) continue;
             
             ctx.save();
             ctx.globalAlpha = wormhole.open ? 1.0 : 0.3;
