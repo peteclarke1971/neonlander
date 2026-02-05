@@ -1038,7 +1038,7 @@ export default function ControlsSettings() {
             </div>
              
              {/* Starfield Customization - collapsible section */}
-             {starfieldStyle !== 'auto' && starfieldStyle !== 'hyperspace' && starfieldStyle !== 'mobile' && (
+             {starfieldStyle !== 'auto' && (
                <Collapsible open={starfieldSettingsOpen} onOpenChange={setStarfieldSettingsOpen}>
                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 border border-border/40 rounded-lg bg-card/20 hover:bg-card/40 transition-colors">
                    <div className="text-left">
