@@ -158,43 +158,59 @@ export function anomalyAccelAt(anoms: Anomaly[], x: number, y: number, _t: numbe
   return { ax, ay };
 }
 
-export function drawAnomaliesField(ctx: CanvasRenderingContext2D, anoms: Anomaly[], _elapsed: number, neonColor: string) {
+export function drawAnomaliesField(
+  ctx: CanvasRenderingContext2D, 
+  anoms: Anomaly[], 
+  _elapsed: number, 
+  neonColor: string,
+  cameraX = 0,
+  viewWidth = 800,
+  worldWidth = 4000
+) {
+  if (anoms.length === 0) return;
+  
   const elapsed = _elapsed;
+  const margin = 200; // Anomalies have large visual radius
   ctx.save();
   ctx.strokeStyle = neonColor as any;
 
-  // Animated radial wave indicating push (repel) vs pull (attract)
-  // Repel: bright band moves outward. Attract: bright band moves inward.
-  const RINGS = 6; // more rings for smoother motion
-  const SPEED = 0.35; // cycles per second
+  const RINGS = 6;
+  const SPEED = 0.35;
+  
   for (const a of anoms) {
-    const t = (elapsed * SPEED) % 1;
-    const target = a.kind === "repel" ? t : 1 - t; // 0..1 position of bright band
+    // Try each wrap offset to find the visible position
+    for (const offset of [-worldWidth, 0, worldWidth]) {
+      const screenX = a.x + offset - cameraX;
+      if (screenX > -margin - a.radius && screenX < viewWidth + margin + a.radius) {
+        const drawX = a.x + offset;
+        const t = (elapsed * SPEED) % 1;
+        const target = a.kind === "repel" ? t : 1 - t;
 
-    for (let i = 1; i <= RINGS; i++) {
-      const r = (a.radius * i) / RINGS;
-      const norm = i / RINGS; // 0..1
-      const dist = Math.abs(norm - target);
-      // Narrow gaussian-ish pulse centered at `target`
-      const pulse = Math.exp(-Math.pow(dist * 6, 2)); // width factor
-      const alpha = 0.08 + 0.38 * pulse; // base + peak
+        for (let i = 1; i <= RINGS; i++) {
+          const r = (a.radius * i) / RINGS;
+          const norm = i / RINGS;
+          const dist = Math.abs(norm - target);
+          const pulse = Math.exp(-Math.pow(dist * 6, 2));
+          const alpha = 0.08 + 0.38 * pulse;
 
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
-      ctx.stroke();
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(drawX, a.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.moveTo(drawX - 6, a.y);
+        ctx.lineTo(drawX + 6, a.y);
+        if (a.kind === "attract") {
+          ctx.moveTo(drawX, a.y - 6);
+          ctx.lineTo(drawX, a.y + 6);
+        }
+        ctx.stroke();
+        break; // Only draw once per anomaly
+      }
     }
-
-    // Polarity indicator: "+" for attract, "-" for repel
-    ctx.globalAlpha = 0.35;
-    ctx.beginPath();
-    ctx.moveTo(a.x - 6, a.y);
-    ctx.lineTo(a.x + 6, a.y);
-    if (a.kind === "attract") {
-      ctx.moveTo(a.x, a.y - 6);
-      ctx.lineTo(a.x, a.y + 6);
-    }
-    ctx.stroke();
   }
   ctx.globalAlpha = 1;
   ctx.restore();

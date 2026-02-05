@@ -54,48 +54,60 @@ export function updateHazards(hazards: Hazard[], dt: number, worldWidth: number,
   }
 }
 
-export function drawHazards(ctx: CanvasRenderingContext2D, hazards: Hazard[], neonColor: string, shadowBlur = 0) {
-  if (hazards.length === 0) return; // Early exit for empty arrays
+export function drawHazards(
+  ctx: CanvasRenderingContext2D, 
+  hazards: Hazard[], 
+  neonColor: string, 
+  shadowBlur = 0,
+  cameraX = 0,
+  viewWidth = 800,
+  worldWidth = 4000
+) {
+  if (hazards.length === 0) return;
   
+  const margin = 100;
   ctx.save();
   ctx.strokeStyle = neonColor as any;
   ctx.globalAlpha = 0.9;
   
-  // Optimize shadow settings
   if (shadowBlur > 0) {
     ctx.shadowColor = neonColor;
     ctx.shadowBlur = shadowBlur;
   }
   
   for (const h of hazards) {
-    ctx.save();
-    ctx.translate(h.x, h.y);
-    ctx.rotate(h.angle);
-    ctx.beginPath();
-    if (h.kind === "debris") {
-      // irregular triangle shard
-      ctx.moveTo(-h.r, -h.r * 0.6);
-      ctx.lineTo(h.r * 0.9, -h.r * 0.3);
-      ctx.lineTo(-h.r * 0.3, h.r);
-      ctx.closePath();
-    } else if (h.kind === "rock") {
-      // rough polygon
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const rr = h.r * (0.7 + (i % 2 ? 0.4 : 0.2));
-        const px = Math.cos(a) * rr;
-        const py = Math.sin(a) * rr;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    // Try each wrap offset to find the visible position
+    for (const offset of [-worldWidth, 0, worldWidth]) {
+      const screenX = h.x + offset - cameraX;
+      if (screenX > -margin && screenX < viewWidth + margin) {
+        ctx.save();
+        ctx.translate(screenX + cameraX, h.y); // Translate back to world coords for the current transform
+        ctx.rotate(h.angle);
+        ctx.beginPath();
+        if (h.kind === "debris") {
+          ctx.moveTo(-h.r, -h.r * 0.6);
+          ctx.lineTo(h.r * 0.9, -h.r * 0.3);
+          ctx.lineTo(-h.r * 0.3, h.r);
+          ctx.closePath();
+        } else if (h.kind === "rock") {
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            const rr = h.r * (0.7 + (i % 2 ? 0.4 : 0.2));
+            const px = Math.cos(a) * rr;
+            const py = Math.sin(a) * rr;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        } else {
+          ctx.arc(0, 0, h.r * 0.8, 0, Math.PI * 2);
+          ctx.moveTo(-h.r * 1.6, 0); ctx.lineTo(h.r * 1.6, 0);
+          ctx.moveTo(0, -h.r * 1.2); ctx.lineTo(0, h.r * 1.2);
+        }
+        ctx.stroke();
+        ctx.restore();
+        break; // Only draw once per hazard
       }
-      ctx.closePath();
-    } else {
-      // small satellite: circle + panels
-      ctx.arc(0, 0, h.r * 0.8, 0, Math.PI * 2);
-      ctx.moveTo(-h.r * 1.6, 0); ctx.lineTo(h.r * 1.6, 0);
-      ctx.moveTo(0, -h.r * 1.2); ctx.lineTo(0, h.r * 1.2);
     }
-    ctx.stroke();
-    ctx.restore();
   }
   ctx.globalAlpha = 1;
   ctx.restore();

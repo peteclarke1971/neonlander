@@ -4872,238 +4872,235 @@ export const GameEngine: React.FC<Props> = ({
         drawTerrain(terrain.worldWidth);
       }
 
-      // Render coral (Level 5 underwater only)
+      // Render coral (Level 5 underwater only) - with world wrap support
       if (isUnderwater && !isCavernLevel && 'coral' in terrain && terrain.coral) {
         ctx.save();
         
         for (const c of terrain.coral) {
-          // Viewport culling
-          if (c.x < viewLeft - 100 || c.x > viewRight + 100) continue;
-          
-          // Animate sway with elapsed time
-          const sway = Math.sin(elapsed * 1.5 + c.swayPhase) * 3; // ±3px horizontal sway
-          
-          const baseX = c.x + sway;
-          const baseY = c.y;
-          
-          // Set coral color and glow
-          ctx.strokeStyle = c.color;
-          ctx.fillStyle = c.color;
-          ctx.lineWidth = shouldOptimizePerformance ? 2 : 3;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          
-          // Render based on coral type
-          switch (c.type) {
-            case 'branch': {
-              // Branching coral with multiple stems
-              const segments = c.segments || 5;
-              ctx.shadowColor = c.color;
-              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
-              
-              for (let i = 0; i < segments; i++) {
-                const angle = -Math.PI / 2 + (i / segments - 0.5) * 0.8; // Spread branches
-                const branchHeight = c.height * (0.6 + Math.random() * 0.4);
-                const endX = baseX + Math.cos(angle) * c.width * 0.4;
-                const endY = baseY - branchHeight;
+          // World wrap rendering for coral
+          for (const offset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            const screenX = c.x + offset - cameraX;
+            if (screenX < -100 || screenX > viewWCull + 100) continue;
+            
+            // Animate sway with elapsed time
+            const sway = Math.sin(elapsed * 1.5 + c.swayPhase) * 3; // ±3px horizontal sway
+            
+            const baseX = c.x + offset + sway;
+            const baseY = c.y;
+            
+            // Set coral color and glow
+            ctx.strokeStyle = c.color;
+            ctx.fillStyle = c.color;
+            ctx.lineWidth = shouldOptimizePerformance ? 2 : 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // Render based on coral type
+            switch (c.type) {
+              case 'branch': {
+                const segments = c.segments || 5;
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
                 
+                for (let i = 0; i < segments; i++) {
+                  const angle = -Math.PI / 2 + (i / segments - 0.5) * 0.8;
+                  const branchHeight = c.height * (0.6 + Math.random() * 0.4);
+                  const endX = baseX + Math.cos(angle) * c.width * 0.4;
+                  const endY = baseY - branchHeight;
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(baseX, baseY);
+                  ctx.quadraticCurveTo(
+                    baseX + Math.cos(angle) * c.width * 0.2,
+                    baseY - branchHeight * 0.5,
+                    endX,
+                    endY
+                  );
+                  ctx.stroke();
+                }
+                break;
+              }
+              
+              case 'frond': {
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
                 ctx.beginPath();
                 ctx.moveTo(baseX, baseY);
-                ctx.quadraticCurveTo(
-                  baseX + Math.cos(angle) * c.width * 0.2,
-                  baseY - branchHeight * 0.5,
-                  endX,
-                  endY
-                );
-                ctx.stroke();
-              }
-              break;
-            }
-            
-            case 'frond': {
-              // Wavy frond-like structure
-              ctx.shadowColor = c.color;
-              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
-              ctx.beginPath();
-              ctx.moveTo(baseX, baseY);
-              
-              const steps = 8;
-              for (let i = 1; i <= steps; i++) {
-                const t = i / steps;
-                const wave = Math.sin(t * Math.PI * 4) * (c.width * 0.3);
-                const x = baseX + wave;
-                const y = baseY - t * c.height;
-                ctx.lineTo(x, y);
-              }
-              ctx.stroke();
-              break;
-            }
-            
-            case 'fan': {
-              // Fan-shaped coral
-              ctx.shadowColor = c.color;
-              ctx.shadowBlur = shouldOptimizePerformance ? 10 : 20;
-              ctx.globalAlpha = 0.4;
-              ctx.beginPath();
-              ctx.moveTo(baseX, baseY);
-              ctx.lineTo(baseX - c.width / 2, baseY - c.height);
-              ctx.lineTo(baseX + c.width / 2, baseY - c.height);
-              ctx.closePath();
-              ctx.fill();
-              ctx.globalAlpha = 1;
-              ctx.stroke();
-              break;
-            }
-            
-            case 'tube': {
-              // Tube clusters
-              const tubes = c.segments || 4;
-              ctx.shadowColor = c.color;
-              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
-              
-              for (let i = 0; i < tubes; i++) {
-                const offset = (i - tubes / 2) * (c.width / tubes);
-                const tubeHeight = c.height * (0.7 + Math.random() * 0.3);
                 
-                ctx.beginPath();
-                ctx.moveTo(baseX + offset, baseY);
-                ctx.lineTo(baseX + offset, baseY - tubeHeight);
+                const steps = 8;
+                for (let i = 1; i <= steps; i++) {
+                  const t = i / steps;
+                  const wave = Math.sin(t * Math.PI * 4) * (c.width * 0.3);
+                  const x = baseX + wave;
+                  const y = baseY - t * c.height;
+                  ctx.lineTo(x, y);
+                }
                 ctx.stroke();
-                
-                // Cap on top
+                break;
+              }
+              
+              case 'fan': {
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = shouldOptimizePerformance ? 10 : 20;
+                ctx.globalAlpha = 0.4;
                 ctx.beginPath();
-                ctx.arc(baseX + offset, baseY - tubeHeight, 3, 0, Math.PI * 2);
+                ctx.moveTo(baseX, baseY);
+                ctx.lineTo(baseX - c.width / 2, baseY - c.height);
+                ctx.lineTo(baseX + c.width / 2, baseY - c.height);
+                ctx.closePath();
                 ctx.fill();
-              }
-              break;
-            }
-            
-            case 'anemone': {
-              // Anemone-like tentacles
-              const tentacles = c.segments || 6;
-              ctx.shadowColor = c.color;
-              ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
-              
-              for (let i = 0; i < tentacles; i++) {
-                const angle = (i / tentacles) * Math.PI * 2 - Math.PI / 2;
-                const tentacleLength = c.height * (0.5 + Math.random() * 0.5);
-                const curve = Math.sin(elapsed * 2 + i) * 8; // Waving motion
-                
-                ctx.beginPath();
-                ctx.moveTo(baseX, baseY);
-                ctx.quadraticCurveTo(
-                  baseX + Math.cos(angle) * c.width * 0.3 + curve,
-                  baseY - tentacleLength * 0.5,
-                  baseX + Math.cos(angle) * c.width * 0.5,
-                  baseY - tentacleLength
-                );
+                ctx.globalAlpha = 1;
                 ctx.stroke();
+                break;
               }
-              break;
+              
+              case 'tube': {
+                const tubes = c.segments || 4;
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+                
+                for (let i = 0; i < tubes; i++) {
+                  const tubeOffset = (i - tubes / 2) * (c.width / tubes);
+                  const tubeHeight = c.height * (0.7 + Math.random() * 0.3);
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(baseX + tubeOffset, baseY);
+                  ctx.lineTo(baseX + tubeOffset, baseY - tubeHeight);
+                  ctx.stroke();
+                  
+                  ctx.beginPath();
+                  ctx.arc(baseX + tubeOffset, baseY - tubeHeight, 3, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+                break;
+              }
+              
+              case 'anemone': {
+                const tentacles = c.segments || 6;
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = shouldOptimizePerformance ? 8 : 16;
+                
+                for (let i = 0; i < tentacles; i++) {
+                  const angle = (i / tentacles) * Math.PI * 2 - Math.PI / 2;
+                  const tentacleLength = c.height * (0.5 + Math.random() * 0.5);
+                  const curve = Math.sin(elapsed * 2 + i) * 8;
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(baseX, baseY);
+                  ctx.quadraticCurveTo(
+                    baseX + Math.cos(angle) * c.width * 0.3 + curve,
+                    baseY - tentacleLength * 0.5,
+                    baseX + Math.cos(angle) * c.width * 0.5,
+                    baseY - tentacleLength
+                  );
+                  ctx.stroke();
+                }
+                break;
+              }
             }
+            break; // Only draw once per coral
           }
         }
         
         ctx.restore();
       }
 
-      // Render jellyfish (Level 5 underwater only)
+      // Render jellyfish (Level 5 underwater only) - with world wrap support
       if (isUnderwater && !isCavernLevel && 'jellyfish' in terrain && terrain.jellyfish) {
         ctx.save();
         
         for (const jf of terrain.jellyfish) {
-          // Viewport culling
-          if (jf.x < viewLeft - 100 || jf.x > viewRight + 100) continue;
-          
-          const bellRadius = jf.size * 0.6;
-          const tentacleLength = jf.size * 1.2;
-          
-          // Jellyfish color - shifts from cyan to neon pink-orange when charging
-          let baseColor = '#00ddff';
-          let glowColor = '#00ffff';
-          
-          if (jf.isTelegraphing) {
-            // Calculate charge progress (0 to 1)
-            const chargeProgress = Math.min(1, (1.5 - jf.telegraphTimer) / 1.5);
+          // World wrap rendering for jellyfish
+          for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            const screenX = jf.x + wrapOffset - cameraX;
+            if (screenX < -100 || screenX > viewWCull + 100) continue;
             
-            // Interpolate from cyan (#00ddff) to neon pink-orange (#ff6400)
-            const r = Math.floor(0 + (255 - 0) * chargeProgress);
-            const g = Math.floor(221 - (221 - 100) * chargeProgress);
-            const b = Math.floor(255 - (255 - 0) * chargeProgress);
-            baseColor = `rgb(${r}, ${g}, ${b})`;
-            glowColor = baseColor;
+            const drawX = jf.x + wrapOffset;
+            const bellRadius = jf.size * 0.6;
+            const tentacleLength = jf.size * 1.2;
             
-            // Pulsing intensity
-            const pulseIntensity = 0.5 + Math.sin(elapsed * 20) * 0.5;
-            jf.glowIntensity = Math.max(jf.glowIntensity, pulseIntensity);
-          }
-          
-          ctx.shadowColor = glowColor;
-          ctx.shadowBlur = shouldOptimizePerformance ? 10 : (20 * jf.glowIntensity);
-          
-          // Draw bell
-          ctx.strokeStyle = baseColor;
-          ctx.fillStyle = baseColor;
-          ctx.globalAlpha = 0.4 + (jf.glowIntensity * 0.2);
-          ctx.lineWidth = 2;
-          
-          ctx.beginPath();
-          ctx.arc(jf.x, jf.y, bellRadius, Math.PI, Math.PI * 2);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          
-          // Draw tentacles
-          ctx.globalAlpha = 0.6;
-          const tentacleCount = 6;
-          
-          for (let i = 0; i < tentacleCount; i++) {
-            const angle = Math.PI + (i / tentacleCount) * Math.PI;
-            const baseX = jf.x + Math.cos(angle) * bellRadius;
-            const baseY = jf.y;
+            // Jellyfish color - shifts from cyan to neon pink-orange when charging
+            let baseColor = '#00ddff';
+            let glowColor = '#00ffff';
             
-            ctx.beginPath();
-            ctx.moveTo(baseX, baseY);
-            
-            const segments = 4;
-            for (let s = 1; s <= segments; s++) {
-              const t = s / segments;
-              const wave = Math.sin(jf.tentaclePhase + i * 0.5 + s) * (jf.size * 0.2);
-              ctx.lineTo(baseX + wave, baseY + t * tentacleLength);
+            if (jf.isTelegraphing) {
+              const chargeProgress = Math.min(1, (1.5 - jf.telegraphTimer) / 1.5);
+              const r = Math.floor(0 + (255 - 0) * chargeProgress);
+              const g = Math.floor(221 - (221 - 100) * chargeProgress);
+              const b = Math.floor(255 - (255 - 0) * chargeProgress);
+              baseColor = `rgb(${r}, ${g}, ${b})`;
+              glowColor = baseColor;
+              const pulseIntensity = 0.5 + Math.sin(elapsed * 20) * 0.5;
+              jf.glowIntensity = Math.max(jf.glowIntensity, pulseIntensity);
             }
-            ctx.stroke();
-          }
-          
-          // Draw electric burst shockwave
-          if (jf.isBursting) {
-            const radius = 75 * jf.burstProgress;
-            ctx.globalAlpha = 0.6 * (1 - jf.burstProgress);
-            ctx.strokeStyle = '#ffff00';
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#ffff00';
-            ctx.shadowBlur = shouldOptimizePerformance ? 15 : 30;
+            
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = shouldOptimizePerformance ? 10 : (20 * jf.glowIntensity);
+            
+            // Draw bell
+            ctx.strokeStyle = baseColor;
+            ctx.fillStyle = baseColor;
+            ctx.globalAlpha = 0.4 + (jf.glowIntensity * 0.2);
+            ctx.lineWidth = 2;
             
             ctx.beginPath();
-            ctx.arc(jf.x, jf.y, radius, 0, Math.PI * 2);
+            ctx.arc(drawX, jf.y, bellRadius, Math.PI, Math.PI * 2);
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
             
-            // Electric arcs
-            const arcCount = 8;
-            for (let i = 0; i < arcCount; i++) {
-              const angle = (i / arcCount) * Math.PI * 2 + (jf.burstProgress * 2);
-              const x1 = jf.x + Math.cos(angle) * (radius * 0.5);
-              const y1 = jf.y + Math.sin(angle) * (radius * 0.5);
-              const x2 = jf.x + Math.cos(angle) * radius;
-              const y2 = jf.y + Math.sin(angle) * radius;
+            // Draw tentacles
+            ctx.globalAlpha = 0.6;
+            const tentacleCount = 6;
+            
+            for (let i = 0; i < tentacleCount; i++) {
+              const angle = Math.PI + (i / tentacleCount) * Math.PI;
+              const tentBaseX = drawX + Math.cos(angle) * bellRadius;
+              const tentBaseY = jf.y;
               
               ctx.beginPath();
-              ctx.moveTo(x1, y1);
-              ctx.lineTo(x2, y2);
+              ctx.moveTo(tentBaseX, tentBaseY);
+              
+              const segments = 4;
+              for (let s = 1; s <= segments; s++) {
+                const t = s / segments;
+                const wave = Math.sin(jf.tentaclePhase + i * 0.5 + s) * (jf.size * 0.2);
+                ctx.lineTo(tentBaseX + wave, tentBaseY + t * tentacleLength);
+              }
               ctx.stroke();
             }
+            
+            // Draw electric burst shockwave
+            if (jf.isBursting) {
+              const radius = 75 * jf.burstProgress;
+              ctx.globalAlpha = 0.6 * (1 - jf.burstProgress);
+              ctx.strokeStyle = '#ffff00';
+              ctx.lineWidth = 3;
+              ctx.shadowColor = '#ffff00';
+              ctx.shadowBlur = shouldOptimizePerformance ? 15 : 30;
+              
+              ctx.beginPath();
+              ctx.arc(drawX, jf.y, radius, 0, Math.PI * 2);
+              ctx.stroke();
+              
+              // Electric arcs
+              const arcCount = 8;
+              for (let i = 0; i < arcCount; i++) {
+                const arcAngle = (i / arcCount) * Math.PI * 2 + (jf.burstProgress * 2);
+                const x1 = drawX + Math.cos(arcAngle) * (radius * 0.5);
+                const y1 = jf.y + Math.sin(arcAngle) * (radius * 0.5);
+                const x2 = drawX + Math.cos(arcAngle) * radius;
+                const y2 = jf.y + Math.sin(arcAngle) * radius;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+              }
+            }
+            
+            break; // Only draw once per jellyfish
           }
-          
-          // Telegraph warning removed - color shift handles the visual cue
         }
         
         ctx.restore();
@@ -5256,14 +5253,14 @@ export const GameEngine: React.FC<Props> = ({
 
       // Wind vectors and anomaly hints
       if (WIND_ENABLED) drawWindVectors(ctx, windZones, terrain.worldWidth, elapsed, neonColor);
-      drawAnomaliesField(ctx, anomalies, elapsed, neonColor);
+      drawAnomaliesField(ctx, anomalies, elapsed, neonColor, cameraX, viewWCull, terrain.worldWidth);
       // Moving hazards with viewport culling (generous margin for smooth scroll-in)
       const visibleHazards = hazards.filter(h => {
         const dx = Math.abs(h.x - cameraX);
         const wrappedDx = Math.min(dx, terrain.worldWidth - dx);
         return wrappedDx < viewWCull / 2 + 400;
       });
-      drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8);
+      drawHazards(ctx, visibleHazards, neonColor, shouldOptimizePerformance ? 4 : 8, cameraX, viewWCull, terrain.worldWidth);
       
       // UFO rendering - render any active UFOs (both scheduled level 10+ and early level 5+ spawns)
       const ufoState = ufoSpawnStateRef.current;
@@ -5293,7 +5290,7 @@ export const GameEngine: React.FC<Props> = ({
         }
       }
       
-      // Collectibles (space junk and wormhole door)
+      // Collectibles (space junk and wormhole door) - with world wrap support
       if (collectiblesRef.current) {
         // Update sparkles
         collectiblesRef.current.spaceJunk.forEach(junk => {
@@ -5303,37 +5300,41 @@ export const GameEngine: React.FC<Props> = ({
           }
         });
         
-        // Render space junk
+        // Render space junk with world wrap
         collectiblesRef.current.spaceJunk.forEach(junk => {
           if (junk.collected) return;
           
-          // Check if visible in viewport
-          const junkLeft = junk.pos.x - 50;
-          const junkRight = junk.pos.x + 50;
-          if (junkRight < viewLeft || junkLeft > viewRight) return;
-          
-          const asset = SPACE_JUNK_ASSETS[junk.shape];
-          const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
-          const scale = 1.0 + 0.1 * Math.sin(elapsed * 2 + junk.seed * 0.001);
-          const sparkles = sparklesRef.current.get(junk.id);
-          
-          ctx.save();
-          ctx.globalAlpha = 0.9;
-          renderSpaceJunk(ctx, junk.shape, junk.pos.x, junk.pos.y, rotation, scale, junk.tint, sparkles, elapsed, junk.seed * 0.001);
-          ctx.restore();
+          // World wrap rendering for space junk
+          for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            const screenX = junk.pos.x + wrapOffset - cameraX;
+            if (screenX < -50 || screenX > viewWCull + 50) continue;
+            
+            const asset = SPACE_JUNK_ASSETS[junk.shape];
+            const rotation = (elapsed * junk.spinDegPerSec * Math.PI) / 180;
+            const scale = 1.0 + 0.1 * Math.sin(elapsed * 2 + junk.seed * 0.001);
+            const sparkles = sparklesRef.current.get(junk.id);
+            
+            ctx.save();
+            ctx.globalAlpha = 0.9;
+            renderSpaceJunk(ctx, junk.shape, junk.pos.x + wrapOffset, junk.pos.y, rotation, scale, junk.tint, sparkles, elapsed, junk.seed * 0.001);
+            ctx.restore();
+            break; // Only draw once per junk item
+          }
         });
         
-        // Render wormhole door
+        // Render wormhole door with world wrap
         if (collectiblesRef.current.wormholeDoor) {
           const wormhole = collectiblesRef.current.wormholeDoor;
-          const whLeft = wormhole.pos.x - wormhole.radius;
-          const whRight = wormhole.pos.x + wormhole.radius;
           
-          if (whRight >= viewLeft && whLeft <= viewRight) {
+          for (const wrapOffset of [-terrain.worldWidth, 0, terrain.worldWidth]) {
+            const screenX = wormhole.pos.x + wrapOffset - cameraX;
+            if (screenX < -wormhole.radius || screenX > viewWCull + wormhole.radius) continue;
+            
             ctx.save();
             ctx.globalAlpha = wormhole.open ? 1.0 : 0.3;
-            renderWormholeDoor(ctx, wormhole.pos.x, wormhole.pos.y, elapsed, wormhole.open, 1.0);
+            renderWormholeDoor(ctx, wormhole.pos.x + wrapOffset, wormhole.pos.y, elapsed, wormhole.open, 1.0);
             ctx.restore();
+            break; // Only draw once
           }
         }
       }
