@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
+import { NeonVortexStarfield } from "./NeonVortexStarfield";
+import { PrismaticWavesStarfield } from "./PrismaticWavesStarfield";
 import { PlayerMenuLeaderboard } from "./PlayerMenuLeaderboard";
 import { GuidePopup } from "./GuidePopup";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
@@ -684,25 +686,16 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [starfieldStyle] = useState(() => {
     try {
       const saved = localStorage.getItem('ll-starfield-style');
-      if (saved === 'hyperspace' || saved === 'mobile') return saved;
+      if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves') return saved;
     } catch {}
     return 'auto';
   });
-  
-  // Determine which starfield to use
-  const useHyperspace = 
-    starfieldStyle === 'hyperspace' || 
-    (starfieldStyle === 'auto' && !isiOS);
 
-  return (
-    <main
-      className={`fixed inset-0 overflow-hidden flex items-center justify-center transition-opacity duration-500 ${assetsLoaded ? 'opacity-100' : 'opacity-0'}`}
-      onKeyDown={handleKeyDown}
-      onClick={resetIdle}
-    >
-      {/* Starfield background - iOS gets MobileStarfield, others get HyperspaceStarfield */}
-      <div className="absolute inset-0 overflow-hidden">
-        {useHyperspace ? (
+  // Render starfield based on preference
+  const renderStarfield = () => {
+    switch (starfieldStyle) {
+      case 'hyperspace':
+        return (
           <HyperspaceStarfield 
             speed={0.28}
             density={1600}
@@ -712,9 +705,41 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             allowBoost={true}
             fullscreen={true}
           />
-        ) : (
+        );
+      case 'mobile':
+        return <MobileStarfield starCount={180} speed={0.5} />;
+      case 'vortex':
+        return <NeonVortexStarfield starCount={280} />;
+      case 'waves':
+        return <PrismaticWavesStarfield starCount={320} />;
+      case 'auto':
+      default:
+        // Auto: iOS uses MobileStarfield, others use HyperspaceStarfield
+        return isiOS ? (
           <MobileStarfield starCount={180} speed={0.5} />
-        )}
+        ) : (
+          <HyperspaceStarfield 
+            speed={0.28}
+            density={1600}
+            focalLength={480}
+            trail={0.55}
+            style="glow"
+            allowBoost={true}
+            fullscreen={true}
+          />
+        );
+    }
+  };
+
+  return (
+    <main
+      className={`fixed inset-0 overflow-hidden flex items-center justify-center transition-opacity duration-500 ${assetsLoaded ? 'opacity-100' : 'opacity-0'}`}
+      onKeyDown={handleKeyDown}
+      onClick={resetIdle}
+    >
+      {/* Starfield background - iOS gets MobileStarfield, others get HyperspaceStarfield */}
+      <div className="absolute inset-0 overflow-hidden">
+        {renderStarfield()}
       </div>
       
       {/* Subtle gradient overlay */}

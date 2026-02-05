@@ -119,7 +119,7 @@ export default function ControlsSettings() {
   const [starfieldStyle, setStarfieldStyle] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('ll-starfield-style');
-      if (saved === 'hyperspace' || saved === 'mobile') return saved;
+      if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves') return saved;
     } catch {}
     return 'auto';
   });
@@ -1018,6 +1018,8 @@ export default function ControlsSettings() {
                   <SelectItem value="auto">Auto (Default)</SelectItem>
                   <SelectItem value="hyperspace">Hyperspace (3D)</SelectItem>
                   <SelectItem value="mobile">Radial Burst</SelectItem>
+                  <SelectItem value="vortex">Neon Vortex</SelectItem>
+                  <SelectItem value="waves">Prismatic Waves</SelectItem>
                 </SelectContent>
               </Select>
             </div>
