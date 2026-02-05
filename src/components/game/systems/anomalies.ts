@@ -181,7 +181,8 @@ export function drawAnomaliesField(
     // Try each wrap offset to find the visible position
     for (const offset of [-worldWidth, 0, worldWidth]) {
       const screenX = a.x + offset - cameraX;
-      if (screenX > -margin - a.radius && screenX < viewWidth + margin + a.radius) {
+      const halfView = viewWidth / 2;
+      if (screenX > -halfView - margin - a.radius && screenX < halfView + margin + a.radius) {
         const drawX = a.x + offset;
         const t = (elapsed * SPEED) % 1;
         const target = a.kind === "repel" ? t : 1 - t;
