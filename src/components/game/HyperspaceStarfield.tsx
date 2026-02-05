@@ -178,10 +178,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       let lastGpId: string | null = getLastDeviceId();
       let gpProfile = loadProfile(lastGpId || undefined);
       
-      // Periodic config refresh for same-tab changes (every 500ms)
-      const configRefreshInterval = setInterval(() => {
-        configRef.current = loadStarfieldConfig();
-      }, 500);
+      // Config refresh handled by storage event listener only (fires on actual changes)
       
       // Listen for storage events (cross-tab changes)
       const handleStorageChange = () => {
@@ -297,9 +294,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         // Draw batched
         ctx.save();
         if (styleIdx === 1 && !lowGraphics && config.glow > 0) {
-          // Glow (only if not in low graphics mode)
+          // Glow (only if not in low graphics mode) - cap shadowBlur for performance
           ctx.shadowColor = useColor as any;
-          ctx.shadowBlur = 12 * config.glow * config.particleSize;
+          ctx.shadowBlur = Math.min(24, 12 * config.glow * Math.min(2, config.particleSize));
         } else {
           ctx.shadowBlur = 0;
         }
@@ -336,9 +333,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
             ctx.globalAlpha = scan;
           }
           
-          // Motion blur effect - draw faded copies along motion path
-          if (config.motionBlur > 0.1 && len > 2) {
-            const blurSteps = Math.floor(2 + config.motionBlur * 3);
+          // Motion blur effect - only draw if enabled and particle moved significantly
+          if (config.motionBlur > 0.1 && len > 8) {
+            const blurSteps = 2;  // Fixed at 2 steps for performance
             for (let b = 0; b < blurSteps; b++) {
               const blurT = b / blurSteps;
               const blurX = sx - dx * blurT * 0.5;
@@ -391,7 +388,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         clearTimeout(initTimeout);
         window.removeEventListener("keydown", onKey);
         resizeObserver.disconnect();
-        clearInterval(configRefreshInterval);
+        
         window.removeEventListener('storage', handleStorageChange);
       };
     }, []);

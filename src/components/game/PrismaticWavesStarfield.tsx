@@ -213,9 +213,9 @@
            }
          }
           
-          // Motion blur effect
-          if (config.motionBlur > 0.1 && prevX !== 0) {
-            const blurSteps = Math.floor(2 + config.motionBlur * 2);
+          // Motion blur effect - only if enabled and significant movement
+          if (config.motionBlur > 0.1 && prevX !== 0 && depthScale > 0.5) {
+            const blurSteps = 2;  // Fixed at 2 for performance
             for (let b = 0; b < blurSteps; b++) {
               const blurT = b / blurSteps;
               const blurX = screenX + (centerX - screenX) * blurT * 0.12;

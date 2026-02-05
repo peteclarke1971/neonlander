@@ -234,9 +234,9 @@ export const IntoTheVoidStarfield: React.FC<IntoTheVoidStarfieldProps> = ({
           // Skip if off-screen
           if (screenX < -50 || screenX > w + 50 || screenY < -50 || screenY > h + 50) continue;
 
-          // Motion blur - draw faded copies toward center
-          if (config.motionBlur > 0.1) {
-            const blurSteps = Math.floor(2 + config.motionBlur * 3);
+          // Motion blur - only if enabled and scale is significant
+          if (config.motionBlur > 0.1 && scale > 0.5) {
+            const blurSteps = 2;  // Fixed at 2 for performance
             for (let b = 0; b < blurSteps; b++) {
               const blurT = b / blurSteps;
               const blurX = screenX + (centerX - screenX) * blurT * 0.2;
