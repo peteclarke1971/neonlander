@@ -1,317 +1,240 @@
 
 
-# Plan: Fix Hyperspace Settings, Add "Into the Void" Effect, New Customization Options, and Update PWA Icons
+# Plan: Fix World Wrap Rendering for All Entities
 
 ## Summary
 
-This plan addresses four major areas:
-1. **Fix Hyperspace starfield settings** - The config is loaded once at mount but never re-read in the animation loop
-2. **Create new "Into the Void" starfield effect** - Concentric circles tunnel coming toward the viewer
-3. **Add new customization options** - Particle size (up to 10x), motion blur slider, single color mode
-4. **Update PWA icons and app name** - Replace icons with uploaded lander logo, change name to "LANDER"
+Objects near the world seam (where x wraps from ~4000 back to 0) appear/disappear abruptly because they are only drawn at their literal x position, not at wrapped offsets. This fix applies the triple-offset rendering pattern to all affected entities.
 
 ---
 
-## Part 1: Fix Hyperspace Settings Not Working
+## Problem Analysis
 
-### Root Cause
+### Current Behavior
 
-In `HyperspaceStarfield.tsx`, the config is loaded once into a ref at mount time (line 43):
-```typescript
-const configRef = useRef(loadStarfieldConfig());
-```
+When the camera is at x=3950 and an object is at x=50:
+1. **Culling**: Correctly calculates wrapped distance as 100px (close to camera)
+2. **Rendering**: Draws object at x=50, which is 3900px away on screen (off-screen left)
+3. **Result**: Object is culled as "visible" but rendered off-screen, then suddenly appears when camera crosses x=0
 
-And reloaded once in the effect setup (line 133):
-```typescript
-configRef.current = loadStarfieldConfig();
-```
+### Solution Pattern
 
-**However**, this never updates when the user changes settings. The animation loop keeps reading the stale `configRef.current` values.
-
-### Solution
-
-Add a storage event listener and periodic config refresh to detect when settings change:
-
-| File | Change |
-|------|--------|
-| `src/components/game/HyperspaceStarfield.tsx` | Add `storage` event listener to reload config when localStorage changes |
-
-The same pattern used in other starfield components should be applied - listen for the `storage` event or periodically reload the config.
-
----
-
-## Part 2: New Starfield Effect - "Into the Void"
-
-### Visual Design
-
-A pure concentric circles tunnel effect where rings expand outward from a central point:
-
-```text
-                ╭────╮
-            ╭───╯    ╰───╮
-        ╭───╯            ╰───╮
-    ╭───╯        ●           ╰───╮
-╭───╯                            ╰───╮
-```
-
-### Key Features
-
-- **Concentric Rings**: Stars arranged on expanding circles at different Z depths
-- **Ring Expansion**: Rings appear at center and expand outward as they approach viewer
-- **Neon Color Bands**: Each ring has a cycling neon color
-- **Motion Blur**: Long radial streaks from center outward
-- **Particle Trails**: Stars leave trailing afterimages
-- **Central Vanishing Point**: Bright core glow at center
-
-### Technical Approach
+The lander already uses the correct pattern - draw at three x-offsets:
 
 ```typescript
-interface VoidStar {
-  ringZ: number;        // Depth position (0.05 to 2.0)
-  angleOnRing: number;  // Position on ring (0 to 2π)  
-  baseRadius: number;   // Ring radius at z=1.0
-  zSpeed: number;       // Speed toward viewer
-  size: number;
-  colorPhase: number;
-}
-
-// Projection math:
-// Ring radius expands as z decreases: screenRadius = baseRadius * FOCAL_LENGTH / z
-// Stars project outward from center as they approach
-```
-
-### Files to Create
-
-| File | Description |
-|------|-------------|
-| `src/components/game/IntoTheVoidStarfield.tsx` | Concentric circles tunnel effect |
-
----
-
-## Part 3: New Customization Options
-
-### New Settings to Add
-
-| Setting | localStorage Key | Default | Range | Description |
-|---------|-----------------|---------|-------|-------------|
-| Particle Size | `ll-starfield-particle-size` | 1.0 | 0.5 - 10.0 | Size multiplier for all particles |
-| Motion Blur | `ll-starfield-motion-blur` | 0.5 | 0 - 1.0 | Blur/fade effect intensity |
-| Single Color Mode | `ll-starfield-single-color` | false | on/off | Lock to current neon hue only |
-
-### Update StarfieldConfig Interface
-
-```typescript
-// src/lib/starfieldConfig.ts
-export interface StarfieldConfig {
-  density: number;
-  speed: number;
-  colorCycle: boolean;
-  colorSpeed: number;
-  neonHue: number;
-  glow: number;
-  trail: number;
-  bloom: number;
-  // NEW:
-  particleSize: number;    // 0.5 - 10.0
-  motionBlur: number;      // 0 - 1.0
-  singleColor: boolean;    // true = use only neonHue
+for (const offset of [-worldWidth, 0, worldWidth]) {
+  const drawX = object.x + offset - cameraX;
+  if (drawX > -margin && drawX < viewWidth + margin) {
+    // Draw object at drawX
+  }
 }
 ```
 
-### UI Controls to Add in Controls.tsx
+---
 
-```text
-┌─────────────────────────────────────────────┐
-│ Starfield Customization                     │
-│                                             │
-│ ... existing controls ...                   │
-│                                             │
-│ Particle Size    [━━━━━●━━━━━━━] 1.0x       │
-│ (scales from 0.5x to 10x)                   │
-│                                             │
-│ Motion Blur      [━━━●━━━━━━━━━] 0.5        │
-│ (adds radial blur/fade effect)              │
-│                                             │
-│ Single Color Mode [OFF]                     │
-│ (when ON, uses only the Base Neon Color)   │
-└─────────────────────────────────────────────┘
+## Affected Systems in GameEngine.tsx
+
+| Entity | Current Rendering | Fix Required |
+|--------|------------------|--------------|
+| Hazards | Single x position (line ~1680) | Triple offset |
+| Anomalies | Single x position (line ~1720) | Triple offset |
+| Space Junk | Single x position (line ~1760) | Triple offset |
+| Jellyfish | Single x position (line ~1850) | Triple offset |
+| Coral | Single x position (line ~1890) | Triple offset |
+| UFO | Single x position (line ~1650) | Triple offset |
+| Collectibles | Single x position (line ~1800) | Triple offset |
+| Moving Pads | Single x position (line ~1580) | Triple offset |
+
+---
+
+## Implementation Details
+
+### Option 1: Modify Individual Draw Calls (Precise Control)
+
+Wrap each entity's draw loop with the offset pattern:
+
+```typescript
+// Before
+drawHazards(ctx, hazards, neonColor, shadowBlur);
+
+// After
+for (const wrapOffset of [-worldWidth, 0, worldWidth]) {
+  ctx.save();
+  ctx.translate(wrapOffset, 0);
+  drawHazards(ctx, hazards, neonColor, shadowBlur);
+  ctx.restore();
+}
 ```
 
-### Files to Modify
+**Pros**: Simple, works with existing draw functions
+**Cons**: Draws everything 3x even when not needed
+
+### Option 2: Filter and Draw Visible Only (Performance Optimized)
+
+For each entity, check which offset makes it visible before drawing:
+
+```typescript
+for (const h of hazards) {
+  for (const offset of [-worldWidth, 0, worldWidth]) {
+    const screenX = h.x + offset - cameraX;
+    if (screenX > -50 && screenX < viewWidth + 50) {
+      // Draw this hazard at this offset
+      drawSingleHazard(ctx, h, offset - cameraX, neonColor);
+      break; // Only draw once
+    }
+  }
+}
+```
+
+**Pros**: Only draws visible entities
+**Cons**: Requires refactoring draw functions to accept offset
+
+### Recommended: Option 1 with Early Exit
+
+Use Option 1's simplicity but add visibility checks inside draw functions:
+
+```typescript
+// In drawHazards - add visibility culling per hazard
+export function drawHazards(
+  ctx: CanvasRenderingContext2D, 
+  hazards: Hazard[], 
+  neonColor: string, 
+  shadowBlur: number,
+  cameraX: number,      // NEW
+  viewWidth: number,    // NEW
+  worldWidth: number    // NEW
+) {
+  const margin = 100;
+  for (const h of hazards) {
+    // Check all three offsets for visibility
+    for (const offset of [-worldWidth, 0, worldWidth]) {
+      const screenX = h.x + offset - cameraX;
+      if (screenX > -margin && screenX < viewWidth + margin) {
+        // Draw at this offset
+        ctx.save();
+        ctx.translate(h.x + offset - cameraX, h.y);
+        // ... draw hazard shape
+        ctx.restore();
+        break;
+      }
+    }
+  }
+}
+```
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/lib/starfieldConfig.ts` | Add new config properties, storage keys, defaults |
-| `src/pages/Controls.tsx` | Add new UI sliders and toggle for the new options |
-| `src/components/game/HyperspaceStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/MobileStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/NeonVortexStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/PrismaticWavesStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/CosmicTunnelStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/NebulaDriftStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
-| `src/components/game/IntoTheVoidStarfield.tsx` | Implement all settings (new file) |
-| `src/components/game/PlayerMenu.tsx` | Add IntoTheVoidStarfield to switch statement |
+| `src/components/game/systems/hazards.ts` | Update `drawHazards` to accept camera/world params and use triple offset |
+| `src/components/game/systems/anomalies.ts` | Update draw function for world wrap |
+| `src/components/game/systems/spaceJunkAssets.ts` | Update `renderSpaceJunk` for world wrap |
+| `src/components/game/systems/collectibles.ts` | Update `drawCollectibles` for world wrap |
+| `src/components/game/systems/movingPads.ts` | Update pad rendering for world wrap |
+| `src/components/game/systems/ufo.ts` | Update UFO rendering for world wrap |
+| `src/components/game/GameEngine.tsx` | Pass new params to draw functions, update jellyfish/coral rendering inline |
 
 ---
 
-## Part 4: PWA Icons and App Name Update
+## Detailed Changes
 
-### Icon Updates
+### 1. hazards.ts - drawHazards
 
-The uploaded lander logo image needs to be:
-1. Copied to the public folder as new icon files
-2. Referenced in manifest.json and index.html
+Add world wrap parameters and triple-offset loop:
 
-| Source | Destination | Purpose |
-|--------|-------------|---------|
-| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/apple-touch-icon.png` | iOS Home Screen icon |
-| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/icon-192.png` | PWA 192x192 icon |
-| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/icon-512.png` | PWA 512x512 icon |
-| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/favicon.png` | Browser tab favicon |
-
-### App Name Changes
-
-| File | Change |
-|------|--------|
-| `public/manifest.json` | Change `"name"` to `"LANDER"`, `"short_name"` to `"LANDER"` |
-| `index.html` | Change `apple-mobile-web-app-title` to `"LANDER"`, update favicon reference |
-
-### manifest.json Updates
-
-```json
-{
-  "name": "LANDER",
-  "short_name": "LANDER",
-  "description": "Retro-inspired lunar lander with modern neon vectors, realistic physics, and satisfying landings.",
-  ...
+```typescript
+export function drawHazards(
+  ctx: CanvasRenderingContext2D, 
+  hazards: Hazard[], 
+  neonColor: string, 
+  shadowBlur = 0,
+  cameraX = 0,
+  viewWidth = 800,
+  worldWidth = 4000
+) {
+  if (hazards.length === 0) return;
+  
+  const margin = 100;
+  ctx.save();
+  ctx.strokeStyle = neonColor;
+  ctx.globalAlpha = 0.9;
+  if (shadowBlur > 0) {
+    ctx.shadowColor = neonColor;
+    ctx.shadowBlur = shadowBlur;
+  }
+  
+  for (const h of hazards) {
+    // Try each wrap offset
+    for (const offset of [-worldWidth, 0, worldWidth]) {
+      const screenX = h.x + offset - cameraX;
+      if (screenX > -margin && screenX < viewWidth + margin) {
+        ctx.save();
+        ctx.translate(screenX, h.y);
+        ctx.rotate(h.angle);
+        // ... existing shape drawing code
+        ctx.restore();
+        break; // Only draw once per hazard
+      }
+    }
+  }
+  
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 ```
 
-### index.html Updates
+### 2. GameEngine.tsx - Call Site Updates
 
-```html
-<meta name="apple-mobile-web-app-title" content="LANDER" />
-<link rel="icon" type="image/png" href="/favicon.png" />
+Update all draw calls to pass the new parameters:
+
+```typescript
+// Before
+drawHazards(ctx, hazards, neonColor, shadowBlur);
+
+// After
+drawHazards(ctx, hazards, neonColor, shadowBlur, cameraX, pxW, worldWidth);
 ```
+
+### 3. Inline Rendering (Jellyfish, Coral)
+
+For entities rendered directly in GameEngine, wrap in offset loop:
+
+```typescript
+// Jellyfish rendering
+for (const jf of jellyfish) {
+  for (const offset of [-worldWidth, 0, worldWidth]) {
+    const screenX = jf.x + offset - cameraX;
+    if (screenX > -100 && screenX < pxW + 100) {
+      // Draw jellyfish at screenX
+      break;
+    }
+  }
+}
+```
+
+---
+
+## Testing Scenarios
+
+After implementation, verify these scenarios work correctly:
+
+1. **Camera at x=3900, object at x=100**: Object should be visible (wrapped distance ~200)
+2. **Camera at x=100, object at x=3900**: Object should be visible (wrapped distance ~200)
+3. **Camera crosses x=0**: Objects should not pop in/out
+4. **Camera crosses x=worldWidth**: Objects should not pop in/out
+5. **Objects moving across seam**: Smooth continuous motion
 
 ---
 
 ## Implementation Order
 
-1. **Copy icon file** to public folder for PWA/favicon use
-2. **Update manifest.json** with new name "LANDER" and icon references
-3. **Update index.html** with new app title and favicon
-4. **Update starfieldConfig.ts** with new settings (particleSize, motionBlur, singleColor)
-5. **Fix HyperspaceStarfield.tsx** - add config refresh mechanism + implement new settings
-6. **Update all other starfield components** with new settings
-7. **Create IntoTheVoidStarfield.tsx** - new concentric circles tunnel effect
-8. **Update Controls.tsx** - add "Into the Void" to dropdown + new customization sliders
-9. **Update PlayerMenu.tsx** - add IntoTheVoidStarfield to render switch
-
----
-
-## Technical Details
-
-### Motion Blur Implementation
-
-Motion blur can be achieved by drawing multiple semi-transparent copies of each particle along its motion path:
-
-```typescript
-if (config.motionBlur > 0.1) {
-  // Draw 3-5 blur copies
-  const blurSteps = Math.floor(3 + config.motionBlur * 2);
-  for (let b = 0; b < blurSteps; b++) {
-    const blurT = b / blurSteps;
-    const blurX = lerp(prevX, currentX, blurT);
-    const blurY = lerp(prevY, currentY, blurT);
-    const blurAlpha = baseAlpha * (1 - blurT) * config.motionBlur * 0.3;
-    // Draw faded copy at blurX, blurY with blurAlpha
-  }
-}
-```
-
-### Single Color Mode Implementation
-
-When enabled, bypass the color cycling and use only the neonHue:
-
-```typescript
-const finalHue = config.singleColor 
-  ? config.neonHue 
-  : (cycledHue + hueShift + 360) % 360;
-```
-
-### Config Refresh for Hyperspace
-
-Add a storage event listener to detect changes:
-
-```typescript
-useEffect(() => {
-  const handleStorageChange = () => {
-    configRef.current = loadStarfieldConfig();
-  };
-  
-  window.addEventListener('storage', handleStorageChange);
-  
-  // Also check periodically for same-tab changes
-  const interval = setInterval(() => {
-    configRef.current = loadStarfieldConfig();
-  }, 500);
-  
-  return () => {
-    window.removeEventListener('storage', handleStorageChange);
-    clearInterval(interval);
-  };
-}, []);
-```
-
----
-
-## Files Summary
-
-### Files to Create
-
-| File | Description |
-|------|-------------|
-| `src/components/game/IntoTheVoidStarfield.tsx` | Concentric circles tunnel starfield |
-| `public/favicon.png` | New favicon (copied from upload) |
-
-### Files to Modify
-
-| File | Description |
-|------|-------------|
-| `public/manifest.json` | Update name to "LANDER" |
-| `index.html` | Update app title and favicon |
-| `src/lib/starfieldConfig.ts` | Add particleSize, motionBlur, singleColor |
-| `src/pages/Controls.tsx` | Add "Into the Void" dropdown option + new sliders |
-| `src/components/game/PlayerMenu.tsx` | Add IntoTheVoidStarfield to render switch |
-| `src/components/game/HyperspaceStarfield.tsx` | Fix config refresh + implement new settings |
-| `src/components/game/MobileStarfield.tsx` | Implement new settings |
-| `src/components/game/NeonVortexStarfield.tsx` | Implement new settings |
-| `src/components/game/PrismaticWavesStarfield.tsx` | Implement new settings |
-| `src/components/game/CosmicTunnelStarfield.tsx` | Implement new settings |
-| `src/components/game/NebulaDriftStarfield.tsx` | Implement new settings |
-
-### Files to Copy
-
-| Source | Destination |
-|--------|-------------|
-| `user-uploads://AFCA166B-...` | `public/apple-touch-icon.png` |
-| `user-uploads://AFCA166B-...` | `public/icon-192.png` |
-| `user-uploads://AFCA166B-...` | `public/icon-512.png` |
-| `user-uploads://AFCA166B-...` | `public/favicon.png` |
-
----
-
-## New Dropdown Options After Implementation
-
-| Value | Label |
-|-------|-------|
-| `auto` | Auto (Default) |
-| `hyperspace` | Hyperspace (3D) |
-| `mobile` | Radial Burst |
-| `vortex` | Neon Vortex |
-| `waves` | Prismatic Waves |
-| `tunnel` | Cosmic Tunnel |
-| `nebula` | Nebula Drift |
-| `void` | Into the Void |
+1. Update `hazards.ts` - `drawHazards` function
+2. Update `anomalies.ts` - draw functions  
+3. Update `spaceJunkAssets.ts` - `renderSpaceJunk` function
+4. Update `collectibles.ts` - `drawCollectibles` function
+5. Update `movingPads.ts` - pad rendering
+6. Update `ufo.ts` - UFO rendering
+7. Update `GameEngine.tsx` - all call sites + inline jellyfish/coral rendering
 
