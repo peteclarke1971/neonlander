@@ -5540,7 +5540,7 @@ export const GameEngine: React.FC<Props> = ({
       let shipColor = neonColor;
       let shipShadowBlur = shadowBlur;
       
-      if (mode === "classic" || mode === "fixed" || mode === "timetrial") {
+      if (mode === "classic" || mode === "fixed" || mode === "timetrial" || mode === "medley") {
         const fuelPercent = fuel / fuelCap;
         
         if (fuelPercent <= 0.5) { // Below 50% fuel - start warning
