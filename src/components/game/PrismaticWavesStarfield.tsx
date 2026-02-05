@@ -1,16 +1,17 @@
  import React, { useRef, useEffect } from "react";
+ import { loadStarfieldConfig, NEON_COLORS, lerpColor, StarfieldConfig } from "@/lib/starfieldConfig";
  
  interface WaveStar {
-   x: number;
-   baseY: number;
+   angle: number;      // Radial angle from center
+   baseRadius: number; // Base radial distance (0-1)
+   z: number;          // Depth (0.05 to 1.5)
+   zSpeed: number;     // Speed toward viewer
    frequency: number;
    amplitude: number;
    phase: number;
-   speed: number;
    layer: number;
    size: number;
    brightness: number;
-   // Trail positions
    prevX: number;
    prevY: number;
  }
@@ -20,12 +21,18 @@
  }
  
  export const PrismaticWavesStarfield: React.FC<PrismaticWavesStarfieldProps> = ({
-   starCount = 320,
+   starCount = 300,
  }) => {
    const canvasRef = useRef<HTMLCanvasElement>(null);
    const rafRef = useRef<number>(0);
    const starsRef = useRef<WaveStar[]>([]);
    const startTimeRef = useRef<number>(0);
+   const configRef = useRef<StarfieldConfig>(loadStarfieldConfig());
+ 
+   // Constants for perspective projection
+   const FOCAL_LENGTH = 400;
+   const NEAR = 0.05;
+   const FAR = 1.5;
  
    useEffect(() => {
      const canvas = canvasRef.current;
@@ -35,26 +42,27 @@
      if (!ctx) return;
  
      startTimeRef.current = performance.now();
+     configRef.current = loadStarfieldConfig();
  
-     // Initialize stars across 3 parallax layers
-     const initStars = (w: number, h: number) => {
+     // Initialize stars with Z-axis depth
+     const initStars = (config: StarfieldConfig) => {
+       const count = Math.floor(starCount * config.density);
        starsRef.current = [];
-       for (let i = 0; i < starCount; i++) {
-         const layer = 1 + Math.floor(Math.random() * 3); // 1-3 (back to front)
-         const x = Math.random() * w;
-         const baseY = Math.random() * h;
+       for (let i = 0; i < count; i++) {
+         const layer = 1 + Math.floor(Math.random() * 3);
          starsRef.current.push({
-           x,
-           baseY,
-           frequency: 0.003 + Math.random() * 0.008,
-           amplitude: 20 + Math.random() * 60 * layer,
+           angle: Math.random() * Math.PI * 2,
+           baseRadius: 0.1 + Math.random() * 0.7,
+           z: NEAR + Math.random() * (FAR - NEAR),
+           zSpeed: (0.12 + Math.random() * 0.2) * layer * 0.4,
+           frequency: 3 + Math.random() * 8,
+           amplitude: 0.02 + Math.random() * 0.08 * layer,
            phase: Math.random() * Math.PI * 2,
-           speed: (30 + Math.random() * 50) * (layer * 0.7),
            layer,
            size: (0.8 + Math.random() * 1.5) * (layer * 0.5 + 0.5),
            brightness: 0.6 + Math.random() * 0.4,
-           prevX: x,
-           prevY: baseY,
+           prevX: 0,
+           prevY: 0,
          });
        }
      };
@@ -69,10 +77,10 @@
        canvas.style.width = `${w}px`;
        canvas.style.height = `${h}px`;
        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-       initStars(w, h);
      };
  
      resize();
+     initStars(configRef.current);
      window.addEventListener("resize", resize);
  
      let lastTime = performance.now();
@@ -85,123 +93,151 @@
  
        const w = window.innerWidth;
        const h = window.innerHeight;
+       const centerX = w / 2;
+       const centerY = h / 2;
  
-       // Global time for color shifting
+       const config = configRef.current;
        const elapsed = (now - startTimeRef.current) / 1000;
-       const colorShift = elapsed * 15; // Hue shift over time
+       const colorSpeed = config.colorCycle ? 15 * config.colorSpeed : 0;
+       const colorShift = elapsed * colorSpeed;
  
        // Clear with dark background
        ctx.fillStyle = "hsl(222, 47%, 5%)";
        ctx.fillRect(0, 0, w, h);
  
-       // Draw subtle horizontal gradient bands (very low alpha)
-       const bandCount = 5;
-       for (let b = 0; b < bandCount; b++) {
-         const bandY = (h / bandCount) * b + (elapsed * 10) % (h / bandCount);
-         const bandHue = ((b * 60) + colorShift) % 360;
-         const gradient = ctx.createLinearGradient(0, bandY - 40, 0, bandY + 40);
-         gradient.addColorStop(0, `hsla(${bandHue}, 100%, 60%, 0)`);
-         gradient.addColorStop(0.5, `hsla(${bandHue}, 100%, 60%, 0.03)`);
-         gradient.addColorStop(1, `hsla(${bandHue}, 100%, 60%, 0)`);
-         ctx.fillStyle = gradient;
-         ctx.fillRect(0, bandY - 40, w, 80);
+       // Central bloom effect
+       if (config.bloom > 0.1) {
+         const bloomRadius = 100 * config.bloom;
+         const hueShift = config.neonHue - 280;
+         const bloomHue = ((colorShift * 0.5) + hueShift + 280 + 360) % 360;
+         const bloomGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius);
+         bloomGradient.addColorStop(0, `hsla(${bloomHue}, 80%, 60%, ${0.12 * config.bloom})`);
+         bloomGradient.addColorStop(0.5, `hsla(${bloomHue}, 80%, 50%, ${0.06 * config.bloom})`);
+         bloomGradient.addColorStop(1, `hsla(${bloomHue}, 80%, 50%, 0)`);
+         ctx.beginPath();
+         ctx.arc(centerX, centerY, bloomRadius, 0, Math.PI * 2);
+         ctx.fillStyle = bloomGradient;
+         ctx.fill();
        }
  
-       // Sort stars by layer for proper depth rendering
+       // Sort stars by z (far first)
        const stars = starsRef.current;
-       const sortedStars = [...stars].sort((a, b) => a.layer - b.layer);
+       const sortedStars = [...stars].sort((a, b) => b.z - a.z);
  
        for (let i = 0; i < sortedStars.length; i++) {
          const star = sortedStars[i];
  
-         // Store previous position for trail
-         star.prevX = star.x;
-         const prevWaveY = star.baseY + Math.sin(star.x * star.frequency + star.phase) * star.amplitude;
-         star.prevY = prevWaveY;
+         // Store previous screen position
+         const prevX = star.prevX;
+         const prevY = star.prevY;
  
-         // Move horizontally
-         star.x += star.speed * dt;
+         // Move toward viewer
+         star.z -= star.zSpeed * config.speed * dt;
  
-         // Calculate wave Y position
-         const waveY = star.baseY + Math.sin(star.x * star.frequency + star.phase) * star.amplitude;
- 
-         // Wrap around when off-screen
-         if (star.x > w + 50) {
-           star.x = -50;
-           star.baseY = Math.random() * h;
-           star.prevX = star.x;
-           star.prevY = star.baseY;
+         // Respawn when too close
+         if (star.z < NEAR) {
+           star.z = FAR;
+           star.angle = Math.random() * Math.PI * 2;
+           star.baseRadius = 0.1 + Math.random() * 0.7;
+           star.prevX = centerX;
+           star.prevY = centerY;
+           continue;
          }
  
-         // Calculate prismatic color based on x position
-         const hue = ((star.x / w) * 360 + colorShift) % 360;
+         // Calculate 3D position with wave motion
+         // Radial direction from center
+         const radialX = Math.cos(star.angle);
+         const radialY = Math.sin(star.angle);
+ 
+         // Wave offset perpendicular to radial direction
+         const wavePhase = star.z * star.frequency + star.phase + elapsed * config.speed * 0.5;
+         const waveOffset = Math.sin(wavePhase) * star.amplitude;
+         const perpX = -radialY * waveOffset;
+         const perpY = radialX * waveOffset;
+ 
+         // Final 3D position with wave
+         const x3d = radialX * star.baseRadius + perpX;
+         const y3d = radialY * star.baseRadius + perpY;
+ 
+         // Perspective projection
+         const screenX = centerX + (x3d / star.z) * FOCAL_LENGTH;
+         const screenY = centerY + (y3d / star.z) * FOCAL_LENGTH;
+ 
+         // Store for next frame
+         star.prevX = screenX;
+         star.prevY = screenY;
+ 
+         // Skip if off-screen
+         if (screenX < -50 || screenX > w + 50 || screenY < -50 || screenY > h + 50) continue;
+ 
+         // Calculate prismatic color based on screen position
+         const screenAngle = Math.atan2(screenY - centerY, screenX - centerX);
+         const hueShift = config.neonHue - 280;
+         const hue = ((screenAngle / (Math.PI * 2) + 0.5) * 360 + colorShift + hueShift + 360) % 360;
          const saturation = 90 + Math.sin(elapsed * 0.5 + i) * 10;
-         const lightness = 55 + star.layer * 8;
+         const depthScale = Math.min(2, 1 / star.z);
+         const lightness = 55 + star.layer * 8 + depthScale * 5;
  
          // Layer-based alpha
-         const layerAlpha = 0.4 + (star.layer / 3) * 0.5;
+         const layerAlpha = (0.4 + (star.layer / 3) * 0.5) * depthScale;
          const baseAlpha = star.brightness * layerAlpha;
+         const displaySize = star.size * depthScale * 0.8;
  
-         // Draw comet trail
-         const trailLength = star.speed * 0.8;
-         if (trailLength > 5) {
-           const trailX = star.x - trailLength;
-           const trailY = star.baseY + Math.sin(trailX * star.frequency + star.phase) * star.amplitude;
+         // Draw comet trail toward center
+         if (config.trail > 0.1 && prevX !== 0 && prevY !== 0) {
+           const dx = centerX - screenX;
+           const dy = centerY - screenY;
+           const dist = Math.sqrt(dx * dx + dy * dy);
+           const trailLen = (30 + star.zSpeed * 50) * config.trail * depthScale;
+           
+           if (dist > 5 && trailLen > 3) {
+             const trailEndX = screenX + (dx / dist) * Math.min(trailLen, dist * 0.4);
+             const trailEndY = screenY + (dy / dist) * Math.min(trailLen, dist * 0.4);
  
-           // Create gradient along trail
-           const trailGradient = ctx.createLinearGradient(trailX, trailY, star.x, waveY);
-           trailGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness}%, 0)`);
-           trailGradient.addColorStop(0.3, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.3})`);
-           trailGradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.6})`);
+             const trailGradient = ctx.createLinearGradient(trailEndX, trailEndY, screenX, screenY);
+             trailGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness}%, 0)`);
+             trailGradient.addColorStop(0.4, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.3})`);
+             trailGradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.6})`);
  
-           ctx.beginPath();
-           ctx.moveTo(trailX, trailY);
-           ctx.lineTo(star.x, waveY);
-           ctx.strokeStyle = trailGradient;
-           ctx.lineWidth = star.size * 1.5;
-           ctx.lineCap = "round";
-           ctx.stroke();
+             ctx.beginPath();
+             ctx.moveTo(trailEndX, trailEndY);
+             ctx.lineTo(screenX, screenY);
+             ctx.strokeStyle = trailGradient;
+             ctx.lineWidth = displaySize * 1.5;
+             ctx.lineCap = "round";
+             ctx.stroke();
+           }
          }
  
-         // Draw star glow (using gradient instead of shadowBlur for iOS performance)
-         const glowRadius = star.size * 4;
-         const glowGradient = ctx.createRadialGradient(
-           star.x, waveY, 0,
-           star.x, waveY, glowRadius
-         );
-         glowGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness + 20}%, ${baseAlpha})`);
-         glowGradient.addColorStop(0.2, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.6})`);
-         glowGradient.addColorStop(0.5, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.2})`);
-         glowGradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, 0)`);
+         // Draw star glow
+         const glowRadius = displaySize * 3 * config.glow;
+         if (glowRadius > 1) {
+           const glowGradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowRadius);
+           glowGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness + 20}%, ${baseAlpha})`);
+           glowGradient.addColorStop(0.3, `hsla(${hue}, ${saturation}%, ${lightness}%, ${baseAlpha * 0.5})`);
+           glowGradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, 0)`);
  
-         ctx.beginPath();
-         ctx.arc(star.x, waveY, glowRadius, 0, Math.PI * 2);
-         ctx.fillStyle = glowGradient;
-         ctx.fill();
+           ctx.beginPath();
+           ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
+           ctx.fillStyle = glowGradient;
+           ctx.fill();
+         }
  
-         // Draw bright core with white tint
+         // Draw bright core
          ctx.beginPath();
-         ctx.arc(star.x, waveY, star.size * 0.6, 0, Math.PI * 2);
+         ctx.arc(screenX, screenY, displaySize * 0.5, 0, Math.PI * 2);
          ctx.fillStyle = `hsla(${hue}, ${saturation * 0.3}%, ${Math.min(100, lightness + 35)}%, ${baseAlpha})`;
          ctx.fill();
        }
  
-       // Chromatic aberration effect at edges (very subtle)
-       const aberrationStrength = 0.08;
-       
-       // Left edge - red tint
-       const leftGradient = ctx.createLinearGradient(0, 0, w * 0.15, 0);
-       leftGradient.addColorStop(0, `rgba(255, 100, 100, ${aberrationStrength})`);
-       leftGradient.addColorStop(1, "rgba(255, 100, 100, 0)");
-       ctx.fillStyle = leftGradient;
-       ctx.fillRect(0, 0, w * 0.15, h);
- 
-       // Right edge - cyan tint
-       const rightGradient = ctx.createLinearGradient(w * 0.85, 0, w, 0);
-       rightGradient.addColorStop(0, "rgba(100, 255, 255, 0)");
-       rightGradient.addColorStop(1, `rgba(100, 255, 255, ${aberrationStrength})`);
-       ctx.fillStyle = rightGradient;
-       ctx.fillRect(w * 0.85, 0, w * 0.15, h);
+       // Vignette
+       const maxRadius = Math.max(w, h) * 0.7;
+       const vignetteGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
+       vignetteGradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+       vignetteGradient.addColorStop(0.7, "rgba(0, 0, 0, 0)");
+       vignetteGradient.addColorStop(1, "rgba(0, 0, 0, 0.5)");
+       ctx.fillStyle = vignetteGradient;
+       ctx.fillRect(0, 0, w, h);
      };
  
      rafRef.current = requestAnimationFrame(loop);

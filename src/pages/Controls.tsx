@@ -11,6 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel, detectOptimalGraphics, BenchmarkResult } from "@/lib/graphicsConfig";
+ import { loadStarfieldConfig, saveStarfieldConfig, resetStarfieldConfig, StarfieldConfig, DEFAULT_STARFIELD_CONFIG } from "@/lib/starfieldConfig";
+ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function ControlsSettings() {
   const navigate = useNavigate();
@@ -119,7 +121,7 @@ export default function ControlsSettings() {
   const [starfieldStyle, setStarfieldStyle] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('ll-starfield-style');
-      if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves') return saved;
+       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula') return saved;
     } catch {}
     return 'auto';
   });
@@ -277,6 +279,10 @@ export default function ControlsSettings() {
   const [selectedSFX, setSelectedSFX] = useState<string>("thruster.mp3");
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const loopingSFXRef = useRef<NodeJS.Timeout | null>(null);
+   
+   // Starfield customization settings
+   const [starfieldConfig, setStarfieldConfig] = useState<StarfieldConfig>(loadStarfieldConfig);
+   const [starfieldSettingsOpen, setStarfieldSettingsOpen] = useState(false);
   
   // Initialize AudioManager
   useEffect(() => {
@@ -472,6 +478,11 @@ export default function ControlsSettings() {
   useEffect(() => {
     try { localStorage.setItem('ll-starfield-style', starfieldStyle); } catch {}
   }, [starfieldStyle]);
+ 
+   // Save starfield config when it changes
+   useEffect(() => {
+     saveStarfieldConfig(starfieldConfig);
+   }, [starfieldConfig]);
 
   // SEO
   useEffect(() => {
@@ -1020,9 +1031,198 @@ export default function ControlsSettings() {
                   <SelectItem value="mobile">Radial Burst</SelectItem>
                   <SelectItem value="vortex">Neon Vortex</SelectItem>
                   <SelectItem value="waves">Prismatic Waves</SelectItem>
+                   <SelectItem value="tunnel">Cosmic Tunnel</SelectItem>
+                   <SelectItem value="nebula">Nebula Drift</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+             
+             {/* Starfield Customization - collapsible section */}
+             {starfieldStyle !== 'auto' && starfieldStyle !== 'hyperspace' && starfieldStyle !== 'mobile' && (
+               <Collapsible open={starfieldSettingsOpen} onOpenChange={setStarfieldSettingsOpen}>
+                 <CollapsibleTrigger className="flex items-center justify-between w-full p-3 border border-border/40 rounded-lg bg-card/20 hover:bg-card/40 transition-colors">
+                   <div className="text-left">
+                     <Label className="cursor-pointer">Starfield Customization</Label>
+                     <div className="text-xs text-muted-foreground">Adjust density, speed, colors, glow, and trails</div>
+                   </div>
+                   <span className="text-muted-foreground">{starfieldSettingsOpen ? '▼' : '▶'}</span>
+                 </CollapsibleTrigger>
+                 <CollapsibleContent className="mt-2 space-y-4 p-4 border border-border/40 rounded-lg bg-card/20">
+                   
+                   {/* Particle Density */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Particle Density</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.density.toFixed(1)}x</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.density]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, density: v[0] }))}
+                       min={0.3}
+                       max={2.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>Sparse</span>
+                       <span>Dense</span>
+                     </div>
+                   </div>
+                   
+                   {/* Speed */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Speed</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.speed.toFixed(1)}x</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.speed]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, speed: v[0] }))}
+                       min={0.3}
+                       max={3.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>Slow</span>
+                       <span>Fast</span>
+                     </div>
+                   </div>
+                   
+                   {/* Color Cycling Toggle */}
+                   <div className="flex items-center justify-between">
+                     <div>
+                       <Label>Color Cycling</Label>
+                       <div className="text-xs text-muted-foreground">Animate through neon colors</div>
+                     </div>
+                     <Switch
+                       checked={starfieldConfig.colorCycle}
+                       onCheckedChange={(v) => setStarfieldConfig(c => ({ ...c, colorCycle: v }))}
+                     />
+                   </div>
+                   
+                   {/* Color Cycle Speed (only if cycling enabled) */}
+                   {starfieldConfig.colorCycle && (
+                     <div className="space-y-2 pl-4 border-l-2 border-border/40">
+                       <div className="flex items-center justify-between">
+                         <Label>Cycle Speed</Label>
+                         <span className="text-sm text-muted-foreground">{starfieldConfig.colorSpeed.toFixed(1)}x</span>
+                       </div>
+                       <Slider
+                         value={[starfieldConfig.colorSpeed]}
+                         onValueChange={(v) => setStarfieldConfig(c => ({ ...c, colorSpeed: v[0] }))}
+                         min={0.2}
+                         max={3.0}
+                         step={0.1}
+                       />
+                     </div>
+                   )}
+                   
+                   {/* Base Neon Hue */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Base Neon Color</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.neonHue}°</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.neonHue]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, neonHue: v[0] }))}
+                       min={0}
+                       max={360}
+                       step={5}
+                     />
+                     <div 
+                       className="h-4 rounded-full"
+                       style={{
+                         background: `linear-gradient(to right, 
+                           hsl(0, 100%, 60%), 
+                           hsl(60, 100%, 60%), 
+                           hsl(120, 100%, 60%), 
+                           hsl(180, 100%, 60%), 
+                           hsl(240, 100%, 60%), 
+                           hsl(300, 100%, 60%), 
+                           hsl(360, 100%, 60%))`
+                       }}
+                     />
+                     <div 
+                       className="w-8 h-4 rounded border border-border mx-auto"
+                       style={{ backgroundColor: `hsl(${starfieldConfig.neonHue}, 100%, 60%)` }}
+                     />
+                   </div>
+                   
+                   {/* Glow Intensity */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Glow Intensity</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.glow.toFixed(1)}x</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.glow]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, glow: v[0] }))}
+                       min={0}
+                       max={2.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>None</span>
+                       <span>Intense</span>
+                     </div>
+                   </div>
+                   
+                   {/* Trail Length */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Trail Length</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.trail.toFixed(1)}x</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.trail]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, trail: v[0] }))}
+                       min={0}
+                       max={2.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>None</span>
+                       <span>Long</span>
+                     </div>
+                   </div>
+                   
+                   {/* Bloom Effect */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Central Bloom</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.bloom.toFixed(1)}</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.bloom]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, bloom: v[0] }))}
+                       min={0}
+                       max={1.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>Off</span>
+                       <span>Bright</span>
+                     </div>
+                   </div>
+                   
+                   {/* Reset to Defaults */}
+                   <Button
+                     variant="outline"
+                     className="w-full"
+                     onClick={() => {
+                       resetStarfieldConfig();
+                       setStarfieldConfig({ ...DEFAULT_STARFIELD_CONFIG });
+                       toast({
+                         title: "Starfield settings reset",
+                         description: "All customizations restored to defaults",
+                       });
+                     }}
+                   >
+                     Reset to Defaults
+                   </Button>
+                 </CollapsibleContent>
+               </Collapsible>
+             )}
             
             {/* Small UFO Section - hidden in player menu mode */}
             {!isPlayerMenuMode && (
