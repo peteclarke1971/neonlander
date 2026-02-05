@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { anyGamepad, getLastDeviceId, loadProfile, readGamepad } from "@/hooks/use-gamepad";
+import { loadStarfieldConfig } from "@/lib/starfieldConfig";
 
 export type HyperspaceStarfieldHandle = {
   SetSpeed: (v: number) => void;
@@ -39,6 +40,7 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
     const seedRef = useRef<number>(123456789);
     const boostRef = useRef<{ t: number; d: number; peak: number }>({ t: 0, d: 0, peak: 1 });
     const startTimeRef = useRef<number>(performance.now());
+    const configRef = useRef(loadStarfieldConfig());
     
     // Reduce initial density for low graphics mode
     const effectiveDensity = lowGraphics ? 400 : density;
@@ -127,6 +129,9 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       const ctx = c.getContext("2d");
       if (!ctx) return;
       
+      // Load starfield config
+      configRef.current = loadStarfieldConfig();
+      
       let initTimeout: number;
       let rafInit: number;
       
@@ -172,21 +177,20 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       let styleIdx = style === "vector" ? 0 : style === "glow" ? 1 : 2;
       let lastGpId: string | null = getLastDeviceId();
       let gpProfile = loadProfile(lastGpId || undefined);
-      // Neon palette from CSS vars for gentle color cycling
-      const styles = getComputedStyle(document.documentElement);
-      const parseHslVar = (name: string) => {
-        try {
-          const value = styles.getPropertyValue(name).trim();
-          if (!value) return [280, 70, 60]; // fallback neon purple
-          const parts = value.split(/\s+/).map(v => parseFloat(v.replace('%','')));
-          if (parts.length >= 3 && parts.every(p => !isNaN(p))) return parts;
-          return [280, 70, 60]; // fallback on invalid data
-        } catch {
-          return [280, 70, 60]; // fallback on error
-        }
+      
+      // Neon palette for color cycling
+      const neonPalette = [
+        [330, 100, 65], // pink
+        [270, 100, 70], // purple
+        [180, 100, 60], // cyan
+        [140, 100, 55], // green
+        [50, 100, 55],  // yellow
+        [25, 100, 60],  // orange
+      ];
+      const lerpHue = (a: number, b: number, t: number) => { 
+        const d = ((b - a + 540) % 360) - 180; 
+        return a + d * t; 
       };
-      const neonPalette = ['--neon-p1','--neon-p2','--neon-p3','--neon-p4','--neon-p5','--neon-p6'].map(v => parseHslVar(v));
-      const lerpHue = (a: number, b: number, t: number) => { const d = ((b - a + 540) % 360) - 180; return a + d * t; };
 
       const loop = () => {
         rafRef.current = requestAnimationFrame(loop);
@@ -232,7 +236,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         }
 
         const fl = opts.current.focalLength;
-        const trailLen = Math.max(0, Math.min(1, opts.current.trail)) * (0.5 + 0.5 * speed01);
+        const config = configRef.current;
+        const trailLen = Math.max(0, Math.min(1, opts.current.trail)) * config.trail * (0.5 + 0.5 * speed01);
         const arr = arrRef.current;
         if (!arr) return;
         const N = starCountRef.current;
@@ -251,16 +256,17 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         const baseZRate = 1.1; // base units/sec (halved)
         const zRate = baseZRate * (0.25 + speed01 * 1.75);
 
-        // Neon color cycle blended by speed towards brighter/whiter
+        // Neon color cycle blended by speed towards brighter/whiter (respecting config)
         const tsec = now / 1000;
-        const cycleDur = 18; // seconds for full palette loop
-        const uCycle = (tsec / cycleDur) % 1;
+        const cycleDur = 18 / config.colorSpeed; // seconds for full palette loop
+        const uCycle = config.colorCycle ? (tsec / cycleDur) % 1 : 0;
         const segF = uCycle * neonPalette.length;
         const segIdx = Math.floor(segF);
         const segT = segF - segIdx;
         const c0 = neonPalette[segIdx];
         const c1 = neonPalette[(segIdx + 1) % neonPalette.length];
-        let baseHue = lerpHue(c0[0], c1[0], segT);
+        const hueShift = config.neonHue - 280; // 280 is default purple
+        let baseHue = lerpHue(c0[0], c1[0], segT) + hueShift;
         let baseSat = c0[1] + (c1[1] - c0[1]) * segT;
         let baseLight = c0[2] + (c1[2] - c0[2]) * segT;
         const tcol = Math.min(1, Math.max(0, speed01));
@@ -273,10 +279,10 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
         // Draw batched
         ctx.save();
-        if (styleIdx === 1 && !lowGraphics) {
+        if (styleIdx === 1 && !lowGraphics && config.glow > 0) {
           // Glow (only if not in low graphics mode)
           ctx.shadowColor = color as any;
-          ctx.shadowBlur = 12;
+          ctx.shadowBlur = 12 * config.glow;
         } else {
           ctx.shadowBlur = 0;
         }
