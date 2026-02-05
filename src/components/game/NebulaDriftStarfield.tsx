@@ -124,7 +124,9 @@
        const centerX = w / 2;
        const centerY = h / 2;
  
-       const config = configRef.current;
+        // Refresh config each frame for live updates
+        configRef.current = loadStarfieldConfig();
+        const config = configRef.current;
        const elapsed = (now - startTimeRef.current) / 1000;
        const cycleSpeed = config.colorCycle ? 0.08 * config.colorSpeed : 0;
        const globalColorPos = (elapsed * cycleSpeed) % NEON_COLORS.length;
@@ -232,19 +234,31 @@
  
          // Color
          const hueShift = config.neonHue - 280;
-         const starColorPos = config.colorCycle 
+          let finalHue: number;
+          let finalS: number;
+          let finalL: number;
+          
+          if (config.singleColor) {
+            finalHue = config.neonHue;
+            finalS = 100;
+            finalL = 65;
+          } else {
+            const starColorPos = config.colorCycle 
            ? (globalColorPos + star.colorPhase) % NEON_COLORS.length
            : star.colorPhase;
-         const colorIndex = Math.floor(starColorPos);
-         const colorT = starColorPos - colorIndex;
-         const c1 = NEON_COLORS[colorIndex];
-         const c2 = NEON_COLORS[(colorIndex + 1) % NEON_COLORS.length];
-         const color = lerpColor(c1, c2, colorT);
-         const finalHue = (color.h + hueShift + 360) % 360;
+            const colorIndex = Math.floor(starColorPos);
+            const colorT = starColorPos - colorIndex;
+            const c1 = NEON_COLORS[colorIndex];
+            const c2 = NEON_COLORS[(colorIndex + 1) % NEON_COLORS.length];
+            const color = lerpColor(c1, c2, colorT);
+            finalHue = (color.h + hueShift + 360) % 360;
+            finalS = color.s;
+            finalL = color.l;
+          }
  
          const depthScale = Math.min(2.5, 1 / star.z);
          const baseAlpha = star.brightness * (0.5 + depthScale * 0.4);
-         const displaySize = star.size * depthScale * (star.isShootingStar ? 1.2 : 0.8);
+          const displaySize = star.size * depthScale * (star.isShootingStar ? 1.2 : 0.8) * config.particleSize;
  
          // Draw trail (longer for shooting stars)
          if (config.trail > 0.1 && prevX !== 0 && prevY !== 0) {
@@ -259,9 +273,9 @@
              const trailEndY = screenY + (dy / dist) * Math.min(trailLen, dist * 0.6);
  
              const trailGradient = ctx.createLinearGradient(trailEndX, trailEndY, screenX, screenY);
-             trailGradient.addColorStop(0, `hsla(${finalHue}, ${color.s}%, ${color.l}%, 0)`);
-             trailGradient.addColorStop(0.3, `hsla(${finalHue}, ${color.s}%, ${color.l}%, ${baseAlpha * 0.3})`);
-             trailGradient.addColorStop(1, `hsla(${finalHue}, ${color.s}%, ${color.l + 10}%, ${baseAlpha * 0.7})`);
+              trailGradient.addColorStop(0, `hsla(${finalHue}, ${finalS}%, ${finalL}%, 0)`);
+              trailGradient.addColorStop(0.3, `hsla(${finalHue}, ${finalS}%, ${finalL}%, ${baseAlpha * 0.3})`);
+              trailGradient.addColorStop(1, `hsla(${finalHue}, ${finalS}%, ${finalL + 10}%, ${baseAlpha * 0.7})`);
  
              ctx.beginPath();
              ctx.moveTo(trailEndX, trailEndY);
@@ -272,14 +286,29 @@
              ctx.stroke();
            }
          }
+          
+          // Motion blur effect
+          if (config.motionBlur > 0.1 && prevX !== 0) {
+            const blurSteps = Math.floor(2 + config.motionBlur * 2);
+            for (let b = 0; b < blurSteps; b++) {
+              const blurT = b / blurSteps;
+              const blurX = screenX + (centerX - screenX) * blurT * 0.12;
+              const blurY = screenY + (centerY - screenY) * blurT * 0.12;
+              const blurAlpha = baseAlpha * (1 - blurT) * config.motionBlur * 0.3;
+              ctx.beginPath();
+              ctx.arc(blurX, blurY, displaySize * 0.4, 0, Math.PI * 2);
+              ctx.fillStyle = `hsla(${finalHue}, ${finalS}%, ${finalL}%, ${blurAlpha})`;
+              ctx.fill();
+            }
+          }
  
          // Star glow
          const glowRadius = displaySize * 3 * config.glow;
          if (glowRadius > 1) {
            const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowRadius);
-           gradient.addColorStop(0, `hsla(${finalHue}, ${color.s}%, ${color.l + 15}%, ${baseAlpha})`);
-           gradient.addColorStop(0.3, `hsla(${finalHue}, ${color.s}%, ${color.l}%, ${baseAlpha * 0.5})`);
-           gradient.addColorStop(1, `hsla(${finalHue}, ${color.s}%, ${color.l}%, 0)`);
+            gradient.addColorStop(0, `hsla(${finalHue}, ${finalS}%, ${finalL + 15}%, ${baseAlpha})`);
+            gradient.addColorStop(0.3, `hsla(${finalHue}, ${finalS}%, ${finalL}%, ${baseAlpha * 0.5})`);
+            gradient.addColorStop(1, `hsla(${finalHue}, ${finalS}%, ${finalL}%, 0)`);
  
            ctx.beginPath();
            ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
@@ -290,7 +319,7 @@
          // Core
          ctx.beginPath();
          ctx.arc(screenX, screenY, displaySize * 0.5, 0, Math.PI * 2);
-         ctx.fillStyle = `hsla(${finalHue}, ${color.s * 0.3}%, ${Math.min(100, color.l + 35)}%, ${baseAlpha})`;
+          ctx.fillStyle = `hsla(${finalHue}, ${finalS * 0.3}%, ${Math.min(100, finalL + 35)}%, ${baseAlpha})`;
          ctx.fill();
        }
  

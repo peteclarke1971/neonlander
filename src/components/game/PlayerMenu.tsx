@@ -5,6 +5,7 @@ import { NeonVortexStarfield } from "./NeonVortexStarfield";
 import { PrismaticWavesStarfield } from "./PrismaticWavesStarfield";
  import { CosmicTunnelStarfield } from "./CosmicTunnelStarfield";
  import { NebulaDriftStarfield } from "./NebulaDriftStarfield";
+import { IntoTheVoidStarfield } from "./IntoTheVoidStarfield";
 import { PlayerMenuLeaderboard } from "./PlayerMenuLeaderboard";
 import { GuidePopup } from "./GuidePopup";
 import { anyGamepad, loadProfile, readGamepad, gateThrustUntilRelease, setUiMode, vibrate } from "@/hooks/use-gamepad";
@@ -718,6 +719,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
          return <CosmicTunnelStarfield starCount={280} />;
        case 'nebula':
          return <NebulaDriftStarfield starCount={250} />;
+      case 'void':
+        return <IntoTheVoidStarfield ringCount={40} />;
       case 'auto':
       default:
         // Auto: iOS uses MobileStarfield, others use HyperspaceStarfield

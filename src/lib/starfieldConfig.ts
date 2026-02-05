@@ -9,6 +9,9 @@
    glow: number;         // 0 - 2.0, glow radius multiplier
    trail: number;        // 0 - 2.0, trail length multiplier
    bloom: number;        // 0 - 1.0, central bloom intensity
+  particleSize: number; // 0.5 - 10.0, particle size multiplier
+  motionBlur: number;   // 0 - 1.0, motion blur/fade intensity
+  singleColor: boolean; // true = use only neonHue
  }
  
  export const DEFAULT_STARFIELD_CONFIG: StarfieldConfig = {
@@ -20,6 +23,9 @@
    glow: 1.0,
    trail: 1.0,
    bloom: 0.5,
+  particleSize: 1.0,
+  motionBlur: 0.5,
+  singleColor: false,
  };
  
  const STORAGE_KEYS = {
@@ -31,6 +37,9 @@
    glow: 'll-starfield-glow',
    trail: 'll-starfield-trail',
    bloom: 'll-starfield-bloom',
+  particleSize: 'll-starfield-particle-size',
+  motionBlur: 'll-starfield-motion-blur',
+  singleColor: 'll-starfield-single-color',
  } as const;
  
  export function loadStarfieldConfig(): StarfieldConfig {
@@ -44,6 +53,9 @@
        glow: parseFloat(localStorage.getItem(STORAGE_KEYS.glow) || '') || DEFAULT_STARFIELD_CONFIG.glow,
        trail: parseFloat(localStorage.getItem(STORAGE_KEYS.trail) || '') || DEFAULT_STARFIELD_CONFIG.trail,
        bloom: parseFloat(localStorage.getItem(STORAGE_KEYS.bloom) || '') || DEFAULT_STARFIELD_CONFIG.bloom,
+      particleSize: parseFloat(localStorage.getItem(STORAGE_KEYS.particleSize) || '') || DEFAULT_STARFIELD_CONFIG.particleSize,
+      motionBlur: parseFloat(localStorage.getItem(STORAGE_KEYS.motionBlur) || '') || DEFAULT_STARFIELD_CONFIG.motionBlur,
+      singleColor: localStorage.getItem(STORAGE_KEYS.singleColor) === 'true',
      };
    } catch {
      return { ...DEFAULT_STARFIELD_CONFIG };
@@ -60,6 +72,9 @@
      if (config.glow !== undefined) localStorage.setItem(STORAGE_KEYS.glow, config.glow.toString());
      if (config.trail !== undefined) localStorage.setItem(STORAGE_KEYS.trail, config.trail.toString());
      if (config.bloom !== undefined) localStorage.setItem(STORAGE_KEYS.bloom, config.bloom.toString());
+    if (config.particleSize !== undefined) localStorage.setItem(STORAGE_KEYS.particleSize, config.particleSize.toString());
+    if (config.motionBlur !== undefined) localStorage.setItem(STORAGE_KEYS.motionBlur, config.motionBlur.toString());
+    if (config.singleColor !== undefined) localStorage.setItem(STORAGE_KEYS.singleColor, config.singleColor ? 'true' : 'false');
    } catch {}
  }
  

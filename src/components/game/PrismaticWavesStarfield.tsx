@@ -96,7 +96,9 @@
        const centerX = w / 2;
        const centerY = h / 2;
  
-       const config = configRef.current;
+        // Refresh config each frame for live updates
+        configRef.current = loadStarfieldConfig();
+        const config = configRef.current;
        const elapsed = (now - startTimeRef.current) / 1000;
        const colorSpeed = config.colorCycle ? 15 * config.colorSpeed : 0;
        const colorShift = elapsed * colorSpeed;
@@ -173,7 +175,9 @@
          // Calculate prismatic color based on screen position
          const screenAngle = Math.atan2(screenY - centerY, screenX - centerX);
          const hueShift = config.neonHue - 280;
-         const hue = ((screenAngle / (Math.PI * 2) + 0.5) * 360 + colorShift + hueShift + 360) % 360;
+          const hue = config.singleColor 
+            ? config.neonHue
+            : ((screenAngle / (Math.PI * 2) + 0.5) * 360 + colorShift + hueShift + 360) % 360;
          const saturation = 90 + Math.sin(elapsed * 0.5 + i) * 10;
          const depthScale = Math.min(2, 1 / star.z);
          const lightness = 55 + star.layer * 8 + depthScale * 5;
@@ -181,7 +185,7 @@
          // Layer-based alpha
          const layerAlpha = (0.4 + (star.layer / 3) * 0.5) * depthScale;
          const baseAlpha = star.brightness * layerAlpha;
-         const displaySize = star.size * depthScale * 0.8;
+          const displaySize = star.size * depthScale * 0.8 * config.particleSize;
  
          // Draw comet trail toward center
          if (config.trail > 0.1 && prevX !== 0 && prevY !== 0) {
@@ -208,6 +212,21 @@
              ctx.stroke();
            }
          }
+          
+          // Motion blur effect
+          if (config.motionBlur > 0.1 && prevX !== 0) {
+            const blurSteps = Math.floor(2 + config.motionBlur * 2);
+            for (let b = 0; b < blurSteps; b++) {
+              const blurT = b / blurSteps;
+              const blurX = screenX + (centerX - screenX) * blurT * 0.12;
+              const blurY = screenY + (centerY - screenY) * blurT * 0.12;
+              const blurAlpha = baseAlpha * (1 - blurT) * config.motionBlur * 0.3;
+              ctx.beginPath();
+              ctx.arc(blurX, blurY, displaySize * 0.4, 0, Math.PI * 2);
+              ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${blurAlpha})`;
+              ctx.fill();
+            }
+          }
  
          // Draw star glow
          const glowRadius = displaySize * 3 * config.glow;

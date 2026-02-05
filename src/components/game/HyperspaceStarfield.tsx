@@ -178,6 +178,17 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
       let lastGpId: string | null = getLastDeviceId();
       let gpProfile = loadProfile(lastGpId || undefined);
       
+      // Periodic config refresh for same-tab changes (every 500ms)
+      const configRefreshInterval = setInterval(() => {
+        configRef.current = loadStarfieldConfig();
+      }, 500);
+      
+      // Listen for storage events (cross-tab changes)
+      const handleStorageChange = () => {
+        configRef.current = loadStarfieldConfig();
+      };
+      window.addEventListener('storage', handleStorageChange);
+      
       // Neon palette for color cycling
       const neonPalette = [
         [330, 100, 65], // pink
@@ -273,6 +284,12 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         baseSat = baseSat * (1 - 0.5 * tcol);
         baseLight = Math.min(88, baseLight + 10 * tcol);
         const color = `hsl(${baseHue} ${baseSat}% ${baseLight}%)`;
+        // Single color mode - use only neonHue
+        const singleColorHue = config.singleColor ? config.neonHue : baseHue;
+        const useColor = config.singleColor 
+          ? `hsl(${singleColorHue} ${baseSat}% ${baseLight}%)`
+          : color;
+        ctx.fillStyle = useColor;
 
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -281,12 +298,12 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         ctx.save();
         if (styleIdx === 1 && !lowGraphics && config.glow > 0) {
           // Glow (only if not in low graphics mode)
-          ctx.shadowColor = color as any;
-          ctx.shadowBlur = 12 * config.glow;
+          ctx.shadowColor = useColor as any;
+          ctx.shadowBlur = 12 * config.glow * config.particleSize;
         } else {
           ctx.shadowBlur = 0;
         }
-        ctx.strokeStyle = color as any;
+        ctx.strokeStyle = useColor as any;
         ctx.globalAlpha = 1;
 
         const margin = 80;
@@ -308,16 +325,33 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
 
           // draw
           if (styleIdx === 0) {
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1 * config.particleSize;
           } else if (styleIdx === 1) {
-            ctx.lineWidth = Math.max(1.5, Math.min(3.5, (1 / zz) * 1.2));
+            ctx.lineWidth = Math.max(1.5, Math.min(3.5, (1 / zz) * 1.2)) * config.particleSize;
           } else {
             // CRT
-            ctx.lineWidth = 1.25;
+            ctx.lineWidth = 1.25 * config.particleSize;
             // subtle scanline shimmer
             const scan = 0.85 + 0.15 * Math.sin((sy + now * 0.06) * 0.12);
             ctx.globalAlpha = scan;
           }
+          
+          // Motion blur effect - draw faded copies along motion path
+          if (config.motionBlur > 0.1 && len > 2) {
+            const blurSteps = Math.floor(2 + config.motionBlur * 3);
+            for (let b = 0; b < blurSteps; b++) {
+              const blurT = b / blurSteps;
+              const blurX = sx - dx * blurT * 0.5;
+              const blurY = sy - dy * blurT * 0.5;
+              const blurAlpha = (1 - blurT) * config.motionBlur * 0.3;
+              ctx.globalAlpha = blurAlpha;
+              ctx.beginPath();
+              ctx.arc(blurX, blurY, ctx.lineWidth * 0.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+          
           ctx.beginPath();
           ctx.moveTo(ex, ey);
           ctx.lineTo(sx, sy);
@@ -357,6 +391,8 @@ export const HyperspaceStarfield = forwardRef<HyperspaceStarfieldHandle, Hypersp
         clearTimeout(initTimeout);
         window.removeEventListener("keydown", onKey);
         resizeObserver.disconnect();
+        clearInterval(configRefreshInterval);
+        window.removeEventListener('storage', handleStorageChange);
       };
     }, []);
 
