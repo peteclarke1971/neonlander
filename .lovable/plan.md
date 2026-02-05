@@ -1,181 +1,107 @@
 
 
-# Plan: Starfield "Flying Through Space" Motion + New Effects + Settings
+# Plan: Fix Hyperspace Settings, Add "Into the Void" Effect, New Customization Options, and Update PWA Icons
 
 ## Summary
 
-This plan addresses three major enhancements:
-1. Modify Neon Vortex and Prismatic Waves to have stars coming **toward the viewer** (flying through space feel)
-2. Create 2 new stunning starfield effects with the same perspective motion
-3. Add comprehensive starfield customization settings (density, speed, color cycle, neon color, glow, trails)
+This plan addresses four major areas:
+1. **Fix Hyperspace starfield settings** - The config is loaded once at mount but never re-read in the animation loop
+2. **Create new "Into the Void" starfield effect** - Concentric circles tunnel coming toward the viewer
+3. **Add new customization options** - Particle size (up to 10x), motion blur slider, single color mode
+4. **Update PWA icons and app name** - Replace icons with uploaded lander logo, change name to "LANDER"
 
 ---
 
-## Part 1: Modify Existing Starfields for "Flying Toward Viewer" Motion
+## Part 1: Fix Hyperspace Settings Not Working
 
-### Current Issues
+### Root Cause
 
-**Neon Vortex**: Stars orbit in a flat 2D spiral plane - no depth perception of "flying through space"
-
-**Prismatic Waves**: Stars move horizontally left-to-right with vertical oscillation - feels like a side-scroller, not flying through space
-
-### Solution: Z-Axis Perspective Projection
-
-Both starfields need to be modified to use 3D perspective projection where:
-- Stars spawn far away (high Z value)
-- Stars move toward the viewer (decreasing Z)
-- Stars project outward from center as they get closer (screen-space expansion)
-- Stars respawn behind when they pass the camera
-
-This is the same technique used in `HyperspaceStarfield` and `MobileStarfield` that creates the "flying through space" feel.
-
-### NeonVortexStarfield.tsx Changes
-
-Transform from orbital motion to perspective spiral:
-
-```text
-Current: Stars orbit center at fixed radius
-New:     Stars spiral toward viewer with expanding outward motion
+In `HyperspaceStarfield.tsx`, the config is loaded once into a ref at mount time (line 43):
+```typescript
+const configRef = useRef(loadStarfieldConfig());
 ```
 
-Key changes:
-- Add `z` depth value to each star (0.1 to 1.5, normalized camera range)
-- Use perspective projection: `screenX = centerX + (x / z) * focalLength`
-- Stars move toward camera (`z -= speed * dt`)
-- Apply spiral rotation as stars approach (`angle += angularSpeed / z`)
-- Respawn at far distance when z drops below threshold
-- Keep neon color cycling and pulse wave effects
-
-### PrismaticWavesStarfield.tsx Changes
-
-Transform from horizontal motion to perspective wave motion:
-
-```text
-Current: Stars move left-to-right with vertical wave
-New:     Stars approach viewer in wave patterns, expanding outward
+And reloaded once in the effect setup (line 133):
+```typescript
+configRef.current = loadStarfieldConfig();
 ```
 
-Key changes:
-- Add `z` depth value to each star
-- Project from center using perspective: particles expand outward as they approach
-- Wave motion now affects the X/Y offset from the radial direction
-- Stars spawn at far distance, move toward viewer
-- Keep prismatic color shifting based on screen position
-- Maintain comet trails (now pointing toward center, not left)
+**However**, this never updates when the user changes settings. The animation loop keeps reading the stale `configRef.current` values.
+
+### Solution
+
+Add a storage event listener and periodic config refresh to detect when settings change:
+
+| File | Change |
+|------|--------|
+| `src/components/game/HyperspaceStarfield.tsx` | Add `storage` event listener to reload config when localStorage changes |
+
+The same pattern used in other starfield components should be applied - listen for the `storage` event or periodically reload the config.
 
 ---
 
-## Part 2: Create 2 New Starfield Effects
+## Part 2: New Starfield Effect - "Into the Void"
 
-### Effect 1: "Cosmic Tunnel" (Wormhole/Tunnel Effect)
+### Visual Design
 
-A cylindrical tunnel of stars that the viewer flies through, with:
-- Stars arranged in concentric rings at varying depths
-- Rings rotate as you approach
-- Neon color bands that pulse through the tunnel
-- Streaking trails creating a "hyperspace tunnel" effect
-- Central glow/vortex at the vanishing point
+A pure concentric circles tunnel effect where rings expand outward from a central point:
 
-**Visual Style**:
 ```text
-        ·   ·   ·   ·   ·
-      ·  ╭─────────╮  ·
-    ·  ╭─╯         ╰─╮  ·
-   · ╭─╯   ╭───╮    ╰─╮ ·
-  · ╭╯    ╭╯   ╰╮    ╰╮ ·
-  · │    │  ●   │     │ ·  ← Central glow
-  · ╰╮    ╰╮   ╭╯    ╭╯ ·
-   · ╰─╮   ╰───╯   ╭─╯ ·
-    ·  ╰─╮       ╭─╯  ·
-      ·  ╰───────╯  ·
-        ·   ·   ·   ·   ·
+                ╭────╮
+            ╭───╯    ╰───╮
+        ╭───╯            ╰───╮
+    ╭───╯        ●           ╰───╮
+╭───╯                            ╰───╮
 ```
 
-**Key Features**:
-- Stars positioned on rings at different Z depths
-- Ring rotation increases as depth decreases (faster near viewer)
-- Neon color cycles through ring layers
-- Central glow pulsates with breathing animation
-- Long streaking trails toward edges
+### Key Features
 
-### Effect 2: "Nebula Drift" (Particle Cloud Effect)
+- **Concentric Rings**: Stars arranged on expanding circles at different Z depths
+- **Ring Expansion**: Rings appear at center and expand outward as they approach viewer
+- **Neon Color Bands**: Each ring has a cycling neon color
+- **Motion Blur**: Long radial streaks from center outward
+- **Particle Trails**: Stars leave trailing afterimages
+- **Central Vanishing Point**: Bright core glow at center
 
-A flowing nebula of colored gas clouds with embedded stars:
-- Large, soft nebula "puffs" drifting toward viewer
-- Embedded bright stars that streak through
-- Multiple layered nebula colors (pink, purple, cyan gradients)
-- Parallax depth with closer nebulas moving faster
-- Occasional bright "shooting stars" cutting through
-
-**Visual Style**:
-```text
-      ░░░▒▒▓▓    ▒▒░░
-    ░░▒▒▓▓████▓▓▒▒░░
-   ░▒▓██████████▓▒░  ★
-  ░▒▓████ ★ █████▓▒░
-   ░▒▓██████████▓▒░
-    ░░▒▒▓▓████▓▓▒▒░░
-      ░░░▒▒▓▓    ▒▒░░
-         ★
-```
-
-**Key Features**:
-- Nebula puffs: Large radial gradients with soft edges
-- 3 layers of nebula depth (back, mid, front)
-- Embedded stars with perspective projection
-- Color palette: Pink/magenta, purple, cyan blending
-- Occasional shooting stars (fast, bright, long trails)
-- Gentle rotation of nebula puffs as they approach
-
----
-
-## Part 3: Starfield Settings
-
-### New Settings (localStorage Keys)
-
-| Setting | Key | Default | Range | Description |
-|---------|-----|---------|-------|-------------|
-| Particle Density | `ll-starfield-density` | 1.0 | 0.3 - 2.0 | Multiplier for star count |
-| Speed | `ll-starfield-speed` | 1.0 | 0.3 - 3.0 | Animation speed multiplier |
-| Color Cycle | `ll-starfield-color-cycle` | true | on/off | Enable neon color cycling |
-| Color Cycle Speed | `ll-starfield-color-speed` | 1.0 | 0.2 - 3.0 | Speed of color transitions |
-| Primary Neon Color | `ll-starfield-neon-hue` | 280 | 0 - 360 | Base hue (purple default) |
-| Glow Intensity | `ll-starfield-glow` | 1.0 | 0 - 2.0 | Star glow radius multiplier |
-| Trail Length | `ll-starfield-trail` | 1.0 | 0 - 2.0 | Motion trail length |
-| Bloom | `ll-starfield-bloom` | 0.5 | 0 - 1.0 | Central glow/bloom intensity |
-
-### Settings UI Design (Controls.tsx)
-
-Add a new collapsible section "Starfield Effects" that appears when any non-"auto" style is selected:
-
-```
-┌─────────────────────────────────────────────┐
-│ Starfield Style                             │
-│ [Dropdown: Neon Vortex ▼]                   │
-│                                             │
-│ ▼ Starfield Customization                   │
-│ ┌─────────────────────────────────────────┐ │
-│ │ Particle Density  [━━━━━●━━━] 1.2x      │ │
-│ │ Speed            [━━●━━━━━━] 0.7x       │ │
-│ │ Color Cycling    [ON]                   │ │
-│ │ Cycle Speed      [━━━━━●━━━] 1.0x       │ │
-│ │ Base Neon Hue    [━━━●━━━━━] 280°       │ │
-│ │   Preview: ████ (purple)                │ │
-│ │ Glow Intensity   [━━━━━●━━━] 1.0x       │ │
-│ │ Trail Length     [━━━━━━━●━] 1.5x       │ │
-│ │ Bloom Effect     [━━━●━━━━━] 0.5        │ │
-│ │                                         │ │
-│ │ [Reset to Defaults]                     │ │
-│ └─────────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-```
-
-### Passing Settings to Starfield Components
-
-Create a shared hook/config that all starfield components read:
+### Technical Approach
 
 ```typescript
-// lib/starfieldConfig.ts
+interface VoidStar {
+  ringZ: number;        // Depth position (0.05 to 2.0)
+  angleOnRing: number;  // Position on ring (0 to 2π)  
+  baseRadius: number;   // Ring radius at z=1.0
+  zSpeed: number;       // Speed toward viewer
+  size: number;
+  colorPhase: number;
+}
+
+// Projection math:
+// Ring radius expands as z decreases: screenRadius = baseRadius * FOCAL_LENGTH / z
+// Stars project outward from center as they approach
+```
+
+### Files to Create
+
+| File | Description |
+|------|-------------|
+| `src/components/game/IntoTheVoidStarfield.tsx` | Concentric circles tunnel effect |
+
+---
+
+## Part 3: New Customization Options
+
+### New Settings to Add
+
+| Setting | localStorage Key | Default | Range | Description |
+|---------|-----------------|---------|-------|-------------|
+| Particle Size | `ll-starfield-particle-size` | 1.0 | 0.5 - 10.0 | Size multiplier for all particles |
+| Motion Blur | `ll-starfield-motion-blur` | 0.5 | 0 - 1.0 | Blur/fade effect intensity |
+| Single Color Mode | `ll-starfield-single-color` | false | on/off | Lock to current neon hue only |
+
+### Update StarfieldConfig Interface
+
+```typescript
+// src/lib/starfieldConfig.ts
 export interface StarfieldConfig {
   density: number;
   speed: number;
@@ -185,137 +111,198 @@ export interface StarfieldConfig {
   glow: number;
   trail: number;
   bloom: number;
-}
-
-export function loadStarfieldConfig(): StarfieldConfig {
-  return {
-    density: parseFloat(localStorage.getItem('ll-starfield-density') || '1'),
-    speed: parseFloat(localStorage.getItem('ll-starfield-speed') || '1'),
-    colorCycle: localStorage.getItem('ll-starfield-color-cycle') !== 'false',
-    colorSpeed: parseFloat(localStorage.getItem('ll-starfield-color-speed') || '1'),
-    neonHue: parseInt(localStorage.getItem('ll-starfield-neon-hue') || '280'),
-    glow: parseFloat(localStorage.getItem('ll-starfield-glow') || '1'),
-    trail: parseFloat(localStorage.getItem('ll-starfield-trail') || '1'),
-    bloom: parseFloat(localStorage.getItem('ll-starfield-bloom') || '0.5'),
-  };
+  // NEW:
+  particleSize: number;    // 0.5 - 10.0
+  motionBlur: number;      // 0 - 1.0
+  singleColor: boolean;    // true = use only neonHue
 }
 ```
 
-All starfield components will import and use this config to scale their effects accordingly.
+### UI Controls to Add in Controls.tsx
 
----
+```text
+┌─────────────────────────────────────────────┐
+│ Starfield Customization                     │
+│                                             │
+│ ... existing controls ...                   │
+│                                             │
+│ Particle Size    [━━━━━●━━━━━━━] 1.0x       │
+│ (scales from 0.5x to 10x)                   │
+│                                             │
+│ Motion Blur      [━━━●━━━━━━━━━] 0.5        │
+│ (adds radial blur/fade effect)              │
+│                                             │
+│ Single Color Mode [OFF]                     │
+│ (when ON, uses only the Base Neon Color)   │
+└─────────────────────────────────────────────┘
+```
 
-## Files to Create
-
-| File | Description |
-|------|-------------|
-| `src/components/game/CosmicTunnelStarfield.tsx` | Wormhole/tunnel effect |
-| `src/components/game/NebulaDriftStarfield.tsx` | Nebula cloud effect |
-| `src/lib/starfieldConfig.ts` | Shared config loader |
-
-## Files to Modify
+### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/game/NeonVortexStarfield.tsx` | Convert to Z-axis perspective |
-| `src/components/game/PrismaticWavesStarfield.tsx` | Convert to Z-axis perspective |
-| `src/pages/Controls.tsx` | Add new dropdown options + customization sliders |
-| `src/components/game/PlayerMenu.tsx` | Import new components, add switch cases |
+| `src/lib/starfieldConfig.ts` | Add new config properties, storage keys, defaults |
+| `src/pages/Controls.tsx` | Add new UI sliders and toggle for the new options |
+| `src/components/game/HyperspaceStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/MobileStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/NeonVortexStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/PrismaticWavesStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/CosmicTunnelStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/NebulaDriftStarfield.tsx` | Implement particleSize, motionBlur, singleColor |
+| `src/components/game/IntoTheVoidStarfield.tsx` | Implement all settings (new file) |
+| `src/components/game/PlayerMenu.tsx` | Add IntoTheVoidStarfield to switch statement |
 
 ---
 
-## Technical Implementation Details
+## Part 4: PWA Icons and App Name Update
 
-### Perspective Projection Math
+### Icon Updates
 
-All starfield effects will use the same core projection:
+The uploaded lander logo image needs to be:
+1. Copied to the public folder as new icon files
+2. Referenced in manifest.json and index.html
 
-```typescript
-const focalLength = 400; // Perspective strength
-const near = 0.05;       // Closest Z before respawn
-const far = 1.5;         // Farthest Z (spawn distance)
+| Source | Destination | Purpose |
+|--------|-------------|---------|
+| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/apple-touch-icon.png` | iOS Home Screen icon |
+| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/icon-192.png` | PWA 192x192 icon |
+| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/icon-512.png` | PWA 512x512 icon |
+| `user-uploads://AFCA166B-2764-4932-9C85-887AE852A712.png` | `public/favicon.png` | Browser tab favicon |
 
-// Project 3D point to 2D screen
-const screenX = centerX + (star.x / star.z) * focalLength;
-const screenY = centerY + (star.y / star.z) * focalLength;
+### App Name Changes
 
-// Scale size by depth (closer = larger)
-const scale = 1 / star.z;
+| File | Change |
+|------|--------|
+| `public/manifest.json` | Change `"name"` to `"LANDER"`, `"short_name"` to `"LANDER"` |
+| `index.html` | Change `apple-mobile-web-app-title` to `"LANDER"`, update favicon reference |
 
-// Move toward viewer
-star.z -= speed * dt;
+### manifest.json Updates
 
-// Respawn when too close
-if (star.z < near) {
-  star.z = far;
-  star.x = (Math.random() - 0.5) * 2;
-  star.y = (Math.random() - 0.5) * 2;
+```json
+{
+  "name": "LANDER",
+  "short_name": "LANDER",
+  "description": "Retro-inspired lunar lander with modern neon vectors, realistic physics, and satisfying landings.",
+  ...
 }
 ```
 
-### Performance Considerations
+### index.html Updates
 
-- All effects target 60fps on iOS Safari
-- Particle counts: Base 250-350, scaled by density setting
-- No `shadowBlur` - use radial gradients for glow
-- Pre-allocate all arrays (Float32Array where appropriate)
-- Batch similar draw operations
-- Limit gradient creation per frame
-
-### Neon Vortex Spiral Enhancement
-
-Add spiral twist as stars approach:
-
-```typescript
-// Angular velocity increases as z decreases (closer = faster rotation)
-star.angle += (config.speed * 0.3 / star.z) * dt;
-
-// Outward spiral expansion as z decreases
-const spiralRadius = star.baseRadius * (1 / star.z);
-const x = Math.cos(star.angle) * spiralRadius;
-const y = Math.sin(star.angle) * spiralRadius;
-```
-
-### Prismatic Waves 3D Transform
-
-Convert wave motion to radial:
-
-```typescript
-// Each star has an angle from center
-const radialX = Math.cos(star.angle);
-const radialY = Math.sin(star.angle);
-
-// Wave offset perpendicular to radial direction
-const waveOffset = Math.sin(star.z * star.frequency + star.phase) * star.amplitude;
-const perpX = -radialY * waveOffset * 0.1;
-const perpY = radialX * waveOffset * 0.1;
-
-// Final 3D position
-const x = radialX * star.radius + perpX;
-const y = radialY * star.radius + perpY;
-
-// Project to screen
-const screenX = centerX + (x / star.z) * focalLength;
-const screenY = centerY + (y / star.z) * focalLength;
+```html
+<meta name="apple-mobile-web-app-title" content="LANDER" />
+<link rel="icon" type="image/png" href="/favicon.png" />
 ```
 
 ---
 
 ## Implementation Order
 
-1. Create `src/lib/starfieldConfig.ts` - Shared config loader
-2. Modify `src/components/game/NeonVortexStarfield.tsx` - Add Z perspective + config integration
-3. Modify `src/components/game/PrismaticWavesStarfield.tsx` - Add Z perspective + config integration
-4. Create `src/components/game/CosmicTunnelStarfield.tsx` - New tunnel effect
-5. Create `src/components/game/NebulaDriftStarfield.tsx` - New nebula effect
-6. Update `src/pages/Controls.tsx` - Add dropdown options + customization section
-7. Update `src/components/game/PlayerMenu.tsx` - Import and render new starfields
+1. **Copy icon file** to public folder for PWA/favicon use
+2. **Update manifest.json** with new name "LANDER" and icon references
+3. **Update index.html** with new app title and favicon
+4. **Update starfieldConfig.ts** with new settings (particleSize, motionBlur, singleColor)
+5. **Fix HyperspaceStarfield.tsx** - add config refresh mechanism + implement new settings
+6. **Update all other starfield components** with new settings
+7. **Create IntoTheVoidStarfield.tsx** - new concentric circles tunnel effect
+8. **Update Controls.tsx** - add "Into the Void" to dropdown + new customization sliders
+9. **Update PlayerMenu.tsx** - add IntoTheVoidStarfield to render switch
 
 ---
 
-## New Dropdown Options
+## Technical Details
 
-After implementation, the Starfield Style dropdown will have:
+### Motion Blur Implementation
+
+Motion blur can be achieved by drawing multiple semi-transparent copies of each particle along its motion path:
+
+```typescript
+if (config.motionBlur > 0.1) {
+  // Draw 3-5 blur copies
+  const blurSteps = Math.floor(3 + config.motionBlur * 2);
+  for (let b = 0; b < blurSteps; b++) {
+    const blurT = b / blurSteps;
+    const blurX = lerp(prevX, currentX, blurT);
+    const blurY = lerp(prevY, currentY, blurT);
+    const blurAlpha = baseAlpha * (1 - blurT) * config.motionBlur * 0.3;
+    // Draw faded copy at blurX, blurY with blurAlpha
+  }
+}
+```
+
+### Single Color Mode Implementation
+
+When enabled, bypass the color cycling and use only the neonHue:
+
+```typescript
+const finalHue = config.singleColor 
+  ? config.neonHue 
+  : (cycledHue + hueShift + 360) % 360;
+```
+
+### Config Refresh for Hyperspace
+
+Add a storage event listener to detect changes:
+
+```typescript
+useEffect(() => {
+  const handleStorageChange = () => {
+    configRef.current = loadStarfieldConfig();
+  };
+  
+  window.addEventListener('storage', handleStorageChange);
+  
+  // Also check periodically for same-tab changes
+  const interval = setInterval(() => {
+    configRef.current = loadStarfieldConfig();
+  }, 500);
+  
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+    clearInterval(interval);
+  };
+}, []);
+```
+
+---
+
+## Files Summary
+
+### Files to Create
+
+| File | Description |
+|------|-------------|
+| `src/components/game/IntoTheVoidStarfield.tsx` | Concentric circles tunnel starfield |
+| `public/favicon.png` | New favicon (copied from upload) |
+
+### Files to Modify
+
+| File | Description |
+|------|-------------|
+| `public/manifest.json` | Update name to "LANDER" |
+| `index.html` | Update app title and favicon |
+| `src/lib/starfieldConfig.ts` | Add particleSize, motionBlur, singleColor |
+| `src/pages/Controls.tsx` | Add "Into the Void" dropdown option + new sliders |
+| `src/components/game/PlayerMenu.tsx` | Add IntoTheVoidStarfield to render switch |
+| `src/components/game/HyperspaceStarfield.tsx` | Fix config refresh + implement new settings |
+| `src/components/game/MobileStarfield.tsx` | Implement new settings |
+| `src/components/game/NeonVortexStarfield.tsx` | Implement new settings |
+| `src/components/game/PrismaticWavesStarfield.tsx` | Implement new settings |
+| `src/components/game/CosmicTunnelStarfield.tsx` | Implement new settings |
+| `src/components/game/NebulaDriftStarfield.tsx` | Implement new settings |
+
+### Files to Copy
+
+| Source | Destination |
+|--------|-------------|
+| `user-uploads://AFCA166B-...` | `public/apple-touch-icon.png` |
+| `user-uploads://AFCA166B-...` | `public/icon-192.png` |
+| `user-uploads://AFCA166B-...` | `public/icon-512.png` |
+| `user-uploads://AFCA166B-...` | `public/favicon.png` |
+
+---
+
+## New Dropdown Options After Implementation
 
 | Value | Label |
 |-------|-------|
@@ -326,4 +313,5 @@ After implementation, the Starfield Style dropdown will have:
 | `waves` | Prismatic Waves |
 | `tunnel` | Cosmic Tunnel |
 | `nebula` | Nebula Drift |
+| `void` | Into the Void |
 
