@@ -1,179 +1,258 @@
 
-# Plan: Low Fuel Flashing in Medley/Survival and iOS Starfield Toggle
+
+# Plan: Create Two New Stunning iOS Starfield Effects
 
 ## Summary
 
-This plan addresses two features:
-1. Replicate the low fuel lander flashing behavior (from Time Trial, Fixed, Classic modes) into Medley and Survival modes
-2. Create an improved starfield option for iOS devices with a toggle in settings
+Create two visually impressive, iOS-optimized starfield components that provide high visual impact with neon color cycles, blur trails, and stunning effects while maintaining 60fps performance. Add them as new options in the Starfield Style dropdown.
 
 ---
 
-## Part 1: Low Fuel Lander Flashing for Medley and Survival
+## New Starfield Effects Overview
 
-### Current Behavior
-- **GameEngine.tsx** (line 5543): The ship color/glow warning system only runs for modes: "classic", "fixed", or "timetrial"
-- **Medley mode** uses GameEngine but is excluded from the condition
-- **SurvivalEngine.tsx**: Has no ship color warning system at all - the lander outline always uses `neonColor`
+### Effect 1: "Neon Vortex" 
+A swirling spiral vortex effect with:
+- Stars moving in spiral patterns toward/from center
+- Smooth neon color cycling (pink → purple → cyan → green → yellow → orange)
+- Soft blur trails that follow the spiral motion
+- Occasional "pulse waves" that ripple outward
+- Glowing particles with variable brightness
 
-### The Warning Effect Logic (from GameEngine lines 5539-5567)
+### Effect 2: "Prismatic Waves"
+A flowing wave-based effect with:
+- Stars arranged in flowing wave patterns across screen
+- Multi-colored neon gradients that shift across the waves
+- Horizontal motion with vertical oscillation
+- Streaking comet-like trails with glow halos
+- Depth layers with parallax motion
+
+---
+
+## Technical Implementation
+
+### New Files to Create
+
+| File | Description |
+|------|-------------|
+| `src/components/game/NeonVortexStarfield.tsx` | Spiral vortex starfield with neon cycling |
+| `src/components/game/PrismaticWavesStarfield.tsx` | Wave-based starfield with flowing motion |
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/game/PlayerMenu.tsx` | Add imports and conditional rendering for new starfields |
+| `src/pages/Controls.tsx` | Add new options to Starfield Style dropdown |
+
+---
+
+## Effect 1: Neon Vortex Starfield
+
+### Visual Design
 ```text
-Fuel Level       | Effect
------------------|------------------------------------------
-50% - 8%         | Ship pulses between neon and red
-                 | Frequency: 2Hz at 50% → 8Hz at 8% (faster as fuel drops)
-                 | Red intensity: 30% at 50% → 100% at 8%
-Below 8%         | Solid red with pulsing glow (5Hz)
-                 | Glow: 20-40px pulsing shadow blur
+    ·  · ·      ·
+   ·    ╔═══╗    ·
+  ·   ╔═╝   ╚═╗   ·
+ ·   ║  ◉ ◉ ◉  ║   ·
+  ·  ╚══╗ ╔══╝  ·
+   ·    ╚═╝    ·
+    ·   · ·   ·
 ```
 
-### Files to Modify
+### Key Features
+- **Spiral Motion**: Stars orbit center with varying radii and speeds
+- **Color Cycling**: Each star cycles through neon palette independently with slight offsets
+- **Blur Trails**: Motion blur achieved via drawing previous positions with decreasing alpha
+- **Pulse Waves**: Periodic circular waves expand from center, affecting star brightness
+- **Performance**: Uses Float32Arrays, minimal state, ~300 particles
 
-| File | Change |
-|------|--------|
-| `src/components/game/GameEngine.tsx` | Add "medley" to the mode check at line 5543 |
-| `src/components/game/SurvivalEngine.tsx` | Add the entire ship color warning logic before lander rendering |
-
-### Implementation Details
-
-**GameEngine.tsx (simple fix)**
-Change line 5543 from:
+### Core Algorithm
 ```typescript
-if (mode === "classic" || mode === "fixed" || mode === "timetrial") {
-```
-To:
-```typescript
-if (mode === "classic" || mode === "fixed" || mode === "timetrial" || mode === "medley") {
-```
-
-**SurvivalEngine.tsx (add full warning logic)**
-Add before line 3608 (where `ctx.globalAlpha = shipAlpha` is set):
-```typescript
-// Low fuel warning - smooth color fade and pulsing glow
-let shipColor = neonColor;
-let shipShadowBlur = shouldOptimize ? 8 : 12;
-
-const fuelPercent = fuelAmount / fuelCap;
-
-if (fuelPercent <= 0.5 && fuelPercent > 0) {
-  if (fuelPercent < 0.08) {
-    // Below 8% - Solid red with pulsing glow
-    shipColor = "#ff0000";
-    const glowPulse = (Math.sin(currentTime * 5 * Math.PI * 2) + 1) / 2;
-    shipShadowBlur = 20 + glowPulse * 20;
-  } else {
-    // 8-50% - Pulsing between neon and red
-    const fuelRatio = (fuelPercent - 0.08) / 0.42;
-    const pulseFreq = 2 + (1 - fuelRatio) * 6;
-    const pulse = (Math.sin(currentTime * pulseFreq * Math.PI * 2) + 1) / 2;
-    const redInfluence = 0.3 + (1 - fuelRatio) * 0.7;
-    shipColor = pulse > (1 - redInfluence) ? "#ff0000" : neonColor;
-  }
+interface VortexStar {
+  angle: number;      // Current angle in radians
+  radius: number;     // Distance from center (0-1)
+  speed: number;      // Angular velocity
+  size: number;       // Star size
+  brightness: number; // Base brightness
+  colorPhase: number; // Offset in color cycle
+  layer: number;      // Depth layer (1-3)
 }
-```
 
-Then update lines 3611-3613 to use `shipColor` and `shipShadowBlur` instead of `neonColor` and hardcoded `12`.
+// Update each frame:
+star.angle += star.speed * dt * (1 + 0.5 / star.radius); // Faster near center
+star.radius += (star.outward ? 0.02 : -0.02) * dt;       // Spiral in/out
+```
 
 ---
 
-## Part 2: iOS Starfield Toggle
+## Effect 2: Prismatic Waves Starfield
 
-### Current Behavior
-- iOS devices use `MobileStarfield` (radial burst with neon color cycling)
-- Non-iOS devices use `HyperspaceStarfield` (3D perspective starfield with trails)
-- No user option to switch between them
+### Visual Design
+```text
+  ~~~≈≈≈~~~≈≈≈~~~≈≈≈~~~
+ ~~~≈≈≈≈≈≈~~~≈≈≈≈≈≈~~~≈≈
+~~~≈≈≈≈≈≈≈≈≈~~~≈≈≈≈≈≈≈≈≈~~
+  ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈
+~~~≈≈≈≈≈≈≈≈≈~~~≈≈≈≈≈≈≈≈≈~~
+```
 
-### Solution: Create Enhanced iOS Starfield + Toggle
+### Key Features
+- **Wave Motion**: Stars follow sine wave paths with varying frequencies
+- **Horizontal Flow**: Stars drift left-to-right (or right-to-left) across screen
+- **Prismatic Colors**: Color gradient shifts across X position (rainbow effect)
+- **Parallax Layers**: 3 depth layers with different speeds and sizes
+- **Comet Trails**: Elongated gradient trails behind faster stars
 
-#### Approach A: Add HyperspaceStarfield Support for iOS
-The `HyperspaceStarfield` component already works on iOS - it just uses simpler rendering. We can allow iOS users to opt into it.
+### Core Algorithm
+```typescript
+interface WaveStar {
+  x: number;           // Position (0 to screenWidth)
+  baseY: number;       // Anchor Y position
+  frequency: number;   // Wave frequency
+  amplitude: number;   // Wave amplitude
+  phase: number;       // Wave phase offset
+  speed: number;       // Horizontal speed
+  layer: number;       // Depth (affects speed, size, alpha)
+}
 
-#### New Setting
-| Setting | localStorage Key | Default | Options |
-|---------|-----------------|---------|---------|
-| Starfield Style | `ll-starfield-style` | `"auto"` | `"auto"`, `"hyperspace"`, `"mobile"` |
+// Update each frame:
+star.x += star.speed * star.layer * dt;
+const waveY = star.baseY + Math.sin(star.x * star.frequency + star.phase) * star.amplitude;
+// Color based on x position in gradient
+const hue = (star.x / width) * 360 + globalTime * 20;
+```
 
-- **auto**: iOS uses MobileStarfield, others use HyperspaceStarfield (current behavior)
-- **hyperspace**: Always use HyperspaceStarfield (3D perspective)
-- **mobile**: Always use MobileStarfield (radial burst)
+---
 
-### Files to Modify
+## Implementation Details
 
-| File | Change |
-|------|--------|
-| `src/pages/Controls.tsx` | Add Starfield Style dropdown (visible in both player menu and developer settings) |
-| `src/components/game/PlayerMenu.tsx` | Read setting and conditionally render starfield |
+### NeonVortexStarfield.tsx
 
-### Settings UI (Controls.tsx)
-Add to the "Gameplay Settings" section:
-```jsx
-<div>
-  <Label>Starfield Style</Label>
-  <Select value={starfieldStyle} onValueChange={setStarfieldStyle}>
-    <SelectTrigger>
-      <SelectValue />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="auto">Auto (Default)</SelectItem>
-      <SelectItem value="hyperspace">Hyperspace (3D)</SelectItem>
-      <SelectItem value="mobile">Radial Burst</SelectItem>
-    </SelectContent>
-  </Select>
-  <p className="text-xs text-muted-foreground mt-1">
-    Choose the starfield effect for menus. Hyperspace uses 3D perspective, Radial uses outward burst.
-  </p>
-</div>
+```typescript
+// Component structure
+const NeonVortexStarfield: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const starsRef = useRef<VortexStar[]>([]);
+  const pulseRef = useRef<{ time: number; active: boolean }>({ time: 0, active: false });
+  
+  // Neon palette (matching MobileStarfield)
+  const NEON_COLORS = [
+    { h: 330, s: 100, l: 65 }, // pink
+    { h: 270, s: 100, l: 70 }, // purple  
+    { h: 180, s: 100, l: 60 }, // cyan
+    { h: 140, s: 100, l: 55 }, // green
+    { h: 50, s: 100, l: 55 },  // yellow
+    { h: 25, s: 100, l: 60 },  // orange
+  ];
+  
+  // Initialize ~300 stars in spiral distribution
+  // Main render loop:
+  // 1. Clear with dark background + subtle vignette
+  // 2. Draw pulse wave if active (expanding ring)
+  // 3. For each star:
+  //    - Calculate spiral position
+  //    - Draw trail (3-5 previous positions with decreasing alpha)
+  //    - Draw star with current neon color + glow
+  // 4. Trigger pulse wave every 4-6 seconds
+};
+```
+
+### PrismaticWavesStarfield.tsx
+
+```typescript
+// Component structure  
+const PrismaticWavesStarfield: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const starsRef = useRef<WaveStar[]>([]);
+  
+  // Initialize ~350 stars across 3 layers
+  // Main render loop:
+  // 1. Clear with dark background
+  // 2. Draw subtle horizontal gradient bands (very low alpha)
+  // 3. For each star (sorted by layer for proper depth):
+  //    - Calculate wave position
+  //    - Calculate prismatic color from position
+  //    - Draw elongated trail gradient
+  //    - Draw star point with glow
+  // 4. Apply subtle chromatic aberration at edges (optional)
+};
+```
+
+---
+
+## Performance Optimizations (Critical for iOS)
+
+1. **Particle Count**: 300-350 stars max (vs 400 in MobileStarfield)
+2. **No shadowBlur**: Use gradient fills instead for glow effects
+3. **Batch Drawing**: Group similar operations
+4. **Float32Arrays**: Efficient numeric storage
+5. **Minimal Allocations**: Reuse color strings, avoid object creation in loop
+6. **RAF Throttling**: Skip frames if dt too small
+7. **No Complex Paths**: Simple arcs and lines only
+
+---
+
+## Settings Integration
+
+### Controls.tsx Update
+```typescript
+<SelectContent>
+  <SelectItem value="auto">Auto (Default)</SelectItem>
+  <SelectItem value="hyperspace">Hyperspace (3D)</SelectItem>
+  <SelectItem value="mobile">Radial Burst</SelectItem>
+  <SelectItem value="vortex">Neon Vortex</SelectItem>
+  <SelectItem value="waves">Prismatic Waves</SelectItem>
+</SelectContent>
 ```
 
 ### PlayerMenu.tsx Update
-Change the starfield rendering logic:
 ```typescript
-// Read starfield preference
-const [starfieldStyle] = useState(() => {
-  try {
-    const saved = localStorage.getItem('ll-starfield-style');
-    if (saved === 'hyperspace' || saved === 'mobile') return saved;
-  } catch {}
-  return 'auto';
-});
+import { NeonVortexStarfield } from "./NeonVortexStarfield";
+import { PrismaticWavesStarfield } from "./PrismaticWavesStarfield";
 
-// Determine which starfield to use
-const useHyperspace = 
-  starfieldStyle === 'hyperspace' || 
-  (starfieldStyle === 'auto' && !isiOS);
-
-// In JSX:
-{useHyperspace ? (
-  <HyperspaceStarfield ... />
-) : (
-  <MobileStarfield ... />
-)}
+// In render:
+const renderStarfield = () => {
+  switch (starfieldStyle) {
+    case 'hyperspace':
+      return <HyperspaceStarfield ... />;
+    case 'mobile':
+      return <MobileStarfield ... />;
+    case 'vortex':
+      return <NeonVortexStarfield />;
+    case 'waves':
+      return <PrismaticWavesStarfield />;
+    case 'auto':
+    default:
+      return isiOS ? <MobileStarfield ... /> : <HyperspaceStarfield ... />;
+  }
+};
 ```
+
+---
+
+## localStorage Key Values
+
+| Key | New Valid Values |
+|-----|------------------|
+| `ll-starfield-style` | `"auto"`, `"hyperspace"`, `"mobile"`, `"vortex"`, `"waves"` |
 
 ---
 
 ## Implementation Order
 
-1. **GameEngine.tsx**: Add "medley" to the fuel warning mode check (1 line change)
-2. **SurvivalEngine.tsx**: Add complete fuel warning logic with shipColor and shipShadowBlur
-3. **Controls.tsx**: Add starfield style dropdown with state and localStorage persistence
-4. **PlayerMenu.tsx**: Read starfield preference and update conditional rendering
+1. **Create `NeonVortexStarfield.tsx`** - Full spiral vortex implementation
+2. **Create `PrismaticWavesStarfield.tsx`** - Full wave pattern implementation  
+3. **Update `Controls.tsx`** - Add "Neon Vortex" and "Prismatic Waves" options to dropdown
+4. **Update `PlayerMenu.tsx`** - Import new components and add switch cases for rendering
 
 ---
 
-## Technical Notes
+## Visual Impact Summary
 
-### Fuel Warning Variables
-Both engines need these variables for the warning effect:
-- `shipColor`: The current ship outline color (neonColor or #ff0000)
-- `shipShadowBlur`: The glow intensity (base value or pulsing 20-40px)
-- `fuelPercent`: Current fuel / fuel capacity
-- Timing: Use `currentTime` (SurvivalEngine) or `elapsed` (GameEngine)
+| Effect | Motion | Colors | Trails | Special |
+|--------|--------|--------|--------|---------|
+| Neon Vortex | Spiral in/out | Cycling neon | Curved blur | Pulse waves |
+| Prismatic Waves | Horizontal + sine wave | Positional gradient | Comet streaks | Parallax layers |
 
-### Starfield Setting Location
-The setting will appear in both Player Menu settings and Developer Menu settings since:
-1. It's a visual preference that players may want to adjust
-2. It's not a technical/debug setting
+Both effects prioritize visual "wow factor" while staying within iOS Safari's canvas performance limits.
 
-### Performance Consideration
-The HyperspaceStarfield on iOS may be slightly more CPU-intensive than MobileStarfield, but both are designed to run at 60fps on modern devices. The `lowGraphics` prop on HyperspaceStarfield reduces particle count if needed.
