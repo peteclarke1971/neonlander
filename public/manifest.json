@@ -1,6 +1,6 @@
 {
-  "name": "Neon Lunar Lander",
-  "short_name": "Lunar Lander",
+  "name": "LANDER",
+  "short_name": "LANDER",
   "description": "Retro-inspired lunar lander with modern neon vectors, realistic physics, and satisfying landings.",
   "start_url": "/",
   "display": "standalone",

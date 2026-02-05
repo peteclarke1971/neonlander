@@ -121,7 +121,7 @@ export default function ControlsSettings() {
   const [starfieldStyle, setStarfieldStyle] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('ll-starfield-style');
-       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula') return saved;
+       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula' || saved === 'void') return saved;
     } catch {}
     return 'auto';
   });
@@ -1033,6 +1033,7 @@ export default function ControlsSettings() {
                   <SelectItem value="waves">Prismatic Waves</SelectItem>
                    <SelectItem value="tunnel">Cosmic Tunnel</SelectItem>
                    <SelectItem value="nebula">Nebula Drift</SelectItem>
+                   <SelectItem value="void">Into the Void</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1203,6 +1204,56 @@ export default function ControlsSettings() {
                        <span>Off</span>
                        <span>Bright</span>
                      </div>
+                   </div>
+                   
+                   {/* Particle Size */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Particle Size</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.particleSize.toFixed(1)}x</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.particleSize]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, particleSize: v[0] }))}
+                       min={0.5}
+                       max={10.0}
+                       step={0.5}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>Tiny</span>
+                       <span>Huge (10x)</span>
+                     </div>
+                   </div>
+                   
+                   {/* Motion Blur */}
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <Label>Motion Blur</Label>
+                       <span className="text-sm text-muted-foreground">{starfieldConfig.motionBlur.toFixed(1)}</span>
+                     </div>
+                     <Slider
+                       value={[starfieldConfig.motionBlur]}
+                       onValueChange={(v) => setStarfieldConfig(c => ({ ...c, motionBlur: v[0] }))}
+                       min={0}
+                       max={1.0}
+                       step={0.1}
+                     />
+                     <div className="flex justify-between text-xs text-muted-foreground">
+                       <span>None</span>
+                       <span>Heavy</span>
+                     </div>
+                   </div>
+                   
+                   {/* Single Color Mode */}
+                   <div className="flex items-center justify-between">
+                     <div>
+                       <Label>Single Color Mode</Label>
+                       <div className="text-xs text-muted-foreground">Lock to Base Neon Color only</div>
+                     </div>
+                     <Switch
+                       checked={starfieldConfig.singleColor}
+                       onCheckedChange={(v) => setStarfieldConfig(c => ({ ...c, singleColor: v }))}
+                     />
                    </div>
                    
                    {/* Reset to Defaults */}

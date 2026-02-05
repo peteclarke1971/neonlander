@@ -37,13 +37,23 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
     
     // Load config and apply density/speed multipliers
     configRef.current = loadStarfieldConfig();
-    const config = configRef.current;
-    const effectiveStarCount = Math.floor(starCount * config.density);
-    const effectiveSpeed = speed * config.speed;
+    
+    // Periodic config refresh for same-tab changes
+    const configRefreshInterval = setInterval(() => {
+      configRef.current = loadStarfieldConfig();
+    }, 500);
+    
+    // Listen for storage events (cross-tab changes)
+    const handleStorageChange = () => {
+      configRef.current = loadStarfieldConfig();
+    };
+    window.addEventListener('storage', handleStorageChange);
 
     // Initialize stars
     const initStars = () => {
       starsRef.current = [];
+      const config = configRef.current;
+      const effectiveStarCount = Math.floor(starCount * config.density);
       for (let i = 0; i < effectiveStarCount; i++) {
         const isFast = Math.random() < 0.05;
         starsRef.current.push({
@@ -87,6 +97,9 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
       const centerY = h / 2;
       const maxRadius = Math.max(w, h) * 0.8;
 
+      const config = configRef.current;
+      const effectiveSpeed = speed * config.speed;
+      
       // Calculate global color cycle position
       const elapsed = (now - startTimeRef.current) / 1000;
       const baseCycleSpeed = 0.08;
@@ -115,22 +128,33 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
         const scale = 0.6 + star.distance * 2.5;
         const alpha = Math.min(1, star.brightness * (0.5 + star.distance * 0.5));
 
-        // Calculate individual star's color position
-        const starColorPos = (globalColorPos + star.colorOffset) % NEON_COLORS.length;
-        const colorIndex = Math.floor(starColorPos);
-        const colorT = starColorPos - colorIndex;
-        const color1 = NEON_COLORS[colorIndex];
-        const color2 = NEON_COLORS[(colorIndex + 1) % NEON_COLORS.length];
-        const baseColor = lerpColor(color1, color2, colorT);
-        const color = {
-          h: (baseColor.h + hueShift + 360) % 360,
-          s: baseColor.s,
-          l: baseColor.l,
-        };
+        // Calculate color - use single color if enabled
+        let finalHue: number;
+        let finalS: number;
+        let finalL: number;
+        
+        if (config.singleColor) {
+          finalHue = config.neonHue;
+          finalS = 100;
+          finalL = 65;
+        } else {
+          const starColorPos = (globalColorPos + star.colorOffset) % NEON_COLORS.length;
+          const colorIndex = Math.floor(starColorPos);
+          const colorT = starColorPos - colorIndex;
+          const color1 = NEON_COLORS[colorIndex];
+          const color2 = NEON_COLORS[(colorIndex + 1) % NEON_COLORS.length];
+          const baseColor = lerpColor(color1, color2, colorT);
+          finalHue = (baseColor.h + hueShift + 360) % 360;
+          finalS = baseColor.s;
+          finalL = baseColor.l;
+        }
 
         const colorBlend = star.distance * 0.6;
-        const finalL = color.l + (100 - color.l) * (1 - colorBlend);
-        const finalS = color.s * colorBlend;
+        const displayL = finalL + (100 - finalL) * (1 - colorBlend);
+        const displayS = finalS * colorBlend;
+        
+        // Apply particle size
+        const sizeMultiplier = config.particleSize;
 
         // Draw star with trail (respecting config.trail)
         const trailLength = star.distance * 8 * effectiveSpeed * config.trail * (star.isFast ? 2.5 : 1);
@@ -143,16 +167,33 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
           ctx.moveTo(trailX, trailY);
           ctx.lineTo(x, y);
           ctx.strokeStyle = star.isFast
-            ? `hsla(${color.h}, ${finalS}%, ${finalL}%, ${alpha * 0.85})`
-            : `hsla(${color.h}, ${finalS * 0.5}%, ${finalL}%, ${alpha * 0.7})`;
-          ctx.lineWidth = star.size * scale * (star.isFast ? 0.7 : 0.5);
+            ? `hsla(${finalHue}, ${displayS}%, ${displayL}%, ${alpha * 0.85})`
+            : `hsla(${finalHue}, ${displayS * 0.5}%, ${displayL}%, ${alpha * 0.7})`;
+          ctx.lineWidth = star.size * scale * (star.isFast ? 0.7 : 0.5) * sizeMultiplier;
           ctx.stroke();
+        }
+        
+        // Motion blur effect
+        if (config.motionBlur > 0.1 && star.distance > 0.1) {
+          const blurSteps = Math.floor(2 + config.motionBlur * 2);
+          const blurDist = star.distance * 0.1 * config.motionBlur;
+          for (let b = 0; b < blurSteps; b++) {
+            const blurT = b / blurSteps;
+            const blurRadius = star.distance - blurDist * blurT;
+            const blurX = centerX + Math.cos(star.angle) * blurRadius * maxRadius;
+            const blurY = centerY + Math.sin(star.angle) * blurRadius * maxRadius;
+            const blurAlpha = alpha * (1 - blurT) * config.motionBlur * 0.4;
+            ctx.beginPath();
+            ctx.arc(blurX, blurY, star.size * scale * sizeMultiplier * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${finalHue}, ${displayS}%, ${displayL}%, ${blurAlpha})`;
+            ctx.fill();
+          }
         }
 
         // Draw star point
         ctx.beginPath();
-        ctx.arc(x, y, star.size * scale, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${color.h}, ${finalS}%, ${finalL}%, ${alpha})`;
+        ctx.arc(x, y, star.size * scale * sizeMultiplier, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${finalHue}, ${displayS}%, ${displayL}%, ${alpha})`;
         ctx.fill();
 
         // Respawn at center when off-screen
@@ -173,6 +214,8 @@ export const MobileStarfield: React.FC<MobileStarfieldProps> = ({
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      clearInterval(configRefreshInterval);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [starCount, speed]);
 

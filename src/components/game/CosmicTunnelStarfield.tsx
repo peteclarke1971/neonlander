@@ -88,7 +88,9 @@
        const centerX = w / 2;
        const centerY = h / 2;
  
-       const config = configRef.current;
+        // Refresh config each frame for live updates
+        configRef.current = loadStarfieldConfig();
+        const config = configRef.current;
        const elapsed = (now - startTimeRef.current) / 1000;
        const cycleSpeed = config.colorCycle ? 0.1 * config.colorSpeed : 0;
        const globalColorPos = (elapsed * cycleSpeed) % NEON_COLORS.length;
@@ -179,13 +181,15 @@
  
          // Color based on depth ring
          const hueShift = config.neonHue - 280;
-         const depthHue = config.colorCycle
+          const depthHue = config.singleColor
+            ? config.neonHue
+            : config.colorCycle
            ? ((star.z * 180 + globalColorPos * 60) + hueShift + 360) % 360
            : ((star.colorPhase / NEON_COLORS.length * 360) + hueShift + 360) % 360;
  
          const depthScale = Math.min(2.5, 1 / star.z);
          const baseAlpha = star.brightness * (0.5 + depthScale * 0.3);
-         const displaySize = star.size * depthScale * 0.7;
+          const displaySize = star.size * depthScale * 0.7 * config.particleSize;
  
          // Draw trail toward center
          if (config.trail > 0.1 && prevX !== 0 && prevY !== 0) {
@@ -212,6 +216,21 @@
              ctx.stroke();
            }
          }
+          
+          // Motion blur effect
+          if (config.motionBlur > 0.1 && prevX !== 0) {
+            const blurSteps = Math.floor(2 + config.motionBlur * 2);
+            for (let b = 0; b < blurSteps; b++) {
+              const blurT = b / blurSteps;
+              const blurX = screenX + (centerX - screenX) * blurT * 0.15;
+              const blurY = screenY + (centerY - screenY) * blurT * 0.15;
+              const blurAlpha = baseAlpha * (1 - blurT) * config.motionBlur * 0.3;
+              ctx.beginPath();
+              ctx.arc(blurX, blurY, displaySize * 0.4, 0, Math.PI * 2);
+              ctx.fillStyle = `hsla(${depthHue}, 100%, 70%, ${blurAlpha})`;
+              ctx.fill();
+            }
+          }
  
          // Draw star glow
          const glowRadius = displaySize * 3 * config.glow;
