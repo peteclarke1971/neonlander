@@ -1,159 +1,142 @@
 
-# Plan: Fix Hyperspace 3D Performance & Verify World-Wrap Rendering
 
-## Summary
+# Revised Plan: Local + Global Leaderboard Overhaul
 
-Two issues need addressing:
-1. **Hyperspace 3D massive FPS drop** - Recent customization changes added expensive operations that kill performance on PC
-2. **Lander feels sluggish** - This is a side effect of the Hyperspace FPS drop affecting the entire app's frame rate
+## What We're Doing
 
-The world-wrap visibility fixes are correct and should NOT be reverted - they properly use centered bounds (`[-halfView, halfView]`) and draw at world coordinates.
+1. **Create a local leaderboard for Medley mode** (it currently has none -- scores go to localStorage but PlayerMenu only shows global)
+2. **Standardize all local leaderboard seed data** across all modes with the same 5 entries
+3. **Wipe and re-seed all global leaderboard tables** as a one-time database operation
+4. **Fix medley "always a high score" bug** by reducing cap from 10 to 5 and adding seed data
+5. **Add local/global alternation** to the PlayerMenu idle carousel
 
 ---
 
-## Part 1: Hyperspace 3D Performance Fix
+## Current State
 
-### Root Cause Analysis
+### Local Leaderboards (localStorage)
 
-The recent changes added several expensive operations:
+| Mode | Storage Key | Seed Data | Status |
+|------|------------|-----------|--------|
+| Campaign (fixed) | `ll-highscores-fixed` | Yes (IH 100000, FIX 50000, etc.) | Exists but needs new seeds |
+| Classic | `ll-highscores-classic` | Yes (IH 100000, LEM 50000, etc.) | Exists but needs new seeds |
+| Survival | `survival-mode-high-scores` | Yes (SRV 15000, END 12000, etc.) | Exists but needs new seeds |
+| Medley | `medleyHighScores_easy` / `medleyHighScores_hard` | No seeds at all | Needs creating with seeds |
 
-| Change | Impact |
-|--------|--------|
-| 500ms `setInterval` for config refresh | Minor CPU overhead, creates garbage collection pressure |
-| Motion blur loop (lines 340-353) | **MAJOR** - draws 2-5 extra `arc()` + `fill()` per star = up to 6000 extra draw calls per frame |
-| `shadowBlur * particleSize` (line 302) | Larger shadow blur = exponentially slower GPU compositing |
-| Config read inside render loop | Memory allocation per frame |
+### Global Leaderboard (Supabase `scores` table)
 
-With 1200 stars and motion blur enabled:
-- Default: 1200 strokes per frame
-- With motion blur: 1200 + (1200 × 5) = **7200 draw calls per frame**
+| Mode | Easy Count | Hard Count |
+|------|-----------|-----------|
+| classic | 2,815 entries (all 100,000) | 1,874 entries (all 5,000-25,000) |
+| fixed | 2,799 entries (all 100,000) | 1,876 entries (all 5,000-25,000) |
+| survival | 36 entries | 0 |
+| medley | 82 entries | 0 |
+| timetrial | 13 entries | 0 |
 
-### Solution: Simplify and Optimize
+---
 
-1. **Remove the 500ms setInterval** - Use only the `storage` event listener (which only fires on actual changes)
-2. **Disable motion blur by default** - Set `motionBlur` default to 0 instead of 0.5
-3. **Cap shadowBlur multiplier** - Limit `shadowBlur * particleSize` to reasonable maximum
-4. **Optimize motion blur when enabled** - Reduce steps and skip when particle isn't moving much
-5. **Cache config read** - Only read config once per frame, not per-star
+## Changes
 
-### Files to Modify
+### 1. Standardize All Local Seed Scores
+
+Update `Index.tsx` (classic + fixed), `Survival.tsx`, and `medleyLeaderboard.ts` so that when no local scores exist, they all seed with:
+
+| Rank | Initials | Score |
+|------|----------|-------|
+| 1 | IH | 50,000 |
+| 2 | SDP | 30,000 |
+| 3 | PC | 15,000 |
+| 4 | ASH | 10,000 |
+| 5 | IAN | 5,000 |
+
+**Files affected:**
+- `src/pages/Index.tsx` -- Update `classicScores` and `fixedScores` seed arrays (lines 58-64 and 76-81)
+- `src/pages/Survival.tsx` -- Update survival seed array (lines 46-52)
+- `src/lib/medleyLeaderboard.ts` -- Add seed scores function, change cap from 10 to 5
+
+### 2. Fix Medley Leaderboard
+
+In `src/lib/medleyLeaderboard.ts`:
+- Add `getDefaultMedleyScores(difficulty)` returning the 5 standard seed scores
+- Update `getMedleyHighScores` to return seeds when localStorage is empty
+- Change `saveMedleyScore` to keep top **5** (not 10)
+- Change `isMedleyHighScore` threshold from 10 to 5
+- Change `getMedleyScoreRank` threshold from 10 to 5
+
+### 3. Wipe and Re-seed Global Scores (One-Time Database Operation)
+
+Delete ALL existing scores for classic, fixed, survival, and medley from the `scores` table, then insert the following 20 rows (5 per mode):
+
+| Mode | Initials | Score | Difficulty |
+|------|----------|-------|------------|
+| classic | IH | 75,000 | easy |
+| classic | EWC | 50,000 | easy |
+| classic | PHI | 30,000 | easy |
+| classic | FAD | 15,000 | easy |
+| classic | LUM | 7,500 | easy |
+| fixed | IH | 75,000 | easy |
+| fixed | EWC | 50,000 | easy |
+| fixed | PHI | 30,000 | easy |
+| fixed | FAD | 15,000 | easy |
+| fixed | LUM | 7,500 | easy |
+| survival | IH | 75,000 | easy |
+| survival | EWC | 50,000 | easy |
+| survival | PHI | 30,000 | easy |
+| survival | FAD | 15,000 | easy |
+| survival | LUM | 7,500 | easy |
+| medley | IH | 75,000 | easy |
+| medley | EWC | 50,000 | easy |
+| medley | PHI | 30,000 | easy |
+| medley | FAD | 15,000 | easy |
+| medley | LUM | 7,500 | easy |
+
+This will be done as two SQL statements: DELETE then INSERT.
+
+Note: The `timetrial` mode scores will NOT be touched (left as-is).
+
+### 4. PlayerMenu Local/Global Alternation
+
+**`src/components/game/PlayerMenu.tsx`:**
+- Add a `leaderboardRound` ref that toggles between 0 (local) and 1 (global) each time the carousel completes a full cycle
+- Pass `source` prop to `PlayerMenuLeaderboard`
+
+**`src/components/game/PlayerMenuLeaderboard.tsx`:**
+- Add `source: "local" | "global"` prop
+- When `source === "global"`: Use existing `fetchTop()` behavior. Heading shows: `"GLOBAL HIGH SCORES - {label}"`
+- When `source === "local"`: Read from the appropriate localStorage key. Heading shows: `"HIGH SCORES - {label}"`
+- Local key mapping:
+  - `fixed` -> `ll-highscores-fixed`
+  - `classic` -> `ll-highscores-classic`
+  - `survival` -> `survival-mode-high-scores`
+  - `medley` -> `medleyHighScores_easy`
+
+### 5. Add Medley Key to Controls.tsx Reset
+
+Update the data reset function in `src/pages/Controls.tsx` to also clear `medleyHighScores_easy` and `medleyHighScores_hard`.
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/lib/starfieldConfig.ts` | Change `motionBlur` default from 0.5 to 0 |
-| `src/components/game/HyperspaceStarfield.tsx` | Remove setInterval, optimize motion blur, cap shadowBlur |
-
-### Specific Code Changes
-
-**starfieldConfig.ts** - Change default:
-```typescript
-motionBlur: 0,  // Was 0.5 - too expensive as default
-```
-
-**HyperspaceStarfield.tsx** - Remove expensive interval:
-```typescript
-// REMOVE this block (lines 181-184):
-const configRefreshInterval = setInterval(() => {
-  configRef.current = loadStarfieldConfig();
-}, 500);
-
-// Keep ONLY the storage event listener for cross-tab changes
-// AND refresh config once at start of each frame (not per-star)
-```
-
-**HyperspaceStarfield.tsx** - Cap shadow blur:
-```typescript
-// Line 302 - cap the multiplier
-ctx.shadowBlur = Math.min(24, 12 * config.glow * Math.min(2, config.particleSize));
-```
-
-**HyperspaceStarfield.tsx** - Optimize motion blur:
-```typescript
-// Only draw motion blur if particle moved significantly AND config enabled
-if (config.motionBlur > 0.1 && len > 8) {  // Was len > 2
-  const blurSteps = 2;  // Fixed at 2, was 2-5 based on config
-  // ... rest of blur code
-}
-```
-
----
-
-## Part 2: Verify World-Wrap Rendering Is Correct
-
-The visibility checks I implemented are mathematically correct:
-
-```typescript
-// Canvas transform applies: ctx.translate(-cameraX, anchor)
-// So world coordinate X renders at screen position (X - cameraX)
-// Screen visible range is [-viewWidth/2, viewWidth/2] relative to center
-
-const screenX = entity.x + wrapOffset - cameraX;
-const halfView = viewWidth / 2;
-if (screenX > -halfView - margin && screenX < halfView + margin) {
-  // Entity is visible - draw at world coords (canvas transform handles the rest)
-  ctx.translate(entity.x + wrapOffset, entity.y);
-}
-```
-
-This is correct because:
-1. `screenX` calculates where the entity will appear on screen
-2. The check uses centered bounds `[-halfView, halfView]` which matches the canvas transform
-3. Drawing uses world coordinates which the canvas transform converts to screen space
-
-### No Changes Needed to World-Wrap Code
-
-The coral, jellyfish, space junk, wormhole, hazards, and anomalies all use the correct pattern. The sluggishness is caused by the Hyperspace FPS drop, not the visibility checks.
-
----
-
-## Part 3: Additional Optimization for Other Starfields
-
-Apply similar motion blur optimization to other starfield components that have the same issue:
-
-| File | Change |
-|------|--------|
-| `PrismaticWavesStarfield.tsx` | Only draw motion blur if `len > 8` and reduce steps |
-| `NeonVortexStarfield.tsx` | Same optimization |
-| `CosmicTunnelStarfield.tsx` | Same optimization |
-| `NebulaDriftStarfield.tsx` | Same optimization |
-| `IntoTheVoidStarfield.tsx` | Same optimization |
+| `src/lib/medleyLeaderboard.ts` | Add seed scores, change cap to 5 |
+| `src/pages/Index.tsx` | Update classic + fixed seed scores to new initials/values |
+| `src/pages/Survival.tsx` | Update survival seed scores to new initials/values |
+| `src/components/game/PlayerMenu.tsx` | Add local/global round alternation logic |
+| `src/components/game/PlayerMenuLeaderboard.tsx` | Add `source` prop, local score reading, update headings |
+| `src/pages/Controls.tsx` | Add medley keys to reset function |
+| Database (SQL) | Delete all scores for 4 modes, insert 20 seed rows |
 
 ---
 
 ## Implementation Order
 
-1. Update `starfieldConfig.ts` - change motionBlur default to 0
-2. Fix `HyperspaceStarfield.tsx` - remove setInterval, optimize motion blur, cap shadowBlur
-3. Apply same optimizations to other starfield components
+1. Database: Delete existing global scores and insert new seed data
+2. `medleyLeaderboard.ts`: Add seeds, fix cap to 5
+3. `Index.tsx`: Update classic + fixed seed scores
+4. `Survival.tsx`: Update survival seed scores
+5. `PlayerMenuLeaderboard.tsx`: Add source prop with local/global support
+6. `PlayerMenu.tsx`: Add alternation logic
+7. `Controls.tsx`: Add medley keys to reset
 
----
-
-## Expected Results
-
-- Hyperspace 3D should run at smooth 60fps on PC
-- Lander controls will feel responsive again (since frame rate is restored)
-- World-wrap rendering continues to work correctly
-- Motion blur is still available for users who want it, just not enabled by default
-
----
-
-## Technical Notes
-
-### Why the setInterval Was Bad
-
-The `setInterval` was firing every 500ms regardless of whether settings changed. This:
-1. Allocates memory for the config object
-2. Parses localStorage strings
-3. Creates garbage collection pressure
-4. Runs even when the game is idle
-
-The `storage` event listener is much better - it only fires when localStorage actually changes.
-
-### Why Motion Blur Was So Expensive
-
-Each `ctx.arc()` + `ctx.fill()` is a separate GPU draw call. With 1200 stars × 5 blur steps = 6000 extra calls. GPU-accelerated 2D canvas can handle many strokes, but `arc()` is particularly expensive because it:
-1. Calculates bezier approximation
-2. Creates a new path
-3. Fills with alpha blending
-
-A simple `stroke()` line is much cheaper than an `arc()` + `fill()`.
