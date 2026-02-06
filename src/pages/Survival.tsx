@@ -44,11 +44,11 @@ const Survival: React.FC = () => {
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
-      { initials: "SRV", score: 15000, distance: 5000, time: 120, date: now },
-      { initials: "END", score: 12000, distance: 3500, time: 90, date: now - 86400000 },
-      { initials: "RUN", score: 9500, distance: 2800, time: 75, date: now - 86400000 * 2 },
-      { initials: "FLY", score: 7000, distance: 2000, time: 60, date: now - 86400000 * 3 },
-      { initials: "JET", score: 5000, distance: 1500, time: 45, date: now - 86400000 * 4 },
+      { initials: "IH",  score: 50000, distance: 5000, time: 120, date: now },
+      { initials: "SDP", score: 30000, distance: 3500, time: 90,  date: now - 86400000 },
+      { initials: "PC",  score: 15000, distance: 2800, time: 75,  date: now - 86400000 * 2 },
+      { initials: "ASH", score: 10000, distance: 2000, time: 60,  date: now - 86400000 * 3 },
+      { initials: "IAN", score: 5000,  distance: 1500, time: 45,  date: now - 86400000 * 4 },
     ];
     try {
       const saved = localStorage.getItem("survival-mode-high-scores");

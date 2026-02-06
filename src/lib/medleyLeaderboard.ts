@@ -12,6 +12,7 @@ export interface MedleyScore {
 }
 
 const STORAGE_KEY_PREFIX = "medleyHighScores";
+const MAX_SCORES = 5;
 
 /**
  * Get the storage key for a specific difficulty
@@ -21,15 +22,40 @@ function getStorageKey(difficulty: Difficulty): string {
 }
 
 /**
+ * Default seed scores for first-time players
+ */
+function getDefaultMedleyScores(difficulty: Difficulty): MedleyScore[] {
+  const now = Date.now();
+  return [
+    { initials: "IH",  score: 50000, furthestStage: 14, difficulty, date: now },
+    { initials: "SDP", score: 30000, furthestStage: 10, difficulty, date: now - 86400000 },
+    { initials: "PC",  score: 15000, furthestStage: 7,  difficulty, date: now - 86400000 * 2 },
+    { initials: "ASH", score: 10000, furthestStage: 4,  difficulty, date: now - 86400000 * 3 },
+    { initials: "IAN", score: 5000,  furthestStage: 2,  difficulty, date: now - 86400000 * 4 },
+  ];
+}
+
+/**
  * Get high scores for a specific difficulty
  */
 export function getMedleyHighScores(difficulty: Difficulty): MedleyScore[] {
   try {
     const key = getStorageKey(difficulty);
     const stored = localStorage.getItem(key);
-    if (!stored) return [];
+    if (!stored) {
+      // Seed with defaults on first access
+      const seeds = getDefaultMedleyScores(difficulty);
+      localStorage.setItem(key, JSON.stringify(seeds));
+      return seeds;
+    }
     
     const scores = JSON.parse(stored) as MedleyScore[];
+    if (!Array.isArray(scores) || scores.length === 0) {
+      const seeds = getDefaultMedleyScores(difficulty);
+      localStorage.setItem(key, JSON.stringify(seeds));
+      return seeds;
+    }
+    
     return scores.sort((a, b) => {
       // Primary sort by score (descending)
       if (b.score !== a.score) return b.score - a.score;
@@ -37,16 +63,16 @@ export function getMedleyHighScores(difficulty: Difficulty): MedleyScore[] {
       if (b.furthestStage !== a.furthestStage) return b.furthestStage - a.furthestStage;
       // Tertiary sort by date (most recent first)
       return b.date - a.date;
-    });
+    }).slice(0, MAX_SCORES);
   } catch (err) {
     console.error("Failed to load medley high scores:", err);
-    return [];
+    return getDefaultMedleyScores(difficulty);
   }
 }
 
 /**
  * Save a new medley score
- * Maintains top 10 scores per difficulty
+ * Maintains top 5 scores per difficulty
  */
 export function saveMedleyScore(score: MedleyScore): void {
   try {
@@ -56,15 +82,15 @@ export function saveMedleyScore(score: MedleyScore): void {
     // Add new score
     existing.push(score);
     
-    // Sort and keep top 10
+    // Sort and keep top 5
     existing.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (b.furthestStage !== a.furthestStage) return b.furthestStage - a.furthestStage;
       return b.date - a.date;
     });
     
-    const top10 = existing.slice(0, 10);
-    localStorage.setItem(key, JSON.stringify(top10));
+    const top = existing.slice(0, MAX_SCORES);
+    localStorage.setItem(key, JSON.stringify(top));
     
     console.log("💾 Saved medley score:", score);
   } catch (err) {
@@ -82,8 +108,8 @@ export function isMedleyHighScore(
 ): boolean {
   const existing = getMedleyHighScores(difficulty);
   
-  // Always qualifies if less than 10 scores
-  if (existing.length < 10) return true;
+  // Always qualifies if less than 5 scores
+  if (existing.length < MAX_SCORES) return true;
   
   // Check if better than the worst high score
   const worstScore = existing[existing.length - 1];
@@ -94,7 +120,7 @@ export function isMedleyHighScore(
 }
 
 /**
- * Get the rank of a score (1-indexed, 0 if not in top 10)
+ * Get the rank of a score (1-indexed, 0 if not in top 5)
  */
 export function getMedleyScoreRank(
   score: number,
@@ -111,12 +137,12 @@ export function getMedleyScoreRank(
     }
   }
   
-  // If not better than any existing score, check if it would make top 10
-  if (existing.length < 10) {
+  // If not better than any existing score, check if it would make top 5
+  if (existing.length < MAX_SCORES) {
     return existing.length + 1;
   }
   
-  return 0; // Not in top 10
+  return 0; // Not in top 5
 }
 
 /**
