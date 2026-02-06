@@ -1,36 +1,94 @@
 import React, { useEffect, useState } from "react";
 import { fetchTop, type ScoreRow } from "@/lib/leaderboard";
+import { getMedleyHighScores } from "@/lib/medleyLeaderboard";
 import type { Mode } from "./types";
+
+/** localStorage key mapping for local leaderboard reading */
+const LOCAL_STORAGE_KEYS: Record<string, string> = {
+  fixed: "ll-highscores-fixed",
+  classic: "ll-highscores-classic",
+  survival: "survival-mode-high-scores",
+  medley: "medleyHighScores_easy",
+};
+
+interface LocalScore {
+  initials: string;
+  score: number;
+}
+
+/** Read local high scores from localStorage for a given mode */
+function readLocalScores(mode: Mode): LocalScore[] {
+  try {
+    if (mode === "medley") {
+      // Medley uses its own module which handles seeding
+      const scores = getMedleyHighScores("easy");
+      return scores.map(s => ({ initials: s.initials, score: s.score }));
+    }
+    
+    const key = LOCAL_STORAGE_KEYS[mode];
+    if (!key) return [];
+    
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    
+    return parsed
+      .slice(0, 5)
+      .map((entry: any) => ({
+        initials: entry.initials || "---",
+        score: entry.score || 0,
+      }));
+  } catch {
+    return [];
+  }
+}
 
 interface PlayerMenuLeaderboardProps {
   mode: Mode;
   label: string;
+  source?: "local" | "global";
 }
 
 /** Leaderboard display styled to match Player Menu aesthetics */
-export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mode, label }) => {
-  const [rows, setRows] = useState<ScoreRow[]>([]);
+export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mode, label, source = "global" }) => {
+  const [rows, setRows] = useState<LocalScore[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
     
-    fetchTop(mode, 5).then(res => {
+    if (source === "local") {
+      // Read from localStorage synchronously
+      const localRows = readLocalScores(mode);
       if (mounted) {
-        setRows(res.rows || []);
+        setRows(localRows);
         setLoading(false);
       }
-    });
+    } else {
+      // Fetch from online database
+      fetchTop(mode, 5).then(res => {
+        if (mounted) {
+          setRows((res.rows || []).map(r => ({ initials: r.initials, score: r.score })));
+          setLoading(false);
+        }
+      });
+    }
     
     return () => { mounted = false; };
-  }, [mode]);
+  }, [mode, source]);
 
   // Always render 5 rows for consistent height (real or placeholder)
   const displayRows = [...rows];
   while (displayRows.length < 5) {
-    displayRows.push({ initials: "---", score: 0, difficulty: "easy", mode } as ScoreRow);
+    displayRows.push({ initials: "---", score: 0 });
   }
+
+  const heading = source === "global" 
+    ? `GLOBAL HIGH SCORES · ${label}`
+    : `HIGH SCORES · ${label}`;
 
   return (
     <div 
@@ -41,7 +99,7 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
         className="text-center text-base font-display tracking-wider mb-4 uppercase"
         style={{ color: "hsl(var(--neon))" }}
       >
-        HIGH SCORES · {label}
+        {heading}
       </h2>
       
       {loading ? (
@@ -57,7 +115,7 @@ export const PlayerMenuLeaderboard: React.FC<PlayerMenuLeaderboardProps> = ({ mo
             const isEmpty = r.initials === "---" || !r.score;
             return (
               <li 
-                key={`${r.id || 'empty'}-${i}`}
+                key={`${r.initials}-${i}`}
                 className={`flex items-center justify-between text-sm h-8 ${isEmpty ? 'opacity-30' : ''}`}
               >
                 <div className="flex items-center gap-3">

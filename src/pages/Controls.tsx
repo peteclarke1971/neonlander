@@ -646,7 +646,9 @@ export default function ControlsSettings() {
           key === 'lightcycles-high-scores' ||
           key === 'neon-docking-high-scores' ||
           key === 'neon-racing-high-scores' ||
-          key === 'survival-mode-high-scores') {
+          key === 'survival-mode-high-scores' ||
+          key === 'medleyHighScores_easy' ||
+          key === 'medleyHighScores_hard') {
         keysToRemove.push(key);
       }
     }

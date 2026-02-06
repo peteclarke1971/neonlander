@@ -56,11 +56,11 @@ const Index = () => {
   const [classicScores, setClassicScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
-      { initials: "IH", score: 100000, difficulty: "easy", date: now },
-      { initials: "LEM", score: 50000, difficulty: "easy", date: now - 86400000 * 2 },
-      { initials: "NGN", score: 25000, difficulty: "hard", date: now - 86400000 * 5 },
-      { initials: "ROK", score: 10000, difficulty: "easy", date: now - 86400000 * 8 },
-      { initials: "LND", score: 5000, difficulty: "hard", date: now - 86400000 * 10 },
+      { initials: "IH",  score: 50000, difficulty: "easy", date: now },
+      { initials: "SDP", score: 30000, difficulty: "easy", date: now - 86400000 * 2 },
+      { initials: "PC",  score: 15000, difficulty: "easy", date: now - 86400000 * 5 },
+      { initials: "ASH", score: 10000, difficulty: "easy", date: now - 86400000 * 8 },
+      { initials: "IAN", score: 5000,  difficulty: "easy", date: now - 86400000 * 10 },
     ];
     try {
       const raw = localStorage.getItem(HS_CLASSIC_KEY);
@@ -73,11 +73,11 @@ const Index = () => {
   const [fixedScores, setFixedScores] = useState<HighScore[]>(() => {
     const now = Date.now();
     const seed: HighScore[] = [
-      { initials: "IH", score: 100000, difficulty: "easy", date: now },
-      { initials: "FIX", score: 50000, difficulty: "easy", date: now - 86400000 * 3 },
-      { initials: "RIG", score: 25000, difficulty: "hard", date: now - 86400000 * 6 },
-      { initials: "SYN", score: 10000, difficulty: "easy", date: now - 86400000 * 9 },
-      { initials: "GLB", score: 5000, difficulty: "hard", date: now - 86400000 * 11 },
+      { initials: "IH",  score: 50000, difficulty: "easy", date: now },
+      { initials: "SDP", score: 30000, difficulty: "easy", date: now - 86400000 * 3 },
+      { initials: "PC",  score: 15000, difficulty: "easy", date: now - 86400000 * 6 },
+      { initials: "ASH", score: 10000, difficulty: "easy", date: now - 86400000 * 9 },
+      { initials: "IAN", score: 5000,  difficulty: "easy", date: now - 86400000 * 11 },
     ];
     try {
       const raw = localStorage.getItem(HS_FIXED_KEY);

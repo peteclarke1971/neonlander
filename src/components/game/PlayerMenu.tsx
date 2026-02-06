@@ -195,6 +195,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [idleTime, setIdleTime] = useState(0);
   const [showLeaderboards, setShowLeaderboards] = useState(false);
   const [leaderboardIndex, setLeaderboardIndex] = useState(0);
+  // Alternates between 0 (local) and 1 (global) each full carousel cycle
+  const leaderboardRoundRef = useRef(0);
   
   // Fullscreen reminder for PC users
   const [showFullscreenReminder, setShowFullscreenReminder] = useState(false);
@@ -327,10 +329,12 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     const cycleInterval = setInterval(() => {
       setLeaderboardIndex(prev => {
         const next = prev + 1;
-        // After cycling through all, hide leaderboards and show menu again
+        // After cycling through all, hide leaderboards and toggle local/global for next cycle
         if (next >= leaderboardCycle.length) {
           setShowLeaderboards(false);
           setIdleTime(0); // Reset idle timer
+          // Toggle round for next cycle
+          leaderboardRoundRef.current = leaderboardRoundRef.current === 0 ? 1 : 0;
           return 0;
         }
         return next;
@@ -808,6 +812,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             <PlayerMenuLeaderboard 
               mode={leaderboardCycle[leaderboardIndex].mode} 
               label={leaderboardCycle[leaderboardIndex].label}
+              source={leaderboardRoundRef.current === 0 ? "local" : "global"}
             />
           </div>
           
