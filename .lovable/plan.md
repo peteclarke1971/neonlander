@@ -1,41 +1,100 @@
 
 
-# Fix: Survival Local Leaderboard Not Seeding on First Launch
+# Live Starfield Preview in Settings
 
-## Problem
+## What We're Doing
 
-The Survival local leaderboard only gets seeded when the user navigates to the Survival page. Unlike Classic/Fixed (which seed on Index.tsx mount) and Medley (which auto-seeds via `getMedleyHighScores`), Survival's seed data is written inside a `useState` initializer that only runs when the Survival component mounts.
+Adding a live preview of the starfield effect directly in the Controls/Settings page so users can see changes in real-time without navigating back to the Player Menu.
 
-When the Player Menu tries to show local Survival scores before the user has ever visited that page, `localStorage.getItem("survival-mode-high-scores")` returns `null` and the leaderboard shows empty.
+## Approach
 
-## Solution
+A preview box will appear whenever the user interacts with the starfield section -- either by selecting a style or expanding the customization settings. The preview will be a rounded container with the selected starfield rendering inside it, positioned just below the style selector and above the customization sliders.
 
-Update the `readLocalScores` function in `PlayerMenuLeaderboard.tsx` to auto-seed any mode that has a missing localStorage key. This ensures the Player Menu always has data to display, even on a completely clean install.
+## How It Works
 
-## File to Modify
+- A preview container (rounded box, ~300px tall, full width) will render the currently selected starfield component
+- The preview appears when:
+  - The user changes the starfield style via the dropdown, OR
+  - The user expands the "Starfield Customization" collapsible
+- The preview stays visible while either condition is true
+- Each starfield style change immediately swaps the rendered component
+- Customization slider changes (density, speed, glow, etc.) will update in real-time because the starfield components already read from localStorage via `loadStarfieldConfig()` and use a storage listener refresh mechanism
 
-**`src/components/game/PlayerMenuLeaderboard.tsx`** -- Update `readLocalScores` function
+## Technical Details
 
-### Current behavior (lines 28-35):
-```typescript
-const raw = localStorage.getItem(key);
-if (!raw) return [];  // <-- Returns empty if key doesn't exist
+### File: `src/pages/Controls.tsx`
+
+**1. Add starfield component imports** (top of file)
+
+Import all 7 starfield components, matching the imports from `PlayerMenu.tsx`:
+- `HyperspaceStarfield`
+- `MobileStarfield`
+- `NeonVortexStarfield`
+- `PrismaticWavesStarfield`
+- `CosmicTunnelStarfield`
+- `NebulaDriftStarfield`
+- `IntoTheVoidStarfield`
+
+**2. Add a `showPreview` state**
+
+Track whether to show the preview based on the user having interacted with the starfield section. It will be `true` when:
+- `starfieldStyle` has been changed from its initial value during this session, OR
+- `starfieldSettingsOpen` is `true`
+
+A simple approach: add a `starfieldTouched` state (starts `false`, set to `true` on first style change). Show preview when `starfieldTouched || starfieldSettingsOpen`.
+
+**3. Add a `renderStarfieldPreview` function**
+
+Mirrors the `renderStarfield` switch from `PlayerMenu.tsx`, mapping each style value to its component:
+
+| Style Value | Component | Props |
+|-------------|-----------|-------|
+| `hyperspace` | `HyperspaceStarfield` | speed=0.28, density=1600, focalLength=480, trail=0.55, style="glow" |
+| `mobile` | `MobileStarfield` | starCount=180, speed=0.5 |
+| `vortex` | `NeonVortexStarfield` | starCount=280 |
+| `waves` | `PrismaticWavesStarfield` | starCount=320 |
+| `tunnel` | `CosmicTunnelStarfield` | starCount=280 |
+| `nebula` | `NebulaDriftStarfield` | starCount=250 |
+| `void` | `IntoTheVoidStarfield` | ringCount=40 |
+| `auto`/default | `NebulaDriftStarfield` | starCount=250 |
+
+**4. Add the preview container in JSX**
+
+Insert between the Starfield Style selector (line ~1041) and the Starfield Customization collapsible (line ~1043). The container will be:
+
+```
+<div style={{
+  position: "relative",
+  width: "100%",
+  height: 300,
+  borderRadius: 12,
+  overflow: "hidden",
+  background: "#000"
+}}>
+  {renderStarfieldPreview()}
+</div>
 ```
 
-### New behavior:
-When the localStorage key is missing (returns null), generate the standard seed scores, write them to localStorage, and return them. This mirrors the pattern already used by `getMedleyHighScores`.
+The preview renders in a black container with `overflow: hidden` and `border-radius`, so the canvas stays clipped within the box. The starfield components use `position: absolute` inside their parent, so they will fill this container naturally.
 
-The seed data will use the same standardized entries:
+**5. Force re-mount on customization changes**
 
-| Rank | Initials | Score |
-|------|----------|-------|
-| 1 | IH | 50,000 |
-| 2 | SDP | 30,000 |
-| 3 | PC | 15,000 |
-| 4 | ASH | 10,000 |
-| 5 | IAN | 5,000 |
+The starfield components load config on mount. To ensure slider changes are reflected live, we add a `key` prop based on a counter that increments on each config change. This forces React to re-mount the canvas component, picking up the latest localStorage values.
 
-### Technical Detail
+Alternatively (and more efficiently), we can dispatch a `storage` event after saving config changes, since the starfield components already listen for storage changes. We'll use a simple approach: add a `previewKey` state that increments when the style changes, so the component re-mounts only on style switch. Config slider changes will be picked up via the existing storage listener mechanism already built into the starfield components.
 
-Add a helper function `getDefaultLocalScores()` that returns the 5 standard seed entries. In `readLocalScores`, when `localStorage.getItem(key)` returns `null` for any non-medley mode, call this helper, write the seeds to localStorage, and return them. This way Classic, Fixed, and Survival all auto-seed consistently -- even if their respective page components haven't mounted yet.
+**6. Wrap style change handler**
+
+When `setStarfieldStyle` is called, also set `starfieldTouched = true` to show the preview.
+
+### Summary of Changes
+
+| Change | Location |
+|--------|----------|
+| Import 7 starfield components | Top of Controls.tsx |
+| Add `starfieldTouched` state | State declarations section |
+| Add `renderStarfieldPreview()` function | Before return JSX |
+| Add preview container div | Between style selector and customization collapsible |
+| Set `starfieldTouched` on style change | `onValueChange` of the Select |
+| Show preview when touched or settings open | Conditional render around preview div |
 
