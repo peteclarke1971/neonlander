@@ -692,10 +692,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Read starfield preference
   const [starfieldStyle] = useState(() => {
     try {
-      const saved = localStorage.getItem('ll-starfield-style');
+   const saved = localStorage.getItem('ll-starfield-style');
        if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula') return saved;
     } catch {}
-    return 'auto';
+    return 'nebula';
   });
 
   // Render starfield based on preference
@@ -727,20 +727,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         return <IntoTheVoidStarfield ringCount={40} />;
       case 'auto':
       default:
-        // Auto: iOS uses MobileStarfield, others use HyperspaceStarfield
-        return isiOS ? (
-          <MobileStarfield starCount={180} speed={0.5} />
-        ) : (
-          <HyperspaceStarfield 
-            speed={0.28}
-            density={1600}
-            focalLength={480}
-            trail={0.55}
-            style="glow"
-            allowBoost={true}
-            fullscreen={true}
-          />
-        );
+        return <NebulaDriftStarfield starCount={250} />;
     }
   };
 
