@@ -285,6 +285,13 @@ export const GameEngine: React.FC<Props> = ({
       return true;
     }
   });
+  const [showLevelNumber] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ll-show-level-number') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [performanceManager] = useState(() => new PerformanceManager());
   const [showFireworks, setShowFireworks] = useState(false);
   const [autoSkipFireworks, setAutoSkipFireworks] = useState(false);
@@ -6393,10 +6400,12 @@ export const GameEngine: React.FC<Props> = ({
 
       <HUD {...hud} collectibles={collectiblesRef.current || undefined} bestTime={bestTime} mode={mode} showFullHUD={showFullHUD} />
 
-      {showFPSSetting && (
+      {(showFPSSetting || (showLevelNumber && mode !== "survival")) && (
         <div className="pointer-events-none absolute bottom-2 right-3 z-40">
           <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded px-2 py-1 text-[20px] font-mono text-muted-foreground">
-            FPS: {Math.round(fps)}{showFullHUD && <> • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}</>}
+            {showFPSSetting && <>FPS: {Math.round(fps)}</>}
+            {showFPSSetting && showFullHUD && <> • Seed: {hud.levelSeed ?? "-"}{mode === "fixed" || mode === "caverns" ? `:${level}` : ""}</>}
+            {showLevelNumber && mode !== "survival" && <>{showFPSSetting ? ' • ' : ''}LVL: {level}</>}
           </div>
         </div>
       )}
