@@ -123,7 +123,7 @@ export default function ControlsSettings() {
       const saved = localStorage.getItem('ll-starfield-style');
        if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula' || saved === 'void') return saved;
     } catch {}
-    return 'auto';
+    return 'nebula';
   });
   const [touchOpacity, setTouchOpacity] = useState<number>(() => {
     try {

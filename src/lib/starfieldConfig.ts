@@ -24,7 +24,7 @@
    trail: 1.0,
    bloom: 0.5,
   particleSize: 1.0,
-  motionBlur: 0,  // Disabled by default - too expensive with many stars
+  motionBlur: 0.5,
   singleColor: false,
  };
  
