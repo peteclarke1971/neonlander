@@ -1,100 +1,74 @@
 
-
-# Live Starfield Preview in Settings
+# Use Player's Chosen Starfield on All Mission Failed Screens
 
 ## What We're Doing
 
-Adding a live preview of the starfield effect directly in the Controls/Settings page so users can see changes in real-time without navigating back to the Player Menu.
-
-## Approach
-
-A preview box will appear whenever the user interacts with the starfield section -- either by selecting a style or expanding the customization settings. The preview will be a rounded container with the selected starfield rendering inside it, positioned just below the style selector and above the customization sliders.
+Replacing the hardcoded starfield effects on every mission failed/game over screen with the user's chosen starfield style (and customization settings). If no style has been chosen, it defaults to Nebula Drift. The existing starfield code on each screen will be commented out (not deleted) so it can be reverted easily.
 
 ## How It Works
 
-- A preview container (rounded box, ~300px tall, full width) will render the currently selected starfield component
-- The preview appears when:
-  - The user changes the starfield style via the dropdown, OR
-  - The user expands the "Starfield Customization" collapsible
-- The preview stays visible while either condition is true
-- Each starfield style change immediately swaps the rendered component
-- Customization slider changes (density, speed, glow, etc.) will update in real-time because the starfield components already read from localStorage via `loadStarfieldConfig()` and use a storage listener refresh mechanism
+A new shared component (`GameOverStarfield`) will read the user's starfield preference from localStorage (`ll-starfield-style`) and render the matching starfield component -- exactly mirroring the Player Menu's `renderStarfield` logic. Since all starfield components already read customization settings (density, speed, glow, etc.) from localStorage via `loadStarfieldConfig()`, the user's custom visual tweaks will automatically apply.
+
+## Pages Affected
+
+| Page | Current Starfield | After Change |
+|------|------------------|--------------|
+| Index.tsx (Classic/Fixed/Medley) | iOS: MobileStarfield, Desktop: HyperspaceStarfield + AsteroidField | User's chosen style |
+| Asteroids.tsx | iOS: MobileStarfield, Desktop: HyperspaceStarfield (vector) | User's chosen style |
+| AsteroidsColor.tsx | None (plain background) | User's chosen style |
+| AsteroidsRemix.tsx | AsteroidStarfield | User's chosen style |
+| LightCycles.tsx | HyperspaceStarfield | User's chosen style |
+| NeonDocking.tsx | HyperspaceStarfield | User's chosen style |
+| NeonRacing.tsx | HyperspaceStarfield | User's chosen style |
+| Survival.tsx | HyperspaceStarfield | User's chosen style |
+| Duel.tsx | iOS: MobileStarfield, Desktop: HyperspaceStarfield | User's chosen style |
 
 ## Technical Details
 
-### File: `src/pages/Controls.tsx`
+### Step 1: Create a shared component
 
-**1. Add starfield component imports** (top of file)
+**New file: `src/components/game/GameOverStarfield.tsx`**
 
-Import all 7 starfield components, matching the imports from `PlayerMenu.tsx`:
-- `HyperspaceStarfield`
-- `MobileStarfield`
-- `NeonVortexStarfield`
-- `PrismaticWavesStarfield`
-- `CosmicTunnelStarfield`
-- `NebulaDriftStarfield`
-- `IntoTheVoidStarfield`
+A simple component that:
+- Reads `ll-starfield-style` from localStorage
+- Renders the corresponding starfield component using the same switch/case as PlayerMenu
+- Wraps everything in a `div` with `position: absolute; inset: 0` styling
+- Falls back to `NebulaDriftStarfield` (the default) if no preference is set
 
-**2. Add a `showPreview` state**
-
-Track whether to show the preview based on the user having interacted with the starfield section. It will be `true` when:
-- `starfieldStyle` has been changed from its initial value during this session, OR
-- `starfieldSettingsOpen` is `true`
-
-A simple approach: add a `starfieldTouched` state (starts `false`, set to `true` on first style change). Show preview when `starfieldTouched || starfieldSettingsOpen`.
-
-**3. Add a `renderStarfieldPreview` function**
-
-Mirrors the `renderStarfield` switch from `PlayerMenu.tsx`, mapping each style value to its component:
-
-| Style Value | Component | Props |
-|-------------|-----------|-------|
-| `hyperspace` | `HyperspaceStarfield` | speed=0.28, density=1600, focalLength=480, trail=0.55, style="glow" |
-| `mobile` | `MobileStarfield` | starCount=180, speed=0.5 |
-| `vortex` | `NeonVortexStarfield` | starCount=280 |
-| `waves` | `PrismaticWavesStarfield` | starCount=320 |
-| `tunnel` | `CosmicTunnelStarfield` | starCount=280 |
-| `nebula` | `NebulaDriftStarfield` | starCount=250 |
-| `void` | `IntoTheVoidStarfield` | ringCount=40 |
-| `auto`/default | `NebulaDriftStarfield` | starCount=250 |
-
-**4. Add the preview container in JSX**
-
-Insert between the Starfield Style selector (line ~1041) and the Starfield Customization collapsible (line ~1043). The container will be:
-
-```
-<div style={{
-  position: "relative",
-  width: "100%",
-  height: 300,
-  borderRadius: 12,
-  overflow: "hidden",
-  background: "#000"
-}}>
-  {renderStarfieldPreview()}
-</div>
+```text
++-------------------------------+
+| GameOverStarfield             |
+|  - reads ll-starfield-style   |
+|  - renders matching component |
+|  - absolute positioned        |
++-------------------------------+
 ```
 
-The preview renders in a black container with `overflow: hidden` and `border-radius`, so the canvas stays clipped within the box. The starfield components use `position: absolute` inside their parent, so they will fill this container naturally.
+### Step 2: Update each page's gameover view
 
-**5. Force re-mount on customization changes**
+For each of the 9 pages listed above:
 
-The starfield components load config on mount. To ensure slider changes are reflected live, we add a `key` prop based on a counter that increments on each config change. This forces React to re-mount the canvas component, picking up the latest localStorage values.
+1. Import `GameOverStarfield`
+2. In the gameover/result section, comment out (wrap in `{/* OLD STARFIELD ... */}`) the existing starfield JSX
+3. Replace with `<GameOverStarfield />`
 
-Alternatively (and more efficiently), we can dispatch a `storage` event after saving config changes, since the starfield components already listen for storage changes. We'll use a simple approach: add a `previewKey` state that increments when the style changes, so the component re-mounts only on style switch. Config slider changes will be picked up via the existing storage listener mechanism already built into the starfield components.
+The existing radial gradient overlays will remain in place -- they sit on top and will continue to work with any starfield style.
 
-**6. Wrap style change handler**
+### Step 3: Remove unused imports (where applicable)
 
-When `setStarfieldStyle` is called, also set `starfieldTouched = true` to show the preview.
+After commenting out the old starfield usage in gameover views, some pages may have starfield imports that are only used for the gameover screen (e.g., NeonRacing only imports HyperspaceStarfield for its gameover). These will be cleaned up, though imports shared with the home view (like in Asteroids.tsx) will remain.
 
 ### Summary of Changes
 
-| Change | Location |
-|--------|----------|
-| Import 7 starfield components | Top of Controls.tsx |
-| Add `starfieldTouched` state | State declarations section |
-| Add `renderStarfieldPreview()` function | Before return JSX |
-| Add preview container div | Between style selector and customization collapsible |
-| Set `starfieldTouched` on style change | `onValueChange` of the Select |
-| Show preview when touched or settings open | Conditional render around preview div |
-
+| File | Action |
+|------|--------|
+| `src/components/game/GameOverStarfield.tsx` | New shared component |
+| `src/pages/Index.tsx` | Replace gameover starfield block |
+| `src/pages/Asteroids.tsx` | Replace gameover starfield block |
+| `src/pages/AsteroidsColor.tsx` | Add starfield to gameover (currently has none) |
+| `src/pages/AsteroidsRemix.tsx` | Replace AsteroidStarfield with GameOverStarfield |
+| `src/pages/LightCycles.tsx` | Replace gameover starfield |
+| `src/pages/NeonDocking.tsx` | Replace gameover starfield |
+| `src/pages/NeonRacing.tsx` | Replace gameover starfield |
+| `src/pages/Survival.tsx` | Replace gameover starfield |
+| `src/pages/Duel.tsx` | Replace gameover starfield |
