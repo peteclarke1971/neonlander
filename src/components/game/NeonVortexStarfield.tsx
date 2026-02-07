@@ -73,10 +73,11 @@
      };
  
      // Resize handler
-     const resize = () => {
-       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-       const w = window.innerWidth;
-       const h = window.innerHeight;
+      const resize = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const parent = canvas.parentElement;
+        const w = parent?.clientWidth || window.innerWidth;
+        const h = parent?.clientHeight || window.innerHeight;
        canvas.width = w * dpr;
        canvas.height = h * dpr;
        canvas.style.width = `${w}px`;
@@ -96,8 +97,9 @@
        const dt = Math.min((now - lastTime) / 1000, 0.1);
        lastTime = now;
  
-       const w = window.innerWidth;
-       const h = window.innerHeight;
+        const parent = canvas.parentElement;
+        const w = parent?.clientWidth || window.innerWidth;
+        const h = parent?.clientHeight || window.innerHeight;
        const centerX = w / 2;
        const centerY = h / 2;
  
