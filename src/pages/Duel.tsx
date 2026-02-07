@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DuelEngine } from "@/engine/duel/DuelEngine";
 import { DuelOptions } from "@/engine/duel/types";
+import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 import { anyGamepad, readGamepad, loadProfile, vibrate } from "@/hooks/use-gamepad";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { MobileStarfield } from "@/components/game/MobileStarfield";
@@ -147,7 +148,9 @@ export default function Duel() {
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      {/* Starfield Background */}
+      {/* GameOverStarfield: user's chosen starfield style */}
+      <GameOverStarfield />
+      {/* OLD STARFIELD BACKGROUND
       <div className="absolute inset-0 z-0">
         {isIOS ? (
           <MobileStarfield starCount={400} speed={0.3} />
@@ -161,6 +164,7 @@ export default function Duel() {
           />
         )}
       </div>
+      END OLD STARFIELD BACKGROUND */}
 
       {/* Radial gradient overlay */}
       <div 

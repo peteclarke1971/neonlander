@@ -28,6 +28,7 @@ import { GameTransition, GameTransitionHandle, TransitionType } from "@/componen
 import { PlayerMenu, GameSettings as PlayerMenuSettings } from "@/components/game/PlayerMenu";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel } from "@/lib/graphicsConfig";
 import { PortraitWarning } from "@/components/game/PortraitWarning";
+import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 
 const HS_CLASSIC_KEY = "ll-highscores-classic";
 const HS_FIXED_KEY = "ll-highscores-fixed";
@@ -1032,50 +1033,11 @@ const retryGame = () => {
             </>
           ) : (
             <>
-              {graphicsLevel === "low" ? (
-                <div className="absolute inset-0 z-0">
-                  <HomeStarfield />
-                </div>
-              ) : isIOSDevice() ? (
-                // iOS uses MobileStarfield for better performance and visual consistency
-                <div className="absolute inset-0 z-0">
-                  <MobileStarfield starCount={400} speed={0.4} />
-                </div>
-              ) : (
-                // Desktop uses HyperspaceStarfield + AsteroidField
-                <>
-                  <HyperspaceStarfield
-                    ref={starfieldRef}
-                    speed={sfConfig?.speed}
-                    density={sfConfig?.density}
-                    focalLength={sfConfig?.focalLength}
-                    trail={sfConfig?.trail}
-                    style={sfConfig?.style}
-                    cx={sfConfig?.cx}
-                    cy={sfConfig?.cy}
-                    allowBoost={false}
-                  />
-                  <AsteroidField
-                    ref={asteroidsRef}
-                    active
-                    activity={0.5}
-                    maxCount={80}
-                    sizeMin={2.0}
-                    sizeMax={8.0}
-                    spinMinDeg={5}
-                    spinMaxDeg={60}
-                    allowNoSpin
-                    clusterFrequency={0.85}
-                    occludeStars
-                    alignToStarfield
-                    focalLength={sfConfig?.focalLength}
-                    cx={sfConfig?.cx}
-                    cy={sfConfig?.cy}
-                    style={sfConfig?.style === 'vector' ? 'vector' : 'glow'}
-                  />
-                </>
-              )}
+              {/* GameOverStarfield: user's chosen starfield style */}
+              {/* OLD: graphicsLevel low = HomeStarfield, iOS = MobileStarfield, Desktop = HyperspaceStarfield + AsteroidField */}
+              <GameOverStarfield />
             </>
+
           )}
           <section className="relative text-center animate-enter" onKeyDown={handleGameOverKeys} tabIndex={0}>
             <h1 ref={successTitleRef} className="text-4xl font-display font-bold mb-3">{lastResult.cause === "success" ? "Mission Successful" : lastResult.cause === "crash" ? "Mission Failed" : "Mission Ended"}</h1>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { AsteroidsRemixEngine } from "@/components/game/AsteroidsRemixEngine";
 import { AsteroidStarfield } from "@/components/game/AsteroidStarfield";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 import { Button } from "@/components/ui/button";
 import { anyGamepad, loadProfile, readGamepad, getLastDeviceId } from "@/hooks/use-gamepad";
 
@@ -258,9 +259,13 @@ const AsteroidsRemix: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen bg-background overflow-hidden">
+      {/* GameOverStarfield: user's chosen starfield style */}
+      <GameOverStarfield />
+      {/* OLD GAMEOVER STARFIELD
       <div className="absolute inset-0 z-0" aria-hidden>
         <AsteroidStarfield />
       </div>
+      END OLD GAMEOVER STARFIELD */}
       
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8">
         <div className="space-y-4">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AsteroidsEngine } from "@/components/game/AsteroidsEngine";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 import { AsteroidsGameOverData } from "@/components/game/types/asteroids";
 import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
 import { MobileStarfield } from "@/components/game/MobileStarfield";
@@ -410,7 +411,9 @@ const Asteroids: React.FC = () => {
   // Game Over view
   return (
     <div className="fixed inset-0 bg-background overflow-hidden flex flex-col">
-      {/* Starfield Background */}
+      {/* GameOverStarfield: user's chosen starfield style */}
+      <GameOverStarfield />
+      {/* OLD GAMEOVER STARFIELD
       <div className="absolute inset-0 z-0">
         {isIOS ? (
           <MobileStarfield starCount={400} speed={0.3} />
@@ -424,6 +427,7 @@ const Asteroids: React.FC = () => {
           />
         )}
       </div>
+      END OLD GAMEOVER STARFIELD */}
       
       {/* Radial gradient overlay */}
       <div 
