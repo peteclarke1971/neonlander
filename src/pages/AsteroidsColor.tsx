@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AsteroidsColorEngine } from "@/components/game/AsteroidsColorEngine";
 import { InitialsEntry } from "@/components/game/InitialsEntry";
+import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 import { anyGamepad, readGamepad, loadProfile, getLastDeviceId } from "@/hooks/use-gamepad";
 import type { ColorOrderGameOverData } from "@/components/game/types/asteroidsColor";
 
@@ -262,8 +263,10 @@ export default function AsteroidsColor() {
     const seconds = Math.floor(lastResult.elapsed % 60);
     
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="text-center space-y-8 max-w-md">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center relative overflow-hidden">
+        {/* GameOverStarfield: user's chosen starfield style */}
+        <GameOverStarfield />
+        <div className="relative z-10 text-center space-y-8 max-w-md">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold text-destructive">GAME OVER</h1>
             <div className="space-y-2">
