@@ -85,6 +85,13 @@ export default function ControlsSettings() {
       return true;
     }
   });
+  const [showLevelNumber, setShowLevelNumber] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ll-show-level-number') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [scanlinesEnabled, setScanlinesEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-scanlines-enabled');
@@ -361,10 +368,15 @@ export default function ControlsSettings() {
   useEffect(() => {
     try {
       localStorage.setItem('ll-show-fps', JSON.stringify(showFPS));
-    } catch {
-      // Silently fail if localStorage is unavailable
-    }
+    } catch {}
   }, [showFPS]);
+
+  // Save show level number setting when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ll-show-level-number', JSON.stringify(showLevelNumber));
+    } catch {}
+  }, [showLevelNumber]);
 
   // Save scanlines setting when it changes
   useEffect(() => {
@@ -1019,6 +1031,16 @@ export default function ControlsSettings() {
               <Switch 
                 checked={showFPS}
                 onCheckedChange={setShowFPS}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Show Level Number</Label>
+                <div className="text-xs text-muted-foreground">Display current level number in bottom-right during gameplay (Campaign, Classic, Time Trial, Medley — not Survival)</div>
+              </div>
+              <Switch 
+                checked={showLevelNumber}
+                onCheckedChange={setShowLevelNumber}
               />
             </div>
             <div className="flex items-center justify-between">

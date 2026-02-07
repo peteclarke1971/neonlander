@@ -170,6 +170,13 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // In-flight tips toggle
   const [tipsEnabled, setTipsEnabled] = useState(isGuideEnabled);
   
+  // Show Level Number toggle (for playtesting)
+  const [showLevelNumber, setShowLevelNumber] = useState(() => {
+    try {
+      return localStorage.getItem('ll-show-level-number') === 'true';
+    } catch { return false; }
+  });
+  
   // Ghost mode settings - persisted to localStorage
   const [ghostModeEnabled, setGhostModeEnabled] = useState(() => {
     return localStorage.getItem('ll-ghost-mode-enabled') === 'true';
@@ -983,7 +990,26 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               textShadow: tipsEnabled ? "0 0 8px hsl(120, 100%, 60%)" : "none"
             }}
           >
-            TIPS {tipsEnabled ? "ON" : "OFF"}
+          TIPS {tipsEnabled ? "ON" : "OFF"}
+          </button>
+          
+          {/* Show Level Number Toggle */}
+          <button
+            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            onClick={() => {
+              resetIdle();
+              const newVal = !showLevelNumber;
+              setShowLevelNumber(newVal);
+              localStorage.setItem('ll-show-level-number', String(newVal));
+            }}
+            style={{ 
+              color: showLevelNumber ? "hsl(200, 100%, 60%)" : "hsl(var(--neon))",
+              borderColor: showLevelNumber ? "hsl(200, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
+              opacity: showLevelNumber ? 0.9 : 0.5,
+              textShadow: showLevelNumber ? "0 0 8px hsl(200, 100%, 60%)" : "none"
+            }}
+          >
+            LVL# {showLevelNumber ? "ON" : "OFF"}
           </button>
         </div>
         
