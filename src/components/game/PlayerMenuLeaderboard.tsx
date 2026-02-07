@@ -16,6 +16,17 @@ interface LocalScore {
   score: number;
 }
 
+/** Standard seed scores for any mode on first launch */
+function getDefaultLocalScores(): LocalScore[] {
+  return [
+    { initials: "IH",  score: 50000 },
+    { initials: "SDP", score: 30000 },
+    { initials: "PC",  score: 15000 },
+    { initials: "ASH", score: 10000 },
+    { initials: "IAN", score: 5000 },
+  ];
+}
+
 /** Read local high scores from localStorage for a given mode */
 function readLocalScores(mode: Mode): LocalScore[] {
   try {
@@ -29,10 +40,19 @@ function readLocalScores(mode: Mode): LocalScore[] {
     if (!key) return [];
     
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
+    if (!raw) {
+      // Auto-seed on first access so the leaderboard is never empty
+      const defaults = getDefaultLocalScores();
+      localStorage.setItem(key, JSON.stringify(defaults));
+      return defaults;
+    }
     
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      const defaults = getDefaultLocalScores();
+      localStorage.setItem(key, JSON.stringify(defaults));
+      return defaults;
+    }
     
     return parsed
       .slice(0, 5)
