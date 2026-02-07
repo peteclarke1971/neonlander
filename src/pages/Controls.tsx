@@ -11,8 +11,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { loadGraphicsSettings, saveGraphicsSettings, GraphicsLevel, detectOptimalGraphics, BenchmarkResult } from "@/lib/graphicsConfig";
- import { loadStarfieldConfig, saveStarfieldConfig, resetStarfieldConfig, StarfieldConfig, DEFAULT_STARFIELD_CONFIG } from "@/lib/starfieldConfig";
- import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { loadStarfieldConfig, saveStarfieldConfig, resetStarfieldConfig, StarfieldConfig, DEFAULT_STARFIELD_CONFIG } from "@/lib/starfieldConfig";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { HyperspaceStarfield } from "@/components/game/HyperspaceStarfield";
+import { MobileStarfield } from "@/components/game/MobileStarfield";
+import { NeonVortexStarfield } from "@/components/game/NeonVortexStarfield";
+import { PrismaticWavesStarfield } from "@/components/game/PrismaticWavesStarfield";
+import { CosmicTunnelStarfield } from "@/components/game/CosmicTunnelStarfield";
+import { NebulaDriftStarfield } from "@/components/game/NebulaDriftStarfield";
+import { IntoTheVoidStarfield } from "@/components/game/IntoTheVoidStarfield";
 
 export default function ControlsSettings() {
   const navigate = useNavigate();
@@ -283,6 +290,32 @@ export default function ControlsSettings() {
    // Starfield customization settings
    const [starfieldConfig, setStarfieldConfig] = useState<StarfieldConfig>(loadStarfieldConfig);
    const [starfieldSettingsOpen, setStarfieldSettingsOpen] = useState(false);
+   const [starfieldTouched, setStarfieldTouched] = useState(false);
+   const [previewKey, setPreviewKey] = useState(0);
+
+   const showStarfieldPreview = starfieldTouched || starfieldSettingsOpen;
+
+   const renderStarfieldPreview = () => {
+     switch (starfieldStyle) {
+       case 'hyperspace':
+         return <HyperspaceStarfield speed={0.28} density={1600} focalLength={480} trail={0.55} style="glow" />;
+       case 'mobile':
+         return <MobileStarfield starCount={180} speed={0.5} />;
+       case 'vortex':
+         return <NeonVortexStarfield starCount={280} />;
+       case 'waves':
+         return <PrismaticWavesStarfield starCount={320} />;
+       case 'tunnel':
+         return <CosmicTunnelStarfield starCount={280} />;
+       case 'nebula':
+         return <NebulaDriftStarfield starCount={250} />;
+       case 'void':
+         return <IntoTheVoidStarfield ringCount={40} />;
+       case 'auto':
+       default:
+         return <NebulaDriftStarfield starCount={250} />;
+     }
+   };
   
   // Initialize AudioManager
   useEffect(() => {
@@ -1023,7 +1056,11 @@ export default function ControlsSettings() {
                 <Label>Starfield Style</Label>
                 <div className="text-xs text-muted-foreground">Choose the starfield effect for menus</div>
               </div>
-              <Select value={starfieldStyle} onValueChange={setStarfieldStyle}>
+              <Select value={starfieldStyle} onValueChange={(v) => {
+                setStarfieldStyle(v);
+                setStarfieldTouched(true);
+                setPreviewKey(k => k + 1);
+              }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -1039,6 +1076,23 @@ export default function ControlsSettings() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Live Starfield Preview */}
+            {showStarfieldPreview && (
+              <div
+                key={previewKey}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: 300,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: "#000",
+                }}
+              >
+                {renderStarfieldPreview()}
+              </div>
+            )}
              
              {/* Starfield Customization - collapsible section */}
              {starfieldStyle !== 'auto' && (
