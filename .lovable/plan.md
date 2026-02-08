@@ -1,74 +1,55 @@
 
-# Fix: Touch Thrust Zone Blocked by Controls Container
+# Fix Medley Mode Levels 2 and 6 Mega Pad Placement
 
 ## The Problem
 
-The touch controls container div spans the full width of the screen (from left edge to right edge) at a higher z-index (z-20) than the thrust overlay (z-10). Even though the actual buttons only occupy the left portion, the invisible container div blocks all touch events across its entire width from reaching the thrust overlay below. Moving the controls upward (via the vertical offset setting) pushes the blocking zone higher, matching the reported issue exactly.
-
-```text
-+--------------------------------------------+
-|                                            |
-|         THRUST ZONE (z-10)                 |
-|         works here                         |
-|                                            |
-|............................................|
-|  [◄] [►] [ABORT]  |   BLOCKED AREA        |  <-- controls container (z-20)
-|  buttons (left)    |   (right side, no     |      spans full width
-|                    |    buttons but still   |
-|                    |    intercepts touch)   |
-+--------------------------------------------+
-```
+Medley mode levels 2 and 6 (0-indexed, meaning the 3rd and 7th levels played) generate terrain where the mega (moving) pad extends off the edge of the terrain into open space. This happens because the deterministic seed for these levels produces terrain/pad placement combinations that don't work properly.
 
 ## The Fix
 
-Add `pointer-events: none` to the controls container div, and `pointer-events: auto` to each button. This makes the container "transparent" to touches, so they pass through to the thrust overlay, while the buttons themselves still capture input normally.
-
-```text
-+--------------------------------------------+
-|                                            |
-|         THRUST ZONE (z-10)                 |
-|         works everywhere                   |
-|                                            |
-|............................................|
-|  [◄] [►] [ABORT]  |   THRUST ZONE         |  <-- container is pointer-events-none
-|  pointer-events    |   (touches pass       |      touches fall through to z-10
-|  auto (captures)   |    through to z-10)   |
-+--------------------------------------------+
-```
+Add a seed fixup table in `medleyConfig.ts` that applies an additional offset to the seed for these specific problematic stages. This changes the terrain and mega pad generation just enough to produce valid placements, without affecting any other levels.
 
 ## Technical Details
 
-### File: `src/components/game/GameEngine.tsx`
+### File: `src/components/game/systems/medleyConfig.ts`
 
-**1. Add `pointer-events-none` to the controls container div (line ~6416)**
+**Add a seed fixup map** above the `getMedleySeed` function:
 
-Change the container's className from:
-`"absolute z-20 flex items-end justify-between gap-3 select-none"`
-to:
-`"absolute z-20 flex items-end justify-between gap-3 select-none pointer-events-none"`
+```typescript
+const MEDLEY_SEED_FIXUPS: Record<number, number> = {
+  2: 31337,   // Level 2 (3rd played) - mega pad was going off terrain
+  6: 71093,   // Level 6 (7th played) - mega pad was going off terrain
+};
+```
 
-**2. Add `pointer-events-auto` to each button**
+**Update `getMedleySeed`** to apply the fixup:
 
-Add `pointer-events-auto` to the className of:
-- Left rotate button (line ~6429)
-- Right rotate button (line ~6441)
-- Abort button (line ~6453)
+```typescript
+export function getMedleySeed(medleyStage: number, difficulty: Difficulty): number {
+  const normalizedStage = Math.max(1, medleyStage);
+  const baseSeed = 942735;
+  const difficultyOffset = difficulty === "hard" ? 200000 : 0;
+  const earlyMedleyOffset = isEarlyMedleyNormalLevel(normalizedStage) ? 500000 : 0;
+  const fixupOffset = MEDLEY_SEED_FIXUPS[normalizedStage] || 0;  // <-- NEW
+  
+  const finalSeed = baseSeed + difficultyOffset + earlyMedleyOffset + fixupOffset + normalizedStage * 7919;
+  // ... rest unchanged
+  return finalSeed;
+}
+```
 
-This ensures the buttons themselves still receive touch events while everything else in the container passes through.
+### How It Works
 
-### Why This Works
+- Level 2 currently generates seed `1,458,573` -- with the fixup (+31337) it becomes `1,489,910`, producing completely different terrain and mega pad placement
+- Level 6 currently generates seed `1,490,249` -- with the fixup (+71093) it becomes `1,561,342`, also producing different terrain
+- The fixup offset values are arbitrary prime-ish numbers chosen to shift the seed far enough to get a completely different terrain generation
+- All other levels remain unchanged (fixup is 0 for them)
+- Both "easy" and "hard" difficulty seeds are fixed since the fixup applies before the difficulty offset
 
-- The container div no longer captures any touch events (pointer-events-none)
-- Touches on empty space within the container fall through to the thrust overlay (z-10) below
-- The individual buttons opt back in (pointer-events-auto) so they still work normally
-- No layout changes needed -- button positions, offsets, and scaling remain identical
-- Works regardless of vertical/horizontal offset or scale settings
+### Summary
 
-### Single File Change
+| File | Change |
+|------|--------|
+| `src/components/game/systems/medleyConfig.ts` | Add `MEDLEY_SEED_FIXUPS` map and apply it in `getMedleySeed` |
 
-| Change | Location | Lines |
-|--------|----------|-------|
-| Add `pointer-events-none` to container | className on line ~6416 | 1 line |
-| Add `pointer-events-auto` to left rotate button | className on line ~6429 | 1 line |
-| Add `pointer-events-auto` to right rotate button | className on line ~6441 | 1 line |
-| Add `pointer-events-auto` to abort button | className on line ~6453 | 1 line |
+This is a single-file, ~5-line change. If the new seeds still produce bad placements (unlikely but possible), the fixup values can simply be adjusted to different numbers until a good result is found.
