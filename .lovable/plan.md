@@ -1,74 +1,74 @@
 
-# Use Player's Chosen Starfield on All Mission Failed Screens
+# Fix: Touch Thrust Zone Blocked by Controls Container
 
-## What We're Doing
+## The Problem
 
-Replacing the hardcoded starfield effects on every mission failed/game over screen with the user's chosen starfield style (and customization settings). If no style has been chosen, it defaults to Nebula Drift. The existing starfield code on each screen will be commented out (not deleted) so it can be reverted easily.
+The touch controls container div spans the full width of the screen (from left edge to right edge) at a higher z-index (z-20) than the thrust overlay (z-10). Even though the actual buttons only occupy the left portion, the invisible container div blocks all touch events across its entire width from reaching the thrust overlay below. Moving the controls upward (via the vertical offset setting) pushes the blocking zone higher, matching the reported issue exactly.
 
-## How It Works
+```text
++--------------------------------------------+
+|                                            |
+|         THRUST ZONE (z-10)                 |
+|         works here                         |
+|                                            |
+|............................................|
+|  [◄] [►] [ABORT]  |   BLOCKED AREA        |  <-- controls container (z-20)
+|  buttons (left)    |   (right side, no     |      spans full width
+|                    |    buttons but still   |
+|                    |    intercepts touch)   |
++--------------------------------------------+
+```
 
-A new shared component (`GameOverStarfield`) will read the user's starfield preference from localStorage (`ll-starfield-style`) and render the matching starfield component -- exactly mirroring the Player Menu's `renderStarfield` logic. Since all starfield components already read customization settings (density, speed, glow, etc.) from localStorage via `loadStarfieldConfig()`, the user's custom visual tweaks will automatically apply.
+## The Fix
 
-## Pages Affected
+Add `pointer-events: none` to the controls container div, and `pointer-events: auto` to each button. This makes the container "transparent" to touches, so they pass through to the thrust overlay, while the buttons themselves still capture input normally.
 
-| Page | Current Starfield | After Change |
-|------|------------------|--------------|
-| Index.tsx (Classic/Fixed/Medley) | iOS: MobileStarfield, Desktop: HyperspaceStarfield + AsteroidField | User's chosen style |
-| Asteroids.tsx | iOS: MobileStarfield, Desktop: HyperspaceStarfield (vector) | User's chosen style |
-| AsteroidsColor.tsx | None (plain background) | User's chosen style |
-| AsteroidsRemix.tsx | AsteroidStarfield | User's chosen style |
-| LightCycles.tsx | HyperspaceStarfield | User's chosen style |
-| NeonDocking.tsx | HyperspaceStarfield | User's chosen style |
-| NeonRacing.tsx | HyperspaceStarfield | User's chosen style |
-| Survival.tsx | HyperspaceStarfield | User's chosen style |
-| Duel.tsx | iOS: MobileStarfield, Desktop: HyperspaceStarfield | User's chosen style |
+```text
++--------------------------------------------+
+|                                            |
+|         THRUST ZONE (z-10)                 |
+|         works everywhere                   |
+|                                            |
+|............................................|
+|  [◄] [►] [ABORT]  |   THRUST ZONE         |  <-- container is pointer-events-none
+|  pointer-events    |   (touches pass       |      touches fall through to z-10
+|  auto (captures)   |    through to z-10)   |
++--------------------------------------------+
+```
 
 ## Technical Details
 
-### Step 1: Create a shared component
+### File: `src/components/game/GameEngine.tsx`
 
-**New file: `src/components/game/GameOverStarfield.tsx`**
+**1. Add `pointer-events-none` to the controls container div (line ~6416)**
 
-A simple component that:
-- Reads `ll-starfield-style` from localStorage
-- Renders the corresponding starfield component using the same switch/case as PlayerMenu
-- Wraps everything in a `div` with `position: absolute; inset: 0` styling
-- Falls back to `NebulaDriftStarfield` (the default) if no preference is set
+Change the container's className from:
+`"absolute z-20 flex items-end justify-between gap-3 select-none"`
+to:
+`"absolute z-20 flex items-end justify-between gap-3 select-none pointer-events-none"`
 
-```text
-+-------------------------------+
-| GameOverStarfield             |
-|  - reads ll-starfield-style   |
-|  - renders matching component |
-|  - absolute positioned        |
-+-------------------------------+
-```
+**2. Add `pointer-events-auto` to each button**
 
-### Step 2: Update each page's gameover view
+Add `pointer-events-auto` to the className of:
+- Left rotate button (line ~6429)
+- Right rotate button (line ~6441)
+- Abort button (line ~6453)
 
-For each of the 9 pages listed above:
+This ensures the buttons themselves still receive touch events while everything else in the container passes through.
 
-1. Import `GameOverStarfield`
-2. In the gameover/result section, comment out (wrap in `{/* OLD STARFIELD ... */}`) the existing starfield JSX
-3. Replace with `<GameOverStarfield />`
+### Why This Works
 
-The existing radial gradient overlays will remain in place -- they sit on top and will continue to work with any starfield style.
+- The container div no longer captures any touch events (pointer-events-none)
+- Touches on empty space within the container fall through to the thrust overlay (z-10) below
+- The individual buttons opt back in (pointer-events-auto) so they still work normally
+- No layout changes needed -- button positions, offsets, and scaling remain identical
+- Works regardless of vertical/horizontal offset or scale settings
 
-### Step 3: Remove unused imports (where applicable)
+### Single File Change
 
-After commenting out the old starfield usage in gameover views, some pages may have starfield imports that are only used for the gameover screen (e.g., NeonRacing only imports HyperspaceStarfield for its gameover). These will be cleaned up, though imports shared with the home view (like in Asteroids.tsx) will remain.
-
-### Summary of Changes
-
-| File | Action |
-|------|--------|
-| `src/components/game/GameOverStarfield.tsx` | New shared component |
-| `src/pages/Index.tsx` | Replace gameover starfield block |
-| `src/pages/Asteroids.tsx` | Replace gameover starfield block |
-| `src/pages/AsteroidsColor.tsx` | Add starfield to gameover (currently has none) |
-| `src/pages/AsteroidsRemix.tsx` | Replace AsteroidStarfield with GameOverStarfield |
-| `src/pages/LightCycles.tsx` | Replace gameover starfield |
-| `src/pages/NeonDocking.tsx` | Replace gameover starfield |
-| `src/pages/NeonRacing.tsx` | Replace gameover starfield |
-| `src/pages/Survival.tsx` | Replace gameover starfield |
-| `src/pages/Duel.tsx` | Replace gameover starfield |
+| Change | Location | Lines |
+|--------|----------|-------|
+| Add `pointer-events-none` to container | className on line ~6416 | 1 line |
+| Add `pointer-events-auto` to left rotate button | className on line ~6429 | 1 line |
+| Add `pointer-events-auto` to right rotate button | className on line ~6441 | 1 line |
+| Add `pointer-events-auto` to abort button | className on line ~6453 | 1 line |
