@@ -176,6 +176,16 @@ export function isEarlyMedleyNormalLevel(medleyStage: number): boolean {
 }
 
 /**
+ * Seed fixups for specific medley stages where the default seed produces
+ * bad terrain/mega-pad placement (e.g. pad extending off terrain edge).
+ * Values are arbitrary offsets that shift the seed enough to get new terrain.
+ */
+const MEDLEY_SEED_FIXUPS: Record<number, number> = {
+  2: 31337,   // Level 2 (3rd played) - mega pad was going off terrain
+  6: 71093,   // Level 6 (7th played) - mega pad was going off terrain
+};
+
+/**
  * Generate a deterministic seed for a medley stage
  */
 export function getMedleySeed(medleyStage: number, difficulty: Difficulty): number {
@@ -185,8 +195,9 @@ export function getMedleySeed(medleyStage: number, difficulty: Difficulty): numb
   
   // Add unique offset for early cycle 1 levels to force new terrain generation
   const earlyMedleyOffset = isEarlyMedleyNormalLevel(normalizedStage) ? 500000 : 0;
+  const fixupOffset = MEDLEY_SEED_FIXUPS[normalizedStage] || 0;
   
-  const finalSeed = baseSeed + difficultyOffset + earlyMedleyOffset + normalizedStage * 7919;
+  const finalSeed = baseSeed + difficultyOffset + earlyMedleyOffset + fixupOffset + normalizedStage * 7919;
   console.log('🌱 Medley Seed:', { medleyStage, normalizedStage, earlyMedleyOffset, finalSeed });
   
   return finalSeed;
