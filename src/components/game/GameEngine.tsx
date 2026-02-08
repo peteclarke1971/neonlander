@@ -6413,7 +6413,7 @@ export const GameEngine: React.FC<Props> = ({
       {/* Controls overlay - Show for touch devices (hides when keyboard/gamepad detected) */}
       {!isUsingPCControls && !isDemo && (
         <div 
-          className="absolute z-20 flex items-end justify-between gap-3 select-none"
+          className="absolute z-20 flex items-end justify-between gap-3 select-none pointer-events-none"
           style={{ 
             bottom: `${32 + (parseInt(localStorage.getItem('ll-touch-controls-offset-y') || '0') || 0)}px`,
             left: `${16 + (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
@@ -6426,7 +6426,7 @@ export const GameEngine: React.FC<Props> = ({
           <div className="flex gap-2">
             <Button 
               variant="neon" 
-              className={`select-none font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
+              className={`select-none pointer-events-auto font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
               onMouseDown={() => (keys.current.left = true)} 
               onMouseUp={() => (keys.current.left = false)} 
               onMouseLeave={() => (keys.current.left = false)}
@@ -6438,7 +6438,7 @@ export const GameEngine: React.FC<Props> = ({
             </Button>
             <Button 
               variant="neon" 
-              className={`select-none font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
+              className={`select-none pointer-events-auto font-['Orbitron'] ${largeRotateButtons ? 'text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none' : ''}`}
               onMouseDown={() => (keys.current.right = true)} 
               onMouseUp={() => (keys.current.right = false)} 
               onMouseLeave={() => (keys.current.right = false)}
@@ -6450,7 +6450,7 @@ export const GameEngine: React.FC<Props> = ({
             </Button>
             <Button 
               variant="destructive" 
-              className="select-none font-['Orbitron'] uppercase"
+              className="select-none pointer-events-auto font-['Orbitron'] uppercase"
               onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
               onMouseUp={() => (keys.current.abort = false)} 
               onMouseLeave={() => (keys.current.abort = false)}
