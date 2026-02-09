@@ -242,6 +242,16 @@ export class MovingPadSystem {
       }
     }
 
+    // Enforce minimum distance from world edges (prevents pads at seam/edge)
+    const edgeMargin = 100;
+    if (pos0.x < edgeMargin || pos1.x < edgeMargin || 
+        pos0.x > worldWidth - edgeMargin || pos1.x > worldWidth - edgeMargin) {
+      if (!forced) return null;
+      // For forced pads, clamp to safe bounds
+      pos0.x = Math.max(edgeMargin, Math.min(worldWidth - edgeMargin, pos0.x));
+      pos1.x = Math.max(edgeMargin, Math.min(worldWidth - edgeMargin, pos1.x));
+    }
+
     // Create pad dimensions
     const width = 24 + rand() * 16; // 24-40 pixels
     
@@ -471,7 +481,10 @@ export class MovingPadSystem {
     }
 
     // Check terrain clearance at several points along path
-    const steps = 20; // increased for better checking
+    const steps = 20;
+    let pathMaxTerrainVariance = 0;
+    const referenceTerrainY = getHeightAt(pos0.x);
+    
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const x = pos0.x + (pos1.x - pos0.x) * t;
@@ -482,7 +495,16 @@ export class MovingPadSystem {
         // Allow flush tracks: permit pad path to be at ground height (not below it)
         if (y > terrainY + 0.5) return false; // below terrain -> invalid
       }
+      
+      // Track terrain variance along shuttle path
+      if (motion === "shuttle") {
+        const variance = Math.abs(terrainY - referenceTerrainY);
+        pathMaxTerrainVariance = Math.max(pathMaxTerrainVariance, variance);
+      }
     }
+    
+    // For shuttle pads, reject paths with high terrain variance (pad would clip through terrain)
+    if (motion === "shuttle" && pathMaxTerrainVariance > 3) return false;
 
   // Check distance from existing pads with width-aware spacing
     for (const pad of existingPads) {
