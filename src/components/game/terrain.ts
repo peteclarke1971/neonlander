@@ -180,6 +180,11 @@ export function generateTerrain(
     }
   }
 
+  // Capture original terrain heights BEFORE any pad modifications
+  for (let i = 0; i <= segments; i++) {
+    originalHeights.set(i, points[i].y);
+  }
+
   // Place landing pads sized from tiny to large
   // In Time Trial mode, use specified pad count for sequenced pads
   const padCount = isTimeTrial && timeTrialPadCount ? timeTrialPadCount : 4;
@@ -384,11 +389,6 @@ export function generateTerrain(
     pads[minIdx].bonus2x = true;
   }
 
-  // Store original terrain heights before pad modifications
-  for (let i = 0; i <= segments; i++) {
-    originalHeights.set(i, points[i].y);
-  }
-  
   // Re-sync seam after all modifications
   points[segments].y = points[0].y;
 
@@ -526,6 +526,19 @@ export function generateTerrain(
           pads.splice(i, 1);
         }
       }
+      
+      // Flatten terrain along mega pad's entire travel path
+      const mpMinX = Math.min(movingPad.pos0.x, movingPad.pos1.x) - (movingPad.width || 32) / 2;
+      const mpMaxX = Math.max(movingPad.pos0.x, movingPad.pos1.x) + (movingPad.width || 32) / 2;
+      const mpY = movingPad.pos0.y;
+      
+      for (let si = 0; si <= segments; si++) {
+        const sx = si * step;
+        if (sx >= mpMinX && sx <= mpMaxX) {
+          points[si].y = mpY;
+        }
+      }
+      console.log(`[Terrain] Flattened terrain under mega pad path x=${mpMinX.toFixed(0)}-${mpMaxX.toFixed(0)} at y=${mpY.toFixed(1)}`);
     }
   }
 
@@ -609,6 +622,46 @@ export function generateTerrain(
     
     console.log(`[Terrain] Validated static pad at (${padCenterX.toFixed(1)}, ${originalTerrainY.toFixed(1)}) width=${padWidth.toFixed(1)}`);
   }
+
+  // ===== FINAL PAD-TERRAIN SYNC PASS =====
+  // After ALL modifications, force every static pad to match definitive terrain height
+  for (let pi = 0; pi < pads.length; pi++) {
+    const pad = pads[pi];
+    const padCenterX = (pad.xStart + pad.xEnd) / 2;
+    const terrainY = getHeightAt(padCenterX);
+    
+    const correction = Math.abs(pad.y - terrainY);
+    if (correction > 2) {
+      console.warn(`[Terrain] Final sync: corrected pad ${pi} from y=${pad.y.toFixed(1)} to y=${terrainY.toFixed(1)} (Δ=${correction.toFixed(1)}px)`);
+    }
+    
+    pad.y = terrainY;
+    
+    // Re-flatten terrain around this pad one final time
+    const syncPadIdx = Math.floor((padCenterX / worldWidthLocal) * segments);
+    const syncClampedIdx = Math.max(0, Math.min(segments - 1, syncPadIdx));
+    const syncPadWidth = pad.xEnd - pad.xStart;
+    const syncHalfCount = Math.max(2, Math.round((syncPadWidth / step) * 1.5));
+    
+    for (let j = -syncHalfCount; j <= syncHalfCount; j++) {
+      const idx = ((syncClampedIdx + j) % (segments + 1) + (segments + 1)) % (segments + 1);
+      points[idx].y = terrainY;
+    }
+  }
+  
+  // Sync sequenced pads if present
+  if (isTimeTrial && sequencedPads.length > 0) {
+    for (const sp of sequencedPads) {
+      const spCenterX = (sp.xStart + sp.xEnd) / 2;
+      const spSyncY = getHeightAt(spCenterX);
+      sp.y = spSyncY;
+      const matchPad = pads.find(p => p.xStart === sp.xStart && p.xEnd === sp.xEnd);
+      if (matchPad) matchPad.y = spSyncY;
+    }
+  }
+  
+  // Re-sync seam point after final pass
+  points[segments].y = points[0].y;
 
   // ===== Generate collectibles =====
   let collectibles: CollectiblesData | undefined;
