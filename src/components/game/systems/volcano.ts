@@ -39,7 +39,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: 1,
       minSize: 6,
       maxSize: 10,
-      baseInterval: 15, // Long time between eruptions
+      baseInterval: 45, // Long time between eruptions (tripled)
       eruptionDuration: 1.2, // Short eruptions
       particleCount: 6, // Very few particles
       power: 0.25 // Weak ejection power
@@ -50,7 +50,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: 1,
       minSize: 7,
       maxSize: 12,
-      baseInterval: 12,
+      baseInterval: 36,
       eruptionDuration: 1.5,
       particleCount: 8,
       power: 0.35
@@ -61,7 +61,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: 1,
       minSize: 8,
       maxSize: 16,
-      baseInterval: 8,
+      baseInterval: 24,
       eruptionDuration: 2,
       particleCount: 15,
       power: 0.6
@@ -72,7 +72,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: 2,
       minSize: 12,
       maxSize: 24,
-      baseInterval: 6,
+      baseInterval: 18,
       eruptionDuration: 2.5,
       particleCount: 25,
       power: 0.8
@@ -83,7 +83,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: Math.min(4, 2 + Math.floor((level - 8) / 3)),
       minSize: 16,
       maxSize: 32, // max size of smallest pad
-      baseInterval: 4,
+      baseInterval: 12,
       eruptionDuration: 3,
       particleCount: 35,
       power: 1.0
@@ -94,7 +94,7 @@ export function getVolcanoConfigForLevel(level: number): VolcanoConfig {
       count: Math.min(4, 2 + Math.floor((level - 8) / 3)),
       minSize: 16,
       maxSize: 32,
-      baseInterval: 4,
+      baseInterval: 12,
       eruptionDuration: 3,
       particleCount: 35,
       power: 1.0
