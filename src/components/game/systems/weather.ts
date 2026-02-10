@@ -423,10 +423,26 @@ export function generateLightningBolt(
   return bolt;
 }
 
-// Export Level 4 constants for use in GameEngine
+// Export Level 4 constants for use in GameEngine (legacy, full intensity)
 export const LEVEL4_CONSTANTS = {
   INTERVAL_MIN: LEVEL4_LIGHTNING_INTERVAL_MIN,
   INTERVAL_MAX: LEVEL4_LIGHTNING_INTERVAL_MAX,
   MAX_CONCURRENT: LEVEL4_MAX_CONCURRENT_BOLTS,
   MAX_CONCURRENT_LOW: LEVEL4_MAX_CONCURRENT_BOLTS_LOW
 };
+
+/**
+ * Get storm constants scaled by storm occurrence.
+ * 1st storm = 75% intensity, ramping to 100% by the 5th occurrence.
+ * Scale factor: 0.75 + (occurrence - 1) * 0.0625, capped at 1.0
+ */
+export function getStormConstants(stormOccurrence: number) {
+  const scale = Math.min(1.0, 0.75 + (stormOccurrence - 1) * 0.0625);
+  return {
+    INTERVAL_MIN: LEVEL4_LIGHTNING_INTERVAL_MIN / scale, // longer intervals = less frequent
+    INTERVAL_MAX: LEVEL4_LIGHTNING_INTERVAL_MAX / scale,
+    MAX_CONCURRENT: Math.max(2, Math.round(LEVEL4_MAX_CONCURRENT_BOLTS * scale)),
+    MAX_CONCURRENT_LOW: Math.max(2, Math.round(LEVEL4_MAX_CONCURRENT_BOLTS_LOW * scale)),
+    HIT_RADIUS_SCALE: scale, // scale the shockwave hit radius
+  };
+}

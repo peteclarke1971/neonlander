@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepad, saveProfile, setLastDeviceId } from "@/hooks/use-gamepad";
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
+import { loadRotationSensitivity, saveRotationSensitivity, resetRotationSensitivity, ROTATION_SENSITIVITY_MIN, ROTATION_SENSITIVITY_MAX, ROTATION_SENSITIVITY_DEFAULT } from "@/lib/rotationSensitivity";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
@@ -147,6 +148,7 @@ export default function ControlsSettings() {
       return 10;
     }
   });
+  const [rotationSensitivity, setRotationSensitivity] = useState<number>(loadRotationSensitivity);
   const [musicMuted, setMusicMuted] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-music-muted');
@@ -979,7 +981,44 @@ export default function ControlsSettings() {
                 </div>
               </div>
             )}
-            {/* Moving Pads - hidden in player menu mode */}
+            {/* Rotation Sensitivity */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <Label htmlFor="rotsensitivity">Rotation Sensitivity</Label>
+                  <div className="text-xs text-muted-foreground">Adjust digital rotation speed (keyboard/gamepad d-pad)</div>
+                </div>
+                {rotationSensitivity !== ROTATION_SENSITIVITY_DEFAULT && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-6 px-2"
+                    onClick={() => {
+                      resetRotationSensitivity();
+                      setRotationSensitivity(ROTATION_SENSITIVITY_DEFAULT);
+                    }}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-56">
+                  <Slider
+                    id="rotsensitivity"
+                    value={[rotationSensitivity]}
+                    min={ROTATION_SENSITIVITY_MIN}
+                    max={ROTATION_SENSITIVITY_MAX}
+                    step={0.1}
+                    onValueChange={([v]) => {
+                      setRotationSensitivity(v);
+                      saveRotationSensitivity(v);
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">{rotationSensitivity.toFixed(1)}×</span>
+              </div>
+            </div>
             {!isPlayerMenuMode && (
               <div className="flex items-center justify-between">
                 <div>
