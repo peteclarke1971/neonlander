@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import TerminalText from "./TerminalText";
 import { HyperspaceStarfield } from "./HyperspaceStarfield";
 import { MobileStarfield } from "./MobileStarfield";
 import { NeonVortexStarfield } from "./NeonVortexStarfield";
@@ -865,12 +866,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
                 </span>
               </button>
             ))}
-            <p 
-              className="text-xs text-center mt-2 opacity-70"
-              style={{ color: "hsl(var(--muted-foreground))" }}
-            >
-              {gameModeOptions.find(m => m.id === selectedMode)?.description}
-            </p>
+            <TerminalText
+              text={gameModeOptions.find(m => m.id === selectedMode)?.description || ""}
+              className="text-xs text-center mt-2"
+            />
             <button
               ref={backButtonRef}
               className="player-menu-back-btn"
