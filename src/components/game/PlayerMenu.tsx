@@ -701,7 +701,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   const [starfieldStyle] = useState(() => {
     try {
    const saved = localStorage.getItem('ll-starfield-style');
-       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula') return saved;
+       if (saved === 'hyperspace' || saved === 'mobile' || saved === 'vortex' || saved === 'waves' || saved === 'tunnel' || saved === 'nebula' || saved === 'void') return saved;
     } catch {}
     return 'nebula';
   });
