@@ -97,7 +97,7 @@ export class MovingPadSystem {
 
     // Speed band based on difficulty (reduced to 25% of original)
     // Speed increases with level up to 5x starting speed
-    const levelSpeedMultiplier = Math.min(5, 1 + (level - 1) * 0.5); // 1x to 5x based on level
+    const levelSpeedMultiplier = Math.min(5, 1 + (Math.min(level, 10) - 1) * 0.5); // 1x to 5x, capped at level 10
     const speedBands = {
       slow: { min: 4 * levelSpeedMultiplier, max: 5 * levelSpeedMultiplier },
       medium: { min: 6 * levelSpeedMultiplier, max: 8 * levelSpeedMultiplier },
@@ -111,7 +111,7 @@ export class MovingPadSystem {
     const dwell = forced ? 0 : 1.6 + rand() * 1.2; // 0 when forced (start moving immediately)
 
     // Score multiplier - forced pads are always MEGA (3x)
-    const scoreMult = forced ? 3.0 : (speedBand === "fast" ? 3.0 : 2.0);
+    const scoreMult = 3.0; // Always 3x for mega pads
 
     // Generate path based on motion type
     let pos0: { x: number; y: number };

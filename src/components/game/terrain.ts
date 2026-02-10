@@ -1,5 +1,5 @@
 import { Pad, TerrainData, MovingPad, CollectiblesData, SequencedPad, Mode, CoralFormation, Jellyfish } from "./types";
-import { isWaterLevel, isCollectionLevel } from "./systems/levelConfig";
+import { isWaterLevel, isCollectionLevel, getWaterOccurrence } from "./systems/levelConfig";
 import { generateVolcanoes } from "./systems/volcano";
 import { movingPadSystem } from "./systems/movingPads";
 import { generateCollectibles, PlacementContext } from "./systems/collectibles";
@@ -80,13 +80,16 @@ export function generateJellyfish(
   seed: number,
   worldWidth: number,
   worldHeight: number,
-  getHeightAt: (x: number) => number
+  getHeightAt: (x: number) => number,
+  waterOccurrence: number = 1
 ): Jellyfish[] {
   const rand = mulberry32(seed ^ 0x4A454C4C); // "JELL" in hex
   const jellyfish: Jellyfish[] = [];
   
-  // Generate 30-50 jellyfish (doubled from original 15-25)
-  const count = 30 + Math.floor(rand() * 21); // 30-50
+  // Scale density: 75% for 1st water, ramping to 100% by 5th occurrence
+  const densityScale = Math.min(1.0, 0.75 + (waterOccurrence - 1) * 0.0625);
+  const baseCount = 30 + Math.floor(rand() * 21); // 30-50
+  const count = Math.round(baseCount * densityScale);
   
   for (let i = 0; i < count; i++) {
     // 30% chance of tiny jellyfish (10-25px), otherwise normal size (20-60px)
@@ -769,9 +772,9 @@ export function generateTerrain(
     ? generateCoral(seed, worldWidthLocal, getHeightAt, pads)
     : undefined;
 
-  // Generate jellyfish for water levels (above terrain)
+  // Generate jellyfish for water levels (above terrain) - density ramps with occurrence
   const jellyfish = isWaterLevel(mode, level)
-    ? generateJellyfish(seed, worldWidthLocal, 800, getHeightAt)
+    ? generateJellyfish(seed, worldWidthLocal, 800, getHeightAt, getWaterOccurrence(level))
     : undefined;
 
   return { 

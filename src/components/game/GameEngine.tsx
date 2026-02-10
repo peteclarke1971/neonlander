@@ -19,7 +19,7 @@ import FireworksDisplay from './FireworksDisplay';
 import { BonusMessageDisplay } from './BonusMessageDisplay';
 import { getTimeTrialLevelConfig } from "./systems/timeTrialLevels";
 import { getDecorationsForLevel, preloadDecorationImages, renderDecorations, BackgroundDecoration } from "./systems/backgroundDecorations";
-import { generateLightningBolt, selectBoltType, LEVEL4_CONSTANTS, LightningBolt, LightningAfterglow, LightningImpact } from "./systems/weather";
+import { generateLightningBolt, selectBoltType, LEVEL4_CONSTANTS, getStormConstants, LightningBolt, LightningAfterglow, LightningImpact } from "./systems/weather";
 import { renderLightningBolts, updateLightningBolts } from "./systems/weatherRenderer";
 import { renderLightningFlash, renderLightningAfterglow, renderLightningImpact, renderOzoneGlow } from "./systems/weatherRendererExtended";
 
@@ -34,7 +34,8 @@ function mulberry32(seed: number) {
 }
 import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
-import { isWaterLevel, isLightningLevel, isCollectionLevel } from "./systems/levelConfig";
+import { isWaterLevel, isLightningLevel, isCollectionLevel, getStormOccurrence } from "./systems/levelConfig";
+import { loadRotationSensitivity } from "@/lib/rotationSensitivity";
 import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
 import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley, isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./systems/medleyConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
@@ -1223,7 +1224,8 @@ export const GameEngine: React.FC<Props> = ({
 
     const fuelConsumption = difficulty === "easy" ? 22 : 30; // units per second at full thrust
     const gravity = 0.02 * 0.75; // unify gravity across difficulties
-    const rotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15; // 15% quicker rotation
+    const rotSensitivity = loadRotationSensitivity();
+    const rotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15 * rotSensitivity; // 15% quicker rotation * sensitivity
     const rotFriction = difficulty === "easy"; // easy: friction stops rotation
 
     let score = initialScore ?? 0;
@@ -4255,12 +4257,14 @@ export const GameEngine: React.FC<Props> = ({
         sweepActiveRef.current = true;
       }
       
-      // ===== LIGHTNING SYSTEM UPDATE (Level 4 Classic Mode) =====
+      // ===== LIGHTNING SYSTEM UPDATE (Storm Levels) =====
       if (lightningEnabled && !worldPausedRef.current) {
         const canvasWidth = c.width;
         const canvasHeight = c.height;
         const dpr = Math.min(2, window.devicePixelRatio || 1);
-        const maxConcurrent = getGraphicsValue(graphicsLevel, LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW, LEVEL4_CONSTANTS.MAX_CONCURRENT_LOW, LEVEL4_CONSTANTS.MAX_CONCURRENT);
+        const stormOcc = getStormOccurrence(level);
+        const stormConsts = getStormConstants(stormOcc);
+        const maxConcurrent = getGraphicsValue(graphicsLevel, stormConsts.MAX_CONCURRENT_LOW, stormConsts.MAX_CONCURRENT_LOW, stormConsts.MAX_CONCURRENT);
         
         // Update existing bolts
         updateLightningBolts(lightningBolts.current, dt);
@@ -4344,10 +4348,11 @@ export const GameEngine: React.FC<Props> = ({
               lightningDebris.current.push(debris);
             }
             
-            // Shockwave on ship if close
+            // Shockwave on ship if close (hit radius scales with storm occurrence)
+            const hitRadius = 200 * stormConsts.HIT_RADIUS_SCALE;
             const dist = Math.sqrt((x - worldX) ** 2 + (y - terrainHeight) ** 2);
-            if (dist < 200) {
-              const shockStrength = (200 - dist) / 200;
+            if (dist < hitRadius) {
+              const shockStrength = (hitRadius - dist) / hitRadius;
               const pushAngle = Math.atan2(y - terrainHeight, x - worldX);
               vx += Math.cos(pushAngle) * shockStrength * 85;
               vy += Math.sin(pushAngle) * shockStrength * 85;
@@ -4368,7 +4373,7 @@ export const GameEngine: React.FC<Props> = ({
             maxLife: 0.5
           });
           
-          nextLightningTime.current = LEVEL4_CONSTANTS.INTERVAL_MIN + Math.random() * (LEVEL4_CONSTANTS.INTERVAL_MAX - LEVEL4_CONSTANTS.INTERVAL_MIN);
+          nextLightningTime.current = stormConsts.INTERVAL_MIN + Math.random() * (stormConsts.INTERVAL_MAX - stormConsts.INTERVAL_MIN);
           
           if (lightningBolts.current.length > maxConcurrent) {
             lightningBolts.current.shift();
