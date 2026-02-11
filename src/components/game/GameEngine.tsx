@@ -90,7 +90,7 @@ import { createDemoAI, updateDemoAI, DemoAIState } from "./DemoAI";
 import { InitialsEntry } from "./InitialsEntry";
 import { fetchGlobalGhost, submitTimeTrialScore, submitGlobalGhost } from "@/lib/leaderboard";
 import { hasPCControlsPreference, setPCControlsPreference, isDesktopDevice, isIPadDevice } from "@/lib/deviceDetection";
-import { showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
+import { showTip, showTipAlways, TipDefinition } from "@/lib/inFlightGuide";
 import { PortraitWarning } from "./PortraitWarning";
 
 interface Props {
@@ -449,9 +449,9 @@ export const GameEngine: React.FC<Props> = ({
     const tipTimeout = setTimeout(() => {
       let tip: TipDefinition | null = null;
       
-      // Time trial specific tip
+      // Time trial specific tip (only on first level)
       if (mode === 'timetrial') {
-        tip = showTipAlways('timetrial');
+        tip = showTip('timetrial');
       }
       // Level-specific tips for classic/fixed modes
       else if (mode === 'classic' || mode === 'fixed') {
