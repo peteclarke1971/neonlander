@@ -2578,6 +2578,11 @@ export const GameEngine: React.FC<Props> = ({
         updateHazards(nearbyHazards, dt, terrain.worldWidth, BASE_HEIGHT);
       }
       
+      // Stop all UFO sounds immediately when not running (landed or crashed)
+      if (!running && !isDemo) {
+        try { audio.current.stopAllUfoSounds(); } catch {}
+      }
+      
       // UFO system update - uses new spawn schedule system
       const ufoConfig = ufoLevelConfigRef.current;
       if (running && ufoConfig && ufoSpawnScheduleRef.current.length > 0) {
@@ -6352,6 +6357,7 @@ export const GameEngine: React.FC<Props> = ({
         audio.current.stopThruster(); 
         try { audio.current.stopFuelAlarm(); } catch {} 
         try { audio.current.stopLevelMusic(); } catch {}
+        try { audio.current.stopAllUfoSounds(); } catch {}
       }
       // Clear mission success timeout on cleanup
       if (missionSuccessTimeoutRef.current) {
