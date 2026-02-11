@@ -465,6 +465,12 @@ export const GameEngine: React.FC<Props> = ({
           // Level 4 is also a storm level - show shield tip instead
           // (storm tip shows on subsequent storm levels)
           tip = showTipAlways('shield');
+        } else if (level === 5) {
+          // First volcano level - show volcano tip
+          tip = showTipAlways('volcano');
+        } else if (level >= 5 && level <= 7) {
+          // First 3 levels with UFOs (5, 6, 7) - show UFO tip once
+          tip = showTip('ufo');
         } else if (level === 9) {
           // First blackout level
           tip = showTipAlways('blackout');
