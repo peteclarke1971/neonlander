@@ -43,8 +43,8 @@ export const TIPS: Record<string, TipDefinition> = {
   },
   timetrial: {
     id: 'timetrial',
-    message: 'Land on pads IN ORDER! Timer starts at first takeoff.',
-    duration: 7000,
+    message: 'Land on pads IN ORDER!',
+    duration: 5000,
   },
   survival: {
     id: 'survival',
