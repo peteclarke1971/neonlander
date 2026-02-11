@@ -751,9 +751,6 @@ export const InitialsFireworks: React.FC<InitialsFireworksProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <canvas ref={canvasRef} className="absolute inset-0" />
-      <div className="absolute bottom-8 text-sm text-muted-foreground/60 animate-pulse">
-        Press W, Space, or ↑ to skip
-      </div>
     </div>
   );
 };
