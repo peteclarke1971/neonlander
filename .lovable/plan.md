@@ -1,25 +1,32 @@
 
+# Fix: Mega Pad Placement Broken in Survival Mode
 
-# Fix: Triple Volcano Eruption Frequency in Classic Mode
+## Root Cause
 
-## Problem
+Two bugs are causing the mega pad to appear incorrectly in survival mode:
 
-The cavern volcano eruption intervals were correctly tripled previously, but the **classic mode** volcano config in `src/components/game/systems/volcano.ts` was never updated. The `baseInterval` values remain at their original frequent rates (15, 12, 8, 6, 4 seconds), causing volcanoes to erupt far too often.
+### Bug 1: Test Code Left In
+In `src/components/game/systems/endlessTerrain.ts` (line 104), there's a line:
+```
+const isForcedTestChunk = this.chunkCounter === 2;
+```
+This forces a MEGA pad on the **third chunk** of every survival game -- far too early, before any real difficulty has ramped up. This was clearly added for testing and never removed.
+
+### Bug 2: Coordinate System Mismatch (the "inside terrain" issue)
+In `src/components/game/systems/movingPads.ts`, when a forced shuttle pad is generated, the positions are calculated in **absolute world coordinates** (e.g., `chunkStartX + bestX` = ~4000+ for chunk 2). However, the edge-margin validation at lines 246-253 compares these absolute positions against `worldWidth`, which is actually just the **chunk width** (~2000).
+
+Since the absolute X coordinates are always larger than the chunk width, the validation always triggers for forced pads, and clamps the positions back down to `worldWidth - 100` (~1900 absolute). This teleports the pad to near the **start of the level**, completely detached from the terrain that was flattened for it in chunk 2. That's why it appears buried inside terrain early in the level.
 
 ## Fix
 
-**File: `src/components/game/systems/volcano.ts`** -- Update `getVolcanoConfigForLevel()` to triple all `baseInterval` values:
+### File: `src/components/game/systems/endlessTerrain.ts`
+- **Remove** the `isForcedTestChunk` variable (line 104)
+- **Remove** its usage in the `shouldGenerateMegaPad` condition (line 106)
+- **Remove** the special level override for forced test chunks (line 374)
 
-| Level Range | Current baseInterval | New baseInterval |
-|-------------|---------------------|-----------------|
-| Level 1 | 15s | 45s |
-| Level 2 | 12s | 36s |
-| Level 3 | 8s | 24s |
-| Level 4-8 | 6s | 18s |
-| Level 9-40 | 4s | 12s |
-| Level 40+ | 4s | 12s |
+This means MEGA pads will only appear organically based on difficulty and interval timing (every 3-9 chunks once difficulty exceeds 0.15), which is the intended behavior.
 
-This matches the same tripling approach already applied to cavern volcanoes (which use 24, 18, 12, 9 second intervals). The volcano size and power values remain unchanged so difficulty still scales -- only the frequency is reduced.
+### File: `src/components/game/systems/movingPads.ts`
+- **Fix the edge-margin check** for forced pads: when `chunkStartX > 0`, offset the bounds check to use `chunkStartX` and `chunkStartX + worldWidth` instead of `0` and `worldWidth`. This ensures the validation works correctly with absolute world coordinates.
 
-No other files need changes.
-
+No other files need changes. Classic mode, Fixed mode, and other modes are unaffected since they don't use `EndlessTerrainGenerator`.
