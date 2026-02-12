@@ -1,32 +1,62 @@
 
-# Fix: Mega Pad Placement Broken in Survival Mode
 
-## Root Cause
+# Fix Plan: Mega Pad on Chunk 2, Blackout at 4000m, Aggressive Volcanoes, Visible Gravity Wells
 
-Two bugs are causing the mega pad to appear incorrectly in survival mode:
+## 1. Force Mega Pad on Chunk 2
 
-### Bug 1: Test Code Left In
-In `src/components/game/systems/endlessTerrain.ts` (line 104), there's a line:
+**File:** `src/components/game/systems/endlessTerrain.ts` (line 105)
+
+Re-add chunk 2 as a forced mega pad spawn, but properly this time (without marking it as test code):
+
+Change the `shouldGenerateMegaPad` condition to also trigger when `this.chunkCounter === 2`:
 ```
-const isForcedTestChunk = this.chunkCounter === 2;
+const shouldGenerateMegaPad = !isAsteroidFieldChunk && (
+  this.chunkCounter === 2 || 
+  (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval)
+);
 ```
-This forces a MEGA pad on the **third chunk** of every survival game -- far too early, before any real difficulty has ramped up. This was clearly added for testing and never removed.
 
-### Bug 2: Coordinate System Mismatch (the "inside terrain" issue)
-In `src/components/game/systems/movingPads.ts`, when a forced shuttle pad is generated, the positions are calculated in **absolute world coordinates** (e.g., `chunkStartX + bestX` = ~4000+ for chunk 2). However, the edge-margin validation at lines 246-253 compares these absolute positions against `worldWidth`, which is actually just the **chunk width** (~2000).
+This places the first mega pad at chunk 2 (~4000m into the level), then subsequent ones follow the existing organic difficulty/interval system.
 
-Since the absolute X coordinates are always larger than the chunk width, the validation always triggers for forced pads, and clamps the positions back down to `worldWidth - 100` (~1900 absolute). This teleports the pad to near the **start of the level**, completely detached from the terrain that was flattened for it in chunk 2. That's why it appears buried inside terrain early in the level.
+## 2. Move First Blackout to 4000m
 
-## Fix
+**File:** `src/components/game/SurvivalEngine.tsx` (lines 1147-1150)
 
-### File: `src/components/game/systems/endlessTerrain.ts`
-- **Remove** the `isForcedTestChunk` variable (line 104)
-- **Remove** its usage in the `shouldGenerateMegaPad` condition (line 106)
-- **Remove** the special level override for forced test chunks (line 374)
+Change the first blackout distance threshold from `1500` to `4000`, and the random range from `1500 + 200` to `4000 + 200`:
+- Line 1148: `currentDistance >= 4000`
+- Line 1150: `4000 + Math.random() * 200`
 
-This means MEGA pads will only appear organically based on difficulty and interval timing (every 3-9 chunks once difficulty exceeds 0.15), which is the intended behavior.
+Subsequent blackouts remain at 60-120 seconds (random) -- no change needed there, that's already the current behavior.
 
-### File: `src/components/game/systems/movingPads.ts`
-- **Fix the edge-margin check** for forced pads: when `chunkStartX > 0`, offset the bounds check to use `chunkStartX` and `chunkStartX + worldWidth` instead of `0` and `worldWidth`. This ensures the validation works correctly with absolute world coordinates.
+## 3. Double Volcano Aggressiveness
 
-No other files need changes. Classic mode, Fixed mode, and other modes are unaffected since they don't use `EndlessTerrainGenerator`.
+**File:** `src/components/game/systems/endlessTerrain.ts` (lines 436-459)
+
+Currently volcanoes only spawn when `difficulty > 0.1 && rand() > 0.5` (50% chance). To make them twice as aggressive:
+- Lower the difficulty threshold from `0.1` to `0.05` (appear sooner)
+- Remove the 50% random gate (`rand() > 0.5`) so they always spawn when difficulty threshold is met
+- Double the volcano power: change `config.power` to `config.power * 2`
+- Double the particle count in the eruption duration config
+
+## 4. Fix Gravity Wells Not Rendering
+
+**File:** `src/components/game/SurvivalEngine.tsx` (line 3151)
+
+The `drawAnomaliesField` call is missing `cameraX` and `viewWidth` parameters. The function defaults to `cameraX=0` and `viewWidth=800`, which means the viewport culling check always rejects anomalies at large world X positions (thousands of pixels from origin). The canvas has already been translated by `-cameraX`, so drawing is in world coordinates, but the visibility culling still needs the real camera position.
+
+Fix: pass `cameraX` and `viewWidth` (and optionally a large worldWidth since survival doesn't wrap):
+```typescript
+drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor, cameraX, viewWidth, Infinity);
+```
+
+Using `Infinity` for worldWidth prevents wrap-offset logic from interfering (survival terrain doesn't wrap).
+
+---
+
+## Summary of File Changes
+
+| File | Change |
+|---|---|
+| `endlessTerrain.ts` | Force mega pad on chunk 2; lower volcano threshold & double power |
+| `SurvivalEngine.tsx` | Blackout from 4000m; pass cameraX/viewWidth to drawAnomaliesField |
+
