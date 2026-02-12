@@ -101,9 +101,8 @@ export class EndlessTerrainGenerator {
     }
     
     // Determine if this should be a MEGA pad chunk (not during asteroid fields)
-    const isForcedTestChunk = this.chunkCounter === 2; // Force MEGA on third chunk for testing
     const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
-    const shouldGenerateMegaPad = !isAsteroidFieldChunk && (isForcedTestChunk || (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval));
+    const shouldGenerateMegaPad = !isAsteroidFieldChunk && (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval);
     
     this.chunkCounter++;
     
@@ -371,7 +370,7 @@ export class EndlessTerrainGenerator {
       };
       
       // Convert difficulty to level (ensure minimum level for forced test chunks)
-      const level = isForcedTestChunk ? 3 : Math.floor(difficulty * 10) + 1;
+      const level = Math.floor(difficulty * 10) + 1;
       
       // FORCE generate the MEGA pad on this perfect terrain
       const megaPad = movingPadSystem.generateMovingPad(

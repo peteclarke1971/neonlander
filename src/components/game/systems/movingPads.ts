@@ -243,13 +243,17 @@ export class MovingPadSystem {
     }
 
     // Enforce minimum distance from world edges (prevents pads at seam/edge)
+    // For endless/survival mode, positions are in absolute world coords (chunkStartX + localX),
+    // so bounds must account for the chunk offset
     const edgeMargin = 100;
-    if (pos0.x < edgeMargin || pos1.x < edgeMargin || 
-        pos0.x > worldWidth - edgeMargin || pos1.x > worldWidth - edgeMargin) {
+    const boundsMinX = chunkStartX > 0 ? chunkStartX + edgeMargin : edgeMargin;
+    const boundsMaxX = chunkStartX > 0 ? chunkStartX + worldWidth - edgeMargin : worldWidth - edgeMargin;
+    if (pos0.x < boundsMinX || pos1.x < boundsMinX || 
+        pos0.x > boundsMaxX || pos1.x > boundsMaxX) {
       if (!forced) return null;
       // For forced pads, clamp to safe bounds
-      pos0.x = Math.max(edgeMargin, Math.min(worldWidth - edgeMargin, pos0.x));
-      pos1.x = Math.max(edgeMargin, Math.min(worldWidth - edgeMargin, pos1.x));
+      pos0.x = Math.max(boundsMinX, Math.min(boundsMaxX, pos0.x));
+      pos1.x = Math.max(boundsMinX, Math.min(boundsMaxX, pos1.x));
     }
 
     // Create pad dimensions
