@@ -102,7 +102,10 @@ export class EndlessTerrainGenerator {
     
     // Determine if this should be a MEGA pad chunk (not during asteroid fields)
     const chunksSinceLastMega = this.chunkCounter - this.lastMegaPadChunk;
-    const shouldGenerateMegaPad = !isAsteroidFieldChunk && (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval);
+    const shouldGenerateMegaPad = !isAsteroidFieldChunk && (
+      this.chunkCounter === 2 || 
+      (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval)
+    );
     
     this.chunkCounter++;
     
@@ -435,7 +438,7 @@ export class EndlessTerrainGenerator {
     
     // Generate volcanoes at higher difficulty (skip during asteroid fields)
     const volcanoes: Volcano[] = [];
-    if (difficulty > 0.1 && rand() > 0.5 && !isAsteroidFieldChunk) {
+    if (difficulty > 0.05 && !isAsteroidFieldChunk) {
       const level = Math.max(1, Math.floor(difficulty * 8));
       const config = getVolcanoConfigForLevel(level);
       
@@ -454,8 +457,8 @@ export class EndlessTerrainGenerator {
         eruptionInterval: config.baseInterval,
         isErupting: false,
         eruptionTimer: 0,
-        eruptionDuration: config.eruptionDuration,
-        power: config.power,
+        eruptionDuration: config.eruptionDuration * 2,
+        power: config.power * 2,
         emissionCarry: 0
       });
     }

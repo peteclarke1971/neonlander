@@ -1144,10 +1144,10 @@ export const SurvivalEngine: React.FC<Props> = ({
         else if (currentTime - lastEffectEndTimeRef.current < EFFECT_SEPARATION_TIME) {
           // Not enough time has passed since last effect ended
         }
-        // FIRST BLACKOUT: Distance-based (1500-1700m)
-        else if (!firstBlackoutTriggeredRef.current && currentDistance >= 1500) {
-          // Random trigger point between 1500-1700m
-          const randomTriggerDistance = 1500 + Math.random() * 200;
+        // FIRST BLACKOUT: Distance-based (4000-4200m)
+        else if (!firstBlackoutTriggeredRef.current && currentDistance >= 4000) {
+          // Random trigger point between 4000-4200m
+          const randomTriggerDistance = 4000 + Math.random() * 200;
           
           if (currentDistance >= randomTriggerDistance) {
             blackoutActiveRef.current = true;
@@ -3148,7 +3148,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           ctx.save();
           ctx.shadowBlur = (ctx.shadowBlur || 15) * 2;
         }
-        drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor);
+        drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor, cameraX, viewWidth, Infinity);
         if (lightStormActiveRef.current || blackoutActiveRef.current) {
           ctx.restore();
         }
