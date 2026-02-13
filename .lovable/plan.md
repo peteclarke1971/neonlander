@@ -1,62 +1,48 @@
 
 
-# Fix Plan: Mega Pad on Chunk 2, Blackout at 4000m, Aggressive Volcanoes, Visible Gravity Wells
+# Fix: Survival Game Over Screen - Match Classic/Fixed Styling
 
-## 1. Force Mega Pad on Chunk 2
+## Changes
 
-**File:** `src/components/game/systems/endlessTerrain.ts` (line 105)
+### 1. Remove Global Leaderboard from Post-Initials View
+Currently after entering initials in survival, the view switches to "home" which shows both the local leaderboard and the `OnlineLeaderboard` component. Instead, survival should stay on the game over screen and show only the local leaderboard (matching classic/fixed behavior).
 
-Re-add chunk 2 as a forced mega pad spawn, but properly this time (without marking it as test code):
+### 2. Match Classic/Fixed Mission Failed Styling
 
-Change the `shouldGenerateMegaPad` condition to also trigger when `this.chunkCounter === 2`:
-```
-const shouldGenerateMegaPad = !isAsteroidFieldChunk && (
-  this.chunkCounter === 2 || 
-  (this.chunkCounter > 2 && difficulty > 0.15 && chunksSinceLastMega >= this.nextMegaPadInterval)
-);
-```
+The survival game over screen needs to adopt the same visual language as the classic/fixed mission failed screen:
 
-This places the first mega pad at chunk 2 (~4000m into the level), then subsequent ones follow the existing organic difficulty/interval system.
+**Current (Survival):**
+- Generic `text-accent` heading
+- `variant="outline"` / `variant="ghost"` buttons
+- Simple card layout for stats
+- No `font-display` usage
+- No `animate-enter` class
 
-## 2. Move First Blackout to 4000m
-
-**File:** `src/components/game/SurvivalEngine.tsx` (lines 1147-1150)
-
-Change the first blackout distance threshold from `1500` to `4000`, and the random range from `1500 + 200` to `4000 + 200`:
-- Line 1148: `currentDistance >= 4000`
-- Line 1150: `4000 + Math.random() * 200`
-
-Subsequent blackouts remain at 60-120 seconds (random) -- no change needed there, that's already the current behavior.
-
-## 3. Double Volcano Aggressiveness
-
-**File:** `src/components/game/systems/endlessTerrain.ts` (lines 436-459)
-
-Currently volcanoes only spawn when `difficulty > 0.1 && rand() > 0.5` (50% chance). To make them twice as aggressive:
-- Lower the difficulty threshold from `0.1` to `0.05` (appear sooner)
-- Remove the 50% random gate (`rand() > 0.5`) so they always spawn when difficulty threshold is met
-- Double the volcano power: change `config.power` to `config.power * 2`
-- Double the particle count in the eruption duration config
-
-## 4. Fix Gravity Wells Not Rendering
-
-**File:** `src/components/game/SurvivalEngine.tsx` (line 3151)
-
-The `drawAnomaliesField` call is missing `cameraX` and `viewWidth` parameters. The function defaults to `cameraX=0` and `viewWidth=800`, which means the viewport culling check always rejects anomalies at large world X positions (thousands of pixels from origin). The canvas has already been translated by `-cameraX`, so drawing is in world coordinates, but the visibility culling still needs the real camera position.
-
-Fix: pass `cameraX` and `viewWidth` (and optionally a large worldWidth since survival doesn't wrap):
-```typescript
-drawAnomaliesField(ctx, allAnomalies, currentTime, neonColor, cameraX, viewWidth, Infinity);
-```
-
-Using `Infinity` for worldWidth prevents wrap-offset logic from interfering (survival terrain doesn't wrap).
+**Target (Classic/Fixed style):**
+- `font-display font-bold` on heading
+- `variant="hero"` and `variant="neon"` buttons
+- Inline score summary like: `Score: X · Distance: Ym · Time: Zs · Landings: N`
+- `animate-enter` animation class on the section
+- Local leaderboard shown after initials entry (no global)
 
 ---
 
-## Summary of File Changes
+## Technical Details
 
-| File | Change |
-|---|---|
-| `endlessTerrain.ts` | Force mega pad on chunk 2; lower volcano threshold & double power |
-| `SurvivalEngine.tsx` | Blackout from 4000m; pass cameraX/viewWidth to drawAnomaliesField |
+### File: `src/pages/Survival.tsx`
+
+**Flow change:** After initials submission, instead of `setView("home")`, stay on `"gameover"` and set a flag like `showLeaderboardsAfterInitials = true` to display the local leaderboard on the game over screen (same pattern as Index.tsx).
+
+**Game Over section changes:**
+- Add `animate-enter` class to the section
+- Change heading to use `font-display font-bold` classes
+- Change stats from card layout to inline summary: `Score: X · Distance: Ym · Time: Zs · Landings: N`
+- Change "Try Again" button from `variant="outline"` to `variant="neon"`
+- Change "Back to Menu" button from `variant="ghost"` to `variant="hero"`
+- After initials, show only local leaderboard (same card style as classic/fixed)
+- Remove the `OnlineLeaderboard` import and usage from the game over flow (keep it on the home screen if desired)
+
+**Initials submission handler:**
+- Change `setView("home")` to `setNeedsInitials(false)` + `setShowLeaderboardsAfterInitials(true)` (stay on gameover)
+- Still submit to online leaderboard in background, just don't display it
 
