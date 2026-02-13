@@ -34,6 +34,7 @@ const Survival: React.FC = () => {
     difficulty: "easy";
     timestamp: number;
   } | null>(null);
+  const [showLeaderboardsAfterInitials, setShowLeaderboardsAfterInitials] = useState(false);
   const [lowGraphics, setLowGraphics] = useState(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
@@ -181,7 +182,7 @@ const Survival: React.FC = () => {
     }
     
     setNeedsInitials(false);
-    setView("home");
+    setShowLeaderboardsAfterInitials(true);
   };
 
   const backToHome = useCallback(() => {
@@ -194,11 +195,13 @@ const Survival: React.FC = () => {
   };
 
   const retryGame = useCallback(() => {
+    setShowLeaderboardsAfterInitials(false);
     setView("game");
   }, []);
 
   const startGame = () => {
-    setRecentlySubmittedScore(null); // Clear highlight when starting new game
+    setRecentlySubmittedScore(null);
+    setShowLeaderboardsAfterInitials(false);
     setView("game");
   };
 
@@ -290,23 +293,18 @@ const Survival: React.FC = () => {
       </div>
       END OLD GAMEOVER STARFIELD */}
       
-      <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full text-center space-y-8 animate-enter">
         <div className="space-y-4">
-          <h1 className="text-4xl font-bold text-accent">
+          <h1 className="text-4xl font-display font-bold text-accent">
             {isHighScore ? "NEW HIGH SCORE!" :
              lastResult?.cause === "crash" ? "SHIP DESTROYED" : 
              lastResult?.cause === "fuel" ? "OUT OF FUEL" : "SURVIVAL ENDED"}
           </h1>
           
           {lastResult && (
-            <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6 space-y-2">
-              <div className="text-lg">Distance: {lastResult.distance.toFixed(0)}m</div>
-              <div className="text-lg">Time: {lastResult.time.toFixed(1)}s</div>
-              <div className="text-2xl font-bold text-accent">
-                Score: {lastResult.score.toLocaleString()}
-              </div>
-              <div className="text-lg">Landings: {lastResult.landings}</div>
-            </div>
+            <p className="text-lg text-muted-foreground">
+              Score: {lastResult.score.toLocaleString()} · Distance: {lastResult.distance.toFixed(0)}m · Time: {lastResult.time.toFixed(1)}s · Landings: {lastResult.landings}
+            </p>
           )}
 
           {isHighScore && needsInitials && lastResult && (
@@ -319,12 +317,32 @@ const Survival: React.FC = () => {
           )}
         </div>
 
+        {showLeaderboardsAfterInitials && highScores.length > 0 && (
+          <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-2xl font-display font-bold text-accent mb-4">LOCAL HIGH SCORES</h2>
+            <div className="space-y-2">
+              {highScores.map((score, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center justify-between text-lg py-2 px-4 rounded bg-background/40"
+                >
+                  <span className="font-mono text-muted-foreground w-8">{idx + 1}.</span>
+                  <span className="font-bold text-accent w-16">{score.initials}</span>
+                  <span className="font-mono flex-1 text-right">{score.score.toLocaleString()}</span>
+                  <span className="text-muted-foreground text-sm ml-4 w-24 text-right">{score.distance.toFixed(0)}m</span>
+                  <span className="text-muted-foreground text-sm ml-2 w-16 text-right">{score.time.toFixed(1)}s</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {(!isHighScore || !needsInitials) && (
           <div className="flex flex-col gap-4">
             <Button 
               ref={retryButtonRef}
               onClick={retryGame} 
-              variant="outline" 
+              variant="neon" 
               size="lg"
               className={focusedButtonIndex === 0 ? 'ring-2 ring-accent' : ''}
               autoFocus
@@ -334,7 +352,7 @@ const Survival: React.FC = () => {
             <Button 
               ref={menuButtonRef}
               onClick={backToHome} 
-              variant="ghost"
+              variant="hero"
               className={focusedButtonIndex === 1 ? 'ring-2 ring-accent' : ''}
             >
               Back to Menu
