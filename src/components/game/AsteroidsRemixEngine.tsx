@@ -141,7 +141,8 @@ export const AsteroidsRemixEngine: React.FC<AsteroidsRemixEngineProps> = ({
       introRef.current = createCountdownIntro();
       introRef.current.onDone(() => {
         setWorldPaused(false);
-        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+        invulnerabilityTimer.current = 1200;
+        try { audioRef.current?.fadeOutIntroTick(); } catch {}
       });
       
       // Start countdown with "warp" variant for remix

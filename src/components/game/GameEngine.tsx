@@ -1872,7 +1872,8 @@ export const GameEngine: React.FC<Props> = ({
     if (!introRef.current) {
       introRef.current = createCountdownIntro();
       introRef.current.onDone(() => {
-        // Gameplay resumes on 'GO' start; ensure overlay clears fully on done
+        // Fade out any lingering tick sounds when GO vanishes
+        try { audio.current.fadeOutIntroTick(); } catch {}
       });
       
       // Start countdown with "freeze" variant for lander

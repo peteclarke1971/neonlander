@@ -335,8 +335,9 @@ export const AsteroidsEngine: React.FC<Props> = ({ difficulty, onExit, onGameOve
       introRef.current = createCountdownIntro();
       introRef.current.onDone(() => {
         setWorldPaused(false);
-        invulnerabilityTimer.current = 1200; // 1.2 seconds invulnerability
+        invulnerabilityTimer.current = 1200;
         try { audio.current.playIntroGo(); } catch {}
+        try { audio.current.fadeOutIntroTick(); } catch {}
       });
       
       // Start countdown with "freeze" variant for classic asteroids
