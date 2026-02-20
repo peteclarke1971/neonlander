@@ -514,6 +514,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       introRef.current = createCountdownIntro();
       introRef.current.onDone(() => {
         worldPausedRef.current = false;
+        try { audio.current.fadeOutIntroTick(); } catch {}
       });
       // Start with "warp" variant like other modes, using onTick/onGo for audio
       introRef.current.start({

@@ -1411,15 +1411,40 @@ export class AudioManager {
     }
   }
 
+  // Track active intro tick sources for fade-out
+  private activeIntroTickNodes: { source: AudioBufferSourceNode; gain: GainNode }[] = [];
+
   // Intro countdown sound effects - uses preloaded buffers for instant playback
   async playIntroTick() {
     if (!this.ctx || !this.master) return;
     
     const volume = this.getConfigVolume('sfx', 'introTick');
     
+    const playTickBuffer = (buffer: AudioBuffer) => {
+      if (!this.ctx || !this.master) return;
+      if (!this.sfxGain) {
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = 1;
+        this.sfxGain.connect(this.master);
+      }
+      const gain = this.ctx.createGain();
+      gain.gain.value = volume;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(gain);
+      gain.connect(this.sfxGain);
+      src.start(0);
+      const entry = { source: src, gain };
+      this.activeIntroTickNodes.push(entry);
+      src.onended = () => {
+        const idx = this.activeIntroTickNodes.indexOf(entry);
+        if (idx >= 0) this.activeIntroTickNodes.splice(idx, 1);
+      };
+    };
+
     // Use preloaded buffer for instant playback
     if (this.introTickBuffer) {
-      this.playOneShot(this.introTickBuffer, volume);
+      playTickBuffer(this.introTickBuffer);
     } else {
       // Fallback: load on demand if not preloaded
       try {
@@ -1427,13 +1452,25 @@ export class AudioManager {
         const buffer = await this.loadBuffer(url);
         if (buffer) {
           this.introTickBuffer = buffer;
-          this.playOneShot(buffer, volume);
+          playTickBuffer(buffer);
         }
       } catch (error) {
         console.warn('Failed to play intro tick sound:', error);
         this.click();
       }
     }
+  }
+
+  // Fade out any still-playing intro tick sounds over ~300ms
+  fadeOutIntroTick() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    for (const entry of this.activeIntroTickNodes) {
+      entry.gain.gain.setValueAtTime(entry.gain.gain.value, now);
+      entry.gain.gain.linearRampToValueAtTime(0, now + 0.3);
+      entry.source.stop(now + 0.35);
+    }
+    this.activeIntroTickNodes = [];
   }
 
   async playIntroGo() {
