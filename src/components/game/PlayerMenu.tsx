@@ -587,6 +587,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("down");
         }
         // Left/Right in footer
+        const footerMax = ghostModeEnabled ? 4 : 3;
         if (input.ui.left && !prev.left && canFire("left")) {
           setFooterFocusedIndex(fi => {
             if (fi > 0) { vibrate(30, 0.15, 0.3); return fi - 1; }
@@ -596,7 +597,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         }
         if (input.ui.right && !prev.right && canFire("right")) {
           setFooterFocusedIndex(fi => {
-            if (fi >= 0 && fi < 3) { vibrate(30, 0.15, 0.3); return fi + 1; }
+            if (fi >= 0 && fi < footerMax) { vibrate(30, 0.15, 0.3); return fi + 1; }
             return fi;
           });
           mark("right");
@@ -604,20 +605,27 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         if (input.ui.select && !prev.select && canFire("select")) {
           setFooterFocusedIndex(fi => {
             if (fi >= 0) {
-              // Toggle the focused footer item
+              // Toggle the focused footer item (dynamic indices based on ghost visibility)
+              const tipsIdx = ghostModeEnabled ? 2 : 1;
+              const lvlIdx = ghostModeEnabled ? 3 : 2;
+              const gfxIdx = ghostModeEnabled ? 4 : 3;
               if (fi === 0) {
                 const newVal = !ghostModeEnabled;
                 setGhostModeEnabled(newVal);
                 localStorage.setItem('ll-ghost-mode-enabled', String(newVal));
-              } else if (fi === 1) {
+              } else if (ghostModeEnabled && fi === 1) {
+                const newVal = !challengeGlobalGhosts;
+                setChallengeGlobalGhosts(newVal);
+                localStorage.setItem('ll-global-ghosts-enabled', String(newVal));
+              } else if (fi === tipsIdx) {
                 const newVal = !tipsEnabled;
                 setTipsEnabled(newVal);
                 setGuideEnabled(newVal);
-              } else if (fi === 2) {
+              } else if (fi === lvlIdx) {
                 const newVal = !showLevelNumber;
                 setShowLevelNumber(newVal);
                 localStorage.setItem('ll-show-level-number', String(newVal));
-              } else if (fi === 3) {
+              } else if (fi === gfxIdx) {
                 const newLevel = cycleGraphicsLevel(graphicsLevel);
                 setGraphicsLevel(newLevel);
                 saveGraphicsSettings(newLevel);
@@ -658,7 +666,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle, ghostModeEnabled, tipsEnabled, showLevelNumber, graphicsLevel, footerFocusedIndex]);
+  }, [showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle, ghostModeEnabled, challengeGlobalGhosts, tipsEnabled, showLevelNumber, graphicsLevel, footerFocusedIndex]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -727,27 +735,34 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           setFooterFocusedIndex(i => i - 1);
         }
       } else if (e.key === "ArrowRight") {
-        if (footerFocusedIndex >= 0 && footerFocusedIndex < 3) {
+        const footerMaxKb = ghostModeEnabled ? 4 : 3;
+        if (footerFocusedIndex >= 0 && footerFocusedIndex < footerMaxKb) {
           e.preventDefault();
           setFooterFocusedIndex(i => i + 1);
         }
       } else if (e.key === "Enter") {
         if (footerFocusedIndex >= 0) {
           e.preventDefault();
-          // Toggle the focused footer item
+          const tipsIdx = ghostModeEnabled ? 2 : 1;
+          const lvlIdx = ghostModeEnabled ? 3 : 2;
+          const gfxIdx = ghostModeEnabled ? 4 : 3;
           if (footerFocusedIndex === 0) {
             const newVal = !ghostModeEnabled;
             setGhostModeEnabled(newVal);
             localStorage.setItem('ll-ghost-mode-enabled', String(newVal));
-          } else if (footerFocusedIndex === 1) {
+          } else if (ghostModeEnabled && footerFocusedIndex === 1) {
+            const newVal = !challengeGlobalGhosts;
+            setChallengeGlobalGhosts(newVal);
+            localStorage.setItem('ll-global-ghosts-enabled', String(newVal));
+          } else if (footerFocusedIndex === tipsIdx) {
             const newVal = !tipsEnabled;
             setTipsEnabled(newVal);
             setGuideEnabled(newVal);
-          } else if (footerFocusedIndex === 2) {
+          } else if (footerFocusedIndex === lvlIdx) {
             const newVal = !showLevelNumber;
             setShowLevelNumber(newVal);
             localStorage.setItem('ll-show-level-number', String(newVal));
-          } else if (footerFocusedIndex === 3) {
+          } else if (footerFocusedIndex === gfxIdx) {
             const newLevel = cycleGraphicsLevel(graphicsLevel);
             setGraphicsLevel(newLevel);
             saveGraphicsSettings(newLevel);
@@ -1095,7 +1110,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           {/* Global Ghosts Toggle - only show if ghost mode is enabled */}
           {ghostModeEnabled && (
             <button
-              className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+              className="text-xs uppercase tracking-widest transition-all px-2 py-1 border rounded"
               onClick={() => {
                 resetIdle();
                 const newVal = !challengeGlobalGhosts;
@@ -1105,8 +1120,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               style={{ 
                 color: challengeGlobalGhosts ? "hsl(45, 100%, 60%)" : "hsl(var(--neon))",
                 borderColor: challengeGlobalGhosts ? "hsl(45, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-                opacity: challengeGlobalGhosts ? 0.9 : 0.5,
-                textShadow: challengeGlobalGhosts ? "0 0 8px hsl(45, 100%, 60%)" : "none"
+                opacity: challengeGlobalGhosts ? 0.9 : (footerFocusedIndex === 1 ? 0.9 : 0.5),
+                textShadow: challengeGlobalGhosts ? "0 0 8px hsl(45, 100%, 60%)" : "none",
+                boxShadow: footerFocusedIndex === 1 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+                outline: footerFocusedIndex === 1 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+                outlineOffset: "2px"
               }}
             >
               GLOBAL {challengeGlobalGhosts ? "ON" : "OFF"}
@@ -1125,10 +1143,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             style={{ 
               color: tipsEnabled ? "hsl(120, 100%, 60%)" : "hsl(var(--neon))",
               borderColor: tipsEnabled ? "hsl(120, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: tipsEnabled ? 0.9 : (footerFocusedIndex === 1 ? 0.9 : 0.5),
+              opacity: tipsEnabled ? 0.9 : (footerFocusedIndex === (ghostModeEnabled ? 2 : 1) ? 0.9 : 0.5),
               textShadow: tipsEnabled ? "0 0 8px hsl(120, 100%, 60%)" : "none",
-              boxShadow: footerFocusedIndex === 1 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
-              outline: footerFocusedIndex === 1 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              boxShadow: footerFocusedIndex === (ghostModeEnabled ? 2 : 1) ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === (ghostModeEnabled ? 2 : 1) ? "1px solid hsl(var(--neon) / 0.8)" : "none",
               outlineOffset: "2px"
             }}
           >
@@ -1147,10 +1165,10 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             style={{ 
               color: showLevelNumber ? "hsl(200, 100%, 60%)" : "hsl(var(--neon))",
               borderColor: showLevelNumber ? "hsl(200, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: showLevelNumber ? 0.9 : (footerFocusedIndex === 2 ? 0.9 : 0.5),
+              opacity: showLevelNumber ? 0.9 : (footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? 0.9 : 0.5),
               textShadow: showLevelNumber ? "0 0 8px hsl(200, 100%, 60%)" : "none",
-              boxShadow: footerFocusedIndex === 2 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
-              outline: footerFocusedIndex === 2 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              boxShadow: footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? "1px solid hsl(var(--neon) / 0.8)" : "none",
               outlineOffset: "2px"
             }}
           >
@@ -1180,11 +1198,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               setGraphicsLevel(newLevel);
               saveGraphicsSettings(newLevel);
             }}
-            style={{ 
+            style={{
               color: "hsl(var(--neon))",
-              opacity: footerFocusedIndex === 3 ? 0.9 : 0.5,
-              boxShadow: footerFocusedIndex === 3 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
-              outline: footerFocusedIndex === 3 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              opacity: footerFocusedIndex === (ghostModeEnabled ? 4 : 3) ? 0.9 : 0.5,
+              boxShadow: footerFocusedIndex === (ghostModeEnabled ? 4 : 3) ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === (ghostModeEnabled ? 4 : 3) ? "1px solid hsl(var(--neon) / 0.8)" : "none",
               outlineOffset: "2px"
             }}
           >
