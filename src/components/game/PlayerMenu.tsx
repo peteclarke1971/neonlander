@@ -148,6 +148,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   onGuideOpenChange,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [footerFocusedIndex, setFooterFocusedIndex] = useState(-1); // -1 = not in footer
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showLevelMenu, setShowLevelMenu] = useState(false);
   const [showGuidePopup, setShowGuidePopup] = useState(false);
@@ -450,8 +451,8 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   }, []);
 
   // Gamepad navigation - use refs for persistent state across effect restarts
-  const gpPrevRef = useRef({ up: false, down: false, select: false, back: false });
-  const gpLastFireRef = useRef({ up: 0, down: 0, select: 0, back: 0 });
+  const gpPrevRef = useRef({ up: false, down: false, left: false, right: false, select: false, back: false });
+  const gpLastFireRef = useRef({ up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 });
 
   useEffect(() => {
     let raf = 0;
@@ -522,6 +523,17 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           vibrate(30, 0.15, 0.3);
           mark("down");
         }
+        // Left/Right also cycle levels (matching keyboard behavior)
+        if (input.ui.left && !prev.left && canFire("left")) {
+          setLevelFocusedIndex(i => (i < startingLevelOptions.length && i > 0) ? i - 1 : i);
+          vibrate(30, 0.15, 0.3);
+          mark("left");
+        }
+        if (input.ui.right && !prev.right && canFire("right")) {
+          setLevelFocusedIndex(i => (i < startingLevelOptions.length - 1) ? i + 1 : i);
+          vibrate(30, 0.15, 0.3);
+          mark("right");
+        }
         if (input.ui.select && !prev.select && canFire("select")) {
           setLevelFocusedIndex(idx => {
             if (idx < startingLevelOptions.length) {
@@ -541,37 +553,112 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           mark("back");
         }
       } else if (!showLeaderboards) {
-        // Navigate main menu (only when not showing leaderboards)
+        // Navigate main menu + footer (only when not showing leaderboards)
         if (input.ui.up && !prev.up && canFire("up")) {
-          setFocusedIndex(i => Math.max(0, i - 1));
-          vibrate(30, 0.15, 0.3); // Light haptic feedback
+          setFooterFocusedIndex(fi => {
+            if (fi >= 0) {
+              // In footer → go back to SETTINGS
+              setFocusedIndex(4);
+              return -1;
+            }
+            // Normal main menu up
+            setFocusedIndex(i => Math.max(0, i - 1));
+            return -1;
+          });
+          vibrate(30, 0.15, 0.3);
           mark("up");
         }
         if (input.ui.down && !prev.down && canFire("down")) {
-          setFocusedIndex(i => Math.min(menuItems.length - 1, i + 1));
-          vibrate(30, 0.15, 0.3); // Light haptic feedback
+          setFooterFocusedIndex(fi => {
+            if (fi >= 0) return fi; // Already in footer, ignore down
+            // Check if on SETTINGS (index 4)
+            let entered = false;
+            setFocusedIndex(i => {
+              if (i >= menuItems.length - 1) {
+                entered = true;
+                return i; // Stay on SETTINGS
+              }
+              return i + 1;
+            });
+            if (entered) return 0; // Enter footer at Ghost
+            return -1;
+          });
+          vibrate(30, 0.15, 0.3);
           mark("down");
         }
-        if (input.ui.select && !prev.select && canFire("select")) {
-          setFocusedIndex(idx => {
-            buttonRefs.current[idx]?.click();
-            return idx;
+        // Left/Right in footer
+        if (input.ui.left && !prev.left && canFire("left")) {
+          setFooterFocusedIndex(fi => {
+            if (fi > 0) { vibrate(30, 0.15, 0.3); return fi - 1; }
+            return fi;
           });
-          vibrate(50, 0.3, 0.5); // Stronger haptic on selection
-          gateThrustUntilRelease();
-          mark("select");
+          mark("left");
+        }
+        if (input.ui.right && !prev.right && canFire("right")) {
+          setFooterFocusedIndex(fi => {
+            if (fi >= 0 && fi < 3) { vibrate(30, 0.15, 0.3); return fi + 1; }
+            return fi;
+          });
+          mark("right");
+        }
+        if (input.ui.select && !prev.select && canFire("select")) {
+          setFooterFocusedIndex(fi => {
+            if (fi >= 0) {
+              // Toggle the focused footer item
+              if (fi === 0) {
+                const newVal = !ghostModeEnabled;
+                setGhostModeEnabled(newVal);
+                localStorage.setItem('ll-ghost-mode-enabled', String(newVal));
+              } else if (fi === 1) {
+                const newVal = !tipsEnabled;
+                setTipsEnabled(newVal);
+                setGuideEnabled(newVal);
+              } else if (fi === 2) {
+                const newVal = !showLevelNumber;
+                setShowLevelNumber(newVal);
+                localStorage.setItem('ll-show-level-number', String(newVal));
+              } else if (fi === 3) {
+                const newLevel = cycleGraphicsLevel(graphicsLevel);
+                setGraphicsLevel(newLevel);
+                saveGraphicsSettings(newLevel);
+              }
+              vibrate(50, 0.3, 0.5);
+              gateThrustUntilRelease();
+              mark("select");
+              return fi;
+            }
+            // Normal main menu select
+            setFocusedIndex(idx => {
+              buttonRefs.current[idx]?.click();
+              return idx;
+            });
+            vibrate(50, 0.3, 0.5);
+            gateThrustUntilRelease();
+            mark("select");
+            return fi;
+          });
         }
         if (input.ui.back && !prev.back && canFire("back")) {
-          onDevPortal();
-          vibrate(40, 0.2, 0.4); // Medium haptic on back
-          mark("back");
+          setFooterFocusedIndex(fi => {
+            if (fi >= 0) {
+              // Exit footer back to SETTINGS
+              setFocusedIndex(4);
+              vibrate(40, 0.2, 0.4);
+              mark("back");
+              return -1;
+            }
+            onDevPortal();
+            vibrate(40, 0.2, 0.4);
+            mark("back");
+            return fi;
+          });
         }
       }
-      gpPrevRef.current = { up: input.ui.up, down: input.ui.down, select: input.ui.select, back: input.ui.back };
+      gpPrevRef.current = { up: input.ui.up, down: input.ui.down, left: input.ui.left, right: input.ui.right, select: input.ui.select, back: input.ui.back };
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle]);
+  }, [showModeMenu, showLevelMenu, showLeaderboards, onDevPortal, resetIdle, ghostModeEnabled, tipsEnabled, showLevelNumber, graphicsLevel, footerFocusedIndex]);
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -614,16 +701,66 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         setShowLevelMenu(false);
       }
     } else if (!showLeaderboards) {
-      // Only handle menu navigation when not showing leaderboards
+      // Handle main menu + footer keyboard navigation
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setFocusedIndex(i => Math.max(0, i - 1));
+        if (footerFocusedIndex >= 0) {
+          // Exit footer back to SETTINGS
+          setFooterFocusedIndex(-1);
+          setFocusedIndex(4);
+        } else {
+          setFocusedIndex(i => Math.max(0, i - 1));
+        }
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusedIndex(i => Math.min(menuItems.length - 1, i + 1));
+        if (footerFocusedIndex >= 0) {
+          // Already in footer, ignore down
+        } else if (focusedIndex >= menuItems.length - 1) {
+          // On SETTINGS → enter footer
+          setFooterFocusedIndex(0);
+        } else {
+          setFocusedIndex(i => i + 1);
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (footerFocusedIndex > 0) {
+          e.preventDefault();
+          setFooterFocusedIndex(i => i - 1);
+        }
+      } else if (e.key === "ArrowRight") {
+        if (footerFocusedIndex >= 0 && footerFocusedIndex < 3) {
+          e.preventDefault();
+          setFooterFocusedIndex(i => i + 1);
+        }
+      } else if (e.key === "Enter") {
+        if (footerFocusedIndex >= 0) {
+          e.preventDefault();
+          // Toggle the focused footer item
+          if (footerFocusedIndex === 0) {
+            const newVal = !ghostModeEnabled;
+            setGhostModeEnabled(newVal);
+            localStorage.setItem('ll-ghost-mode-enabled', String(newVal));
+          } else if (footerFocusedIndex === 1) {
+            const newVal = !tipsEnabled;
+            setTipsEnabled(newVal);
+            setGuideEnabled(newVal);
+          } else if (footerFocusedIndex === 2) {
+            const newVal = !showLevelNumber;
+            setShowLevelNumber(newVal);
+            localStorage.setItem('ll-show-level-number', String(newVal));
+          } else if (footerFocusedIndex === 3) {
+            const newLevel = cycleGraphicsLevel(graphicsLevel);
+            setGraphicsLevel(newLevel);
+            saveGraphicsSettings(newLevel);
+          }
+        }
       } else if (e.key === "Escape") {
         e.preventDefault();
-        onDevPortal();
+        if (footerFocusedIndex >= 0) {
+          setFooterFocusedIndex(-1);
+          setFocusedIndex(4);
+        } else {
+          onDevPortal();
+        }
       }
     }
   };
@@ -819,7 +956,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
                 ref={el => { buttonRefs.current[index] = el; }}
                 className="player-menu-btn w-full max-w-xs"
                 onClick={() => handleAction(item.id)}
-                onFocus={() => setFocusedIndex(index)}
+                onFocus={() => { setFocusedIndex(index); setFooterFocusedIndex(-1); }}
               >
                 {item.id === "start" ? (
                   <span className="flex flex-col items-center">
@@ -935,7 +1072,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
         <div className="flex items-center gap-2">
           {/* Ghost Mode Toggle */}
           <button
-            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            className="text-xs uppercase tracking-widest transition-all px-2 py-1 border rounded"
             onClick={() => {
               resetIdle();
               const newVal = !ghostModeEnabled;
@@ -945,8 +1082,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             style={{ 
               color: ghostModeEnabled ? "hsl(280, 100%, 70%)" : "hsl(var(--neon))",
               borderColor: ghostModeEnabled ? "hsl(280, 100%, 70% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: ghostModeEnabled ? 0.9 : 0.5,
-              textShadow: ghostModeEnabled ? "0 0 8px hsl(280, 100%, 70%)" : "none"
+              opacity: ghostModeEnabled ? 0.9 : (footerFocusedIndex === 0 ? 0.9 : 0.5),
+              textShadow: ghostModeEnabled ? "0 0 8px hsl(280, 100%, 70%)" : "none",
+              boxShadow: footerFocusedIndex === 0 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === 0 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              outlineOffset: "2px"
             }}
           >
             GHOST {ghostModeEnabled ? "ON" : "OFF"}
@@ -975,7 +1115,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           
           {/* In-Flight Tips Toggle */}
           <button
-            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            className="text-xs uppercase tracking-widest transition-all px-2 py-1 border rounded"
             onClick={() => {
               resetIdle();
               const newVal = !tipsEnabled;
@@ -985,8 +1125,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             style={{ 
               color: tipsEnabled ? "hsl(120, 100%, 60%)" : "hsl(var(--neon))",
               borderColor: tipsEnabled ? "hsl(120, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: tipsEnabled ? 0.9 : 0.5,
-              textShadow: tipsEnabled ? "0 0 8px hsl(120, 100%, 60%)" : "none"
+              opacity: tipsEnabled ? 0.9 : (footerFocusedIndex === 1 ? 0.9 : 0.5),
+              textShadow: tipsEnabled ? "0 0 8px hsl(120, 100%, 60%)" : "none",
+              boxShadow: footerFocusedIndex === 1 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === 1 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              outlineOffset: "2px"
             }}
           >
           TIPS {tipsEnabled ? "ON" : "OFF"}
@@ -994,7 +1137,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           
           {/* Show Level Number Toggle */}
           <button
-            className="text-xs uppercase tracking-widest transition-opacity px-2 py-1 border rounded"
+            className="text-xs uppercase tracking-widest transition-all px-2 py-1 border rounded"
             onClick={() => {
               resetIdle();
               const newVal = !showLevelNumber;
@@ -1004,8 +1147,11 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
             style={{ 
               color: showLevelNumber ? "hsl(200, 100%, 60%)" : "hsl(var(--neon))",
               borderColor: showLevelNumber ? "hsl(200, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: showLevelNumber ? 0.9 : 0.5,
-              textShadow: showLevelNumber ? "0 0 8px hsl(200, 100%, 60%)" : "none"
+              opacity: showLevelNumber ? 0.9 : (footerFocusedIndex === 2 ? 0.9 : 0.5),
+              textShadow: showLevelNumber ? "0 0 8px hsl(200, 100%, 60%)" : "none",
+              boxShadow: footerFocusedIndex === 2 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === 2 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              outlineOffset: "2px"
             }}
           >
             LVL# {showLevelNumber ? "ON" : "OFF"}
@@ -1027,14 +1173,20 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           
           {/* GFX Toggle */}
           <button
-            className="text-xs uppercase tracking-widest opacity-50 hover:opacity-80 transition-opacity px-2 py-1 border border-current/30 rounded"
+            className="text-xs uppercase tracking-widest transition-all px-2 py-1 border border-current/30 rounded"
             onClick={() => {
               resetIdle();
               const newLevel = cycleGraphicsLevel(graphicsLevel);
               setGraphicsLevel(newLevel);
               saveGraphicsSettings(newLevel);
             }}
-            style={{ color: "hsl(var(--neon))" }}
+            style={{ 
+              color: "hsl(var(--neon))",
+              opacity: footerFocusedIndex === 3 ? 0.9 : 0.5,
+              boxShadow: footerFocusedIndex === 3 ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
+              outline: footerFocusedIndex === 3 ? "1px solid hsl(var(--neon) / 0.8)" : "none",
+              outlineOffset: "2px"
+            }}
           >
             {getGraphicsLabel(graphicsLevel)}
           </button>
