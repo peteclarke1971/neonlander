@@ -453,6 +453,14 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
   // Gamepad navigation - use refs for persistent state across effect restarts
   const gpPrevRef = useRef({ up: false, down: false, left: false, right: false, select: false, back: false });
   const gpLastFireRef = useRef({ up: 0, down: 0, left: 0, right: 0, select: 0, back: 0 });
+  const gpInputReadyRef = useRef(false);
+
+  // 300ms input cooldown on mount to prevent pass-through from previous screen
+  useEffect(() => {
+    gpInputReadyRef.current = false;
+    const t = setTimeout(() => { gpInputReadyRef.current = true; }, 300);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let raf = 0;
@@ -474,6 +482,12 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       }
       const input = readGamepad(gp, profile);
       const prev = gpPrevRef.current;
+
+      // During cooldown, track state but skip all actions
+      if (!gpInputReadyRef.current) {
+        gpPrevRef.current = { ...input.ui };
+        return;
+      }
       
       // Any gamepad input resets idle
       if (input.ui.up || input.ui.down || input.ui.select || input.ui.back) {

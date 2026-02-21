@@ -7,6 +7,7 @@ import { InitialsEntry } from "@/components/game/InitialsEntry";
 import { GameOverStarfield } from "@/components/game/GameOverStarfield";
 import { OnlineLeaderboard } from "@/components/game/OnlineLeaderboard";
 import { submitScore } from "@/lib/leaderboard";
+import { anyGamepad, loadProfile, readGamepad, getLastDeviceId, gateThrustUntilRelease } from "@/hooks/use-gamepad";
 
 type View = "home" | "game" | "gameover";
 
@@ -69,6 +70,15 @@ const Survival: React.FC = () => {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [focusedButtonIndex, setFocusedButtonIndex] = useState(0);
 
+  const backToHome = useCallback(() => {
+    window.location.href = "/?view=playermenu";
+  }, []);
+
+  const retryGame = useCallback(() => {
+    setShowLeaderboardsAfterInitials(false);
+    setView("game");
+  }, []);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
@@ -95,35 +105,83 @@ const Survival: React.FC = () => {
     };
   }, [view]);
 
+  // Keyboard navigation for gameover screen
+  useEffect(() => {
+    if (view !== 'gameover' || needsInitials) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setFocusedButtonIndex(i => Math.max(0, i - 1));
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setFocusedButtonIndex(i => Math.min(1, i + 1));
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusedButtonIndex === 0) retryGame();
+        else backToHome();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [view, needsInitials, focusedButtonIndex, retryGame, backToHome]);
+
   // Gamepad polling for gameover screen navigation
   useEffect(() => {
     if (view !== 'gameover' || needsInitials) return;
     
     let raf = 0;
-    let prevUp = false, prevDown = false, prevSelect = false;
+    const prev = { up: false, down: false, left: false, right: false, select: false };
+    let lastId = getLastDeviceId();
+    let profile = loadProfile(lastId);
+    const readyAt = performance.now() + 300; // 300ms input cooldown
     
     const poll = () => {
       raf = requestAnimationFrame(poll);
-      const gp = navigator.getGamepads?.()?.[0];
+      const gp = anyGamepad();
       if (!gp) return;
+      if (lastId !== gp.id) {
+        lastId = gp.id;
+        profile = loadProfile(gp.id);
+      }
+      const input = readGamepad(gp, profile);
       
-      const up = gp.axes[1] < -0.5 || gp.buttons[12]?.pressed;
-      const down = gp.axes[1] > 0.5 || gp.buttons[13]?.pressed;
-      const select = gp.buttons[0]?.pressed;
-      
-      if (up && !prevUp) setFocusedButtonIndex(i => Math.max(0, i - 1));
-      if (down && !prevDown) setFocusedButtonIndex(i => Math.min(1, i + 1));
-      if (select && !prevSelect) {
-        if (focusedButtonIndex === 0) retryGame();
-        else backToHome();
+      // During cooldown, track state but skip actions
+      if (performance.now() < readyAt) {
+        prev.up = input.ui.up;
+        prev.down = input.ui.down;
+        prev.left = input.ui.left;
+        prev.right = input.ui.right;
+        prev.select = input.ui.select;
+        return;
       }
       
-      prevUp = up; prevDown = down; prevSelect = select;
+      // Navigate: up/left = previous, down/right = next
+      if ((input.ui.up && !prev.up) || (input.ui.left && !prev.left)) {
+        setFocusedButtonIndex(i => Math.max(0, i - 1));
+      }
+      if ((input.ui.down && !prev.down) || (input.ui.right && !prev.right)) {
+        setFocusedButtonIndex(i => Math.min(1, i + 1));
+      }
+      if (input.ui.select && !prev.select) {
+        if (focusedButtonIndex === 0) retryGame();
+        else {
+          gateThrustUntilRelease();
+          backToHome();
+        }
+      }
+      
+      prev.up = input.ui.up;
+      prev.down = input.ui.down;
+      prev.left = input.ui.left;
+      prev.right = input.ui.right;
+      prev.select = input.ui.select;
     };
     
     raf = requestAnimationFrame(poll);
     return () => cancelAnimationFrame(raf);
-  }, [view, needsInitials, focusedButtonIndex]);
+  }, [view, needsInitials, focusedButtonIndex, retryGame, backToHome]);
 
   // Auto-focus first button when gameover shows
   useEffect(() => {
@@ -185,19 +243,9 @@ const Survival: React.FC = () => {
     setShowLeaderboardsAfterInitials(true);
   };
 
-  const backToHome = useCallback(() => {
-    // After game ends, go back to Player Menu
-    window.location.href = "/?view=playermenu";
-  }, []);
-
   const backToMainMenu = () => {
     window.location.href = "/?view=playermenu";
   };
-
-  const retryGame = useCallback(() => {
-    setShowLeaderboardsAfterInitials(false);
-    setView("game");
-  }, []);
 
   const startGame = () => {
     setRecentlySubmittedScore(null);
