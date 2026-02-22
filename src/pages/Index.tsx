@@ -799,7 +799,10 @@ const retryGame = () => {
   useEffect(() => {
     if (view !== "demo") return;
     
+    let exited = false;
     const exitOnUserInput = () => {
+      if (exited) return;
+      exited = true;
       console.log("👆 User input detected in demo, exiting");
       exitDemo();
     };
@@ -809,10 +812,25 @@ const retryGame = () => {
       window.addEventListener(event, exitOnUserInput);
     });
 
+    // Poll gamepad for any button/stick input to exit demo
+    const gamepadPoll = setInterval(() => {
+      const gp = anyGamepad();
+      if (!gp) return;
+      // Check any button pressed
+      for (let i = 0; i < gp.buttons.length; i++) {
+        if (gp.buttons[i].pressed) { exitOnUserInput(); return; }
+      }
+      // Check any axis moved beyond deadzone
+      for (let i = 0; i < gp.axes.length; i++) {
+        if (Math.abs(gp.axes[i]) > 0.3) { exitOnUserInput(); return; }
+      }
+    }, 100);
+
     return () => {
       events.forEach(event => {
         window.removeEventListener(event, exitOnUserInput);
       });
+      clearInterval(gamepadPoll);
     };
   }, [view]);
 
