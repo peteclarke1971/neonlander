@@ -65,11 +65,9 @@ const Survival: React.FC = () => {
   // Get neon color from CSS
   const neonColor = `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--neon')})`;
 
-  // Button refs for gamepad navigation on gameover
-  const retryButtonRef = useRef<HTMLButtonElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [focusedButtonIndex, setFocusedButtonIndex] = useState(0);
-  const focusedIndexRef = useRef(0);
+  // Game over button navigation (matches Asteroids pattern)
+  const gameOverButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [gameOverFocusIndex, setGameOverFocusIndex] = useState(0);
 
   const backToHome = useCallback(() => {
     window.location.href = "/?view=playermenu";
@@ -106,100 +104,68 @@ const Survival: React.FC = () => {
     };
   }, [view]);
 
-  // Keyboard navigation for gameover screen
-  useEffect(() => {
-    if (view !== 'gameover' || needsInitials) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const next = Math.max(0, focusedIndexRef.current - 1);
-        focusedIndexRef.current = next;
-        setFocusedButtonIndex(next);
-      }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        const next = Math.min(1, focusedIndexRef.current + 1);
-        focusedIndexRef.current = next;
-        setFocusedButtonIndex(next);
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (focusedIndexRef.current === 0) retryGame();
-        else backToHome();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [view, needsInitials, retryGame, backToHome]);
-
-  // Gamepad polling for gameover screen navigation
-  useEffect(() => {
-    if (view !== 'gameover' || needsInitials) return;
-    
-    let raf = 0;
-    const prev = { up: false, down: false, left: false, right: false, select: false };
-    let lastId = getLastDeviceId();
-    let profile = loadProfile(lastId);
-    const readyAt = performance.now() + 300; // 300ms input cooldown
-    
-    const poll = () => {
-      raf = requestAnimationFrame(poll);
-      const gp = anyGamepad();
-      if (!gp) return;
-      if (lastId !== gp.id) {
-        lastId = gp.id;
-        profile = loadProfile(gp.id);
-      }
-      const input = readGamepad(gp, profile);
-      
-      // During cooldown, track state but skip actions
-      if (performance.now() < readyAt) {
-        prev.up = input.ui.up;
-        prev.down = input.ui.down;
-        prev.left = input.ui.left;
-        prev.right = input.ui.right;
-        prev.select = input.ui.select;
-        return;
-      }
-      
-      // Navigate: up/left = previous, down/right = next
-      if ((input.ui.up && !prev.up) || (input.ui.left && !prev.left)) {
-        const next = Math.max(0, focusedIndexRef.current - 1);
-        focusedIndexRef.current = next;
-        setFocusedButtonIndex(next);
-      }
-      if ((input.ui.down && !prev.down) || (input.ui.right && !prev.right)) {
-        const next = Math.min(1, focusedIndexRef.current + 1);
-        focusedIndexRef.current = next;
-        setFocusedButtonIndex(next);
-      }
-      if (input.ui.select && !prev.select) {
-        if (focusedIndexRef.current === 0) retryGame();
-        else {
-          gateThrustUntilRelease();
-          backToHome();
-        }
-      }
-      
-      prev.up = input.ui.up;
-      prev.down = input.ui.down;
-      prev.left = input.ui.left;
-      prev.right = input.ui.right;
-      prev.select = input.ui.select;
-    };
-    
-    raf = requestAnimationFrame(poll);
-    return () => cancelAnimationFrame(raf);
-  }, [view, needsInitials, retryGame, backToHome]);
-
-  // Auto-focus first button when gameover shows
+  // Game over keyboard/gamepad handling (matches Asteroids pattern)
   useEffect(() => {
     if (view === 'gameover' && !needsInitials) {
-      focusedIndexRef.current = 0;
-      setFocusedButtonIndex(0);
-      retryButtonRef.current?.focus();
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (targetTag === 'input' || targetTag === 'textarea') return;
+        
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          setGameOverFocusIndex(i => i === 0 ? 1 : 0);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (gameOverFocusIndex === 0) retryGame();
+          else backToHome();
+        }
+      };
+      
+      let lastSelect = false;
+      let lastNav = 0;
+      const NAV_DELAY = 180;
+      
+      const handleGamepad = () => {
+        const gp = anyGamepad();
+        if (!gp) return;
+        
+        const profile = loadProfile(getLastDeviceId());
+        const input = readGamepad(gp, profile);
+        const now = performance.now();
+        
+        if (now - lastNav > NAV_DELAY) {
+          if (input.ui.down || input.ui.up || input.ui.left || input.ui.right) {
+            setGameOverFocusIndex(i => i === 0 ? 1 : 0);
+            lastNav = now;
+          }
+        }
+        
+        if (input.ui.select && !lastSelect) {
+          if (gameOverFocusIndex === 0) retryGame();
+          else {
+            gateThrustUntilRelease();
+            backToHome();
+          }
+        }
+        lastSelect = input.ui.select;
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      const gamepadInterval = setInterval(handleGamepad, 50);
+      
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        clearInterval(gamepadInterval);
+      };
     }
-  }, [view, needsInitials]);
+  }, [view, needsInitials, gameOverFocusIndex, retryGame, backToHome]);
+
+  // Focus game over buttons
+  useEffect(() => {
+    if (view === 'gameover' && !needsInitials && gameOverButtonRefs.current[gameOverFocusIndex]) {
+      gameOverButtonRefs.current[gameOverFocusIndex]?.focus();
+    }
+  }, [view, needsInitials, gameOverFocusIndex]);
 
   const handleGameOver = (data: SurvivalGameOverData) => {
     setLastResult(data);
@@ -396,26 +362,25 @@ const Survival: React.FC = () => {
         )}
 
         {(!isHighScore || !needsInitials) && (
-          <div className="flex flex-col gap-4">
-            <Button 
-              ref={retryButtonRef}
-              onClick={retryGame} 
-              variant="neon" 
-              size="lg"
-              className={focusedButtonIndex === 0 ? 'ring-2 ring-accent' : ''}
+          <nav className="flex flex-col items-center gap-2 w-full max-w-xs">
+            <button
+              ref={el => gameOverButtonRefs.current[0] = el}
+              className={`player-menu-btn w-full ${gameOverFocusIndex === 0 ? 'selected' : ''}`}
+              onClick={retryGame}
+              onFocus={() => setGameOverFocusIndex(0)}
               autoFocus
             >
-              Try Again
-            </Button>
-            <Button 
-              ref={menuButtonRef}
-              onClick={backToHome} 
-              variant="hero"
-              className={focusedButtonIndex === 1 ? 'ring-2 ring-accent' : ''}
+              TRY AGAIN
+            </button>
+            <button
+              ref={el => gameOverButtonRefs.current[1] = el}
+              className={`player-menu-btn w-full ${gameOverFocusIndex === 1 ? 'selected' : ''}`}
+              onClick={backToHome}
+              onFocus={() => setGameOverFocusIndex(1)}
             >
-              Back to Menu
-            </Button>
-          </div>
+              BACK TO MENU
+            </button>
+          </nav>
         )}
       </div>
     </div>
