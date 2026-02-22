@@ -68,6 +68,7 @@ const Survival: React.FC = () => {
   // Game over button navigation (matches Asteroids pattern)
   const gameOverButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [gameOverFocusIndex, setGameOverFocusIndex] = useState(0);
+  const focusIndexRef = useRef(0);
 
   const backToHome = useCallback(() => {
     window.location.href = "/?view=playermenu";
@@ -104,61 +105,66 @@ const Survival: React.FC = () => {
     };
   }, [view]);
 
-  // Game over keyboard/gamepad handling (matches Asteroids pattern)
+  // Game over keyboard/gamepad handling — ref-based to avoid effect restarts
   useEffect(() => {
-    if (view === 'gameover' && !needsInitials) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (targetTag === 'input' || targetTag === 'textarea') return;
-        
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-          e.preventDefault();
-          setGameOverFocusIndex(i => i === 0 ? 1 : 0);
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (gameOverFocusIndex === 0) retryGame();
-          else backToHome();
+    if (view !== 'gameover' || needsInitials) return;
+
+    focusIndexRef.current = 0;
+    setGameOverFocusIndex(0);
+
+    const setIdx = (next: number) => {
+      focusIndexRef.current = next;
+      setGameOverFocusIndex(next);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea') return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setIdx(focusIndexRef.current === 0 ? 1 : 0);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusIndexRef.current === 0) retryGame();
+        else backToHome();
+      }
+    };
+
+    let prevDir = false;
+    let prevSelect = false;
+
+    const handleGamepad = () => {
+      const gp = anyGamepad();
+      if (!gp) return;
+
+      const profile = loadProfile(getLastDeviceId());
+      const input = readGamepad(gp, profile);
+
+      const dir = input.ui.down || input.ui.up || input.ui.left || input.ui.right;
+      if (dir && !prevDir) {
+        setIdx(focusIndexRef.current === 0 ? 1 : 0);
+      }
+      prevDir = dir;
+
+      if (input.ui.select && !prevSelect) {
+        if (focusIndexRef.current === 0) retryGame();
+        else {
+          gateThrustUntilRelease();
+          backToHome();
         }
-      };
-      
-      let lastSelect = false;
-      let lastNav = 0;
-      const NAV_DELAY = 180;
-      
-      const handleGamepad = () => {
-        const gp = anyGamepad();
-        if (!gp) return;
-        
-        const profile = loadProfile(getLastDeviceId());
-        const input = readGamepad(gp, profile);
-        const now = performance.now();
-        
-        if (now - lastNav > NAV_DELAY) {
-          if (input.ui.down || input.ui.up || input.ui.left || input.ui.right) {
-            setGameOverFocusIndex(i => i === 0 ? 1 : 0);
-            lastNav = now;
-          }
-        }
-        
-        if (input.ui.select && !lastSelect) {
-          if (gameOverFocusIndex === 0) retryGame();
-          else {
-            gateThrustUntilRelease();
-            backToHome();
-          }
-        }
-        lastSelect = input.ui.select;
-      };
-      
-      window.addEventListener('keydown', handleKeyDown);
-      const gamepadInterval = setInterval(handleGamepad, 50);
-      
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-        clearInterval(gamepadInterval);
-      };
-    }
-  }, [view, needsInitials, gameOverFocusIndex, retryGame, backToHome]);
+      }
+      prevSelect = input.ui.select;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    const gamepadInterval = setInterval(handleGamepad, 50);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(gamepadInterval);
+    };
+  }, [view, needsInitials, retryGame, backToHome]);
 
   // Focus game over buttons
   useEffect(() => {
