@@ -69,6 +69,7 @@ const Survival: React.FC = () => {
   const retryButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [focusedButtonIndex, setFocusedButtonIndex] = useState(0);
+  const focusedIndexRef = useRef(0);
 
   const backToHome = useCallback(() => {
     window.location.href = "/?view=playermenu";
@@ -111,21 +112,25 @@ const Survival: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        setFocusedButtonIndex(i => Math.max(0, i - 1));
+        const next = Math.max(0, focusedIndexRef.current - 1);
+        focusedIndexRef.current = next;
+        setFocusedButtonIndex(next);
       }
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
-        setFocusedButtonIndex(i => Math.min(1, i + 1));
+        const next = Math.min(1, focusedIndexRef.current + 1);
+        focusedIndexRef.current = next;
+        setFocusedButtonIndex(next);
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (focusedButtonIndex === 0) retryGame();
+        if (focusedIndexRef.current === 0) retryGame();
         else backToHome();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [view, needsInitials, focusedButtonIndex, retryGame, backToHome]);
+  }, [view, needsInitials, retryGame, backToHome]);
 
   // Gamepad polling for gameover screen navigation
   useEffect(() => {
@@ -159,13 +164,17 @@ const Survival: React.FC = () => {
       
       // Navigate: up/left = previous, down/right = next
       if ((input.ui.up && !prev.up) || (input.ui.left && !prev.left)) {
-        setFocusedButtonIndex(i => Math.max(0, i - 1));
+        const next = Math.max(0, focusedIndexRef.current - 1);
+        focusedIndexRef.current = next;
+        setFocusedButtonIndex(next);
       }
       if ((input.ui.down && !prev.down) || (input.ui.right && !prev.right)) {
-        setFocusedButtonIndex(i => Math.min(1, i + 1));
+        const next = Math.min(1, focusedIndexRef.current + 1);
+        focusedIndexRef.current = next;
+        setFocusedButtonIndex(next);
       }
       if (input.ui.select && !prev.select) {
-        if (focusedButtonIndex === 0) retryGame();
+        if (focusedIndexRef.current === 0) retryGame();
         else {
           gateThrustUntilRelease();
           backToHome();
@@ -181,11 +190,12 @@ const Survival: React.FC = () => {
     
     raf = requestAnimationFrame(poll);
     return () => cancelAnimationFrame(raf);
-  }, [view, needsInitials, focusedButtonIndex, retryGame, backToHome]);
+  }, [view, needsInitials, retryGame, backToHome]);
 
   // Auto-focus first button when gameover shows
   useEffect(() => {
     if (view === 'gameover' && !needsInitials) {
+      focusedIndexRef.current = 0;
       setFocusedButtonIndex(0);
       retryButtonRef.current?.focus();
     }
