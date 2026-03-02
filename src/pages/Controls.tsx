@@ -208,6 +208,22 @@ export default function ControlsSettings() {
     }
   });
   
+  // Ghost mode settings
+  const [ghostModeEnabled, setGhostModeEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ll-ghost-mode-enabled') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [globalGhostsEnabled, setGlobalGhostsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ll-global-ghosts-enabled') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Terrain-masked fireworks toggle (experimental)
   const [terrainMaskedFireworks, setTerrainMaskedFireworks] = useState<boolean>(() => {
     try {
@@ -957,6 +973,40 @@ export default function ControlsSettings() {
         <div className="mt-6 border rounded-lg border-border/60 p-4 bg-card/50">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Gameplay Settings</h2>
           <div className="grid grid-cols-1 gap-4">
+            {/* Ghost Mode */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Ghost Mode</Label>
+                <div className="text-xs text-muted-foreground">Show your best ghost replay during gameplay</div>
+              </div>
+              <Switch
+                checked={ghostModeEnabled}
+                onCheckedChange={(v) => {
+                  setGhostModeEnabled(v);
+                  localStorage.setItem('ll-ghost-mode-enabled', String(v));
+                  if (!v) {
+                    setGlobalGhostsEnabled(false);
+                    localStorage.setItem('ll-global-ghosts-enabled', 'false');
+                  }
+                }}
+              />
+            </div>
+            {/* Global Ghosts - only when ghost mode is on */}
+            {ghostModeEnabled && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Global Ghosts</Label>
+                  <div className="text-xs text-muted-foreground">Show the world record ghost replay (gold)</div>
+                </div>
+                <Switch
+                  checked={globalGhostsEnabled}
+                  onCheckedChange={(v) => {
+                    setGlobalGhostsEnabled(v);
+                    localStorage.setItem('ll-global-ghosts-enabled', String(v));
+                  }}
+                />
+              </div>
+            )}
             {/* Rotation Boost - hidden in player menu mode */}
             {!isPlayerMenuMode && (
               <div className="flex items-center justify-between">
