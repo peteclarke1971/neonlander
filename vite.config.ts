@@ -19,4 +19,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  esbuild: {
+    // Strip console.log and console.warn from production builds
+    // to prevent information leakage of game internals
+    // console.error is preserved for monitoring
+    pure: mode === 'production' ? ['console.log', 'console.warn', 'console.info', 'console.debug'] : [],
+  },
 }));
