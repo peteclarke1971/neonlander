@@ -669,9 +669,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
               mark("back");
               return -1;
             }
-            onDevPortal();
-            vibrate(40, 0.2, 0.4);
-            mark("back");
+            // Do NOT navigate to dev portal from main player menu
             return fi;
           });
         }
