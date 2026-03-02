@@ -116,6 +116,10 @@ const Index = () => {
   const homeRef = useRef<HTMLButtonElement>(null);
   const retryCurrRef = useRef<HTMLButtonElement>(null);
   const retryRef = useRef<HTMLButtonElement>(null);
+  // Time Trial success button refs
+  const ttRetryRef = useRef<HTMLButtonElement>(null);
+  const ttContRef = useRef<HTMLButtonElement>(null);
+  const ttMenuRef = useRef<HTMLButtonElement>(null);
 
   // Hyperspace starfield control and randomized config per gameover screen
   const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
@@ -572,7 +576,12 @@ const retryGame = () => {
     if (view !== "gameover") return;
     const t = setTimeout(() => {
       if (lastResult?.cause === "success") {
-        contRef.current?.focus();
+        if (mode === "timetrial") {
+          setGoIndex(0);
+          ttRetryRef.current?.focus();
+        } else {
+          contRef.current?.focus();
+        }
       } else {
         if (!needsInitials) {
           setGoIndex(1);
@@ -627,7 +636,14 @@ const retryGame = () => {
       const target = (document.activeElement as HTMLElement) || document.body;
       target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     };
-    const focusOrder = () => [homeRef.current, retryCurrRef.current, retryRef.current] as const;
+    const focusOrder = (): (HTMLButtonElement | null)[] => {
+      if (lastResult?.cause === "success") {
+        return mode === "timetrial"
+          ? [ttRetryRef.current, ttContRef.current, ttMenuRef.current]
+          : [contRef.current];
+      }
+      return [homeRef.current, retryCurrRef.current, retryRef.current];
+    };
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const gp = anyGamepad?.();
@@ -667,21 +683,13 @@ const retryGame = () => {
       }
       if (input.ui.select && !prev.select && canFire("select")) {
         gateThrustUntilRelease();
-        if (lastResult?.cause === "success") {
-          contRef.current?.click();
+        const order = focusOrder();
+        const active = document.activeElement as HTMLElement | null;
+        const idx = order.findIndex((el) => el === active);
+        if (idx >= 0) {
+          order[idx]?.click();
         } else {
-          const active = document.activeElement as HTMLElement | null;
-          const order = focusOrder();
-          // If nothing focused, activate current index
-          if (!active) {
-            (order[goIndex] ?? order[0])?.click();
-          } else if (active === retryCurrRef.current) {
-            retryCurrRef.current?.click();
-          } else if (active === retryRef.current) {
-            retryRef.current?.click();
-          } else {
-            homeRef.current?.click();
-          }
+          (order[goIndex] ?? order[0])?.click();
         }
         mark("select");
       }
@@ -697,19 +705,19 @@ const retryGame = () => {
     if (view !== "gameover") return;
     const key = e.key;
     const focus = (el?: HTMLElement | null) => el && el.focus();
-    if (lastResult?.cause === "success") {
-      if (key === "Enter") { e.preventDefault(); contRef.current?.click(); }
-      return;
-    }
-    const order = [homeRef.current, retryCurrRef.current, retryRef.current];
+    const order: (HTMLElement | null)[] = lastResult?.cause === "success"
+      ? (mode === "timetrial"
+        ? [ttRetryRef.current, ttContRef.current, ttMenuRef.current]
+        : [contRef.current])
+      : [homeRef.current, retryCurrRef.current, retryRef.current];
     const active = document.activeElement as HTMLElement | null;
     const idx = order.findIndex((el) => el === active);
     if (idx >= 0) {
-      if (key === "ArrowRight") { e.preventDefault(); const ni = Math.min(order.length - 1, idx + 1); setGoIndex(ni); focus(order[ni]); }
-      if (key === "ArrowLeft") { e.preventDefault(); const ni = Math.max(0, idx - 1); setGoIndex(ni); focus(order[ni]); }
+      if (key === "ArrowRight" || key === "ArrowDown") { e.preventDefault(); const ni = Math.min(order.length - 1, idx + 1); setGoIndex(ni); focus(order[ni]); }
+      if (key === "ArrowLeft" || key === "ArrowUp") { e.preventDefault(); const ni = Math.max(0, idx - 1); setGoIndex(ni); focus(order[ni]); }
       if (key === "Enter") { e.preventDefault(); active?.click(); }
     } else {
-      // No button focused, ensure our index is focused (defaults to Home)
+      // No button focused, ensure our index is focused
       focus(order[goIndex] ?? order[0]);
     }
   };
@@ -1393,13 +1401,13 @@ const retryGame = () => {
                 mode === "timetrial" ? (
                   // Time Trial: Show three buttons
                   <>
-                    <Button variant="neon" onClick={handleRetryLevel} disabled={needsInitials}>
+                    <Button ref={ttRetryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={handleRetryLevel} disabled={needsInitials}>
                       Try Again
                     </Button>
-                    <Button variant="default" onClick={() => handleContinueLevel((lastResult.level ?? 0) + 1)} disabled={needsInitials}>
+                    <Button ref={ttContRef} variant="default" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => handleContinueLevel((lastResult.level ?? 0) + 1)} disabled={needsInitials}>
                       Continue
                     </Button>
-                    <Button variant="outline" onClick={() => {
+                    <Button ref={ttMenuRef} variant="outline" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
                       setView(gameOriginView);
                       resetTimers();
                     }} disabled={needsInitials}>
