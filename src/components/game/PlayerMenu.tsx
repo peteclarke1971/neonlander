@@ -1192,27 +1192,7 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
           TIPS {tipsEnabled ? "ON" : "OFF"}
           </button>
           
-          {/* Show Level Number Toggle */}
-          <button
-            className="text-xs uppercase tracking-widest transition-all px-2 py-1 border rounded"
-            onClick={() => {
-              resetIdle();
-              const newVal = !showLevelNumber;
-              setShowLevelNumber(newVal);
-              localStorage.setItem('ll-show-level-number', String(newVal));
-            }}
-            style={{ 
-              color: showLevelNumber ? "hsl(200, 100%, 60%)" : "hsl(var(--neon))",
-              borderColor: showLevelNumber ? "hsl(200, 100%, 60% / 0.5)" : "hsl(var(--neon) / 0.3)",
-              opacity: showLevelNumber ? 0.9 : (footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? 0.9 : 0.5),
-              textShadow: showLevelNumber ? "0 0 8px hsl(200, 100%, 60%)" : "none",
-              boxShadow: footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? "0 0 12px hsl(var(--neon) / 0.6), inset 0 0 6px hsl(var(--neon) / 0.2)" : "none",
-              outline: footerFocusedIndex === (ghostModeEnabled ? 3 : 2) ? "1px solid hsl(var(--neon) / 0.8)" : "none",
-              outlineOffset: "2px"
-            }}
-          >
-            LVL# {showLevelNumber ? "ON" : "OFF"}
-          </button>
+          {/* Show Level Number Toggle - hidden from home screen, available in dev settings */}
         </div>
         
         {/* Right side controls */}
