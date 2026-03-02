@@ -1396,46 +1396,45 @@ const retryGame = () => {
 
             {/* GameTransition moved to root level for all views */}
 
-            <div className="mt-6 flex flex-col items-center gap-2 w-full max-w-xs mx-auto">
+            <div className="mt-6 flex gap-3 justify-center">
               {lastResult.cause === "success" ? (
                 mode === "timetrial" ? (
                   // Time Trial: Show three buttons
                   <>
-                    <button ref={ttRetryRef} className={`player-menu-btn w-full ${goIndex === 0 ? "selected" : ""}`} onFocus={() => setGoIndex(0)} onClick={handleRetryLevel} disabled={needsInitials}>
+                    <Button ref={ttRetryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={handleRetryLevel} disabled={needsInitials}>
                       Try Again
-                    </button>
-                    <button ref={ttContRef} className={`player-menu-btn w-full ${goIndex === 1 ? "selected" : ""}`} onFocus={() => setGoIndex(1)} onClick={() => handleContinueLevel((lastResult.level ?? 0) + 1)} disabled={needsInitials}>
+                    </Button>
+                    <Button ref={ttContRef} variant="default" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => handleContinueLevel((lastResult.level ?? 0) + 1)} disabled={needsInitials}>
                       Continue
-                    </button>
-                    <button ref={ttMenuRef} className={`player-menu-btn w-full ${goIndex === 2 ? "selected" : ""}`} onFocus={() => setGoIndex(2)} onClick={() => {
+                    </Button>
+                    <Button ref={ttMenuRef} variant="outline" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
                       setView(gameOriginView);
                       resetTimers();
                     }} disabled={needsInitials}>
                       Main Menu
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   // Fixed/Classic: Single Continue button
-                  <button
+                  <Button
                     ref={contRef}
-                    className={`player-menu-btn w-full ${goIndex === 0 ? "selected" : ""}`}
-                    onFocus={() => setGoIndex(0)}
+                    variant="neon"
                     onClick={continueGame}
                   >
                     Continue
-                  </button>
+                  </Button>
                 )
               ) : (
                 <>
-                  <button ref={homeRef} className={`player-menu-btn w-full ${goIndex === 0 ? "selected" : ""}`} onFocus={() => setGoIndex(0)} onClick={() => {
+                  <Button ref={homeRef} variant="hero" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
                     console.log("🏠 Home button clicked from gameover, returning to:", gameOriginView);
                     setShowLeaderboardsAfterInitials(false);
                     setShowMedleyHighScoreEntry(false);
                     setView(gameOriginView);
                     resetTimers();
-                  }} disabled={needsInitials || showMedleyHighScoreEntry}>Home</button>
-                  <button ref={retryCurrRef} className={`player-menu-btn w-full ${goIndex === 1 ? "selected" : ""}`} onFocus={() => setGoIndex(1)} onClick={retryCurrentLevel} disabled={needsInitials || showMedleyHighScoreEntry}>Retry Current Level</button>
-                  <button ref={retryRef} className={`player-menu-btn w-full ${goIndex === 2 ? "selected" : ""}`} onFocus={() => setGoIndex(2)} onClick={retryGame} disabled={needsInitials || showMedleyHighScoreEntry}>Retry From Start</button>
+                  }} disabled={needsInitials || showMedleyHighScoreEntry}>Home</Button>
+                  <Button ref={retryCurrRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryCurrentLevel} disabled={needsInitials || showMedleyHighScoreEntry}>Retry Current Level</Button>
+                  <Button ref={retryRef} variant="neon" className="focus-visible:ring-2 focus-visible:ring-accent" onClick={retryGame} disabled={needsInitials || showMedleyHighScoreEntry}>Retry From Start</Button>
                 </>
               )}
             </div>

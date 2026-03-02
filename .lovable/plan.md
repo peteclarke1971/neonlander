@@ -1,40 +1,39 @@
 
-
-# Fix: Visible Button Highlighting on Game Over Screens
+# Fix: Gamepad/Keyboard Navigation on Success Screens
 
 ## Problem
-The gamepad navigation correctly moves between buttons on success (and failure) screens, but there is no visible highlighting. The buttons use `focus-visible:ring-2` CSS, which only activates on keyboard-initiated focus, not programmatic `.focus()` from gamepad code.
-
-## Solution
-Replace all game over `<Button>` components (both success and failure screens) with `player-menu-btn` styled buttons that use the existing `goIndex` state to apply a `selected` class -- the same proven pattern used on the Survival game over screen.
+After entering high score initials on success screens (especially Time Trial), the gamepad can't navigate or select buttons because:
+1. The Time Trial success buttons (Try Again, Continue, Main Menu) have no refs -- they can't be focused or clicked programmatically
+2. The gamepad handler only does `contRef.current?.click()` for all success screens, which only works for the Fixed/Classic single "Continue" button
+3. The keyboard handler ignores arrow keys entirely on success screens (early return at line 700-702)
 
 ## Changes
 
 ### File: `src/pages/Index.tsx`
 
-**1. Replace Time Trial success buttons (lines 1403-1415)**
+**1. Add refs for the three Time Trial success buttons**
 
-Replace the three `<Button>` components with `<button>` elements using `player-menu-btn` class and `goIndex`-driven `selected` class:
-- Button 0: TRY AGAIN (`goIndex === 0`)
-- Button 1: CONTINUE (`goIndex === 1`)  
-- Button 2: MAIN MENU (`goIndex === 2`)
+Create `ttRetryRef`, `ttContRef`, `ttMenuRef` alongside existing button refs and attach them to the Time Trial success buttons (lines 1396-1407).
 
-Each button gets `onFocus={() => setGoIndex(n)}` to sync state when focused by any means.
+**2. Update keyboard handler (`handleGameOverKeys`, ~line 696)**
 
-**2. Replace Fixed/Classic success Continue button (lines 1419-1425)**
+Remove the early return for success screens. Add arrow key navigation for Time Trial (3 buttons: ttRetryRef, ttContRef, ttMenuRef) using Left/Right/Up/Down. Keep Enter activating the focused button. For Fixed/Classic success, keep Enter-to-continue behavior.
 
-Replace with a `player-menu-btn` button with `selected` class when `goIndex === 0`.
+**3. Update gamepad handler (~line 630)**
 
-**3. Replace mission failed buttons (lines 1428-1438)**
+For success screens, check if mode is "timetrial":
+- If Time Trial: navigate between the 3 buttons using directional input (same pattern as mission failed), select activates focused button
+- If Fixed/Classic: keep existing `contRef.current?.click()` behavior
 
-Replace the three `<Button>` components with `player-menu-btn` styled buttons:
-- Button 0: HOME (`goIndex === 0`)
-- Button 1: RETRY CURRENT LEVEL (`goIndex === 1`)
-- Button 2: RETRY FROM START (`goIndex === 2`)
+**4. Update focus initialization (~line 570)**
 
-**4. Update container layout (line 1399)**
+When entering gameover with Time Trial success, focus the first Time Trial button (`ttRetryRef`) instead of `contRef`.
 
-Change the flex container from horizontal (`flex gap-3`) to vertical (`flex flex-col items-center gap-2 w-full max-w-xs mx-auto`) to match the Survival screen's button layout.
+**5. Update `focusOrder` in gamepad loop (~line 630)**
 
-### Result
-All post-game buttons will show the neon light-trail highlight animation when navigated to via gamepad, matching the Survival game over screen's visual feedback.
+Make `focusOrder()` return the correct button set based on success/failure and mode:
+- Time Trial success: `[ttRetryRef, ttContRef, ttMenuRef]`
+- Fixed/Classic success: `[contRef]`
+- Failure: `[homeRef, retryCurrRef, retryRef]` (unchanged)
+
+This ensures all success screens get full keyboard and gamepad navigation matching the mission failed screens.
