@@ -1,60 +1,39 @@
 
-# Fix: Survival Game Over Button Navigation
+# Fix: Gamepad/Keyboard Navigation on Success Screens
 
-## Root Cause
-The `focusedButtonIndex` state is included in the dependency arrays of both the keyboard and gamepad `useEffect` hooks. Every time focus changes (e.g., pressing down to highlight "Back to Menu"), the effects restart, which:
-1. **Gamepad**: Resets the 300ms cooldown (`readyAt = performance.now() + 300`), blocking further input for another 300ms after each navigation
-2. **Both**: Recreates event handlers and edge-detection state (`prev`) on every focus change, potentially causing missed or duplicate inputs
+## Problem
+After entering high score initials on success screens (especially Time Trial), the gamepad can't navigate or select buttons because:
+1. The Time Trial success buttons (Try Again, Continue, Main Menu) have no refs -- they can't be focused or clicked programmatically
+2. The gamepad handler only does `contRef.current?.click()` for all success screens, which only works for the Fixed/Classic single "Continue" button
+3. The keyboard handler ignores arrow keys entirely on success screens (early return at line 700-702)
 
-## Fix
+## Changes
 
-### File: `src/pages/Survival.tsx`
+### File: `src/pages/Index.tsx`
 
-**Use a ref to track `focusedButtonIndex`** so neither effect needs it in its dependency array:
+**1. Add refs for the three Time Trial success buttons**
 
-1. Add `const focusedIndexRef = useRef(0)` alongside the existing state
-2. Keep `focusedButtonIndex` state for rendering (the ring highlight), but sync it to the ref
-3. Update the keyboard `useEffect`:
-   - Read `focusedIndexRef.current` instead of `focusedButtonIndex` from closure
-   - Remove `focusedButtonIndex` from dependency array (keep `view`, `needsInitials`, `retryGame`, `backToHome`)
-   - When changing focus, update both state and ref
-4. Update the gamepad `useEffect`:
-   - Read `focusedIndexRef.current` instead of `focusedButtonIndex` from closure
-   - Remove `focusedButtonIndex` from dependency array (keep `view`, `needsInitials`, `retryGame`, `backToHome`)
-   - The 300ms cooldown now only triggers once when entering gameover, not on every focus change
+Create `ttRetryRef`, `ttContRef`, `ttMenuRef` alongside existing button refs and attach them to the Time Trial success buttons (lines 1396-1407).
 
-### Keyboard handler becomes:
-```typescript
-const onKey = (e: KeyboardEvent) => {
-  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-    e.preventDefault();
-    const next = Math.max(0, focusedIndexRef.current - 1);
-    focusedIndexRef.current = next;
-    setFocusedButtonIndex(next);
-  }
-  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-    e.preventDefault();
-    const next = Math.min(1, focusedIndexRef.current + 1);
-    focusedIndexRef.current = next;
-    setFocusedButtonIndex(next);
-  }
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    if (focusedIndexRef.current === 0) retryGame();
-    else backToHome();
-  }
-};
-```
+**2. Update keyboard handler (`handleGameOverKeys`, ~line 696)**
 
-### Gamepad handler select becomes:
-```typescript
-if (input.ui.select && !prev.select) {
-  if (focusedIndexRef.current === 0) retryGame();
-  else {
-    gateThrustUntilRelease();
-    backToHome();
-  }
-}
-```
+Remove the early return for success screens. Add arrow key navigation for Time Trial (3 buttons: ttRetryRef, ttContRef, ttMenuRef) using Left/Right/Up/Down. Keep Enter activating the focused button. For Fixed/Classic success, keep Enter-to-continue behavior.
 
-This ensures the 300ms cooldown only fires once on screen entry, and navigation/selection always reads the latest focus index without restarting the effects.
+**3. Update gamepad handler (~line 630)**
+
+For success screens, check if mode is "timetrial":
+- If Time Trial: navigate between the 3 buttons using directional input (same pattern as mission failed), select activates focused button
+- If Fixed/Classic: keep existing `contRef.current?.click()` behavior
+
+**4. Update focus initialization (~line 570)**
+
+When entering gameover with Time Trial success, focus the first Time Trial button (`ttRetryRef`) instead of `contRef`.
+
+**5. Update `focusOrder` in gamepad loop (~line 630)**
+
+Make `focusOrder()` return the correct button set based on success/failure and mode:
+- Time Trial success: `[ttRetryRef, ttContRef, ttMenuRef]`
+- Fixed/Classic success: `[contRef]`
+- Failure: `[homeRef, retryCurrRef, retryRef]` (unchanged)
+
+This ensures all success screens get full keyboard and gamepad navigation matching the mission failed screens.
