@@ -225,9 +225,13 @@ export class AudioManager {
         }
       }
       // iOS sometimes needs a tiny silent buffer played to truly unlock
-      if ((navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) && !this._iosUnlocked) {
+      // Retry until context is actually running (first attempt often fails if called too early)
+      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
+      if (isIOS && (!this._iosUnlocked || this.ctx.state === 'suspended')) {
         this.playUnlockBuffer();
-        this._iosUnlocked = true;
+        if (this.ctx.state === 'running') {
+          this._iosUnlocked = true;
+        }
       }
     }
   }

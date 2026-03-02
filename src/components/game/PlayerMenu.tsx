@@ -301,11 +301,27 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     window.addEventListener("pointerdown", startOnInteract);
     window.addEventListener("touchstart", startOnInteract);
     window.addEventListener("keydown", startOnInteract);
+    window.addEventListener("gamepadconnected", startOnInteract);
+    
+    // Periodic retry: if a gamepad is connected but audio is still suspended, keep trying
+    const periodicUnlock = setInterval(() => {
+      if (musicStartedRef.current) return;
+      const gp = anyGamepad?.();
+      if (gp) {
+        audioRef.current.resume().then(() => {
+          if (!musicStartedRef.current && musicOn) {
+            tryStart();
+          }
+        }).catch(() => {});
+      }
+    }, 2000);
     
     return () => {
       window.removeEventListener("pointerdown", startOnInteract);
       window.removeEventListener("touchstart", startOnInteract);
       window.removeEventListener("keydown", startOnInteract);
+      window.removeEventListener("gamepadconnected", startOnInteract);
+      clearInterval(periodicUnlock);
     };
   }, [musicOn]);
   
@@ -492,6 +508,17 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
       // Any gamepad input resets idle
       if (input.ui.up || input.ui.down || input.ui.select || input.ui.back) {
         resetIdle();
+      }
+      
+      // Unlock audio on any gamepad button press (iOS requires user gesture)
+      if (input.ui.up || input.ui.down || input.ui.left || input.ui.right || input.ui.select || input.ui.back) {
+        audioRef.current.resume();
+        if (!musicStartedRef.current && musicOn) {
+          audioRef.current.playTitleMusic().then(() => {
+            audioRef.current.setTitleMusicMuted(false);
+            musicStartedRef.current = true;
+          }).catch(() => {});
+        }
       }
       
       if (showModeMenu) {
