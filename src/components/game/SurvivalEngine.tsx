@@ -758,9 +758,10 @@ export const SurvivalEngine: React.FC<Props> = ({
     };
     
     // Spectacular explosion helper functions
+    const isHighRes = c.width > 2500; // 4K detection
     const spawnExplosion = (cx: number, cy: number) => {
-      // Primary explosion wave (reduce count for low graphics)
-      const primaryCount = shouldOptimize ? 12 : (120 + Math.floor(Math.random() * 60));
+      // Primary explosion wave — scale counts for resolution / low graphics
+      const primaryCount = shouldOptimize ? 12 : isHighRes ? 80 : (120 + Math.floor(Math.random() * 60));
       for (let i = 0; i < primaryCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 600 + Math.random() * 600; // 3x faster for dramatic expansion
@@ -786,7 +787,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       
       // Secondary fire/smoke layer - delayed spawn
       setTimeout(() => {
-        const secondaryCount = shouldOptimize ? 6 : (80 + Math.floor(Math.random() * 40));
+        const secondaryCount = shouldOptimize ? 6 : isHighRes ? 50 : (80 + Math.floor(Math.random() * 40));
         for (let i = 0; i < secondaryCount; i++) {
           const a = Math.random() * Math.PI * 2;
           const s = 180 + Math.random() * 220; // 2.5x faster
@@ -809,7 +810,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }, 100);
       
       // Spark system
-      const sparkCount = shouldOptimize ? 5 : (40 + Math.floor(Math.random() * 20));
+      const sparkCount = shouldOptimize ? 5 : isHighRes ? 25 : (40 + Math.floor(Math.random() * 20));
       for (let i = 0; i < sparkCount; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 800 + Math.random() * 600; // Much faster for dramatic streaks
@@ -825,7 +826,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Enhanced shockwaves
-      const ringCount = shouldOptimize ? 1 : (3 + Math.floor(Math.random() * 2));
+      const ringCount = shouldOptimize ? 1 : isHighRes ? 2 : (3 + Math.floor(Math.random() * 2));
       for (let i = 0; i < ringCount; i++) {
         shockwaves.push({ 
           x: cx, 
@@ -842,7 +843,7 @@ export const SurvivalEngine: React.FC<Props> = ({
 
     const spawnDebris = (cx: number, cy: number, cvx: number, cvy: number) => {
       // Enhanced debris system
-      const pieceCount = shouldOptimize ? 6 : (80 + Math.floor(Math.random() * 40));
+      const pieceCount = shouldOptimize ? 6 : isHighRes ? 50 : (80 + Math.floor(Math.random() * 40));
       for (let i = 0; i < pieceCount; i++) {
         const dir = Math.random() * Math.PI * 2;
         const speed = 220 + Math.random() * 320;

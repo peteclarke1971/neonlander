@@ -535,13 +535,26 @@ export const VectorWormhole = forwardRef<VectorWormholeHandle, VectorWormholePro
       const c = canvasRef.current!;
       const ctx = c.getContext("2d")!;
       const resize = () => {
+        // Use parent element dimensions as the source of truth (matches starfield pattern)
+        const parent = c.parentElement;
+        const w = parent ? parent.clientWidth : c.clientWidth;
+        const h = parent ? parent.clientHeight : c.clientHeight;
         const dpr = Math.min(1.0, window.devicePixelRatio || 1);
-        c.width = Math.floor(c.clientWidth * dpr);
-        c.height = Math.floor(c.clientHeight * dpr);
+        c.width = Math.floor(w * dpr);
+        c.height = Math.floor(h * dpr);
+        // Ensure CSS size matches parent so clientWidth/clientHeight stay in sync
+        c.style.width = w + 'px';
+        c.style.height = h + 'px';
       };
       resize();
-      const onResize = () => { resize(); };
-      window.addEventListener("resize", onResize);
+      // Use ResizeObserver on parent for reliable resize tracking
+      let ro: ResizeObserver | null = null;
+      const parent = c.parentElement;
+      if (parent) {
+        ro = new ResizeObserver(() => resize());
+        ro.observe(parent);
+      }
+      window.addEventListener("resize", resize);
 
       // start immediately if active
       if (active) {
@@ -571,7 +584,7 @@ export const VectorWormhole = forwardRef<VectorWormholeHandle, VectorWormholePro
         if (phase.current !== "idle") draw(ctx, dt);
       };
       raf.current = requestAnimationFrame(loopFn);
-      return () => { cancelAnimationFrame(raf.current); window.removeEventListener("resize", onResize); };
+      return () => { cancelAnimationFrame(raf.current); window.removeEventListener("resize", resize); ro?.disconnect(); };
     }, [active]);
 
     // hotkeys: boost and roll toggle and skip
