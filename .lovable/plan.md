@@ -1,62 +1,52 @@
 
+# Fix: Three Visual/Performance Issues
 
-# Standardize Game-Over Buttons to Arcade Style
+## Issue 1: VectorWormhole Off-Center on Some Resolutions
 
-## Overview
+**Root Cause**: The `wormholeVP` (vanishing point) is calculated based on the `successTitleRef` element's bounding rect position, computing `cx` and `cy` as ratios of `window.innerWidth` / `window.innerHeight`. However, this calculation happens once on gameover view mount and on resize. If the title element hasn't fully laid out yet or the gameover container doesn't match `window` dimensions (e.g., scrollbars, notch insets), the cx/cy values become inaccurate.
 
-Replace all `<Button>` component usage on mission-failed/game-over screens with the `player-menu-btn` pattern (matching Survival and Asteroids modes). This gives consistent neon arcade styling with `selected` class highlighting for focused items.
+Additionally, the `VectorWormhole` component uses `c.clientWidth` / `c.clientHeight` for its canvas but applies `opts.current.cx * w` for the pixel center. If the canvas element doesn't fill the full viewport (CSS sizing mismatch), the center drifts.
 
-## Files to Change
+**Fix (in `src/pages/Index.tsx`)**:
+- Simplify the vanishing point to always use `{ cx: 0.5, cy: 0.5 }` as the default, only adjusting if the title ref is reliably measured.
+- Add a `ResizeObserver` on the container to re-measure more reliably.
+- Clamp cx/cy to a tighter range around center (0.35-0.65) to prevent extreme off-center positions.
 
-### 1. Index.tsx (Main Lander -- Mission Failed + Success buttons)
+**Fix (in `src/components/game/VectorWormhole.tsx`)**:
+- Ensure the canvas resize logic accounts for DPR correctly and that `clientWidth`/`clientHeight` matches the actual visible area. The canvas currently sets its pixel dimensions via `c.width = w * dpr` but then uses `c.clientWidth` for drawing calculations -- ensure these stay in sync by using the parent element dimensions as the source of truth (matching the starfield pattern).
 
-**Lines 1399-1439**: Replace `<Button>` components with `player-menu-btn` buttons.
+## Issue 2: Survival Mode Explosion Slowdown at 4K
 
-- Mission Failed buttons (Home, Retry Current Level, Retry From Start): change from horizontal `<Button>` layout to a vertical `<nav>` with `player-menu-btn` buttons and `selected` class tied to `goIndex`.
-- Success buttons (Continue, Time Trial trio): same treatment.
-- Change the container from `flex gap-3` horizontal to `flex flex-col items-center gap-2 w-full max-w-xs` vertical nav.
-- Use `ref` callback pattern (`ref={el => ...}`) instead of single refs, or keep existing refs but add `player-menu-btn` class and `selected` logic.
+**Root Cause**: In `SurvivalEngine.tsx`, the `spawnExplosion` function creates 120-180 primary particles, then 80-120 secondary particles after 100ms, plus 40-60 sparks. That's up to 360 particles, each drawn with `fillRect` and `globalCompositeOperation: "lighter"`. The debris system adds another 80-120 pieces with rotation transforms. At 4K resolution, the canvas is 4x the pixel count, making every draw call more expensive. Combined with shockwave rings, flash effects, and camera shake, this creates a frame budget spike.
 
-### 2. LightCycles.tsx (Lines 411-418)
+**Fix (in `src/components/game/SurvivalEngine.tsx`)**:
+- Scale particle counts based on canvas resolution. At 4K (width > 2500), reduce counts by ~40%:
+  - Primary: cap at 80 (from 120-180)
+  - Secondary: cap at 50 (from 80-120)  
+  - Sparks: cap at 25 (from 40-60)
+  - Debris: cap at 50 (from 80-120)
+- Keep particle velocities and colors identical so the visual "feel" stays the same -- fewer particles at higher speed still looks dramatic.
+- Reduce shockwave ring count from 3-5 to max 2 at 4K.
+- The `shouldOptimize` flag already handles low-graphics mode (12 particles); add a middle tier for high-res displays.
 
-Replace:
-```html
-<div className="space-y-4">
-  <Button ref={tryAgainRef} ... variant="outline" ...>Try Again</Button>
-  <Button ref={mainMenuRef} ... variant="ghost" ...>Main Menu</Button>
-</div>
-```
-With:
-```html
-<nav className="flex flex-col items-center gap-2 w-full max-w-xs">
-  <button ref={tryAgainRef} className={`player-menu-btn w-full ${goFocusIndex === 0 ? 'selected' : ''}`} onClick={retryGame} onFocus={() => setGoFocusIndex(0)} autoFocus>TRY AGAIN</button>
-  <button ref={mainMenuRef} className={`player-menu-btn w-full ${goFocusIndex === 1 ? 'selected' : ''}`} onClick={backToHome} onFocus={() => setGoFocusIndex(1)}>MAIN MENU</button>
-</nav>
-```
+## Issue 3: Jerky Level Transition (Hyperspace Jump)
 
-### 3. NeonRacing.tsx (Lines 441-448) -- same pattern as LightCycles
+**Root Cause**: The `GameTransition` component uses `setProgress(newProgress)` via React state updates on every `requestAnimationFrame`. This triggers a React re-render on every frame, which is unnecessary and causes micro-stutters. The opacity is also derived from this React state. The hyperspace effect itself (HyperspaceStarfield) renders fine via its own canvas loop, but the containing div's opacity flickers due to state-driven rendering.
 
-### 4. NeonDocking.tsx (Lines 432-447)
+Additionally, the transition has a total duration of only 3000ms (200ms fade-out + 2600ms effect + 200ms fade-in) with `setPhase` state changes at each boundary, causing momentary freezes during React reconciliation.
 
-Has three states (high score, crash with no retry, normal). Replace both the crash state and normal state buttons with `player-menu-btn` pattern.
+**Fix (rewrite the transition animation in `src/components/game/GameTransition.tsx`)**:
+- Replace `setProgress` React state with a ref (`progressRef`) and use direct DOM manipulation (`containerRef.current.style.opacity = ...`) to avoid re-renders during animation.
+- Use a single `requestAnimationFrame` loop for the entire transition lifecycle (fade-out -> effect -> fade-in) instead of separate `setTimeout` + `useEffect` chains per phase. Track all timing in refs.
+- Smooth the speed ramp on HyperspaceStarfield: instead of jumping from 0.1 to 2.0 at the effect phase start, use a gradual easing curve that accelerates over the first 60% of the effect duration.
+- Increase the effect duration slightly from 2600ms to 3200ms for a less rushed feel.
+- Remove all `setProgress` and `setPhase` calls from the animation loop. Only call `setCurrentTransition(null)` and `setPhase("complete")` once when fully done.
 
-### 5. AsteroidsColor.tsx (Lines 288-297)
+## Technical Summary
 
-Replace `<Button>` components with `player-menu-btn` pattern. Add `goFocusIndex` state and gamepad/keyboard navigation (currently missing).
-
-### 6. AsteroidsRemix.tsx (Lines 306-311)
-
-Replace `<Button>` components with `player-menu-btn` pattern. Add focus index state and navigation support.
-
-## Navigation
-
-All modes that already have gamepad polling and keyboard listeners (LightCycles, NeonRacing, NeonDocking, Index.tsx) keep their existing navigation logic -- the only change is the visual button element. AsteroidsColor and AsteroidsRemix need focus-index state and basic keyboard/gamepad nav added (matching the pattern already in Asteroids.tsx).
-
-## Technical Details
-
-- Remove `<Button>` import where no longer needed on game-over screens
-- Use uppercase text (TRY AGAIN, MAIN MENU, etc.) to match arcade style
-- All buttons get `player-menu-btn w-full` class with `selected` conditional
-- Wrap in `<nav className="flex flex-col items-center gap-2 w-full max-w-xs">`
-- Existing gamepad loops and keyboard handlers continue to work since they use refs
-
+| File | Changes |
+|------|---------|
+| `src/pages/Index.tsx` | Tighten wormholeVP clamping, add fallback to (0.5, 0.5) |
+| `src/components/game/VectorWormhole.tsx` | Use parent element dimensions for canvas sizing |
+| `src/components/game/SurvivalEngine.tsx` | Add resolution-aware particle scaling in `spawnExplosion` and `spawnDebris` |
+| `src/components/game/GameTransition.tsx` | Replace state-driven animation with ref-based RAF loop, smooth speed ramp |
