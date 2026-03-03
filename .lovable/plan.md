@@ -1,52 +1,85 @@
 
-# Fix: Three Visual/Performance Issues
 
-## Issue 1: VectorWormhole Off-Center on Some Resolutions
+# Optimize VectorWormhole Effect for Mission Success Screens
 
-**Root Cause**: The `wormholeVP` (vanishing point) is calculated based on the `successTitleRef` element's bounding rect position, computing `cx` and `cy` as ratios of `window.innerWidth` / `window.innerHeight`. However, this calculation happens once on gameover view mount and on resize. If the title element hasn't fully laid out yet or the gameover container doesn't match `window` dimensions (e.g., scrollbars, notch insets), the cx/cy values become inaccurate.
+## Overview
 
-Additionally, the `VectorWormhole` component uses `c.clientWidth` / `c.clientHeight` for its canvas but applies `opts.current.cx * w` for the pixel center. If the canvas element doesn't fill the full viewport (CSS sizing mismatch), the center drifts.
+Create a new lightweight wormhole component (`VectorWormholeLite`) that delivers a visually striking tunnel effect with dramatically fewer draw calls. The existing `VectorWormhole` component is preserved unchanged as a fallback. Index.tsx switches to using the lite version.
 
-**Fix (in `src/pages/Index.tsx`)**:
-- Simplify the vanishing point to always use `{ cx: 0.5, cy: 0.5 }` as the default, only adjusting if the title ref is reliably measured.
-- Add a `ResizeObserver` on the container to re-measure more reliably.
-- Clamp cx/cy to a tighter range around center (0.35-0.65) to prevent extreme off-center positions.
+## Current Problem
 
-**Fix (in `src/components/game/VectorWormhole.tsx`)**:
-- Ensure the canvas resize logic accounts for DPR correctly and that `clientWidth`/`clientHeight` matches the actual visible area. The canvas currently sets its pixel dimensions via `c.width = w * dpr` but then uses `c.clientWidth` for drawing calculations -- ensure these stay in sync by using the parent element dimensions as the source of truth (matching the starfield pattern).
+The existing `VectorWormhole` (616 lines) is heavy:
+- Draws 16-36 sided polygons per ring, with bloom passes using `shadowBlur: 10` and `globalCompositeOperation: "lighter"`
+- Helical rib strands with per-step centerline + radius calculations
+- Up to 64 filament lines with per-segment projection math
+- Aperture discs with additional bloom passes
+- Adaptive quality scaling that itself adds overhead (FPS tracking, dynamic parameter adjustment every 20 frames)
 
-## Issue 2: Survival Mode Explosion Slowdown at 4K
+## New `VectorWormholeLite` Design
 
-**Root Cause**: In `SurvivalEngine.tsx`, the `spawnExplosion` function creates 120-180 primary particles, then 80-120 secondary particles after 100ms, plus 40-60 sparks. That's up to 360 particles, each drawn with `fillRect` and `globalCompositeOperation: "lighter"`. The debris system adds another 80-120 pieces with rotation transforms. At 4K resolution, the canvas is 4x the pixel count, making every draw call more expensive. Combined with shockwave rings, flash effects, and camera shake, this creates a frame budget spike.
+A clean, single-purpose tunnel effect (~200 lines) that achieves a better visual with far fewer draw calls:
 
-**Fix (in `src/components/game/SurvivalEngine.tsx`)**:
-- Scale particle counts based on canvas resolution. At 4K (width > 2500), reduce counts by ~40%:
-  - Primary: cap at 80 (from 120-180)
-  - Secondary: cap at 50 (from 80-120)  
-  - Sparks: cap at 25 (from 40-60)
-  - Debris: cap at 50 (from 80-120)
-- Keep particle velocities and colors identical so the visual "feel" stays the same -- fewer particles at higher speed still looks dramatic.
-- Reduce shockwave ring count from 3-5 to max 2 at 4K.
-- The `shouldOptimize` flag already handles low-graphics mode (12 particles); add a middle tier for high-res displays.
+**Rendering approach:**
+- **Concentric rings only** -- no ribs, filaments, or apertures. Simple circles drawn with `ctx.arc()` (one draw call each vs N-sided polygon paths)
+- **20-30 rings** visible at once (vs potentially hundreds of ring segments + filament points)
+- Rings expand from center as they approach the viewer, creating the "flying through a tunnel" feel
+- **No `shadowBlur`** -- use radial gradients for the central glow and simple alpha for ring brightness (shadowBlur is the single biggest GPU cost in canvas)
+- **No `globalCompositeOperation: "lighter"`** bloom passes -- achieve glow through slightly thicker bright lines and a single central radial gradient
+- **Hue cycling** along ring depth for the neon color shift, reading from `--neon` CSS variable (cached, not per-frame)
+- **Subtle camera wobble** via simple sine-based offset (no seeded noise, no centerline function)
+- **Ring rotation** -- each ring rotates at a slightly different speed for visual interest
 
-## Issue 3: Jerky Level Transition (Hyperspace Jump)
+**Performance wins:**
+- ~30 `ctx.arc()` calls per frame vs hundreds of polygon vertices + bloom passes
+- Zero `shadowBlur` usage
+- Zero composite operation switches
+- No adaptive quality system needed (it's already fast enough)
+- Single `requestAnimationFrame` loop, no FPS tracking overhead
 
-**Root Cause**: The `GameTransition` component uses `setProgress(newProgress)` via React state updates on every `requestAnimationFrame`. This triggers a React re-render on every frame, which is unnecessary and causes micro-stutters. The opacity is also derived from this React state. The hyperspace effect itself (HyperspaceStarfield) renders fine via its own canvas loop, but the containing div's opacity flickers due to state-driven rendering.
+**Visual quality:**
+- Central pulsing glow (single radial gradient)
+- Depth-based alpha falloff (far rings are dimmer)
+- Hue shifts along depth for rainbow tunnel effect
+- Subtle vignette overlay
+- Ring line width scales with proximity for depth cue
 
-Additionally, the transition has a total duration of only 3000ms (200ms fade-out + 2600ms effect + 200ms fade-in) with `setPhase` state changes at each boundary, causing momentary freezes during React reconciliation.
+## Props Interface
 
-**Fix (rewrite the transition animation in `src/components/game/GameTransition.tsx`)**:
-- Replace `setProgress` React state with a ref (`progressRef`) and use direct DOM manipulation (`containerRef.current.style.opacity = ...`) to avoid re-renders during animation.
-- Use a single `requestAnimationFrame` loop for the entire transition lifecycle (fade-out -> effect -> fade-in) instead of separate `setTimeout` + `useEffect` chains per phase. Track all timing in refs.
-- Smooth the speed ramp on HyperspaceStarfield: instead of jumping from 0.1 to 2.0 at the effect phase start, use a gradual easing curve that accelerates over the first 60% of the effect duration.
-- Increase the effect duration slightly from 2600ms to 3200ms for a less rushed feel.
-- Remove all `setProgress` and `setPhase` calls from the animation loop. Only call `setCurrentTransition(null)` and `setPhase("complete")` once when fully done.
+Same props as existing `VectorWormhole` so it's a drop-in replacement:
+- `active`, `loop`, `cx`, `cy`, `speed`, `className`
+- Simplified -- no `preset`, `seed`, `focalLength`, `motionReduce`, `style` (always glow-style)
+- Keeps the `ref` handle with `Play`, `Stop`, `SetSpeed` for compatibility
 
-## Technical Summary
+## File Changes
 
-| File | Changes |
-|------|---------|
-| `src/pages/Index.tsx` | Tighten wormholeVP clamping, add fallback to (0.5, 0.5) |
-| `src/components/game/VectorWormhole.tsx` | Use parent element dimensions for canvas sizing |
-| `src/components/game/SurvivalEngine.tsx` | Add resolution-aware particle scaling in `spawnExplosion` and `spawnDebris` |
-| `src/components/game/GameTransition.tsx` | Replace state-driven animation with ref-based RAF loop, smooth speed ramp |
+| File | Change |
+|------|--------|
+| `src/components/game/VectorWormholeLite.tsx` | **New file** -- lightweight tunnel effect (~200 lines) |
+| `src/pages/Index.tsx` | Import `VectorWormholeLite` instead of `VectorWormhole` for the success screen |
+| `src/components/game/VectorWormhole.tsx` | **No changes** -- preserved as backup |
+
+## Technical Details
+
+### VectorWormholeLite rendering loop (pseudocode)
+
+```text
+each frame:
+  clear canvas
+  draw central radial gradient (pulsing glow)
+  for each ring (sorted far-to-near):
+    update z position (move toward viewer)
+    if z < near: respawn at far
+    calculate screen radius = baseRadius / z * focalLength
+    calculate alpha from depth
+    calculate hue from depth + time
+    ctx.arc(centerX, centerY, screenRadius, 0, TAU)
+    ctx.stroke()
+  draw vignette overlay
+```
+
+### Index.tsx changes
+
+- Line 19: Add import for `VectorWormholeLite`
+- Lines 1051-1061: Replace `<VectorWormhole>` with `<VectorWormholeLite>` keeping same `cx`, `cy`, `loop`, `active` props
+- Keep `VectorWormhole` import for potential future use (or remove if unused -- the file itself stays)
+
