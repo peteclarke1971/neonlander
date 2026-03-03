@@ -87,19 +87,31 @@ export default function AsteroidsColor() {
     localStorage.setItem("asteroids_swap_buttons", newValue.toString());
   };
 
+  const [goFocusIndex, setGoFocusIndex] = useState(0);
+
   // Check if last result is a high score
   const isHighScore = lastResult && (highScores[lastResult.difficulty]?.length < 10 || 
     lastResult.score > (highScores[lastResult.difficulty]?.[9]?.score || 0));
 
-  // Game over screen controls
+  // Game over screen controls with full nav
   useEffect(() => {
-    if (view !== "gameover") return;
+    if (view !== "gameover" || isHighScore) return;
 
+    const btnCount = 2;
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.code === "Space" || e.code === "Enter") {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         e.preventDefault();
-        if (isHighScore) return; // Let initials entry handle this
-        retryGame();
+        setGoFocusIndex(prev => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setGoFocusIndex(prev => Math.min(btnCount - 1, prev + 1));
+      } else if (e.key === "Enter" || e.code === "Space") {
+        e.preventDefault();
+        // Click whichever is focused
+        const btns = document.querySelectorAll<HTMLButtonElement>('nav .player-menu-btn');
+        btns[goFocusIndex]?.click();
       } else if (e.code === "Escape") {
         e.preventDefault();
         backToHome();
@@ -109,15 +121,14 @@ export default function AsteroidsColor() {
     const handleGamepadInput = () => {
       const gp = anyGamepad();
       if (!gp) return;
-      
       const profile = loadProfile(getLastDeviceId());
       const input = readGamepad(gp, profile);
-      
-      if (input.ui.select && !isHighScore) {
-        retryGame();
-      } else if (input.ui.back) {
-        backToHome();
-      }
+      if (input.ui.up) setGoFocusIndex(prev => Math.max(0, prev - 1));
+      else if (input.ui.down) setGoFocusIndex(prev => Math.min(btnCount - 1, prev + 1));
+      else if (input.ui.select) {
+        const btns = document.querySelectorAll<HTMLButtonElement>('nav .player-menu-btn');
+        btns[goFocusIndex]?.click();
+      } else if (input.ui.back) backToHome();
     };
 
     document.addEventListener("keydown", handleKeyPress);
@@ -127,7 +138,7 @@ export default function AsteroidsColor() {
       document.removeEventListener("keydown", handleKeyPress);
       clearInterval(gamepadInterval);
     };
-  }, [view, isHighScore]);
+  }, [view, isHighScore, goFocusIndex]);
 
   if (view === "home") {
     return (
@@ -285,16 +296,10 @@ export default function AsteroidsColor() {
               onInitialsConfirmed={handleInitialsSubmit}
             />
           ) : (
-            <div className="space-y-4">
-              <Button onClick={retryGame} size="lg" className="w-full">
-                Try Again
-                <Badge variant="secondary" className="ml-2">SPACE</Badge>
-              </Button>
-              <Button onClick={backToHome} variant="outline" size="lg" className="w-full">
-                Main Menu
-                <Badge variant="secondary" className="ml-2">ESC</Badge>
-              </Button>
-            </div>
+            <nav className="flex flex-col items-center gap-2 w-full max-w-xs">
+              <button className={`player-menu-btn w-full ${goFocusIndex === 0 ? 'selected' : ''}`} onClick={retryGame} onFocus={() => setGoFocusIndex(0)} autoFocus>TRY AGAIN</button>
+              <button className={`player-menu-btn w-full ${goFocusIndex === 1 ? 'selected' : ''}`} onClick={backToHome} onFocus={() => setGoFocusIndex(1)}>MAIN MENU</button>
+            </nav>
           )}
         </div>
       </div>
