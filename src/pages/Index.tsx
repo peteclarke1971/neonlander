@@ -868,21 +868,43 @@ const retryGame = () => {
     return () => clearTimeout(musicTimer);
    }, [view, sfConfig, lastResult, currentSuccessBg]);
  
-   // Compute vanishing point under the success title
+   // Compute vanishing point under the success title — clamped near center
    useEffect(() => {
      if (view !== "gameover" || lastResult?.cause !== "success") return;
+     // Default to dead-center so it's always safe
+     setWormholeVP({ cx: 0.5, cy: 0.5 });
+
      const update = () => {
-       const r = successTitleRef.current?.getBoundingClientRect();
-       if (!r) return;
-       const cx = (r.left + r.width / 2) / window.innerWidth;
-       const cy = Math.min(0.95, Math.max(0.05, (r.bottom + 16) / window.innerHeight));
+       const el = successTitleRef.current;
+       if (!el) return;
+       const r = el.getBoundingClientRect();
+       // Use the container dimensions if available, fall back to window
+       const containerW = el.closest('.min-h-screen')?.clientWidth || window.innerWidth;
+       const containerH = el.closest('.min-h-screen')?.clientHeight || window.innerHeight;
+       if (containerW < 1 || containerH < 1) return;
+       const rawCx = (r.left + r.width / 2) / containerW;
+       const rawCy = (r.bottom + 16) / containerH;
+       // Clamp to a tight range around center to prevent extreme drift
+       const cx = Math.min(0.65, Math.max(0.35, rawCx));
+       const cy = Math.min(0.65, Math.max(0.35, rawCy));
        setWormholeVP({ cx, cy });
      };
-     update();
-     const onRes = () => update();
-     window.addEventListener("resize", onRes);
-     const t = setTimeout(update, 0);
-     return () => { window.removeEventListener("resize", onRes); clearTimeout(t); };
+
+     // Use ResizeObserver for reliable measurement after layout
+     const el = successTitleRef.current;
+     let ro: ResizeObserver | null = null;
+     if (el) {
+       ro = new ResizeObserver(() => update());
+       ro.observe(el.closest('.min-h-screen') || el);
+     }
+     // Also measure after a frame to catch initial layout
+     const raf = requestAnimationFrame(update);
+     window.addEventListener("resize", update);
+     return () => {
+       window.removeEventListener("resize", update);
+       cancelAnimationFrame(raf);
+       ro?.disconnect();
+     };
    }, [view, lastResult]);
 
   return (

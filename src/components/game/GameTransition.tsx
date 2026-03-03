@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { HyperspaceStarfield, HyperspaceStarfieldHandle } from './HyperspaceStarfield';
 import { AsteroidField, AsteroidFieldHandle } from './AsteroidField';
 import { VectorWormhole, VectorWormholeHandle } from './VectorWormhole';
@@ -20,38 +20,53 @@ interface GameTransitionProps {
   onReady?: () => void;
 }
 
+// Durations in ms
+const DURATIONS: Record<TransitionType, { fadeOut: number; effect: number; fadeIn: number }> = {
+  "hyperspace-jump": { fadeOut: 200, effect: 3200, fadeIn: 200 },
+  "vector-scanline": { fadeOut: 150, effect: 700, fadeIn: 150 },
+  "wormhole-portal": { fadeOut: 500, effect: 4000, fadeIn: 500 },
+  "neon-grid-flip": { fadeOut: 200, effect: 500, fadeIn: 200 },
+  "asteroid-blast": { fadeOut: 150, effect: 500, fadeIn: 150 },
+};
+
 export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionProps>(
   ({ isActive, className = "", onReady }, ref) => {
     const [currentTransition, setCurrentTransition] = useState<TransitionType | null>(null);
+    // phase kept for conditional rendering only — NOT used in animation loop
     const [phase, setPhase] = useState<"fade-out" | "effect" | "fade-in" | "complete">("complete");
-    const [progress, setProgress] = useState(0);
-    
+
     const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
     const asteroidRef = useRef<AsteroidFieldHandle>(null);
     const wormholeRef = useRef<VectorWormholeHandle>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const onCompleteRef = useRef<(() => void) | null>(null);
-    const animationRef = useRef<number | null>(null);
+    const rafRef = useRef<number>(0);
 
-    // Signal component is ready
-    useEffect(() => {
-      onReady?.();
-    }, [onReady]);
+    // Animation state kept entirely in refs to avoid re-renders
+    const animStartRef = useRef(0);
+    const typeRef = useRef<TransitionType | null>(null);
+    const midFiredRef = useRef(false);
+
+    useEffect(() => { onReady?.(); }, [onReady]);
 
     useImperativeHandle(ref, () => ({
       startTransition: (type: TransitionType, onComplete: () => void) => {
-        console.log("🎬 GameTransition.startTransition called:", type, { currentTransition, phase });
-        if (currentTransition) {
+        console.log("🎬 GameTransition.startTransition called:", type);
+        if (typeRef.current) {
           console.log("⚠️ Transition already in progress, ignoring");
-          return; // Prevent overlapping transitions
+          return;
         }
-        
-        console.log("🎨 Setting transition:", type);
+
+        typeRef.current = type;
+        onCompleteRef.current = onComplete;
+        midFiredRef.current = false;
+        animStartRef.current = performance.now();
+
+        // React state for rendering the correct child component
         setCurrentTransition(type);
         setPhase("fade-out");
-        setProgress(0);
-        onCompleteRef.current = onComplete;
-        
+
         // Configure transition-specific effects
         if (type === "hyperspace-jump") {
           starfieldRef.current?.SetSpeed(0.1);
@@ -61,223 +76,186 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
           wormholeRef.current?.SetSeed(Math.random() * 0xffffffff);
           wormholeRef.current?.Play("warp-in");
         }
-      }
+
+        // Kick off the single RAF loop
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(tick);
+      },
     }));
 
-    // Main transition timer
-    useEffect(() => {
-      if (!currentTransition || phase === "complete") return;
+    // Easing helper
+    const easeInOutCubic = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-      const durations = {
-        "hyperspace-jump": { fadeOut: 200, effect: 2600, fadeIn: 200 },
-        "vector-scanline": { fadeOut: 150, effect: 700, fadeIn: 150 },
-        "wormhole-portal": { fadeOut: 500, effect: 4000, fadeIn: 500 },
-        "neon-grid-flip": { fadeOut: 200, effect: 500, fadeIn: 200 },
-        "asteroid-blast": { fadeOut: 150, effect: 500, fadeIn: 150 }
-      };
+    // --- Single RAF loop handles the entire lifecycle ---
+    const tick = useCallback((now: number) => {
+      const type = typeRef.current;
+      if (!type) return;
 
-      const timing = durations[currentTransition];
-      let duration = 0;
-      let nextPhase: "fade-out" | "effect" | "fade-in" | "complete" = "complete";
+      const timing = DURATIONS[type];
+      const totalDur = timing.fadeOut + timing.effect + timing.fadeIn;
+      const elapsed = now - animStartRef.current;
+      const clamped = Math.min(elapsed, totalDur);
 
-      switch (phase) {
-        case "fade-out":
-          duration = timing.fadeOut;
-          nextPhase = "effect";
-          break;
-        case "effect":
-          duration = timing.effect;
-          nextPhase = "fade-in";
-          // Trigger view change at midpoint of effect
-          if (currentTransition === "hyperspace-jump") {
-            starfieldRef.current?.SetSpeed(2.0); // Accelerate dramatically
+      // Determine which phase we're in and compute opacity
+      let opacity = 0;
+      let localProgress = 0; // 0..1 within current phase
+
+      if (clamped < timing.fadeOut) {
+        // Fade-out
+        localProgress = clamped / timing.fadeOut;
+        opacity = easeInOutCubic(localProgress);
+      } else if (clamped < timing.fadeOut + timing.effect) {
+        // Effect phase
+        const effElapsed = clamped - timing.fadeOut;
+        localProgress = effElapsed / timing.effect;
+        opacity = 1;
+
+        // Fire mid-point callback once
+        if (!midFiredRef.current && effElapsed >= timing.effect / 2) {
+          midFiredRef.current = true;
+          onCompleteRef.current?.();
+        }
+
+        // Hyperspace speed ramp: smooth ease from 0.1 → 2.0 over first 60%, hold, then ease down
+        if (type === "hyperspace-jump") {
+          let spd: number;
+          if (localProgress < 0.6) {
+            spd = 0.1 + 1.9 * easeInOutCubic(localProgress / 0.6);
+          } else if (localProgress < 0.85) {
+            spd = 2.0;
+          } else {
+            spd = 2.0 * (1 - easeInOutCubic((localProgress - 0.85) / 0.15));
           }
-          setTimeout(() => {
-            onCompleteRef.current?.();
-          }, duration / 2);
-          break;
-        case "fade-in":
-          duration = timing.fadeIn;
-          nextPhase = "complete";
-          break;
+          starfieldRef.current?.SetSpeed(spd);
+        }
+      } else {
+        // Fade-in (reverse)
+        const fiElapsed = clamped - timing.fadeOut - timing.effect;
+        localProgress = fiElapsed / timing.fadeIn;
+        opacity = 1 - easeInOutCubic(localProgress);
       }
 
-      const timer = setTimeout(() => {
-        if (nextPhase === "complete") {
-          setCurrentTransition(null);
-          setProgress(0);
-        }
-        setPhase(nextPhase);
-      }, duration);
+      // Apply opacity directly to DOM — no React re-render
+      if (containerRef.current) {
+        containerRef.current.style.opacity = String(opacity);
+      }
 
-      // Progress animation
-      const startTime = performance.now();
-      const progressLoop = () => {
-        const elapsed = performance.now() - startTime;
-        const newProgress = Math.min(elapsed / duration, 1);
-        setProgress(newProgress);
-        
-        if (newProgress < 1) {
-          requestAnimationFrame(progressLoop);
-        }
-      };
-      progressLoop();
+      // Draw canvas-based effects
+      if (type === "vector-scanline" || type === "neon-grid-flip" || type === "asteroid-blast") {
+        drawCanvasEffect(type, clamped, timing);
+      }
 
-      return () => clearTimeout(timer);
-    }, [currentTransition, phase]);
+      // Continue or finish
+      if (clamped < totalDur) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        // Transition complete — single state update
+        typeRef.current = null;
+        if (containerRef.current) containerRef.current.style.opacity = "0";
+        setCurrentTransition(null);
+        setPhase("complete");
+      }
+    }, []);
 
-    // Vector scanline effect
-    const drawScanlines = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    // --- Canvas effect drawing (scanline / grid / asteroid) ---
+    const drawCanvasEffect = (type: TransitionType, elapsed: number, timing: typeof DURATIONS["vector-scanline"]) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Resize canvas to match viewport
+      if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      const inEffect = elapsed >= timing.fadeOut && elapsed < timing.fadeOut + timing.effect;
+      const effProgress = inEffect
+        ? (elapsed - timing.fadeOut) / timing.effect
+        : elapsed >= timing.fadeOut + timing.effect ? 1 : 0;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (type === "vector-scanline") drawScanlines(ctx, canvas, effProgress, inEffect);
+      else if (type === "neon-grid-flip") drawNeonGrid(ctx, canvas, effProgress);
+      else if (type === "asteroid-blast") drawAsteroidBlast(ctx, canvas, effProgress, inEffect);
+    };
+
+    // --- Individual canvas effects (unchanged visuals) ---
+    const drawScanlines = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, progress: number, inEffect: boolean) => {
       const scanlineHeight = 4;
-      const speed = 800; // pixels per second
-      const elapsed = progress * 1000; // convert to ms
-      const scanlineY = (elapsed * speed) / 1000;
-      
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+      const speed = 800;
+      const scanlineY = progress * speed;
+
+      ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
       ctx.fillRect(0, scanlineY - scanlineHeight, canvas.width, scanlineHeight * 2);
-      
-      // Add static noise above scanline
-      if (phase === "effect") {
+
+      if (inEffect) {
         const imageData = ctx.getImageData(0, 0, canvas.width, Math.min(scanlineY, canvas.height));
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
           if (Math.random() > 0.95) {
             const noise = Math.random() * 255;
-            data[i] = noise;     // R
-            data[i + 1] = noise; // G
-            data[i + 2] = noise; // B
+            data[i] = noise;
+            data[i + 1] = noise;
+            data[i + 2] = noise;
           }
         }
         ctx.putImageData(imageData, 0, 0);
       }
     };
 
-    // Neon grid flip effect
-    const drawNeonGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    const drawNeonGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, flipProgress: number) => {
       const gridSize = 50;
-      const flipProgress = phase === "effect" ? progress : (phase === "fade-in" ? 1 : 0);
-      
       ctx.strokeStyle = `hsl(180 100% 50% / ${0.6 * (1 - Math.abs(flipProgress - 0.5) * 2)})`;
       ctx.lineWidth = 2;
       ctx.setLineDash([]);
-      
-      // 3D flip transformation
-      const perspective = Math.sin(flipProgress * Math.PI);
       const scaleY = Math.cos(flipProgress * Math.PI);
-      
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.scale(1, Math.abs(scaleY) * 0.3 + 0.7);
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
-      
-      // Draw grid
       for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
       }
-      
       for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
-      
       ctx.restore();
     };
 
-    // Asteroid blast effect
-    const drawAsteroidBlast = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
-      // Particle explosion effect
+    const drawAsteroidBlast = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, blastProgress: number, inEffect: boolean) => {
       const numParticles = 50;
-      const blastProgress = phase === "effect" ? progress : (phase === "fade-in" ? 1 : 0);
-      
       for (let i = 0; i < numParticles; i++) {
         const angle = (i / numParticles) * Math.PI * 2;
         const distance = blastProgress * 300 * (0.5 + Math.random() * 0.5);
         const x = canvas.width / 2 + Math.cos(angle) * distance;
         const y = canvas.height / 2 + Math.sin(angle) * distance;
         const size = (1 - blastProgress) * 8 * Math.random();
-        
         ctx.fillStyle = `hsl(${30 + Math.random() * 60}, 100%, ${50 + Math.random() * 50}%)`;
         ctx.beginPath();
         ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.fill();
       }
-      
-      // White flash effect
-      if (phase === "effect" && progress > 0.7) {
-        const flashAlpha = Math.sin((progress - 0.7) * Math.PI / 0.3);
+      if (inEffect && blastProgress > 0.7) {
+        const flashAlpha = Math.sin((blastProgress - 0.7) * Math.PI / 0.3);
         ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.6})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     };
 
-    // Canvas effects rendering with continuous animation
-    useEffect(() => {
-      if (!currentTransition || !canvasRef.current) return;
-      if (currentTransition === "hyperspace-jump" || currentTransition === "wormhole-portal") return;
+    // Cleanup
+    useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      const draw = () => {
-        if (!currentTransition || phase === "complete") return;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        switch (currentTransition) {
-          case "vector-scanline":
-            drawScanlines(ctx, canvas);
-            break;
-          case "neon-grid-flip":
-            drawNeonGrid(ctx, canvas);
-            break;
-          case "asteroid-blast":
-            drawAsteroidBlast(ctx, canvas);
-            break;
-        }
-        
-        // Continue animation loop
-        animationRef.current = requestAnimationFrame(draw);
-      };
-
-      draw();
-
-      return () => {
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-          animationRef.current = null;
-        }
-      };
-    }, [currentTransition, phase]);
-
-    // Show transition when active and transition is set
     if (!isActive) return null;
 
-    const getOpacity = () => {
-      switch (phase) {
-        case "fade-out":
-          return progress;
-        case "effect":
-          return 1;
-        case "fade-in":
-          return 1 - progress;
-        default:
-          return 0;
-      }
-    };
-
     return (
-      <div 
+      <div
+        ref={containerRef}
         className={`fixed inset-0 z-50 pointer-events-none ${className}`}
-        style={{ opacity: getOpacity() }}
+        style={{ opacity: 0 }}
       >
         {/* Hyperspace Jump */}
         {currentTransition === "hyperspace-jump" && (
@@ -291,9 +269,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
             className="w-full h-full"
           />
         )}
-        
-        {/* Asteroid Blast - handled by canvas now */}
-        
+
         {/* Wormhole Portal */}
         {currentTransition === "wormhole-portal" && (
           <VectorWormhole
@@ -304,15 +280,15 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
             className="w-full h-full"
           />
         )}
-        
+
         {/* Canvas-based effects */}
-        {(currentTransition === "vector-scanline" || 
+        {(currentTransition === "vector-scanline" ||
           currentTransition === "neon-grid-flip" ||
           currentTransition === "asteroid-blast") && (
           <canvas
             ref={canvasRef}
             className="w-full h-full"
-            style={{ imageRendering: 'pixelated' }}
+            style={{ imageRendering: "pixelated" }}
           />
         )}
       </div>
