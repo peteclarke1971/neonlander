@@ -387,7 +387,8 @@ export const GameEngine: React.FC<Props> = ({
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isIPhone = /iPhone/i.test(navigator.userAgent);
   const isIPad = isIPadDevice();
-  const shouldOptimizePerformance = isOptimizedGraphics(graphicsLevel);
+  // Demo mode always uses the optimized-but-pretty thruster path (high-GFX with thruster optimization)
+  const shouldOptimizePerformance = isDemo ? false : isOptimizedGraphics(graphicsLevel);
   const shouldOptimizeLightBeam = isIPad && isOptimizedGraphics(graphicsLevel);
   // iPad thruster optimization: use fast fillRect rendering on mid/high GFX (matches SurvivalEngine approach)
   const useIPadThrusterOptimization = isIPad && !shouldOptimizePerformance;
@@ -400,8 +401,8 @@ export const GameEngine: React.FC<Props> = ({
       return false;
     }
   });
-  // Unified thruster optimization: applies to iPad (automatic) OR PC with toggle enabled
-  const useThrusterOptimization = useIPadThrusterOptimization || (pcThrusterOptimization && !isMobile);
+  // Unified thruster optimization: applies to iPad (automatic), PC with toggle, or demo mode (always on for attract visuals)
+  const useThrusterOptimization = isDemo || useIPadThrusterOptimization || (pcThrusterOptimization && !isMobile);
   const [performanceGoverning, setPerformanceGoverning] = useState(false);
   const frameTimeAccumulator = useRef(0);
   const lastPerformanceCheck = useRef(0);
