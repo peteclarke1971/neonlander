@@ -16,8 +16,10 @@ import type { AsteroidFieldHandle } from "@/components/game/AsteroidField";
 import { MobileStarfield } from "@/components/game/MobileStarfield";
 import { isIOSDevice } from "@/lib/deviceDetection";
 import { AddToHomeScreen } from "@/components/game/AddToHomeScreen";
-import { VectorWormhole } from "@/components/game/VectorWormhole";
+import { VectorWormhole } from "@/components/game/VectorWormhole"; // kept as backup
 import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
+import { VectorWormholeLite } from "@/components/game/VectorWormholeLite";
+import type { VectorWormholeLiteHandle } from "@/components/game/VectorWormholeLite";
 import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
 import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
@@ -124,7 +126,7 @@ const Index = () => {
   // Hyperspace starfield control and randomized config per gameover screen
   const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
   const asteroidsRef = useRef<AsteroidFieldHandle>(null);
-   const wormholeRef = useRef<VectorWormholeHandle>(null);
+   const wormholeRef = useRef<VectorWormholeLiteHandle>(null);
    const gwRef = useRef<GravityWaveHandle>(null);
    const successTitleRef = useRef<HTMLHeadingElement>(null);
    const [wormholeVP, setWormholeVP] = useState<{ cx: number; cy: number } | null>(null);
@@ -851,9 +853,7 @@ const retryGame = () => {
     if (view !== "gameover" || !sfConfig || lastResult?.cause !== "success") return;
     try {
       if (currentSuccessBg === 0) {
-        wormholeRef.current?.SetSeed(((sfConfig.seed ?? 0) ^ 0x57f00f) >>> 0);
-        wormholeRef.current?.SetStyle(((sfConfig.style || "glow").charAt(0).toUpperCase() + (sfConfig.style || "glow").slice(1)) as any);
-        wormholeRef.current?.Play("Wormhole");
+        wormholeRef.current?.Play();
       } else {
         // Start Gravity Wave with deterministic seed
         const baseSeed = ((sfConfig.seed ?? 0) ^ 0xA11CE) >>> 0;
@@ -1048,16 +1048,12 @@ const retryGame = () => {
               ) : (
                 <>
                   {currentSuccessBg === 0 ? (
-                    <VectorWormhole
+                    <VectorWormholeLite
                       ref={wormholeRef}
                       active
                       loop
-                      preset="Wormhole"
-                      style={(sfConfig?.style || "glow") as any}
-                      focalLength={sfConfig?.focalLength}
                       cx={wormholeVP?.cx ?? 0.5}
                       cy={wormholeVP?.cy ?? 0.5}
-                      seed={(sfConfig?.seed ?? 0) ^ 0x57F00F}
                     />
                   ) : (
                     <>
