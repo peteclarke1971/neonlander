@@ -102,15 +102,24 @@ const AsteroidsRemix: React.FC = () => {
   };
 
   const isHighScore = lastResult && (highScores.length < 10 || highScores.some(score => lastResult.score > score.score));
+  const [goFocusIndex, setGoFocusIndex] = useState(0);
   
   useEffect(() => {
     if (view === "gameover" && !isHighScore) {
+      const btnCount = 2;
       const handleKeyDown = (e: KeyboardEvent) => {
         const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (targetTag === "input" || targetTag === "textarea") return;
-        if (e.key === "Enter") {
+        if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
           e.preventDefault();
-          retryGame();
+          setGoFocusIndex(prev => Math.max(0, prev - 1));
+        } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+          e.preventDefault();
+          setGoFocusIndex(prev => Math.min(btnCount - 1, prev + 1));
+        } else if (e.key === "Enter" || e.code === "Space") {
+          e.preventDefault();
+          const btns = document.querySelectorAll<HTMLButtonElement>('nav .player-menu-btn');
+          btns[goFocusIndex]?.click();
         }
       };
       
@@ -119,9 +128,12 @@ const AsteroidsRemix: React.FC = () => {
         if (gp) {
           const profile = loadProfile(getLastDeviceId());
           const input = readGamepad(gp, profile);
-          if (input.buttons.abort) {
-            retryGame();
-          }
+          if (input.ui?.up) setGoFocusIndex(prev => Math.max(0, prev - 1));
+          else if (input.ui?.down) setGoFocusIndex(prev => Math.min(btnCount - 1, prev + 1));
+          else if (input.ui?.select) {
+            const btns = document.querySelectorAll<HTMLButtonElement>('nav .player-menu-btn');
+            btns[goFocusIndex]?.click();
+          } else if (input.ui?.back) backToHome();
         }
       };
       
@@ -133,7 +145,7 @@ const AsteroidsRemix: React.FC = () => {
         clearInterval(gamepadInterval);
       };
     }
-  }, [view, isHighScore]);
+  }, [view, isHighScore, goFocusIndex]);
 
   if (view === "home") {
     return (
@@ -303,14 +315,10 @@ const AsteroidsRemix: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="space-y-4">
-            <Button onClick={retryGame} variant="outline" size="lg" autoFocus>
-              Try Again
-            </Button>
-            <Button onClick={backToHome} variant="ghost">
-              Main Menu
-            </Button>
-          </div>
+          <nav className="flex flex-col items-center gap-2 w-full max-w-xs">
+            <button className={`player-menu-btn w-full ${goFocusIndex === 0 ? 'selected' : ''}`} onClick={retryGame} onFocus={() => setGoFocusIndex(0)} autoFocus>TRY AGAIN</button>
+            <button className={`player-menu-btn w-full ${goFocusIndex === 1 ? 'selected' : ''}`} onClick={backToHome} onFocus={() => setGoFocusIndex(1)}>MAIN MENU</button>
+          </nav>
         )}
       </div>
     </div>

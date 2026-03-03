@@ -210,7 +210,7 @@ const NeonDocking: React.FC = () => {
 
   // Add keyboard/gamepad handling for game over screen (disabled on crash)
   useEffect(() => {
-    if (view === "gameover" && !isHighScore && lastResult?.cause !== "crash") {
+    if (view === "gameover" && !isHighScore) {
       const handleKeyDown = (e: KeyboardEvent) => {
         const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
         if (tag === "input" || tag === "textarea") return;
@@ -429,22 +429,11 @@ const NeonDocking: React.FC = () => {
               onInitialsConfirmed={handleInitialsSubmit}
             />
           </div>
-        ) : lastResult?.cause === "crash" ? (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Ship destroyed.</p>
-            <a href="/" className="inline-block">
-              <Button variant="outline">Main Menu</Button>
-            </a>
-          </div>
         ) : (
-          <div className="space-y-4">
-            <Button ref={tryAgainRef} onClick={retryGame} variant="outline" size="lg" className={goFocusIndex === 0 ? "focus-visible:ring-2 focus-visible:ring-accent" : ""}>
-              Try Again
-            </Button>
-            <Button ref={mainMenuRef} onClick={backToHome} variant="ghost" className={goFocusIndex === 1 ? "focus-visible:ring-2 focus-visible:ring-accent" : ""}>
-              Main Menu
-            </Button>
-          </div>
+          <nav className="flex flex-col items-center gap-2 w-full max-w-xs">
+            <button ref={tryAgainRef} className={`player-menu-btn w-full ${goFocusIndex === 0 ? 'selected' : ''}`} onClick={retryGame} onFocus={() => setGoFocusIndex(0)} autoFocus>TRY AGAIN</button>
+            <button ref={mainMenuRef} className={`player-menu-btn w-full ${goFocusIndex === 1 ? 'selected' : ''}`} onClick={backToHome} onFocus={() => setGoFocusIndex(1)}>MAIN MENU</button>
+          </nav>
         )}
       </div>
     </div>
