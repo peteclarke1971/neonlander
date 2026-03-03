@@ -1,79 +1,62 @@
 
 
-# Fix: iPad Audio Not Starting with Gamepad
+# Standardize Game-Over Buttons to Arcade Style
 
-## Problem
+## Overview
 
-On iPad, audio often doesn't start for a long time when using a gamepad/joypad. This happens because:
+Replace all `<Button>` component usage on mission-failed/game-over screens with the `player-menu-btn` pattern (matching Survival and Asteroids modes). This gives consistent neon arcade styling with `selected` class highlighting for focused items.
 
-1. **iOS requires a user gesture to unlock AudioContext** -- but gamepad button presses do NOT fire standard DOM events (`pointerdown`, `touchstart`, `keydown`). The Player Menu only listens for those three event types to trigger `audio.resume()`.
+## Files to Change
 
-2. **The gamepad polling loop in PlayerMenu never calls `audio.resume()`** -- so pressing gamepad buttons navigates menus fine but never unlocks the AudioContext. Audio only starts when the user happens to tap the screen or press a keyboard key.
+### 1. Index.tsx (Main Lander -- Mission Failed + Success buttons)
 
-3. **The iOS silent-buffer unlock only runs once** -- if the first attempt happens before the context is truly ready (e.g., during the auto-start attempt on mount), the `_iosUnlocked` flag gets set to `true` and the silent buffer trick is never retried.
+**Lines 1399-1439**: Replace `<Button>` components with `player-menu-btn` buttons.
 
-## Solution
+- Mission Failed buttons (Home, Retry Current Level, Retry From Start): change from horizontal `<Button>` layout to a vertical `<nav>` with `player-menu-btn` buttons and `selected` class tied to `goIndex`.
+- Success buttons (Continue, Time Trial trio): same treatment.
+- Change the container from `flex gap-3` horizontal to `flex flex-col items-center gap-2 w-full max-w-xs` vertical nav.
+- Use `ref` callback pattern (`ref={el => ...}`) instead of single refs, or keep existing refs but add `player-menu-btn` class and `selected` logic.
 
-### 1. Add `audio.resume()` call to the gamepad polling loop (PlayerMenu.tsx)
+### 2. LightCycles.tsx (Lines 411-418)
 
-At the top of the gamepad loop, after detecting any button press, call `audioRef.current.resume()`. This ensures that every gamepad interaction attempts to unlock/resume the AudioContext. Since `resume()` is cheap (no-op when already running), this has zero performance cost.
+Replace:
+```html
+<div className="space-y-4">
+  <Button ref={tryAgainRef} ... variant="outline" ...>Try Again</Button>
+  <Button ref={mainMenuRef} ... variant="ghost" ...>Main Menu</Button>
+</div>
+```
+With:
+```html
+<nav className="flex flex-col items-center gap-2 w-full max-w-xs">
+  <button ref={tryAgainRef} className={`player-menu-btn w-full ${goFocusIndex === 0 ? 'selected' : ''}`} onClick={retryGame} onFocus={() => setGoFocusIndex(0)} autoFocus>TRY AGAIN</button>
+  <button ref={mainMenuRef} className={`player-menu-btn w-full ${goFocusIndex === 1 ? 'selected' : ''}`} onClick={backToHome} onFocus={() => setGoFocusIndex(1)}>MAIN MENU</button>
+</nav>
+```
 
-### 2. Add `gamepadconnected` to the interaction event listeners (PlayerMenu.tsx)
+### 3. NeonRacing.tsx (Lines 441-448) -- same pattern as LightCycles
 
-Add `"gamepadconnected"` to the list of window events that trigger `startOnInteract`. This catches the moment a gamepad is first connected and tries to unlock audio. While this alone may not satisfy iOS's gesture requirement, it provides an additional unlock opportunity.
+### 4. NeonDocking.tsx (Lines 432-447)
 
-### 3. Make the iOS silent-buffer unlock retry-able (AudioManager.ts)
+Has three states (high score, crash with no retry, normal). Replace both the crash state and normal state buttons with `player-menu-btn` pattern.
 
-Change the `_iosUnlocked` flag logic so it resets when the context is still suspended. This way, if the first unlock attempt didn't actually work (common on iOS when called too early), subsequent `resume()` calls will retry the silent buffer trick until it succeeds.
+### 5. AsteroidsColor.tsx (Lines 288-297)
 
-### 4. Add periodic audio unlock retry in PlayerMenu (PlayerMenu.tsx)
+Replace `<Button>` components with `player-menu-btn` pattern. Add `goFocusIndex` state and gamepad/keyboard navigation (currently missing).
 
-Add a periodic check (every 2 seconds) that detects if a gamepad is connected but the AudioContext is still suspended, and calls `resume()`. This catches edge cases where the user connected the gamepad before the page loaded and hasn't pressed any button yet.
+### 6. AsteroidsRemix.tsx (Lines 306-311)
+
+Replace `<Button>` components with `player-menu-btn` pattern. Add focus index state and navigation support.
+
+## Navigation
+
+All modes that already have gamepad polling and keyboard listeners (LightCycles, NeonRacing, NeonDocking, Index.tsx) keep their existing navigation logic -- the only change is the visual button element. AsteroidsColor and AsteroidsRemix need focus-index state and basic keyboard/gamepad nav added (matching the pattern already in Asteroids.tsx).
 
 ## Technical Details
 
-### File: `src/components/game/PlayerMenu.tsx`
-
-**Change 1 -- Gamepad loop audio unlock (around line 492)**
-
-After the idle reset check, add:
-```typescript
-// Unlock audio on any gamepad button press (iOS requires user gesture)
-if (input.ui.up || input.ui.down || input.ui.left || input.ui.right || input.ui.select || input.ui.back) {
-  audioRef.current.resume();
-  if (!musicStartedRef.current && musicOn) {
-    audioRef.current.playTitleMusic().then(() => {
-      audioRef.current.setTitleMusicMuted(false);
-      musicStartedRef.current = true;
-    }).catch(() => {});
-  }
-}
-```
-
-**Change 2 -- Add gamepadconnected event listener (around line 301)**
-
-Add `"gamepadconnected"` to the interaction listeners:
-```typescript
-window.addEventListener("gamepadconnected", startOnInteract);
-// ... and in cleanup:
-window.removeEventListener("gamepadconnected", startOnInteract);
-```
-
-### File: `src/components/game/AudioManager.ts`
-
-**Change 3 -- Make iOS unlock retryable (around line 228)**
-
-Change the condition so the silent buffer is replayed if the context is still suspended:
-```typescript
-// iOS sometimes needs a tiny silent buffer played to truly unlock
-const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-if (isIOS && (!this._iosUnlocked || this.ctx.state === 'suspended')) {
-  this.playUnlockBuffer();
-  if (this.ctx.state === 'running') {
-    this._iosUnlocked = true;
-  }
-}
-```
-
-This ensures the silent buffer trick keeps retrying on iOS until the AudioContext actually transitions to the "running" state, rather than giving up after one attempt.
+- Remove `<Button>` import where no longer needed on game-over screens
+- Use uppercase text (TRY AGAIN, MAIN MENU, etc.) to match arcade style
+- All buttons get `player-menu-btn w-full` class with `selected` conditional
+- Wrap in `<nav className="flex flex-col items-center gap-2 w-full max-w-xs">`
+- Existing gamepad loops and keyboard handlers continue to work since they use refs
 
