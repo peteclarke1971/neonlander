@@ -20,8 +20,10 @@ import { VectorWormhole } from "@/components/game/VectorWormhole"; // kept as ba
 import type { VectorWormholeHandle } from "@/components/game/VectorWormhole";
 import { VectorWormholeLite } from "@/components/game/VectorWormholeLite";
 import type { VectorWormholeLiteHandle } from "@/components/game/VectorWormholeLite";
-import { GravityDistortionWave } from "@/components/game/GravityDistortionWave";
+import { GravityDistortionWave } from "@/components/game/GravityDistortionWave"; // kept as backup
 import type { GravityWaveHandle } from "@/components/game/GravityDistortionWave";
+import { GravityWaveLite } from "@/components/game/GravityWaveLite";
+import type { GravityWaveLiteHandle } from "@/components/game/GravityWaveLite";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
@@ -127,7 +129,7 @@ const Index = () => {
   const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
   const asteroidsRef = useRef<AsteroidFieldHandle>(null);
    const wormholeRef = useRef<VectorWormholeLiteHandle>(null);
-   const gwRef = useRef<GravityWaveHandle>(null);
+   const gwRef = useRef<GravityWaveLiteHandle>(null);
    const successTitleRef = useRef<HTMLHeadingElement>(null);
    const [wormholeVP, setWormholeVP] = useState<{ cx: number; cy: number } | null>(null);
    const [currentSuccessBg, setCurrentSuccessBg] = useState<number>(0);
@@ -855,9 +857,7 @@ const retryGame = () => {
       if (currentSuccessBg === 0) {
         wormholeRef.current?.Play();
       } else {
-        // Start Gravity Wave with deterministic seed
-        const baseSeed = ((sfConfig.seed ?? 0) ^ 0xA11CE) >>> 0;
-        gwRef.current?.Play({ baseSeed, modeName: mode, levelIndex: carry?.level ?? 0, instanceId: successCount });
+        gwRef.current?.Play();
       }
     } catch {}
     // Play mission success music after landing sound finishes (triggered after 1 second)
@@ -1056,20 +1056,13 @@ const retryGame = () => {
                       cy={wormholeVP?.cy ?? 0.5}
                     />
                   ) : (
-                    <>
-                      <GravityDistortionWave
-                        ref={gwRef}
-                        active
-                        preset="Normal"
-                        focalLength={sfConfig?.focalLength}
-                        cx={wormholeVP?.cx ?? 0.5}
-                        cy={wormholeVP?.cy ?? 0.5}
-                        baseSeed={(sfConfig?.seed ?? 0) ^ 0xA11CE}
-                        modeName={mode}
-                        levelIndex={carry?.level ?? 0}
-                        instanceId={successCount}
-                      />
-                    </>
+                    <GravityWaveLite
+                      ref={gwRef}
+                      active
+                      preset="Normal"
+                      cx={wormholeVP?.cx ?? 0.5}
+                      cy={wormholeVP?.cy ?? 0.5}
+                    />
                   )}
                 </>
               )}
