@@ -1,85 +1,94 @@
 
 
-# Optimize VectorWormhole Effect for Mission Success Screens
+# Create Lightweight GravityWaveLite to Replace Heavy GravityDistortionWave
 
 ## Overview
 
-Create a new lightweight wormhole component (`VectorWormholeLite`) that delivers a visually striking tunnel effect with dramatically fewer draw calls. The existing `VectorWormhole` component is preserved unchanged as a fallback. Index.tsx switches to using the lite version.
+The `GravityDistortionWave` component (928 lines) is the other mission-success effect that alternates with `VectorWormholeLite`. It's extremely heavy due to:
+- Tile-based screen warp (`drawImage` in a nested loop -- hundreds of `drawImage` calls per frame)
+- Dual canvas system (background + composited output)
+- Grid of rings + spokes with `shadowBlur` and `globalCompositeOperation: "lighter"`
+- Spoke twinkle system, energy burst particles, center vortex gradients
+- FPS governor that dynamically adjusts parameters (overhead in itself)
+- Seeded PRNG system with complex parameter randomization
 
-## Current Problem
+## New `GravityWaveLite` Design
 
-The existing `VectorWormhole` (616 lines) is heavy:
-- Draws 16-36 sided polygons per ring, with bloom passes using `shadowBlur: 10` and `globalCompositeOperation: "lighter"`
-- Helical rib strands with per-step centerline + radius calculations
-- Up to 64 filament lines with per-segment projection math
-- Aperture discs with additional bloom passes
-- Adaptive quality scaling that itself adds overhead (FPS tracking, dynamic parameter adjustment every 20 frames)
+A clean ~220-line component that captures the visual essence -- concentric rippling rings radiating outward from center with color cycling -- but rendered with minimal draw calls:
 
-## New `VectorWormholeLite` Design
+**Visual approach:**
+- Concentric rings drawn with `ctx.arc()` that pulse in radius (sinusoidal displacement), creating a "gravity ripple" look
+- Rings flow outward from center (tunnel/expansion feel)
+- Radial spoke lines from center to edges (simple `moveTo/lineTo`, no quadratic curves)
+- Color cycling through hue spectrum (rainbow effect matching the original)
+- Central pulsing glow via a single radial gradient
+- Vignette overlay
 
-A clean, single-purpose tunnel effect (~200 lines) that achieves a better visual with far fewer draw calls:
+**What's removed vs the original:**
+- No tile-based screen warp (the single biggest cost -- hundreds of `drawImage` calls)
+- No dual canvas system
+- No `shadowBlur` anywhere
+- No `globalCompositeOperation: "lighter"` 
+- No FPS governor (not needed -- it's already fast)
+- No energy burst particle system
+- No spoke twinkle system
+- No chromatic aberration
+- No seeded PRNG (visual randomization via simple `Math.random()` at init)
 
-**Rendering approach:**
-- **Concentric rings only** -- no ribs, filaments, or apertures. Simple circles drawn with `ctx.arc()` (one draw call each vs N-sided polygon paths)
-- **20-30 rings** visible at once (vs potentially hundreds of ring segments + filament points)
-- Rings expand from center as they approach the viewer, creating the "flying through a tunnel" feel
-- **No `shadowBlur`** -- use radial gradients for the central glow and simple alpha for ring brightness (shadowBlur is the single biggest GPU cost in canvas)
-- **No `globalCompositeOperation: "lighter"`** bloom passes -- achieve glow through slightly thicker bright lines and a single central radial gradient
-- **Hue cycling** along ring depth for the neon color shift, reading from `--neon` CSS variable (cached, not per-frame)
-- **Subtle camera wobble** via simple sine-based offset (no seeded noise, no centerline function)
-- **Ring rotation** -- each ring rotates at a slightly different speed for visual interest
-
-**Performance wins:**
-- ~30 `ctx.arc()` calls per frame vs hundreds of polygon vertices + bloom passes
-- Zero `shadowBlur` usage
-- Zero composite operation switches
-- No adaptive quality system needed (it's already fast enough)
-- Single `requestAnimationFrame` loop, no FPS tracking overhead
-
-**Visual quality:**
-- Central pulsing glow (single radial gradient)
-- Depth-based alpha falloff (far rings are dimmer)
-- Hue shifts along depth for rainbow tunnel effect
-- Subtle vignette overlay
-- Ring line width scales with proximity for depth cue
+**Performance budget:** ~40-50 draw calls per frame (24 rings + 16 spokes + 2 gradients)
 
 ## Props Interface
 
-Same props as existing `VectorWormhole` so it's a drop-in replacement:
-- `active`, `loop`, `cx`, `cy`, `speed`, `className`
-- Simplified -- no `preset`, `seed`, `focalLength`, `motionReduce`, `style` (always glow-style)
-- Keeps the `ref` handle with `Play`, `Stop`, `SetSpeed` for compatibility
+Simplified to match what Index.tsx actually passes:
+
+```text
+active: boolean
+preset: "Calm" | "Normal" | "Storm"  (controls speed/intensity)
+cx, cy: number (0-1, center point)
+className: string
+```
+
+Ref handle keeps `Play`, `Stop`, `SetSeed`, `PulseNow` for compatibility (SetSeed and PulseNow are no-ops).
 
 ## File Changes
 
 | File | Change |
 |------|--------|
-| `src/components/game/VectorWormholeLite.tsx` | **New file** -- lightweight tunnel effect (~200 lines) |
-| `src/pages/Index.tsx` | Import `VectorWormholeLite` instead of `VectorWormhole` for the success screen |
-| `src/components/game/VectorWormhole.tsx` | **No changes** -- preserved as backup |
+| `src/components/game/GravityWaveLite.tsx` | **New file** -- lightweight ripple/grid effect (~220 lines) |
+| `src/pages/Index.tsx` | Import `GravityWaveLite` instead of `GravityDistortionWave` for the success screen |
+| `src/components/game/GravityDistortionWave.tsx` | **No changes** -- preserved as backup |
 
 ## Technical Details
 
-### VectorWormholeLite rendering loop (pseudocode)
+### Rendering loop (pseudocode)
 
 ```text
 each frame:
-  clear canvas
+  clear canvas with dark background
+  
   draw central radial gradient (pulsing glow)
-  for each ring (sorted far-to-near):
-    update z position (move toward viewer)
-    if z < near: respawn at far
-    calculate screen radius = baseRadius / z * focalLength
-    calculate alpha from depth
-    calculate hue from depth + time
-    ctx.arc(centerX, centerY, screenRadius, 0, TAU)
+  
+  for each spoke (16 total):
+    calculate angle
+    draw line from center to edge
+    stroke with hue-shifted color, alpha based on pulse
+  
+  for each ring (24 total):
+    update z (move outward toward viewer)
+    if z > far: respawn at near
+    calculate screen radius from z
+    add sinusoidal ripple displacement
+    calculate hue from depth + elapsed time
+    ctx.arc(centerX, centerY, radius, 0, TAU)
     ctx.stroke()
+  
   draw vignette overlay
 ```
 
 ### Index.tsx changes
 
-- Line 19: Add import for `VectorWormholeLite`
-- Lines 1051-1061: Replace `<VectorWormhole>` with `<VectorWormholeLite>` keeping same `cx`, `cy`, `loop`, `active` props
-- Keep `VectorWormhole` import for potential future use (or remove if unused -- the file itself stays)
+- Add import for `GravityWaveLite` and `GravityWaveLiteHandle`
+- Replace `<GravityDistortionWave>` JSX block with `<GravityWaveLite>` keeping `active`, `preset`, `cx`, `cy` props
+- Update the `gwRef` type to `GravityWaveLiteHandle`
+- Remove the complex `gwRef.current?.Play()` / `SetSeed()` calls from the success activation logic (lite version auto-starts on `active`)
 
