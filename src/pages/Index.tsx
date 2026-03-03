@@ -505,10 +505,9 @@ const Index = () => {
       setView("game");
     };
     
-    transitionRef.current?.startTransition("hyperspace-jump", () => {
-      executeTransition();
-      setTimeout(() => setIsTransitioning(false), 200);
-    });
+    // Skip starfield transition — just execute the level change immediately
+    executeTransition();
+    setIsTransitioning(false);
   };
 const retryGame = () => {
   const root = document.documentElement;
