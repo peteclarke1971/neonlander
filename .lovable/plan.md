@@ -1,21 +1,30 @@
 
 
-# Fix Thruster Particle Alignment in Survival Mode
+# Fix Misaligned Thruster Particles in Survival Mode
 
-## Problem
+## Root Cause
 
-The thruster nozzle spawn position uses an offset of `10` from the ship center, which places particles exactly at the ship body base (`y = 10` in local coords). The landing legs extend to `y = 12`. Since the ship is rendered AFTER particles (ship at line ~3512, particles at line ~3299), newly spawned particles are visually hidden behind the ship body for their first few frames, making the exhaust appear to emerge from the middle of the ship rather than from the bottom.
+Comparing `SurvivalEngine.tsx` particle code with the working `GameEngine.tsx`:
+
+| Parameter | GameEngine (works) | SurvivalEngine (broken) |
+|-----------|-------------------|------------------------|
+| Nozzle offset | 10 | 14 (too far below ship) |
+| Trail length factor | 0.03 | 0.15 (5x too long) |
+| Line width | `1.8 + (1-age)*1.0` (2.8→1.8) | `1.8 * (1-t)` (1.8→0, inverts) |
+| Head dot | none | fillRect (adds visual noise) |
+
+The nozzle at 14 places particles well below the visible ship body, and the trail factor of 0.15 (vs GameEngine's 0.03) creates 5x longer trails that visually stretch back into and through the ship -- producing the "mirrored" effect. The line width formula tapering to 0 also makes trails look spiky and scattered.
 
 ## Fix
 
-Increase the nozzle offset from `10` to `14` so particles spawn clearly below the landing legs. This is a one-line constant change in `SurvivalEngine.tsx` at lines 1601-1609 (the nozzle position calculations).
+In `SurvivalEngine.tsx`, align the particle system with `GameEngine.tsx`:
 
-**Before:** `shipX - Math.sin(shipAngle) * 10` / `shipY + Math.cos(shipAngle) * 10`
-**After:** `shipX - Math.sin(shipAngle) * 14` / `shipY + Math.cos(shipAngle) * 14`
-
-Apply to all three nozzle positions (center, left, right). Left/right lateral offset stays at `3`.
+1. **Nozzle offset**: Change from 14 back to 10 (all 5 nozzle calculations, lines 1601-1609)
+2. **Trail factor**: Change from 0.15 to 0.03 (line 3308)
+3. **Line width**: Change from `1.8 * (1 - t)` to `1.8 + (1 - t) * 1.0` to match GameEngine (line 3309)
+4. **Remove head dot**: Remove the fillRect head dot rendering (lines 3316-3319) -- GameEngine doesn't use one for the line-rendered path
 
 | File | Change |
 |------|--------|
-| `src/components/game/SurvivalEngine.tsx` | Update nozzle offset from `10` to `14` in all 5 nozzle position calculations (lines 1601-1609) |
+| `src/components/game/SurvivalEngine.tsx` | Fix nozzle offset (10), trail length (0.03), line width formula, remove head dot |
 
