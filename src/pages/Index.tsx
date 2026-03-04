@@ -1041,30 +1041,22 @@ const retryGame = () => {
         <main className="min-h-screen relative flex items-center justify-center">
           {lastResult.cause === "success" ? (
             <>
-              {graphicsLevel === "low" ? (
-                <div className="absolute inset-0 z-0">
-                  <HomeStarfield />
-                </div>
+              {currentSuccessBg === 0 ? (
+                <VectorWormholeLite
+                  ref={wormholeRef}
+                  active
+                  loop
+                  cx={wormholeVP?.cx ?? 0.5}
+                  cy={wormholeVP?.cy ?? 0.5}
+                />
               ) : (
-                <>
-                  {currentSuccessBg === 0 ? (
-                    <VectorWormholeLite
-                      ref={wormholeRef}
-                      active
-                      loop
-                      cx={wormholeVP?.cx ?? 0.5}
-                      cy={wormholeVP?.cy ?? 0.5}
-                    />
-                  ) : (
-                    <GravityWaveLite
-                      ref={gwRef}
-                      active
-                      preset="Normal"
-                      cx={wormholeVP?.cx ?? 0.5}
-                      cy={wormholeVP?.cy ?? 0.5}
-                    />
-                  )}
-                </>
+                <GravityWaveLite
+                  ref={gwRef}
+                  active
+                  preset="Normal"
+                  cx={wormholeVP?.cx ?? 0.5}
+                  cy={wormholeVP?.cy ?? 0.5}
+                />
               )}
             </>
           ) : (
