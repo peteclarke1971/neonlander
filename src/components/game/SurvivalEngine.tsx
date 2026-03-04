@@ -1599,14 +1599,14 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             // Spawn thruster particles — tiered per device
             const nozzlePositions = isLowGfx ? [
-              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
+              { x: shipX - Math.sin(shipAngle) * 14, y: shipY + Math.cos(shipAngle) * 14 }
             ] : [
               // Center nozzle
-              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 },
+              { x: shipX - Math.sin(shipAngle) * 14, y: shipY + Math.cos(shipAngle) * 14 },
               // Left nozzle
-              { x: shipX - Math.sin(shipAngle) * 10 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 + Math.sin(shipAngle) * 3 },
+              { x: shipX - Math.sin(shipAngle) * 14 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 14 + Math.sin(shipAngle) * 3 },
               // Right nozzle
-              { x: shipX - Math.sin(shipAngle) * 10 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 - Math.sin(shipAngle) * 3 }
+              { x: shipX - Math.sin(shipAngle) * 14 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 14 - Math.sin(shipAngle) * 3 }
             ];
             
             for (const nozzle of nozzlePositions) {
