@@ -1599,14 +1599,14 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             // Spawn thruster particles — tiered per device
             const nozzlePositions = isLowGfx ? [
-              { x: shipX - Math.sin(shipAngle) * 14, y: shipY + Math.cos(shipAngle) * 14 }
+              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
             ] : [
               // Center nozzle
-              { x: shipX - Math.sin(shipAngle) * 14, y: shipY + Math.cos(shipAngle) * 14 },
+              { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 },
               // Left nozzle
-              { x: shipX - Math.sin(shipAngle) * 14 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 14 + Math.sin(shipAngle) * 3 },
+              { x: shipX - Math.sin(shipAngle) * 10 - Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 + Math.sin(shipAngle) * 3 },
               // Right nozzle
-              { x: shipX - Math.sin(shipAngle) * 14 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 14 - Math.sin(shipAngle) * 3 }
+              { x: shipX - Math.sin(shipAngle) * 10 + Math.cos(shipAngle) * 3, y: shipY + Math.cos(shipAngle) * 10 - Math.sin(shipAngle) * 3 }
             ];
             
             for (const nozzle of nozzlePositions) {
@@ -3305,18 +3305,14 @@ export const SurvivalEngine: React.FC<Props> = ({
         
         if (isMobileHighGfx) {
           // Velocity-trail lines for iPhone/iPad high-gfx — spectacular without shadowBlur cost
-          const trailLen = 0.15;
-          const lineW = 1.8 * (1 - t);
+          const trailLen = 0.03;
+          const lineW = 1.8 + (1 - t) * 1.0;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * trailLen, p.y - p.vy * trailLen);
           ctx.strokeStyle = `hsla(${particleHue}, ${alpha})`;
           ctx.lineWidth = lineW;
           ctx.stroke();
-          // Head dot
-          const headSize = 2.5 * (1 - t);
-          ctx.fillStyle = `hsla(${particleHue}, ${Math.min(1, alpha * 1.3)})`;
-          ctx.fillRect(p.x - headSize / 2, p.y - headSize / 2, headSize, headSize);
         } else if (isLowGfx) {
           // Minimal dots for low-gfx
           ctx.fillStyle = `hsla(${particleHue}, ${alpha})`;
