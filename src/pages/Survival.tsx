@@ -36,13 +36,16 @@ const Survival: React.FC = () => {
     timestamp: number;
   } | null>(null);
   const [showLeaderboardsAfterInitials, setShowLeaderboardsAfterInitials] = useState(false);
-  const [lowGraphics, setLowGraphics] = useState(() => {
+  const [graphicsLevel, setGraphicsLevel] = useState<'low' | 'mid' | 'high'>(() => {
     try {
       const saved = localStorage.getItem('ll-graphics-settings');
-      return saved ? JSON.parse(saved).lowGraphics : true;
-    } catch {
-      return true; // Default to low-gfx
-    }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.graphicsLevel) return parsed.graphicsLevel;
+        return parsed.lowGraphics ? 'low' : 'high';
+      }
+    } catch {}
+    return 'low'; // Default to low-gfx
   });
   const [highScores, setHighScores] = useState<HighScore[]>(() => {
     const now = Date.now();
@@ -84,7 +87,11 @@ const Survival: React.FC = () => {
       const saved = localStorage.getItem('ll-graphics-settings');
       if (saved) {
         const parsed = JSON.parse(saved);
-        setLowGraphics(parsed.lowGraphics);
+        if (parsed.graphicsLevel) {
+          setGraphicsLevel(parsed.graphicsLevel);
+        } else {
+          setGraphicsLevel(parsed.lowGraphics ? 'low' : 'high');
+        }
       }
     } catch {
       // Keep current value if parsing fails
@@ -237,9 +244,9 @@ const Survival: React.FC = () => {
 
   if (view === "game") {
     return <SurvivalEngine 
-      key={lowGraphics ? 'low' : 'high'}
+      key={graphicsLevel}
       onGameOver={handleGameOver} 
-      lowGraphics={lowGraphics}
+      graphicsLevel={graphicsLevel}
     />;
   }
 
@@ -247,7 +254,7 @@ const Survival: React.FC = () => {
     return (
       <div className="relative w-full h-screen bg-background overflow-hidden">
         <div className="absolute inset-0 z-0" aria-hidden>
-          <HyperspaceStarfield lowGraphics={lowGraphics} />
+          <HyperspaceStarfield lowGraphics={graphicsLevel === 'low'} />
         </div>
         
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">

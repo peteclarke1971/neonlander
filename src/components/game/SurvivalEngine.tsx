@@ -40,6 +40,7 @@ import { CountdownOverlay } from "./intro/CountdownOverlay";
 interface Props {
   onGameOver: (data: SurvivalGameOverData) => void;
   lowGraphics?: boolean;
+  graphicsLevel?: 'low' | 'mid' | 'high';
 }
 
 const BASE_HEIGHT = 360;
@@ -60,7 +61,8 @@ const easeInOutCubic = (t: number): number => {
 
 export const SurvivalEngine: React.FC<Props> = ({
   onGameOver, 
-  lowGraphics = false
+  lowGraphics = false,
+  graphicsLevel: graphicsLevelProp
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -672,15 +674,23 @@ export const SurvivalEngine: React.FC<Props> = ({
     // Rotation modifier system (matching main game)
     const rotModConfig: RotationModConfig = DEFAULT_ROTATION_MOD_CONFIG;
     
-    // Performance optimization
+    // Performance optimization — tiered system
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const shouldOptimize = isMobile || lowGraphics;
-    const THRUSTER_PARTICLE_COUNT = shouldOptimize ? 2 : 25;
+    const isIPhone = /iPhone/i.test(navigator.userAgent);
+    const isIPad = isIPadDevice();
+    // Derive effective graphics level from prop or legacy boolean
+    const gfxLevel = graphicsLevelProp ?? (lowGraphics ? 'low' : 'high');
+    const isLowGfx = gfxLevel === 'low';
+    // shouldOptimize: used for non-thruster visuals (stars, debris, explosions etc)
+    const shouldOptimize = isLowGfx;
+    // iPhone/iPad mid or high gfx gets a boosted thruster tier
+    const isMobileHighGfx = (isIPhone || isIPad) && !isLowGfx;
+    const THRUSTER_PARTICLE_COUNT = isLowGfx ? 2 : isMobileHighGfx ? 12 : 25;
     
     // World width for spatial audio (3 chunks visible at once)
     const WORLD_WIDTH = CHUNK_WIDTH * 3;
     
-    const dprInit = shouldOptimize ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const dprInit = (isLowGfx || isMobileHighGfx) ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const getViewWidth = () => c.width / dprInit;
     const getViewHeight = () => c.height / dprInit;
     
@@ -1587,8 +1597,8 @@ export const SurvivalEngine: React.FC<Props> = ({
             
             audio.current.setThruster(1);
             
-            // Spawn thruster particles (matching main game)
-            const nozzlePositions = shouldOptimize ? [
+            // Spawn thruster particles — tiered per device
+            const nozzlePositions = isLowGfx ? [
               { x: shipX - Math.sin(shipAngle) * 10, y: shipY + Math.cos(shipAngle) * 10 }
             ] : [
               // Center nozzle
@@ -1602,12 +1612,14 @@ export const SurvivalEngine: React.FC<Props> = ({
             for (const nozzle of nozzlePositions) {
               const particlesPerNozzle = Math.ceil(THRUSTER_PARTICLE_COUNT / nozzlePositions.length);
               for (let i = 0; i < particlesPerNozzle; i++) {
-                const angleSpread = shouldOptimize ? 0.6 : 1.6;
+                const angleSpread = isLowGfx ? 0.6 : isMobileHighGfx ? 1.2 : 1.6;
                 const pa = shipAngle + (Math.random() - 0.5) * angleSpread + Math.PI;
-                const sp = shouldOptimize ? 
+                const sp = isLowGfx ? 
                   (60 + Math.random() * 120) : 
+                  isMobileHighGfx ?
+                  (80 + Math.random() * 180) :
                   (100 + Math.random() * 200);
-                const lifespan = shouldOptimize ? 0.5 : 1.6;
+                const lifespan = isLowGfx ? 0.5 : isMobileHighGfx ? 1.2 : 1.6;
                 
                 thrusterParticles.push({
                   x: nozzle.x,
@@ -2452,7 +2464,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       }
       
       // Limit thruster particles for performance
-      const maxThrusterParticles = shouldOptimize ? 30 : 300;
+      const maxThrusterParticles = isLowGfx ? 30 : isMobileHighGfx ? 150 : 300;
       if (thrusterParticles.length > maxThrusterParticles) {
         thrusterParticles.splice(0, thrusterParticles.length - maxThrusterParticles);
       }
@@ -3284,16 +3296,40 @@ export const SurvivalEngine: React.FC<Props> = ({
         });
       }
       
-      // Draw thruster particles
+      // Draw thruster particles — tiered rendering
+      ctx.shadowBlur = 0;
       for (const p of thrusterParticles) {
         const t = p.life / p.max;
         const alpha = 1 - t;
-        const size = shouldOptimize ? 1.5 : (3 - t * 2);
         const particleHue = classicColorsMode.current ? styles.getPropertyValue('--neon') : `${currentPalette.hue}, ${currentPalette.saturation}%, ${currentPalette.lightness}%`;
-        ctx.fillStyle = `hsla(${particleHue}, ${alpha})`;
-        ctx.shadowColor = neonColor;
-        ctx.shadowBlur = shouldOptimize ? 0 : 6;
-        ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+        
+        if (isMobileHighGfx) {
+          // Velocity-trail lines for iPhone/iPad high-gfx — spectacular without shadowBlur cost
+          const trailLen = 0.15;
+          const lineW = 1.8 * (1 - t);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - p.vx * trailLen, p.y - p.vy * trailLen);
+          ctx.strokeStyle = `hsla(${particleHue}, ${alpha})`;
+          ctx.lineWidth = lineW;
+          ctx.stroke();
+          // Head dot
+          const headSize = 2.5 * (1 - t);
+          ctx.fillStyle = `hsla(${particleHue}, ${Math.min(1, alpha * 1.3)})`;
+          ctx.fillRect(p.x - headSize / 2, p.y - headSize / 2, headSize, headSize);
+        } else if (isLowGfx) {
+          // Minimal dots for low-gfx
+          ctx.fillStyle = `hsla(${particleHue}, ${alpha})`;
+          ctx.fillRect(p.x - 0.75, p.y - 0.75, 1.5, 1.5);
+        } else {
+          // Full desktop rendering with glow
+          const size = 3 - t * 2;
+          ctx.fillStyle = `hsla(${particleHue}, ${alpha})`;
+          ctx.shadowColor = neonColor;
+          ctx.shadowBlur = 6;
+          ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+          ctx.shadowBlur = 0;
+        }
       }
       
       // Draw enhanced shockwaves (multiple concentric rings with gradient)
