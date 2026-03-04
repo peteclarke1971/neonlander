@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { HyperspaceStarfield, HyperspaceStarfieldHandle } from './HyperspaceStarfield';
 import { AsteroidField, AsteroidFieldHandle } from './AsteroidField';
-import { VectorWormhole, VectorWormholeHandle } from './VectorWormhole';
+import { VectorWormhole, VectorWormholeHandle } from './VectorWormhole'; // kept as backup
+import { VectorWormholeLite, VectorWormholeLiteHandle } from './VectorWormholeLite';
 
 export type TransitionType = 
   | "hyperspace-jump"
@@ -37,7 +38,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
 
     const starfieldRef = useRef<HyperspaceStarfieldHandle>(null);
     const asteroidRef = useRef<AsteroidFieldHandle>(null);
-    const wormholeRef = useRef<VectorWormholeHandle>(null);
+    const wormholeRef = useRef<VectorWormholeLiteHandle>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const onCompleteRef = useRef<(() => void) | null>(null);
@@ -73,8 +74,7 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
         } else if (type === "asteroid-blast") {
           asteroidRef.current?.SetSeed(Math.random() * 0xffffffff);
         } else if (type === "wormhole-portal") {
-          wormholeRef.current?.SetSeed(Math.random() * 0xffffffff);
-          wormholeRef.current?.Play("warp-in");
+          wormholeRef.current?.Play();
         }
 
         // Kick off the single RAF loop
@@ -272,10 +272,9 @@ export const GameTransition = forwardRef<GameTransitionHandle, GameTransitionPro
 
         {/* Wormhole Portal */}
         {currentTransition === "wormhole-portal" && (
-          <VectorWormhole
+          <VectorWormholeLite
             ref={wormholeRef}
             active={true}
-            preset="Wormhole"
             loop={false}
             className="w-full h-full"
           />
