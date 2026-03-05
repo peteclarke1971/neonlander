@@ -3954,9 +3954,9 @@ export const SurvivalEngine: React.FC<Props> = ({
     <div ref={containerRef} className="relative w-full h-screen bg-background overflow-hidden">
       <canvas ref={canvasRef} className="absolute inset-0" />
       
-      {isTouch && (
+      {(isTouch || isIPadDevice()) && (
         <div
-          className="absolute inset-0 z-10 select-none"
+          className="absolute inset-0 z-10 touch-none select-none"
           onTouchStart={(e) => { 
             e.preventDefault(); 
             if (e.touches.length > 0 && !paused) { 
@@ -4029,7 +4029,7 @@ export const SurvivalEngine: React.FC<Props> = ({
       {/* Touch Controls - Only show if not using PC controls */}
       {!isUsingPCControls && (
         <div 
-          className="absolute z-20 flex items-end justify-between gap-3 select-none"
+          className="absolute z-20 flex items-end justify-between gap-3 select-none pointer-events-none"
           style={{ 
             bottom: `${32 + (parseInt(localStorage.getItem('ll-touch-controls-offset-y') || '0') || 0)}px`,
             left: `${16 + (parseInt(localStorage.getItem('ll-touch-controls-offset-x') || '0') || 0)}px`,
@@ -4041,8 +4041,8 @@ export const SurvivalEngine: React.FC<Props> = ({
         >
           <div className="flex gap-2">
             <Button 
-              variant="outline" 
-              className="select-none font-['Orbitron']"
+              variant="neon" 
+              className="select-none pointer-events-auto font-['Orbitron'] text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none"
               onMouseDown={() => (keys.current.left = true)} 
               onMouseUp={() => (keys.current.left = false)} 
               onMouseLeave={() => (keys.current.left = false)}
@@ -4050,11 +4050,11 @@ export const SurvivalEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.left = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.left = false; }}
             >
-              <span className="select-none flex items-center justify-center">Rotate ◄</span>
+              <span className="select-none flex items-center justify-center">◄</span>
             </Button>
             <Button 
-              variant="outline" 
-              className="select-none font-['Orbitron']"
+              variant="neon" 
+              className="select-none pointer-events-auto font-['Orbitron'] text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none"
               onMouseDown={() => (keys.current.right = true)} 
               onMouseUp={() => (keys.current.right = false)} 
               onMouseLeave={() => (keys.current.right = false)}
@@ -4062,7 +4062,19 @@ export const SurvivalEngine: React.FC<Props> = ({
               onTouchEnd={(e) => { e.preventDefault(); keys.current.right = false; }}
               onTouchCancel={(e) => { e.preventDefault(); keys.current.right = false; }}
             >
-              <span className="select-none flex items-center justify-center">Rotate ►</span>
+              <span className="select-none flex items-center justify-center">►</span>
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="select-none pointer-events-auto font-['Orbitron'] uppercase"
+              onMouseDown={() => { keys.current.abort = true; abortAssist.current = true; }} 
+              onMouseUp={() => (keys.current.abort = false)} 
+              onMouseLeave={() => (keys.current.abort = false)}
+              onTouchStart={(e) => { e.preventDefault(); keys.current.abort = true; abortAssist.current = true; }} 
+              onTouchEnd={(e) => { e.preventDefault(); keys.current.abort = false; }}
+              onTouchCancel={(e) => { e.preventDefault(); keys.current.abort = false; }}
+            >
+              <span className="select-none">ABORT</span>
             </Button>
           </div>
         </div>
