@@ -1,30 +1,36 @@
 
 
-# Fix Misaligned Thruster Particles in Survival Mode
+# Replicate GameEngine Touch Controls in Survival Mode
 
-## Root Cause
+## Problem
 
-Comparing `SurvivalEngine.tsx` particle code with the working `GameEngine.tsx`:
+SurvivalEngine's touch controls differ from GameEngine in several ways:
+- Uses `variant="outline"` instead of `variant="neon"` (different visual style)
+- No large button mode (`largeRotateButtons`) -- buttons are small text-based
+- Missing the **ABORT button** entirely (abort logic exists but no touch button)
+- Missing `pointer-events-none` on container / `pointer-events-auto` on buttons (the pass-through pattern)
+- Missing `touch-none` class on the thrust overlay
+- Missing `isIPad` check on thrust overlay visibility
 
-| Parameter | GameEngine (works) | SurvivalEngine (broken) |
-|-----------|-------------------|------------------------|
-| Nozzle offset | 10 | 14 (too far below ship) |
-| Trail length factor | 0.03 | 0.15 (5x too long) |
-| Line width | `1.8 + (1-age)*1.0` (2.8→1.8) | `1.8 * (1-t)` (1.8→0, inverts) |
-| Head dot | none | fillRect (adds visual noise) |
+## Changes to `src/components/game/SurvivalEngine.tsx`
 
-The nozzle at 14 places particles well below the visible ship body, and the trail factor of 0.15 (vs GameEngine's 0.03) creates 5x longer trails that visually stretch back into and through the ship -- producing the "mirrored" effect. The line width formula tapering to 0 also makes trails look spiky and scattered.
+1. **Thrust overlay**: Add `touch-none` class and include `isIPad` in the visibility condition (matching GameEngine line 6399)
 
-## Fix
+2. **Touch controls container**: Add `pointer-events-none` class to the wrapper div (matching GameEngine line 6435)
 
-In `SurvivalEngine.tsx`, align the particle system with `GameEngine.tsx`:
+3. **Rotate buttons**: 
+   - Change `variant="outline"` to `variant="neon"`
+   - Add `pointer-events-auto` class
+   - Add large button styling: `text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none`
+   - Change labels from `'Rotate ◄'` / `'Rotate ►'` to just `'◄'` / `'►'`
 
-1. **Nozzle offset**: Change from 14 back to 10 (all 5 nozzle calculations, lines 1601-1609)
-2. **Trail factor**: Change from 0.15 to 0.03 (line 3308)
-3. **Line width**: Change from `1.8 * (1 - t)` to `1.8 + (1 - t) * 1.0` to match GameEngine (line 3309)
-4. **Remove head dot**: Remove the fillRect head dot rendering (lines 3316-3319) -- GameEngine doesn't use one for the line-rendered path
+4. **Add ABORT button** after the rotate buttons (inside the same flex container), matching GameEngine lines 6470-6481:
+   - `variant="destructive"`, `pointer-events-auto`, Orbitron uppercase font
+   - Wire to `keys.current.abort` and `abortAssist.current`
+
+5. **Add `isIPad` detection** if not already present (for thrust overlay condition)
 
 | File | Change |
 |------|--------|
-| `src/components/game/SurvivalEngine.tsx` | Fix nozzle offset (10), trail length (0.03), line width formula, remove head dot |
+| `src/components/game/SurvivalEngine.tsx` | Update touch controls to match GameEngine: neon variant, large buttons, ABORT button, pointer-events pass-through |
 
