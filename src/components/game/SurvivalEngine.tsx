@@ -1438,7 +1438,7 @@ export const SurvivalEngine: React.FC<Props> = ({
               shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
             }
             if (keys.current.right) {
-              shipAngularVel += modifiedRotAccel * dt;
+              shipAngularVel += modifiedRotAccel * digitalRotSensitivity * dt;
             }
           }
           
