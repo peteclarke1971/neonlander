@@ -150,6 +150,7 @@ export default function ControlsSettings() {
     }
   });
   const [rotationSensitivity, setRotationSensitivity] = useState<number>(loadRotationSensitivity);
+  const [analogRotationSensitivity, setAnalogRotationSensitivity] = useState<number>(loadAnalogRotationSensitivity);
   const [musicMuted, setMusicMuted] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-music-muted');
