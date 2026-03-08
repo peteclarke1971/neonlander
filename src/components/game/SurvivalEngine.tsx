@@ -669,6 +669,8 @@ export const SurvivalEngine: React.FC<Props> = ({
     
     // Physics constants matching main game (EASY MODE)
     const GRAVITY = 0.02 * 0.75; // 0.015
+    const digitalRotSensitivity = loadRotationSensitivity();
+    const analogRotSensitivity = loadAnalogRotationSensitivity();
     const ROTATION_ACCEL = 2.2 * 1.15; // Easy mode rotation (base value)
     const THRUST_ACCEL = 9.8 * 0.7; // 6.86
     const FUEL_BURN = 22; // Easy mode fuel consumption
