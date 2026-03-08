@@ -11,6 +11,8 @@ import { anyGamepad, readGamepad, loadProfile, vibrate, getLastDeviceId, setLast
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
 import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
+import { loadRotationSensitivity } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity } from "@/lib/analogRotationSensitivity";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import FireworksDisplay from "./FireworksDisplay";
