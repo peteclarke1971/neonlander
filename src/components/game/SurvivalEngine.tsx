@@ -1435,7 +1435,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           } else {
             // Keyboard rotation controls (only if gyro not active)
             if (keys.current.left) {
-              shipAngularVel -= modifiedRotAccel * dt;
+              shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
             }
             if (keys.current.right) {
               shipAngularVel += modifiedRotAccel * dt;
