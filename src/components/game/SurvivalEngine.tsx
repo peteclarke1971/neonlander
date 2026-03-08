@@ -1382,7 +1382,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Digital rotation (shoulder buttons)
           if (input.buttons.rotateLeft) {
-            shipAngularVel -= modifiedRotAccel * dt;
+            shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
           }
           if (input.buttons.rotateRight) {
             shipAngularVel += modifiedRotAccel * dt;
