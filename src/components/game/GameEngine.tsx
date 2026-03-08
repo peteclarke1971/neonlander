@@ -2122,7 +2122,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!gpLeft && !gpRight) {
             if (Math.abs(input.rotation) > 0.0001) {
-              av += input.rotation * rotAccel * dt;
+              av += input.rotation * analogRotAccel * dt;
             }
           }
           // Pause on rising edge
