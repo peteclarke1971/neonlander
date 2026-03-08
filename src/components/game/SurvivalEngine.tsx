@@ -1385,7 +1385,7 @@ export const SurvivalEngine: React.FC<Props> = ({
             shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
           }
           if (input.buttons.rotateRight) {
-            shipAngularVel += modifiedRotAccel * dt;
+            shipAngularVel += modifiedRotAccel * digitalRotSensitivity * dt;
           }
           
           // Apply thrust from gamepad
