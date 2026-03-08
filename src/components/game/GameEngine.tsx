@@ -1233,7 +1233,10 @@ export const GameEngine: React.FC<Props> = ({
     const fuelConsumption = difficulty === "easy" ? 22 : 30; // units per second at full thrust
     const gravity = 0.02 * 0.75; // unify gravity across difficulties
     const rotSensitivity = loadRotationSensitivity();
-    const rotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15 * rotSensitivity; // 15% quicker rotation * sensitivity
+    const analogRotSensitivity = loadAnalogRotationSensitivity();
+    const baseRotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15; // 15% quicker rotation (base)
+    const rotAccel = baseRotAccel * rotSensitivity; // digital sensitivity
+    const analogRotAccel = baseRotAccel * analogRotSensitivity; // analog sensitivity
     const rotFriction = difficulty === "easy"; // easy: friction stops rotation
 
     let score = initialScore ?? 0;
