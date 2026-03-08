@@ -1431,7 +1431,7 @@ export const SurvivalEngine: React.FC<Props> = ({
           const gyroInput = gyroRotationRef.current;
           if (Math.abs(gyroInput) > 0.05) {
             // Analog gyroscope input with modified acceleration
-            shipAngularVel += gyroInput * modifiedRotAccel * dt * 1.2;
+            shipAngularVel += gyroInput * modifiedRotAccel * analogRotSensitivity * dt * 1.2;
           } else {
             // Keyboard rotation controls (only if gyro not active)
             if (keys.current.left) {
