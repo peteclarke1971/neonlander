@@ -36,6 +36,7 @@ import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { isWaterLevel, isLightningLevel, isCollectionLevel, getStormOccurrence } from "./systems/levelConfig";
 import { loadRotationSensitivity } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity } from "@/lib/analogRotationSensitivity";
 import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
 import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley, isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./systems/medleyConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
