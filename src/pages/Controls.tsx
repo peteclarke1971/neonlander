@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepad, saveProfile, setLastDeviceId } from "@/hooks/use-gamepad";
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
 import { loadRotationSensitivity, saveRotationSensitivity, resetRotationSensitivity, ROTATION_SENSITIVITY_MIN, ROTATION_SENSITIVITY_MAX, ROTATION_SENSITIVITY_DEFAULT } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity, saveAnalogRotationSensitivity, resetAnalogRotationSensitivity, ANALOG_ROTATION_SENSITIVITY_MIN, ANALOG_ROTATION_SENSITIVITY_MAX, ANALOG_ROTATION_SENSITIVITY_DEFAULT } from "@/lib/analogRotationSensitivity";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
