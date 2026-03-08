@@ -11,6 +11,8 @@ import { anyGamepad, readGamepad, loadProfile, vibrate, getLastDeviceId, setLast
 import { updateVolcanoes, drawVolcanoes, checkVolcanoParticleCollision, VolcanoParticle } from "./systems/volcano";
 import { anomalyAccelAt, drawAnomaliesField, Anomaly } from "./systems/anomalies";
 import { DEFAULT_ROTATION_MOD_CONFIG, updateRotationModifier, applyRotationModifier, RotationModConfig } from "./systems/rotationMod";
+import { loadRotationSensitivity } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity } from "@/lib/analogRotationSensitivity";
 import { CursorManager } from "@/lib/cursorManager";
 import { loadCursorConfig } from "@/lib/cursorConfig";
 import FireworksDisplay from "./FireworksDisplay";
@@ -667,6 +669,8 @@ export const SurvivalEngine: React.FC<Props> = ({
     
     // Physics constants matching main game (EASY MODE)
     const GRAVITY = 0.02 * 0.75; // 0.015
+    const digitalRotSensitivity = loadRotationSensitivity();
+    const analogRotSensitivity = loadAnalogRotationSensitivity();
     const ROTATION_ACCEL = 2.2 * 1.15; // Easy mode rotation (base value)
     const THRUST_ACCEL = 9.8 * 0.7; // 6.86
     const FUEL_BURN = 22; // Easy mode fuel consumption
@@ -1373,15 +1377,15 @@ export const SurvivalEngine: React.FC<Props> = ({
           
           // Analog rotation (left stick X-axis)
           if (Math.abs(input.rotation) > 0.05) {
-            shipAngularVel += input.rotation * modifiedRotAccel * dt * 1.2;
+            shipAngularVel += input.rotation * modifiedRotAccel * analogRotSensitivity * dt * 1.2;
           }
           
           // Digital rotation (shoulder buttons)
           if (input.buttons.rotateLeft) {
-            shipAngularVel -= modifiedRotAccel * dt;
+            shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
           }
           if (input.buttons.rotateRight) {
-            shipAngularVel += modifiedRotAccel * dt;
+            shipAngularVel += modifiedRotAccel * digitalRotSensitivity * dt;
           }
           
           // Apply thrust from gamepad
@@ -1427,14 +1431,14 @@ export const SurvivalEngine: React.FC<Props> = ({
           const gyroInput = gyroRotationRef.current;
           if (Math.abs(gyroInput) > 0.05) {
             // Analog gyroscope input with modified acceleration
-            shipAngularVel += gyroInput * modifiedRotAccel * dt * 1.2;
+            shipAngularVel += gyroInput * modifiedRotAccel * analogRotSensitivity * dt * 1.2;
           } else {
             // Keyboard rotation controls (only if gyro not active)
             if (keys.current.left) {
-              shipAngularVel -= modifiedRotAccel * dt;
+              shipAngularVel -= modifiedRotAccel * digitalRotSensitivity * dt;
             }
             if (keys.current.right) {
-              shipAngularVel += modifiedRotAccel * dt;
+              shipAngularVel += modifiedRotAccel * digitalRotSensitivity * dt;
             }
           }
           

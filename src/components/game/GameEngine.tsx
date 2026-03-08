@@ -36,6 +36,7 @@ import { generateCavern, CavernData } from "./cavern";
 import { getCavernSeed } from "./systems/fixedCavernMode";
 import { isWaterLevel, isLightningLevel, isCollectionLevel, getStormOccurrence } from "./systems/levelConfig";
 import { loadRotationSensitivity } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity } from "@/lib/analogRotationSensitivity";
 import { getIntroLevelType, getNextIntroName } from "./systems/levelIntroNames";
 import { getMedleyLevelType, getMedleySeed, getMedleyDifficulty, countNormalLevelsCompleted, getMedleyUFOConfig, shouldSpawnUFOsInMedley, isEarlyMedleyNormalLevel, getMedleyNormalLevelNumber } from "./systems/medleyConfig";
 import { generateWindZones, windAccelAt, drawWindVectors } from "./systems/wind";
@@ -1232,7 +1233,10 @@ export const GameEngine: React.FC<Props> = ({
     const fuelConsumption = difficulty === "easy" ? 22 : 30; // units per second at full thrust
     const gravity = 0.02 * 0.75; // unify gravity across difficulties
     const rotSensitivity = loadRotationSensitivity();
-    const rotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15 * rotSensitivity; // 15% quicker rotation * sensitivity
+    const analogRotSensitivity = loadAnalogRotationSensitivity();
+    const baseRotAccel = (difficulty === "easy" ? 2.2 : 2.8) * 1.15; // 15% quicker rotation (base)
+    const rotAccel = baseRotAccel * rotSensitivity; // digital sensitivity
+    const analogRotAccel = baseRotAccel * analogRotSensitivity; // analog sensitivity
     const rotFriction = difficulty === "easy"; // easy: friction stops rotation
 
     let score = initialScore ?? 0;
@@ -2118,7 +2122,7 @@ export const GameEngine: React.FC<Props> = ({
           
           if (!gpLeft && !gpRight) {
             if (Math.abs(input.rotation) > 0.0001) {
-              av += input.rotation * rotAccel * dt;
+              av += input.rotation * analogRotAccel * dt;
             }
           }
           // Pause on rising edge

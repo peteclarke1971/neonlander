@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { anyGamepad, getLastDeviceId, getPlatformFromId, loadProfile, readGamepad, saveProfile, setLastDeviceId } from "@/hooks/use-gamepad";
 import { loadCursorConfig, saveCursorConfig, CursorConfig, isDesktop } from "@/lib/cursorConfig";
 import { loadRotationSensitivity, saveRotationSensitivity, resetRotationSensitivity, ROTATION_SENSITIVITY_MIN, ROTATION_SENSITIVITY_MAX, ROTATION_SENSITIVITY_DEFAULT } from "@/lib/rotationSensitivity";
+import { loadAnalogRotationSensitivity, saveAnalogRotationSensitivity, resetAnalogRotationSensitivity, ANALOG_ROTATION_SENSITIVITY_MIN, ANALOG_ROTATION_SENSITIVITY_MAX, ANALOG_ROTATION_SENSITIVITY_DEFAULT } from "@/lib/analogRotationSensitivity";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getGlobalAudioManager } from "@/components/game/AudioManager";
@@ -149,6 +150,7 @@ export default function ControlsSettings() {
     }
   });
   const [rotationSensitivity, setRotationSensitivity] = useState<number>(loadRotationSensitivity);
+  const [analogRotationSensitivity, setAnalogRotationSensitivity] = useState<number>(loadAnalogRotationSensitivity);
   const [musicMuted, setMusicMuted] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('ll-music-muted');
@@ -1031,12 +1033,12 @@ export default function ControlsSettings() {
                 </div>
               </div>
             )}
-            {/* Rotation Sensitivity */}
+            {/* Digital Rotation Sensitivity */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <div>
-                  <Label htmlFor="rotsensitivity">Rotation Sensitivity</Label>
-                  <div className="text-xs text-muted-foreground">Adjust digital rotation speed (keyboard/gamepad d-pad)</div>
+                  <Label htmlFor="rotsensitivity">Digital Rotation Sensitivity</Label>
+                  <div className="text-xs text-muted-foreground">Adjust rotation speed for keyboard & gamepad d-pad</div>
                 </div>
                 {rotationSensitivity !== ROTATION_SENSITIVITY_DEFAULT && (
                   <Button
@@ -1067,6 +1069,44 @@ export default function ControlsSettings() {
                   />
                 </div>
                 <span className="text-xs text-muted-foreground">{rotationSensitivity.toFixed(1)}×</span>
+              </div>
+            </div>
+            {/* Analogue Rotation Sensitivity */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <Label htmlFor="analogrotsensitivity">Analogue Rotation Sensitivity</Label>
+                  <div className="text-xs text-muted-foreground">Adjust rotation speed for gamepad analog stick & gyroscope</div>
+                </div>
+                {analogRotationSensitivity !== ANALOG_ROTATION_SENSITIVITY_DEFAULT && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-6 px-2"
+                    onClick={() => {
+                      resetAnalogRotationSensitivity();
+                      setAnalogRotationSensitivity(ANALOG_ROTATION_SENSITIVITY_DEFAULT);
+                    }}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-56">
+                  <Slider
+                    id="analogrotsensitivity"
+                    value={[analogRotationSensitivity]}
+                    min={ANALOG_ROTATION_SENSITIVITY_MIN}
+                    max={ANALOG_ROTATION_SENSITIVITY_MAX}
+                    step={0.1}
+                    onValueChange={([v]) => {
+                      setAnalogRotationSensitivity(v);
+                      saveAnalogRotationSensitivity(v);
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">{analogRotationSensitivity.toFixed(1)}×</span>
               </div>
             </div>
             {!isPlayerMenuMode && (

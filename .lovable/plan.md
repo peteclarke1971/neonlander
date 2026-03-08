@@ -1,42 +1,36 @@
 
 
-# Separate Digital & Analog Rotation Sensitivity Settings
+# Replicate GameEngine Touch Controls in Survival Mode
 
-## Summary
+## Problem
 
-Currently there's a single "Rotation Sensitivity" setting that only applies to digital rotation (keyboard/d-pad) in GameEngine. The analog stick rotation in GameEngine uses `rotAccel` (which includes this sensitivity) but through a different code path. SurvivalEngine doesn't use the sensitivity setting at all.
+SurvivalEngine's touch controls differ from GameEngine in several ways:
+- Uses `variant="outline"` instead of `variant="neon"` (different visual style)
+- No large button mode (`largeRotateButtons`) -- buttons are small text-based
+- Missing the **ABORT button** entirely (abort logic exists but no touch button)
+- Missing `pointer-events-none` on container / `pointer-events-auto` on buttons (the pass-through pattern)
+- Missing `touch-none` class on the thrust overlay
+- Missing `isIPad` check on thrust overlay visibility
 
-This plan creates a new **analog rotation sensitivity** setting alongside the existing one (renamed to "digital"), both defaulting to 1.0.
+## Changes to `src/components/game/SurvivalEngine.tsx`
 
-## Changes
+1. **Thrust overlay**: Add `touch-none` class and include `isIPad` in the visibility condition (matching GameEngine line 6399)
 
-### 1. New file: `src/lib/analogRotationSensitivity.ts`
-- Mirror of `rotationSensitivity.ts` with storage key `ll-analog-rotation-sensitivity`
-- Same range (0.5–2.0), same default (1.0)
-- Export `loadAnalogRotationSensitivity`, `saveAnalogRotationSensitivity`, `resetAnalogRotationSensitivity`, and constants
+2. **Touch controls container**: Add `pointer-events-none` class to the wrapper div (matching GameEngine line 6435)
 
-### 2. `src/lib/rotationSensitivity.ts`
-- No changes needed (this stays as the digital sensitivity)
+3. **Rotate buttons**: 
+   - Change `variant="outline"` to `variant="neon"`
+   - Add `pointer-events-auto` class
+   - Add large button styling: `text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none`
+   - Change labels from `'Rotate ◄'` / `'Rotate ►'` to just `'◄'` / `'►'`
 
-### 3. `src/pages/Controls.tsx`
-- Rename label from "Rotation Sensitivity" → **"Digital Rotation Sensitivity"**
-- Update description to "Adjust rotation speed for keyboard & gamepad d-pad"
-- Add a new **"Analog Rotation Sensitivity"** slider below it with description "Adjust rotation speed for gamepad analog stick & gyroscope"
-- Import the new analog sensitivity functions
-- Add state + slider wiring (same pattern as existing)
+4. **Add ABORT button** after the rotate buttons (inside the same flex container), matching GameEngine lines 6470-6481:
+   - `variant="destructive"`, `pointer-events-auto`, Orbitron uppercase font
+   - Wire to `keys.current.abort` and `abortAssist.current`
 
-### 4. `src/components/game/GameEngine.tsx`
-- Import `loadAnalogRotationSensitivity`
-- Load analog sensitivity alongside digital: `const analogRotSensitivity = loadAnalogRotationSensitivity()`
-- Line ~2121: Change `input.rotation * rotAccel * dt` to use `analogRotSensitivity` instead of the digital sensitivity baked into `rotAccel`. This means computing a separate `analogRotAccel` from the base rotation value × analogSensitivity
-- Digital rotation (line 2375-2376) continues using the existing `rotAccel` (which includes digital sensitivity)
+5. **Add `isIPad` detection** if not already present (for thrust overlay condition)
 
-### 5. `src/components/game/SurvivalEngine.tsx`
-- Import both `loadRotationSensitivity` and `loadAnalogRotationSensitivity`
-- Apply digital sensitivity to keyboard/d-pad rotation paths (lines ~1381, 1384, 1433-1437)
-- Apply analog sensitivity to analog stick rotation (line ~1376) and gyroscope input (line ~1430)
-- Multiply `ROTATION_ACCEL` by respective sensitivity values
-
-### Defaults
-Both settings default to **1.0** — no gameplay change until a player adjusts them.
+| File | Change |
+|------|--------|
+| `src/components/game/SurvivalEngine.tsx` | Update touch controls to match GameEngine: neon variant, large buttons, ABORT button, pointer-events pass-through |
 
