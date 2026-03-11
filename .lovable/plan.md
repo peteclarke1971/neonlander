@@ -1,36 +1,18 @@
 
 
-# Replicate GameEngine Touch Controls in Survival Mode
+# Fix Landing Detection Height in GameEngine
 
 ## Problem
+In GameEngine, collision is detected when `y + 8 >= ground` (line 3398), but the ship is then snapped to `pad.y - 12`. This means the collision triggers when the ship center is at `ground - 8`, then it jumps up to `ground - 12` — a visible 4px upward "bump".
 
-SurvivalEngine's touch controls differ from GameEngine in several ways:
-- Uses `variant="outline"` instead of `variant="neon"` (different visual style)
-- No large button mode (`largeRotateButtons`) -- buttons are small text-based
-- Missing the **ABORT button** entirely (abort logic exists but no touch button)
-- Missing `pointer-events-none` on container / `pointer-events-auto` on buttons (the pass-through pattern)
-- Missing `touch-none` class on the thrust overlay
-- Missing `isIPad` check on thrust overlay visibility
+In SurvivalEngine, collision uses `shipY + 12 >= terrainY` and snaps to `pad.y - 12` — perfectly consistent, no bump.
 
-## Changes to `src/components/game/SurvivalEngine.tsx`
+## Fix
+Change GameEngine line 3398 from `y + 8` to `y + 12` to match SurvivalEngine. This makes collision trigger at the same position it snaps to, eliminating the visual bump.
 
-1. **Thrust overlay**: Add `touch-none` class and include `isIPad` in the visibility condition (matching GameEngine line 6399)
+**One line change:**
+- `src/components/game/GameEngine.tsx` line 3398: `const foot = y + 8` → `const foot = y + 12`
 
-2. **Touch controls container**: Add `pointer-events-none` class to the wrapper div (matching GameEngine line 6435)
-
-3. **Rotate buttons**: 
-   - Change `variant="outline"` to `variant="neon"`
-   - Add `pointer-events-auto` class
-   - Add large button styling: `text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none`
-   - Change labels from `'Rotate ◄'` / `'Rotate ►'` to just `'◄'` / `'►'`
-
-4. **Add ABORT button** after the rotate buttons (inside the same flex container), matching GameEngine lines 6470-6481:
-   - `variant="destructive"`, `pointer-events-auto`, Orbitron uppercase font
-   - Wire to `keys.current.abort` and `abortAssist.current`
-
-5. **Add `isIPad` detection** if not already present (for thrust overlay condition)
-
-| File | Change |
-|------|--------|
-| `src/components/game/SurvivalEngine.tsx` | Update touch controls to match GameEngine: neon variant, large buttons, ABORT button, pointer-events pass-through |
+## Graphics Default
+The game defaults to **Low graphics** (`"low"`) when no setting is saved — see `loadGraphicsSettings()` return on line 33 of `graphicsConfig.ts`.
 
