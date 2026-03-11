@@ -327,7 +327,7 @@ export const GameEngine: React.FC<Props> = ({
   // Timer state for speed bonus calculation
   const [timerActive, setTimerActive] = useState(false);
   const timerActiveRef = useRef(false);
-  const timerStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Animation frame ref for proper cleanup
   const rafRef = useRef<number>(0);
