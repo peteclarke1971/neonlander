@@ -3503,9 +3503,9 @@ export const GameEngine: React.FC<Props> = ({
                 // Do NOT end the run here; simply rest on the start pad
             } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
               // successful landing ONLY on cavern end pad
-              y = pad.y - 10;
-              vy = 0; vx = 0; av = 0; angle = 0;
-              const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
+               y = pad.y - 12;
+               vy = 0; vx = 0; av = 0; angle = 0;
+               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
               const applied2x = !!pad.bonus2x;
               if (applied2x) earned *= 2;
