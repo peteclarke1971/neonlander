@@ -4668,9 +4668,9 @@ export const GameEngine: React.FC<Props> = ({
             
             // Draw ship triangle
             ctx.beginPath();
-            ctx.moveTo(0, -8);
-            ctx.lineTo(-6, 6);
-            ctx.lineTo(6, 6);
+            ctx.moveTo(0, -10);
+            ctx.lineTo(-8, 10);
+            ctx.lineTo(8, 10);
             ctx.closePath();
             ctx.stroke();
             
