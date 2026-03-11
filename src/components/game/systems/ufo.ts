@@ -1,6 +1,7 @@
 import type { UFO, UFOBullet, UFOState, UFOSpawnData, UFOEvents, UFOConfig } from "../types/ufo";
 import type { Asteroid, Projectile } from "../types/asteroids";
 import { getScaledConfig, createUFOSeed } from "./ufoConfig";
+import { splitAsteroid } from "./asteroids";
 
 function mulberry32(seed: number) {
   let t = seed >>> 0;
