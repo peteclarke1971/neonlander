@@ -3395,7 +3395,7 @@ export const GameEngine: React.FC<Props> = ({
         } else {
           // Normal terrain collision
           const ground = terrain.getHeightAt(x);
-          const foot = y + 8; // lander foot approximation
+          const foot = y + 12; // lander foot — matches snap offset (pad.y - 12)
           collisionDetected = foot >= ground;
         }
         
