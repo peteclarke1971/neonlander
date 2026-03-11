@@ -3607,7 +3607,7 @@ export const GameEngine: React.FC<Props> = ({
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
             // MEGA! Moving pad landing
             const landedPad = movingPadLanding;
-            y = landedPad.currentPos.y - 8;
+            y = landedPad.currentPos.y - 10;
             vy = landedPad.currentVelocity.y; 
             vx = landedPad.currentVelocity.x; 
             av = 0; angle = 0;
@@ -3695,7 +3695,7 @@ export const GameEngine: React.FC<Props> = ({
                 // Check if landing on correct pad in sequence
                 if (sequencedPad.sequenceNumber === ttState.currentTarget) {
                   // Correct pad! Advance sequence
-                  y = landedPad.y - 8;
+                  y = landedPad.y - 10;
                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   // Award fuel bonus for successful landing
@@ -3784,7 +3784,7 @@ export const GameEngine: React.FC<Props> = ({
                   // Wrong pad - currently just warning, no penalty
                   console.warn("⚠️ Wrong pad! Expected", ttState.currentTarget, "but landed on", sequencedPad.sequenceNumber);
                   // For now, allow takeoff without penalty - could add penalty later
-                  y = landedPad.y - 8;
+                   y = landedPad.y - 10;
                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   if (!hasPlayedLandingSoundRef.current && !isDemo) {
@@ -3802,7 +3802,7 @@ export const GameEngine: React.FC<Props> = ({
               // Regular landing logic (non-time-trial)
               // Regular landing logic (non-time-trial)
               const landedPad = (pad || nearPad)!;
-              y = landedPad.y - 8;
+              y = landedPad.y - 10;
               vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
@@ -4668,9 +4668,9 @@ export const GameEngine: React.FC<Props> = ({
             
             // Draw ship triangle
             ctx.beginPath();
-            ctx.moveTo(0, -8);
-            ctx.lineTo(-6, 6);
-            ctx.lineTo(6, 6);
+            ctx.moveTo(0, -10);
+            ctx.lineTo(-8, 10);
+            ctx.lineTo(8, 10);
             ctx.closePath();
             ctx.stroke();
             
