@@ -321,7 +321,7 @@ export const SurvivalEngine: React.FC<Props> = ({
   const [showFireworks, setShowFireworks] = useState(false);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [landingType, setLandingType] = useState<'regular' | 'moving' | '2x' | 'retro-burst' | null>(null);
-  const fireworkTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const fireworkTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   
   // Terrain-masked fireworks setting
   const [terrainMaskedFireworks] = useState<boolean>(() => {

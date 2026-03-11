@@ -312,7 +312,7 @@ export default function ControlsSettings() {
   const [selectedMusic, setSelectedMusic] = useState<string>("title.mp3");
   const [selectedSFX, setSelectedSFX] = useState<string>("thruster.mp3");
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
-  const loopingSFXRef = useRef<NodeJS.Timeout | null>(null);
+  const loopingSFXRef = useRef<ReturnType<typeof setTimeout> | null>(null);
    
    // Starfield customization settings
    const [starfieldConfig, setStarfieldConfig] = useState<StarfieldConfig>(loadStarfieldConfig);

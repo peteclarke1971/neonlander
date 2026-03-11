@@ -327,7 +327,7 @@ export const GameEngine: React.FC<Props> = ({
   // Timer state for speed bonus calculation
   const [timerActive, setTimerActive] = useState(false);
   const timerActiveRef = useRef(false);
-  const timerStartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Animation frame ref for proper cleanup
   const rafRef = useRef<number>(0);
@@ -605,7 +605,7 @@ export const GameEngine: React.FC<Props> = ({
   const earlyUFODestroyed = useRef(false);
   
   // Mission success 6-second timeout
-  const missionSuccessTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const missionSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // CTRL+F7 dev skip flag
   const devSkipTriggered = useRef(false);
