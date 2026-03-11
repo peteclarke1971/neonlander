@@ -3607,7 +3607,7 @@ export const GameEngine: React.FC<Props> = ({
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
             // MEGA! Moving pad landing
             const landedPad = movingPadLanding;
-            y = landedPad.currentPos.y - 8;
+            y = landedPad.currentPos.y - 10;
             vy = landedPad.currentVelocity.y; 
             vx = landedPad.currentVelocity.x; 
             av = 0; angle = 0;
