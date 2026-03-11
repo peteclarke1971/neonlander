@@ -3784,8 +3784,8 @@ export const GameEngine: React.FC<Props> = ({
                   // Wrong pad - currently just warning, no penalty
                   console.warn("⚠️ Wrong pad! Expected", ttState.currentTarget, "but landed on", sequencedPad.sequenceNumber);
                   // For now, allow takeoff without penalty - could add penalty later
-                   y = landedPad.y - 10;
-                  vy = 0; vx = 0; av = 0; angle = 0;
+                    y = landedPad.y - 12;
+                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   if (!hasPlayedLandingSoundRef.current && !isDemo) {
                     audio.current.landingCrash();
