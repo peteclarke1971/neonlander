@@ -605,7 +605,7 @@ export const GameEngine: React.FC<Props> = ({
   const earlyUFODestroyed = useRef(false);
   
   // Mission success 6-second timeout
-  const missionSuccessTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const missionSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // CTRL+F7 dev skip flag
   const devSkipTriggered = useRef(false);
