@@ -3503,9 +3503,9 @@ export const GameEngine: React.FC<Props> = ({
                 // Do NOT end the run here; simply rest on the start pad
             } else if (pad === cav.endPad && okAngle && okVy && okVx && fuel >= 0) {
               // successful landing ONLY on cavern end pad
-              y = pad.y - 10;
-              vy = 0; vx = 0; av = 0; angle = 0;
-              const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
+               y = pad.y - 12;
+               vy = 0; vx = 0; av = 0; angle = 0;
+               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(pad.multiplier * 150 + finesse));
               const applied2x = !!pad.bonus2x;
               if (applied2x) earned *= 2;
@@ -3607,7 +3607,7 @@ export const GameEngine: React.FC<Props> = ({
           } else if (movingPadLanding && okAngle && okVy && okVx && fuel >= 0) {
             // MEGA! Moving pad landing
             const landedPad = movingPadLanding;
-            y = landedPad.currentPos.y - 10;
+            y = landedPad.currentPos.y - 12;
             vy = landedPad.currentVelocity.y; 
             vx = landedPad.currentVelocity.x; 
             av = 0; angle = 0;
@@ -3695,8 +3695,8 @@ export const GameEngine: React.FC<Props> = ({
                 // Check if landing on correct pad in sequence
                 if (sequencedPad.sequenceNumber === ttState.currentTarget) {
                   // Correct pad! Advance sequence
-                  y = landedPad.y - 10;
-                  vy = 0; vx = 0; av = 0; angle = 0;
+                   y = landedPad.y - 12;
+                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   // Award fuel bonus for successful landing
                   fuel += 25;
@@ -3784,8 +3784,8 @@ export const GameEngine: React.FC<Props> = ({
                   // Wrong pad - currently just warning, no penalty
                   console.warn("⚠️ Wrong pad! Expected", ttState.currentTarget, "but landed on", sequencedPad.sequenceNumber);
                   // For now, allow takeoff without penalty - could add penalty later
-                   y = landedPad.y - 10;
-                  vy = 0; vx = 0; av = 0; angle = 0;
+                    y = landedPad.y - 12;
+                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   if (!hasPlayedLandingSoundRef.current && !isDemo) {
                     audio.current.landingCrash();
@@ -3802,9 +3802,9 @@ export const GameEngine: React.FC<Props> = ({
               // Regular landing logic (non-time-trial)
               // Regular landing logic (non-time-trial)
               const landedPad = (pad || nearPad)!;
-              y = landedPad.y - 10;
-              vy = 0; vx = 0; av = 0; angle = 0;
-              const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
+               y = landedPad.y - 12;
+               vy = 0; vx = 0; av = 0; angle = 0;
+               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
               const applied2x = !!landedPad.bonus2x;
               if (applied2x) earned *= 2;
