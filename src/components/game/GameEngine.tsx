@@ -3695,8 +3695,8 @@ export const GameEngine: React.FC<Props> = ({
                 // Check if landing on correct pad in sequence
                 if (sequencedPad.sequenceNumber === ttState.currentTarget) {
                   // Correct pad! Advance sequence
-                  y = landedPad.y - 10;
-                  vy = 0; vx = 0; av = 0; angle = 0;
+                   y = landedPad.y - 12;
+                   vy = 0; vx = 0; av = 0; angle = 0;
                   
                   // Award fuel bonus for successful landing
                   fuel += 25;
