@@ -3802,7 +3802,7 @@ export const GameEngine: React.FC<Props> = ({
               // Regular landing logic (non-time-trial)
               // Regular landing logic (non-time-trial)
               const landedPad = (pad || nearPad)!;
-              y = landedPad.y - 8;
+              y = landedPad.y - 10;
               vy = 0; vx = 0; av = 0; angle = 0;
               const finesse = Math.floor(200 * (1 - Math.max(Math.abs(vx), Math.abs(vy)) / 2));
               let earned = Math.max(50, Math.floor(landedPad.multiplier * 150 + finesse));
