@@ -30,7 +30,7 @@ export function loadGraphicsSettings(): GraphicsLevel {
       }
     }
   } catch {}
-  return "low"; // Default to low for mobile safety
+  return "high"; // Default to high
 }
 
 /**
