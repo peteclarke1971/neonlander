@@ -1,33 +1,36 @@
 
 
-# Reset Global Ghosts and High Scores
+# Replicate GameEngine Touch Controls in Survival Mode
 
-## What we'll do
+## Problem
 
-### 1. Delete ghost records (keep only timetrial)
-Delete all rows from `ghost_records` where `mode != 'timetrial'`. This removes fixed and medley ghosts so new players can set their own.
+SurvivalEngine's touch controls differ from GameEngine in several ways:
+- Uses `variant="outline"` instead of `variant="neon"` (different visual style)
+- No large button mode (`largeRotateButtons`) -- buttons are small text-based
+- Missing the **ABORT button** entirely (abort logic exists but no touch button)
+- Missing `pointer-events-none` on container / `pointer-events-auto` on buttons (the pass-through pattern)
+- Missing `touch-none` class on the thrust overlay
+- Missing `isIPad` check on thrust overlay visibility
 
-### 2. Reset global high scores
-Delete ALL rows from `scores`, then insert exactly 5 seed entries per mode (classic, fixed, medley, survival). Timetrial scores will also be preserved by re-inserting them after reading.
+## Changes to `src/components/game/SurvivalEngine.tsx`
 
-Seed scores per mode:
-| Rank | Initials | Score |
-|------|----------|-------|
-| 1 | IH | 75,000 |
-| 2 | EWC | 50,000 |
-| 3 | PHI | 30,000 |
-| 4 | FAD | 15,000 |
-| 5 | LUM | 7,500 |
+1. **Thrust overlay**: Add `touch-none` class and include `isIPad` in the visibility condition (matching GameEngine line 6399)
 
-### 3. Preserve timetrial scores
-Read existing timetrial scores before deletion, then re-insert them.
+2. **Touch controls container**: Add `pointer-events-none` class to the wrapper div (matching GameEngine line 6435)
 
-### Implementation
-All done via database data operations (insert tool) — no code changes needed. The `No deletes allowed` RLS policy on scores uses `RESTRICTIVE` with `false`, which blocks deletes via the client. We'll need a temporary migration to delete and re-seed, or use the insert tool which bypasses RLS.
+3. **Rotate buttons**: 
+   - Change `variant="outline"` to `variant="neon"`
+   - Add `pointer-events-auto` class
+   - Add large button styling: `text-5xl px-8 py-9 min-w-[80px] flex items-center justify-center leading-none`
+   - Change labels from `'Rotate ◄'` / `'Rotate ►'` to just `'◄'` / `'►'`
 
-**Steps:**
-1. Read timetrial scores to preserve
-2. Delete all non-timetrial ghost records
-3. Delete all non-timetrial scores
-4. Insert 5 seed rows × 4 modes (classic, fixed, medley, survival) = 20 rows
+4. **Add ABORT button** after the rotate buttons (inside the same flex container), matching GameEngine lines 6470-6481:
+   - `variant="destructive"`, `pointer-events-auto`, Orbitron uppercase font
+   - Wire to `keys.current.abort` and `abortAssist.current`
+
+5. **Add `isIPad` detection** if not already present (for thrust overlay condition)
+
+| File | Change |
+|------|--------|
+| `src/components/game/SurvivalEngine.tsx` | Update touch controls to match GameEngine: neon variant, large buttons, ABORT button, pointer-events pass-through |
 
