@@ -1,66 +1,60 @@
 
-The user is asking two related questions:
 
-1. **Do we need to wait for a tap?** — Yes, browsers/iOS require a user gesture before audio can play. There's no way around this on the web (or in a Capacitor WebView). However, the tap doesn't have to be an *explicit* "tap to start" screen — any user interaction works (clicking Play, navigating menus, etc.). The current setup already piggybacks on existing taps (HomeScreen, PlayerMenu, Controls), so no extra "tap to enable audio" prompt is needed. That's good.
+## Diagnosis
 
-2. **Can we hardcode all audio mappings from Supabase?** — Yes. The `audioConfigService` already has an `exportAsTypeScript()` method that generates a fully-baked `defaultAudioConfig.ts`. We can:
-   - Pull the current `audio_config` + `audio_library` rows from Supabase for all 3 soundtracks (default/retro, modern, hidden)
-   - Generate a complete `defaultAudioConfig.ts` with all paths/volumes baked in
-   - Add a `skipCloudFetch` flag (already mentioned in memory) so `audioConfigService.loadConfig()` returns the bundled defaults *synchronously* without ever hitting Supabase
-   - This eliminates the Supabase round-trip on iOS startup entirely → faster, more reliable audio, works fully offline
+You confirmed the smoking gun: synthesized fallback sounds (oscillators / white noise via `playNoise`) play fine in TestFlight, but every MP3-backed sound and music track is silent. That tells us:
 
-This is the ideal solution for the iOS native build.
+- The AudioContext IS unlocking and running on iOS.
+- The user-gesture chain IS intact.
+- The problem is **specifically loading the audio files**.
 
-Let me check the current state of defaultAudioConfig and audioConfigService to confirm the export structure.
+Looking at `AudioManager.loadBuffer()`:
 
-## Plan
+```ts
+private async loadBuffer(url: string): Promise<AudioBuffer | null> {
+  this.ensureCtx();
+  if (!this.ctx) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const arr = await res.arrayBuffer();
+    return await this.ctx.decodeAudioData(arr);
+  } catch {
+    return null;            // <— silently swallows ALL errors
+  }
+}
+```
 
-### Question 1: Do we need to wait for a tap?
+In Capacitor iOS the WebView serves files from `capacitor://localhost`. WKWebView's `fetch()` is well-known to misbehave on local binary assets — it can return empty/malformed `ArrayBuffer`s for MP3s, causing `decodeAudioData` to reject. The blanket `catch` then sets every buffer to `null`, every `playOneShot` skips, and the synth fallbacks play instead. Exactly what you're seeing.
 
-**Yes — but no extra prompt is needed.** iOS WebView (and all browsers) require audio to start inside a user gesture. The good news: the existing taps on HomeScreen, PlayerMenu, and Controls already satisfy this — `unlockSync()` runs on those taps. No "tap to enable sound" overlay required. Audio simply won't play *before* the first tap, which is the platform rule, not something we can bypass.
+## Fix plan
 
-### Question 2: Hardcode all audio mappings — yes, fully feasible
+### 1. Replace `loadBuffer` with a robust 3-tier loader
 
-We'll bake the current Supabase config into `defaultAudioConfig.ts` for all 3 soundtracks, and add a flag to skip cloud fetches entirely.
+Try in order:
+1. `XMLHttpRequest` with `responseType: 'arraybuffer'` (works reliably on WKWebView for local assets)
+2. `fetch()` (web/PWA fallback)
+3. Log any failure with the URL + error so it's visible in Xcode console
 
-### Steps
+This single change should restore all SFX and music in the iOS build.
 
-1. **Pull current config from Supabase** (read-only query) — fetch all rows from `audio_config` joined with `audio_library` for `default`, `retro`, `modern`, and `hidden` soundtracks. This gives the path + volume for every event_key.
+### 2. Add a diagnostic logger
+Replace the silent `catch {}` with `console.error('[audio] failed to load', url, err)`. In production builds these are stripped, but warn/error survive enough for native debugging via Safari Web Inspector when attached to the device.
 
-2. **Rewrite `src/lib/defaultAudioConfig.ts`** to contain a `BAKED_AUDIO_CONFIGS` map keyed by soundtrack:
-   ```ts
-   export const BAKED_AUDIO_CONFIGS: Record<SoundtrackType, AudioConfig> = {
-     default: { music: {...}, sfx: {...} },
-     retro:   { music: {...}, sfx: {...} },
-     modern:  { music: {...}, sfx: {...} },
-     hidden:  { music: {...}, sfx: {...} },
-   };
-   ```
-   All 61 music + 38 SFX entries baked in with the exact paths currently in Supabase.
+### 3. Ensure file paths resolve correctly under capacitor://
+Use `new URL(path, document.baseURI).toString()` inside `loadBuffer` so relative `/audio/foo.mp3` resolves to `capacitor://localhost/audio/foo.mp3` rather than a malformed URL.
 
-3. **Add `SKIP_CLOUD_AUDIO_FETCH` flag** (default: `true`) at the top of `audioConfigService.ts`.
-
-4. **Modify `audioConfigService.loadConfig()`** so when the flag is true:
-   - Return `BAKED_AUDIO_CONFIGS[this.soundtrack]` synchronously (wrapped in `Promise.resolve` to keep the async signature)
-   - Never hit Supabase
-   - Never `await` anything network-related during gameplay
-
-5. **Keep the Audio Settings page working** — it can still read from cloud (for browsing the library) but the *game itself* uses the baked config. The Audio Settings export-to-TypeScript button still works for future re-bakes.
-
-6. **Result**:
-   - No Supabase calls during gameplay → iOS audio unlock is rock-solid
-   - Works fully offline (great for native iOS / TestFlight)
-   - Faster startup (no network round-trip)
-   - To update audio later: change Supabase, then ask me to "re-bake the audio config" and I'll regenerate the file
+### 4. Optional safety net for music
+For long music files, fall back to an `HTMLAudioElement`-based player (via `MediaElementAudioSourceNode`) if `decodeAudioData` still fails. `<audio>` uses iOS's native media pipeline and handles streaming MP3s reliably even when WebAudio decode can't.
 
 ### Files affected
+- `src/components/game/AudioManager.ts` — rewrite `loadBuffer` with XHR-first strategy + URL resolution + error logging.
 
-- `src/lib/defaultAudioConfig.ts` — replace with baked config for all 4 soundtrack variants
-- `src/lib/audioConfigService.ts` — add `SKIP_CLOUD_AUDIO_FETCH` flag and short-circuit `loadConfig()`
+### What this does NOT change
+- The baked Supabase config (kept).
+- The synchronous `unlockSync()` gesture handling (kept).
+- Public web build behavior (XHR works fine in browsers too, fetch fallback covers any edge case).
 
-### Notes
+### Expected outcome
+After rebuild + TestFlight: all SFX (thruster, crash, intro tick/go, comet, UFO loops) and music (title, level, endless, mission success) start playing normally on iOS native.
 
-- The current `DEFAULT_AUDIO_CONFIG` only covers one soundtrack. We'll expand it to a per-soundtrack map.
-- Audio Settings page will still function (it reads `audio_library` directly for the browser UI).
-- If you ever want to switch back to live cloud config, flip `SKIP_CLOUD_AUDIO_FETCH = false`.
-- I'll need to run the Supabase read query during implementation to get the actual paths/volumes.
