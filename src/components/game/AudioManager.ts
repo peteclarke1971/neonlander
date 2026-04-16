@@ -279,15 +279,98 @@ export class AudioManager {
     if (this.ctx && this.ctx.state === "running") this.ctx.suspend();
   }
 
+  private fetchArrayBufferXHR(absoluteUrl: string): Promise<ArrayBuffer | null> {
+    return new Promise((resolve) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', absoluteUrl, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = () => {
+          // Capacitor capacitor:// scheme often returns status 0 on success
+          const ok = (xhr.status >= 200 && xhr.status < 300) || xhr.status === 0;
+          if (ok && xhr.response && (xhr.response as ArrayBuffer).byteLength > 0) {
+            resolve(xhr.response as ArrayBuffer);
+          } else {
+            console.error('[audio] XHR bad response', absoluteUrl, 'status=', xhr.status, 'len=', xhr.response?.byteLength);
+            resolve(null);
+          }
+        };
+        xhr.onerror = () => {
+          console.error('[audio] XHR error', absoluteUrl);
+          resolve(null);
+        };
+        xhr.send();
+      } catch (e) {
+        console.error('[audio] XHR threw', absoluteUrl, e);
+        resolve(null);
+      }
+    });
+  }
+
   private async loadBuffer(url: string): Promise<AudioBuffer | null> {
     this.ensureCtx();
     if (!this.ctx) return null;
+
+    // Resolve to absolute URL so Capacitor's capacitor://localhost origin is used correctly
+    let absoluteUrl = url;
     try {
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const arr = await res.arrayBuffer();
-      return await this.ctx.decodeAudioData(arr);
-    } catch {
+      absoluteUrl = new URL(url, document.baseURI).toString();
+    } catch (e) {
+      console.error('[audio] URL resolve failed', url, e);
+    }
+
+    // Tier 1: XHR (most reliable on iOS WKWebView for local binary assets)
+    let arr: ArrayBuffer | null = await this.fetchArrayBufferXHR(absoluteUrl);
+
+    // Tier 2: fetch() fallback (web/PWA)
+    if (!arr) {
+      try {
+        const res = await fetch(absoluteUrl);
+        if (res.ok) {
+          arr = await res.arrayBuffer();
+        } else {
+          console.error('[audio] fetch not ok', absoluteUrl, res.status);
+        }
+      } catch (e) {
+        console.error('[audio] fetch threw', absoluteUrl, e);
+      }
+    }
+
+    if (!arr || arr.byteLength === 0) {
+      console.error('[audio] no data for', absoluteUrl);
+      return null;
+    }
+
+    // Decode — use callback form for older iOS Safari/WKWebView compatibility
+    try {
+      return await new Promise<AudioBuffer | null>((resolve) => {
+        const ctx = this.ctx!;
+        try {
+          const p = ctx.decodeAudioData(
+            arr!,
+            (buf) => resolve(buf),
+            (err) => {
+              console.error('[audio] decodeAudioData error (cb)', absoluteUrl, err);
+              resolve(null);
+            }
+          );
+          // Some implementations return a Promise as well
+          if (p && typeof (p as Promise<AudioBuffer>).then === 'function') {
+            (p as Promise<AudioBuffer>).then(
+              (buf) => resolve(buf),
+              (err) => {
+                console.error('[audio] decodeAudioData error (promise)', absoluteUrl, err);
+                resolve(null);
+              }
+            );
+          }
+        } catch (e) {
+          console.error('[audio] decodeAudioData threw', absoluteUrl, e);
+          resolve(null);
+        }
+      });
+    } catch (e) {
+      console.error('[audio] decode wrapper threw', absoluteUrl, e);
       return null;
     }
   }
