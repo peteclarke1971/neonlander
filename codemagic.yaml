@@ -1,0 +1,72 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 120
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      groups:
+        - default
+      vars:
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+        BUNDLE_ID: "com.peteclarke.neonlander"
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Build web app
+        script: npm run build
+      - name: Install Capacitor CLI
+        script: npm install -g @capacitor/cli
+      - name: Add iOS platform
+        script: npx cap add ios
+      - name: Set up app icon
+        script: |
+          ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          sips -z 1024 1024 public/icon-512.png --out "$ICON_DIR/AppIcon.png"
+          cat > "$ICON_DIR/Contents.json" << 'ICONEOF'
+          {
+            "images" : [
+              {
+                "filename" : "AppIcon.png",
+                "idiom" : "universal",
+                "platform" : "ios",
+                "size" : "1024x1024"
+              }
+            ],
+            "info" : {
+              "author" : "xcode",
+              "version" : 1
+            }
+          }
+          ICONEOF
+      - name: Add encryption compliance to Info.plist
+        script: /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool NO" ios/App/App/Info.plist
+      - name: Capacitor sync
+        script: npx cap sync ios
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch signing files from Apple
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key @env:CM_CERTIFICATE_PRIVATE_KEY \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build ipa
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --disable-xcpretty
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
