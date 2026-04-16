@@ -120,7 +120,16 @@ class AudioConfigService {
     if (this.configLoaded && this.config) {
       return this.config;
     }
-    
+
+    // Fast path: use baked config and never touch the network.
+    // Critical for iOS — preserves the user-gesture chain for audio unlock.
+    if (SKIP_CLOUD_AUDIO_FETCH) {
+      const baked = BAKED_AUDIO_CONFIGS[this.soundtrack] ?? DEFAULT_AUDIO_CONFIG;
+      this.config = structuredClone(baked);
+      this.configLoaded = true;
+      return this.config;
+    }
+
     if (this.loadPromise) {
       return this.loadPromise;
     }
