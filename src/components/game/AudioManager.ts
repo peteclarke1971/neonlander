@@ -214,24 +214,63 @@ export class AudioManager {
     }
   }
 
+  /**
+   * SYNCHRONOUS unlock — MUST be called inside a user gesture handler
+   * (pointerdown/touchstart/click/keydown) BEFORE any await statements.
+   *
+   * On iOS WebView (Safari + Capacitor), audio playback is permitted only
+   * inside the synchronous tick of a user gesture. Any `await` between the
+   * gesture and the AudioContext / buffer playback breaks the gesture
+   * provenance and audio fails silently. This method:
+   *   1. Creates the AudioContext synchronously
+   *   2. Calls ctx.resume() (fire-and-forget — promise not awaited here)
+   *   3. Plays a 1-sample silent buffer to fully unlock iOS audio
+   * All in the same synchronous tick. Safe to call from any gesture handler.
+   */
+  unlockSync(): void {
+    this.ensureCtx();
+    if (!this.ctx) return;
+    // Fire-and-forget resume — DO NOT await. iOS WebView only honours the
+    // gesture if playback is queued in the same synchronous tick.
+    if (this.ctx.state === 'suspended') {
+      try { this.ctx.resume(); } catch (e) { console.warn("AudioContext resume failed:", e); }
+    }
+    // Always play the silent unlock buffer on iOS until we confirm running.
+    const isIOS = navigator.userAgent.includes('iPhone') ||
+                  navigator.userAgent.includes('iPad') ||
+                  // iPad on iPadOS 13+ reports as Mac with touch
+                  (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+    if (isIOS && !this._iosUnlocked) {
+      try { this.playUnlockBuffer(); } catch {}
+      // We optimistically mark unlocked; subsequent calls re-check state
+      if (this.ctx.state === 'running') {
+        this._iosUnlocked = true;
+      }
+    }
+  }
+
+  /**
+   * Async resume — safe to call from non-gesture contexts (e.g. setTimeout,
+   * after an await). For first-touch gesture handlers, prefer unlockSync()
+   * and call this only AFTER unlockSync() to await the resume promise.
+   */
   async resume(): Promise<void> {
     this.ensureCtx();
-    if (this.ctx) {
-      if (this.ctx.state === "suspended") {
-        try {
-          await this.ctx.resume();
-        } catch (e) {
-          console.warn("AudioContext resume failed:", e);
-        }
+    if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      try {
+        await this.ctx.resume();
+      } catch (e) {
+        console.warn("AudioContext resume failed:", e);
       }
-      // iOS sometimes needs a tiny silent buffer played to truly unlock
-      // Retry until context is actually running (first attempt often fails if called too early)
-      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-      if (isIOS && (!this._iosUnlocked || this.ctx.state === 'suspended')) {
-        this.playUnlockBuffer();
-        if (this.ctx.state === 'running') {
-          this._iosUnlocked = true;
-        }
+    }
+    const isIOS = navigator.userAgent.includes('iPhone') ||
+                  navigator.userAgent.includes('iPad') ||
+                  (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document);
+    if (isIOS && (!this._iosUnlocked || this.ctx.state === 'suspended')) {
+      try { this.playUnlockBuffer(); } catch {}
+      if (this.ctx.state === 'running') {
+        this._iosUnlocked = true;
       }
     }
   }
