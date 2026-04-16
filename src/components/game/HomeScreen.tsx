@@ -549,6 +549,11 @@ export const HomeScreen: React.FC<Props> = ({
     // Attempt immediately (will be ignored by browsers that require gesture)
     tryStart();
     const startOnInteract = () => {
+      // CRITICAL FOR iOS / CAPACITOR: unlock audio SYNCHRONOUSLY inside the
+      // user-gesture tick BEFORE any await/promise chain. iOS WebView only
+      // honours the gesture if AudioContext + silent unlock buffer happen in
+      // the same synchronous tick as the touch/click event.
+      audioRef.current.unlockSync();
       tryStart();
       // Preload all sound effects on first user interaction for instant playback
       audioRef.current.preloadSFX();
