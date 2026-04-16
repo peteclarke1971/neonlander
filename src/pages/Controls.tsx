@@ -792,7 +792,8 @@ export default function ControlsSettings() {
     const audio = audioManagerRef.current;
     if (!audio) return;
     
-    audio.resume();
+    // iOS / Capacitor: synchronous unlock inside the click gesture tick.
+    audio.unlockSync();
     
     // Stop any looping SFX
     if (loopingSFXRef.current) {
