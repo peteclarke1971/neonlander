@@ -11,6 +11,12 @@ workflows:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.peteclarke.neonlander"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -46,6 +52,8 @@ workflows:
         script: /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool NO" ios/App/App/Info.plist
       - name: Capacitor sync
         script: npx cap sync ios
+      - name: Set build number
+        script: /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/App/App/Info.plist
       - name: Initialize keychain
         script: keychain initialize
       - name: Fetch signing files from Apple
