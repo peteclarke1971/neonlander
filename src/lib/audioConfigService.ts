@@ -8,9 +8,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from './logger';
-import { 
-  DEFAULT_AUDIO_CONFIG, 
-  type AudioConfig, 
+import {
+  DEFAULT_AUDIO_CONFIG,
+  BAKED_AUDIO_CONFIGS,
+  type AudioConfig,
   type SoundtrackType,
   type MusicEventKey,
   type SfxEventKey,
@@ -18,6 +19,14 @@ import {
   MUSIC_EVENT_KEYS,
   SFX_EVENT_KEYS,
 } from './defaultAudioConfig';
+
+/**
+ * When true, the game uses the BAKED audio config and never hits Supabase
+ * during gameplay. This is essential for iOS Capacitor builds where any
+ * `await` between a user gesture and audio.play() breaks the gesture chain
+ * and silently disables sound. Flip to `false` to re-enable live cloud config.
+ */
+const SKIP_CLOUD_AUDIO_FETCH = true;
 
 interface AudioLibraryRow {
   id: string;
@@ -111,7 +120,16 @@ class AudioConfigService {
     if (this.configLoaded && this.config) {
       return this.config;
     }
-    
+
+    // Fast path: use baked config and never touch the network.
+    // Critical for iOS — preserves the user-gesture chain for audio unlock.
+    if (SKIP_CLOUD_AUDIO_FETCH) {
+      const baked = BAKED_AUDIO_CONFIGS[this.soundtrack] ?? DEFAULT_AUDIO_CONFIG;
+      this.config = structuredClone(baked);
+      this.configLoaded = true;
+      return this.config;
+    }
+
     if (this.loadPromise) {
       return this.loadPromise;
     }
