@@ -16,8 +16,10 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Install Capacitor CLI
-        script: npm install -g @capacitor/cli
+      - name: Install Capacitor CLI and packages
+        script: |
+          npm install -g @capacitor/cli
+          npm install @capacitor/core @capacitor/ios
       - name: Add iOS platform
         script: npx cap add ios
       - name: Set up app icon
