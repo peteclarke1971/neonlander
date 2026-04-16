@@ -291,6 +291,9 @@ export const PlayerMenu: React.FC<PlayerMenuProps> = ({
     tryStart();
     
     const startOnInteract = () => {
+      // CRITICAL FOR iOS / CAPACITOR: synchronous unlock inside the gesture
+      // tick BEFORE any await/promise. See AudioManager.unlockSync() docs.
+      audioRef.current.unlockSync();
       tryStart();
       if (!musicStartedRef.current) {
         audioRef.current.preloadSFX();
