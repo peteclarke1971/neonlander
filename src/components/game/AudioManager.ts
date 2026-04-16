@@ -298,11 +298,15 @@ export class AudioManager {
       return this.preloadPromise;
     }
 
+    // CRITICAL FOR iOS CAPACITOR: unlock synchronously BEFORE any await.
+    // If this method is called from a user gesture handler, the unlock
+    // must happen in the same tick. We tolerate it being called from a
+    // non-gesture context too (it's a no-op then on iOS).
+    this.unlockSync();
+
     this.preloadPromise = (async () => {
-      // Ensure config is loaded first
+      // Now safe to await — the AudioContext is already created/unlocked.
       await this.initializeConfig();
-      
-      // Ensure context is resumed before loading
       await this.resume();
       this.ensureCtx();
       if (!this.ctx) return;
